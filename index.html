@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小蛇 ♡ 小奚 甜蜜记</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Nunito:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #b5737a;
+            --primary-light: #d4a0a8;
+            --gold: #c9a970;
+            --bg: #fdf8f6;
+            --text: #4a3535;
+            --text-muted: #a08888;
+            --card: rgba(255, 252, 250, 0.9);
+            --border: rgba(200, 155, 155, 0.22);
+            --shadow: rgba(180, 120, 120, 0.13);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            color: var(--text);
+            min-height: 100vh;
+            padding: 30px 16px 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        /* ── 樱花粒子 canvas ── */
+        #sakura-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 620px;
+            width: 100%;
+        }
+
+        /* ── 头部 ── */
+        .site-header {
+            text-align: center;
+            padding: 48px 0 36px;
+        }
+
+        .site-header h1 {
+            font-family: 'ZCOOL KuaiLe', cursive;
+            font-size: 2.8em;
+            color: var(--primary);
+            letter-spacing: 4px;
+            line-height: 1.2;
+            text-shadow: 0 2px 20px rgba(181, 115, 122, 0.18);
+        }
+
+        .site-header .tagline {
+            margin-top: 12px;
+            font-size: 0.92em;
+            color: var(--gold);
+            letter-spacing: 3px;
+            font-weight: 400;
+        }
+
+        .header-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 20px auto 0;
+            max-width: 260px;
+        }
+        .header-divider span { flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--primary-light), transparent); }
+        .header-divider i { color: var(--primary-light); font-size: 0.9em; }
+
+        /* ── 计时器 ── */
+        .timer-section { text-align: center; margin-bottom: 32px; }
+
+        .timer-label {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            letter-spacing: 2px;
+            margin-bottom: 18px;
+        }
+
+        .timer-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .timer-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px 8px 14px;
+            box-shadow: 0 4px 24px var(--shadow);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .timer-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(to right, var(--primary-light), var(--gold));
+            opacity: 0.6;
+        }
+
+        .timer-card .num {
+            display: block;
+            font-family: 'ZCOOL KuaiLe', cursive;
+            font-size: 2.2em;
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .timer-card .unit {
+            display: block;
+            font-size: 0.72em;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+
+        /* ── 按钮 ── */
+        .btn-group {
+            display: flex;
+            gap: 14px;
+            justify-content: center;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            color: #fff;
+            border: none;
+            padding: 13px 26px;
+            border-radius: 40px;
+            font-size: 0.95em;
+            font-weight: 400;
+            cursor: pointer;
+            letter-spacing: 1px;
+            box-shadow: 0 6px 20px rgba(181, 115, 122, 0.3);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(181, 115, 122, 0.42);
+        }
+
+        button:active { transform: translateY(1px); }
+        button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; transform: none; }
+
+        /* ── 时光轴 ── */
+        .timeline-section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px 28px;
+            box-shadow: 0 8px 40px var(--shadow);
+            backdrop-filter: blur(12px);
+        }
+
+        .timeline-title {
+            font-family: 'ZCOOL KuaiLe', cursive;
+            font-size: 1.4em;
+            color: var(--primary);
+            text-align: center;
+            letter-spacing: 3px;
+            margin-bottom: 28px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .timeline-track {
+            position: relative;
+            padding-left: 28px;
+        }
+
+        .timeline-track::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 6px;
+            bottom: 6px;
+            width: 1px;
+            background: linear-gradient(to bottom, var(--primary-light), transparent);
+        }
+
+        /* ── 记录卡片 ── */
+        .moment-card {
+            position: relative;
+            background: rgba(255, 250, 248, 0.7);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px 18px;
+            margin-bottom: 20px;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .moment-card::before {
+            content: '♡';
+            position: absolute;
+            left: -24px;
+            top: 14px;
+            font-size: 0.75em;
+            color: var(--primary-light);
+        }
+
+        .moment-card:hover {
+            transform: translateX(4px);
+            box-shadow: 0 6px 24px var(--shadow);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+        .time-text {
+            font-size: 0.75em;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .author-badge {
+            font-size: 0.72em;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .author-snake {
+            background: rgba(220, 155, 180, 0.18);
+            color: #b0527a;
+            border: 1px solid rgba(220, 155, 180, 0.35);
+        }
+
+        .author-xi {
+            background: rgba(160, 185, 220, 0.18);
+            color: #4a72a0;
+            border: 1px solid rgba(160, 185, 220, 0.35);
+        }
+
+        .delete-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: none;
+            border: 1px solid rgba(200, 155, 155, 0.4);
+            color: var(--text-muted);
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 0.72em;
+            cursor: pointer;
+            box-shadow: none;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+            flex-shrink: 0;
+        }
+
+        .delete-btn:hover {
+            background: rgba(200, 155, 155, 0.1);
+            color: var(--primary);
+            border-color: var(--primary-light);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .card-text {
+            font-size: 0.95em;
+            line-height: 1.8;
+            color: var(--text);
+            white-space: pre-wrap;
+        }
+
+        .card-img {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-top: 10px;
+            cursor: zoom-in;
+            transition: opacity 0.2s;
+            display: block;
+        }
+
+        .card-img:hover { opacity: 0.92; }
+
+        /* ── 灯箱 ── */
+        #lightbox {
+            position: fixed;
+            inset: 0;
+            background: rgba(40, 20, 20, 0.85);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            cursor: zoom-out;
+        }
+
+        #lightbox.show { opacity: 1; visibility: visible; }
+
+        #lightbox img {
+            max-width: 90vw;
+            max-height: 88vh;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            object-fit: contain;
+        }
+
+        /* ── 弹窗 ── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(250, 235, 235, 0.35);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.show { opacity: 1; visibility: visible; }
+
+        .modal-box {
+            background: rgba(255, 252, 250, 0.92);
+            border-radius: 24px;
+            padding: 34px 30px;
+            width: 88%;
+            max-width: 340px;
+            box-shadow: 0 20px 50px rgba(181, 115, 122, 0.22);
+            text-align: center;
+            transform: translateY(16px) scale(0.97);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+        }
+
+        .modal-overlay.show .modal-box { transform: translateY(0) scale(1); }
+
+        .modal-title {
+            font-family: 'ZCOOL KuaiLe', cursive;
+            color: var(--primary);
+            margin-bottom: 6px;
+            font-size: 1.3em;
+            letter-spacing: 2px;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 12px 16px;
+            margin: 14px 0;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 1em;
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            text-align: center;
+            color: var(--text);
+            background: rgba(255,255,255,0.9);
+        }
+
+        .modal-input:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(212, 160, 168, 0.15);
+        }
+
+        .modal-msg {
+            font-size: 0.88em;
+            min-height: 20px;
+            margin-bottom: 14px;
+            color: var(--primary);
+        }
+
+        .modal-btns { display: flex; gap: 10px; justify-content: center; }
+
+        .modal-btns button { padding: 10px 22px; font-size: 0.9em; }
+
+        .btn-cancel {
+            background: transparent;
+            color: var(--text-muted);
+            box-shadow: none;
+            border: 1px solid var(--border);
+        }
+
+        .btn-cancel:hover {
+            background: rgba(200,155,155,0.08);
+            box-shadow: none;
+            transform: none;
+            color: var(--text);
+        }
+
+        /* ── 空状态 ── */
+        .empty-state {
+            text-align: center;
+            padding: 30px 0;
+            color: var(--text-muted);
+            font-size: 0.9em;
+            letter-spacing: 1px;
+        }
+
+        /* ── 响应式 ── */
+        @media (max-width: 480px) {
+            .site-header h1 { font-size: 2.1em; }
+            .timer-card .num { font-size: 1.7em; }
+            .timeline-section { padding: 24px 16px; }
+            .timeline-track { padding-left: 22px; }
+            button { padding: 12px 20px; font-size: 0.88em; }
+        }
+
+        /* ── 纪念日 ── */
+        .anniv-section { margin-bottom: 28px; }
+
+        .section-label {
+            font-size: 0.8em;
+            color: var(--text-muted);
+            letter-spacing: 2px;
+            text-align: center;
+            margin-bottom: 14px;
+        }
+
+        .anniv-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .anniv-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 14px 10px;
+            text-align: center;
+            box-shadow: 0 3px 16px var(--shadow);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s;
+        }
+
+        .anniv-card:hover { transform: translateY(-2px); }
+
+        .anniv-card.today {
+            border-color: var(--gold);
+            background: linear-gradient(135deg, rgba(255,248,235,0.95), rgba(255,255,250,0.95));
+        }
+
+        .anniv-card .anniv-icon { font-size: 1.5em; margin-bottom: 6px; display: block; }
+
+        .anniv-card .anniv-name {
+            font-size: 0.78em;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .anniv-card .anniv-days {
+            font-family: 'ZCOOL KuaiLe', cursive;
+            font-size: 1.6em;
+            color: var(--primary);
+            line-height: 1;
+        }
+
+        .anniv-card .anniv-unit { font-size: 0.7em; color: var(--text-muted); margin-top: 3px; }
+
+        .anniv-card.today .anniv-days { color: var(--gold); font-size: 1.1em; }
+
+        /* ── 心情打卡 ── */
+        .mood-section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 24px 24px 20px;
+            box-shadow: 0 8px 40px var(--shadow);
+            margin-bottom: 24px;
+        }
+
+        .mood-section-title {
+            font-family: 'ZCOOL KuaiLe', cursive;
+            font-size: 1.15em;
+            color: var(--primary);
+            letter-spacing: 2px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mood-heatmap {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .mood-dot {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85em;
+            cursor: default;
+            position: relative;
+            transition: transform 0.15s;
+        }
+
+        .mood-dot:hover { transform: scale(1.2); z-index: 2; }
+
+        .mood-dot[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 110%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(74,53,53,0.85);
+            color: #fff;
+            font-size: 0.7em;
+            padding: 3px 7px;
+            border-radius: 6px;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .mood-empty-dot {
+            width: 28px; height: 28px;
+            border-radius: 8px;
+            background: rgba(200,155,155,0.08);
+            border: 1px dashed rgba(200,155,155,0.2);
+        }
+
+        .mood-checkin-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .mood-checkin-label { font-size: 0.85em; color: var(--text-muted); }
+
+        .btn-mood {
+            padding: 9px 20px;
+            font-size: 0.85em;
+            border-radius: 30px;
+            box-shadow: 0 4px 14px rgba(181,115,122,0.25);
+        }
+
+        /* 心情弹窗 emoji 选择 */
+        .mood-emoji-row {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 14px 0;
+        }
+
+        .mood-emoji-btn {
+            width: 46px; height: 46px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            background: rgba(200,155,155,0.08);
+            font-size: 1.5em;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+            box-shadow: none;
+            padding: 0;
+        }
+
+        .mood-emoji-btn:hover { transform: scale(1.15); box-shadow: none; }
+        .mood-emoji-btn.selected { border-color: var(--primary); background: rgba(181,115,122,0.12); transform: scale(1.15); }
+
+        @media (max-width: 480px) {
+            .anniv-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+            .anniv-card { padding: 12px 6px; }
+            .anniv-card .anniv-days { font-size: 1.3em; }
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="sakura-canvas"></canvas>
+
+<div class="container">
+
+    <header class="site-header">
+        <h1>小蛇 ♡ 小奚</h1>
+        <p class="tagline">愿得一人心，白首不相离</p>
+        <div class="header-divider">
+            <span></span><i>❀</i><span></span>
+        </div>
+    </header>
+
+    <section class="timer-section">
+        <p class="timer-label">我们已经相伴走过</p>
+        <div class="timer-grid">
+            <div class="timer-card"><span class="num" id="t-days">0</span><span class="unit">天</span></div>
+            <div class="timer-card"><span class="num" id="t-hours">0</span><span class="unit">小时</span></div>
+            <div class="timer-card"><span class="num" id="t-minutes">0</span><span class="unit">分</span></div>
+            <div class="timer-card"><span class="num" id="t-seconds">0</span><span class="unit">秒</span></div>
+        </div>
+    </section>
+
+
+    <section class="anniv-section">
+        <p class="section-label">✨ 重要纪念日</p>
+        <div class="anniv-grid" id="anniv-grid"></div>
+    </section>
+
+    <section class="mood-section">
+        <div class="mood-section-title">🌈 心情日历</div>
+        <div class="mood-heatmap" id="mood-heatmap"></div>
+        <div class="mood-checkin-row">
+            <span class="mood-checkin-label">今天心情怎么样？</span>
+            <button class="btn-mood" onclick="checkPassword('mood')">✨ 打卡心情</button>
+        </div>
+    </section>
+
+    <div class="btn-group">
+        <button id="btn-photo" onclick="checkPassword('photo')">📷 上传心情照片</button>
+        <button id="btn-text" onclick="checkPassword('text')">✍️ 记录今日总结</button>
+        <input type="file" id="photo-input" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event)">
+    </div>
+
+    <section class="timeline-section">
+        <h3 class="timeline-title">⏳ 时光足迹</h3>
+        <div class="timeline-track" id="timeline-content">
+            <div class="empty-state">正在加载甜蜜回忆…</div>
+        </div>
+    </section>
+
+</div>
+
+<!-- 密码弹窗 -->
+<div class="modal-overlay" id="customModal">
+    <div class="modal-box">
+        <h3 class="modal-title">请输入专属暗号 💖</h3>
+        <input type="password" class="modal-input" id="modalInput" placeholder="请输入暗号…">
+        <div class="modal-msg" id="modalMsg"></div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeModal()">取消</button>
+            <button onclick="verifyCode()">确认</button>
+        </div>
+    </div>
+</div>
+
+<!-- 文字输入弹窗 -->
+<div class="modal-overlay" id="textModal">
+    <div class="modal-box">
+        <h3 class="modal-title">记录今日总结 ✍️</h3>
+        <textarea class="modal-input" id="textInput" placeholder="写下今天的总结或心情吧…" rows="5" style="resize:vertical;text-align:left;"></textarea>
+        <div class="modal-msg" id="textModalMsg"></div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeTextModal()">取消</button>
+            <button onclick="submitText()">保存</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- 心情打卡弹窗 -->
+<div class="modal-overlay" id="moodModal">
+    <div class="modal-box">
+        <h3 class="modal-title">今日心情打卡 🌈</h3>
+        <div class="mood-emoji-row" id="moodEmojiRow">
+            <button class="mood-emoji-btn" data-score="1" onclick="selectMood(1)">😢</button>
+            <button class="mood-emoji-btn" data-score="2" onclick="selectMood(2)">😕</button>
+            <button class="mood-emoji-btn" data-score="3" onclick="selectMood(3)">😊</button>
+            <button class="mood-emoji-btn" data-score="4" onclick="selectMood(4)">😄</button>
+            <button class="mood-emoji-btn" data-score="5" onclick="selectMood(5)">🥰</button>
+        </div>
+        <textarea class="modal-input" id="moodNote" placeholder="说说今天发生了什么…（可选）" rows="3" style="resize:none;text-align:left;margin-top:4px;"></textarea>
+        <div class="modal-msg" id="moodModalMsg"></div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeMoodModal()">取消</button>
+            <button onclick="submitMood()">记录</button>
+        </div>
+    </div>
+</div>
+
+<!-- 灯箱 -->
+<div id="lightbox" onclick="closeLightbox()">
+    <img id="lightbox-img" src="" alt="回忆放大">
+</div>
+
+<script>
+    // ==========================================
+    // 1. 配置区
+    // ==========================================
+    const startDate = new Date(2026, 4, 23, 1, 0, 0);
+
+    const USERS = {
+        "5201314": "小奚",
+        "5211314": "小蛇"
+    };
+
+
+    const ANNIVERSARIES = [
+        { name: '在一起', icon: '💑', month: 5,  day: 23 },
+        { name: '小奚生日', icon: '🎂', month: 7,  day: 11 },
+        { name: '小蛇生日', icon: '🎂', month: 8,  day: 15 },
+    ];
+
+    const SUPABASE_URL = 'https://tveiegolbotlqpjpwpes.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_AhdN1U9vSR1efN_5zDYMLQ_D_fyt3gN';
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+        global: { fetch: (...args) => fetch(...args) }
+    });
+
+    // ==========================================
+    // 2. 樱花动画
+    // ==========================================
+    (function() {
+        const canvas = document.getElementById('sakura-canvas');
+        const ctx = canvas.getContext('2d');
+        let petals = [];
+        const PETAL_COUNT = 28;
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        function newPetal() {
+            return {
+                x: Math.random() * canvas.width,
+                y: -20,
+                size: 6 + Math.random() * 8,
+                speedY: 0.6 + Math.random() * 1.2,
+                speedX: -0.4 + Math.random() * 0.8,
+                rot: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 0.03,
+                alpha: 0.5 + Math.random() * 0.4,
+                sway: Math.random() * Math.PI * 2,
+                swaySpeed: 0.008 + Math.random() * 0.01
+            };
+        }
+
+        for (let i = 0; i < PETAL_COUNT; i++) {
+            const p = newPetal();
+            p.y = Math.random() * canvas.height;
+            petals.push(p);
+        }
+
+        function drawPetal(p) {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
+            ctx.globalAlpha = p.alpha;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, p.size, p.size * 0.55, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#f2b8c0';
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            petals.forEach((p, i) => {
+                p.sway += p.swaySpeed;
+                p.x += p.speedX + Math.sin(p.sway) * 0.5;
+                p.y += p.speedY;
+                p.rot += p.rotSpeed;
+                if (p.y > canvas.height + 20) petals[i] = newPetal();
+                drawPetal(p);
+            });
+            requestAnimationFrame(animate);
+        }
+        animate();
+    })();
+
+    // ==========================================
+    // 3. 计时器
+    // ==========================================
+    function updateTimer() {
+        const now = new Date();
+        const diff = Math.floor((now - startDate) / 1000);
+        const days    = Math.floor(diff / 86400);
+        const hours   = Math.floor((diff % 86400) / 3600);
+        const minutes = Math.floor((diff % 3600) / 60);
+        const seconds = diff % 60;
+        document.getElementById('t-days').innerText    = days;
+        document.getElementById('t-hours').innerText   = String(hours).padStart(2,'0');
+        document.getElementById('t-minutes').innerText = String(minutes).padStart(2,'0');
+        document.getElementById('t-seconds').innerText = String(seconds).padStart(2,'0');
+    }
+    setInterval(updateTimer, 1000);
+    updateTimer();
+
+    // ==========================================
+    // 4. 交互逻辑
+    // ==========================================
+    let currentAction = '';
+    let currentAuthor = '';
+
+    function checkPassword(actionType) {
+        currentAction = actionType;
+        const modal = document.getElementById('customModal');
+        const input = document.getElementById('modalInput');
+        document.getElementById('modalMsg').innerText = '';
+        input.value = '';
+        modal.classList.add('show');
+        setTimeout(() => input.focus(), 100);
+    }
+
+    function closeModal() {
+        document.getElementById('customModal').classList.remove('show');
+    }
+
+    function verifyCode() {
+        const inputVal = document.getElementById('modalInput').value;
+        const msgEl = document.getElementById('modalMsg');
+
+        if (USERS[inputVal]) {
+            currentAuthor = USERS[inputVal];
+            msgEl.style.color = '#7ab87a';
+            msgEl.innerText = `暗号正确，${currentAuthor} 💖`;
+            setTimeout(() => {
+                closeModal();
+                if (currentAction === 'photo') {
+                    document.getElementById('photo-input').click();
+                } else if (currentAction === 'text') {
+                    handleTextUpload();
+                } else if (currentAction === 'delete') {
+                    deleteMoment(pendingDeleteId);
+                } else if (currentAction === 'mood') {
+                    openMoodModal();
+                }
+            }, 500);
+        } else if (inputVal.trim() === '') {
+            msgEl.style.color = '#b5737a';
+            msgEl.innerText = '暗号不能为空哦！';
+        } else {
+            msgEl.style.color = '#b5737a';
+            msgEl.innerText = '暗号不对哦，是不是别人在偷看？😎';
+        }
+    }
+
+    document.getElementById('modalInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') verifyCode();
+    });
+
+    // --- 上传文字 ---
+    function handleTextUpload() {
+        const modal = document.getElementById('textModal');
+        const input = document.getElementById('textInput');
+        document.getElementById('textModalMsg').innerText = '';
+        input.value = '';
+        modal.classList.add('show');
+        setTimeout(() => input.focus(), 100);
+    }
+
+    function closeTextModal() {
+        document.getElementById('textModal').classList.remove('show');
+    }
+
+    async function submitText() {
+        const text = document.getElementById('textInput').value.trim();
+        const msgEl = document.getElementById('textModalMsg');
+        if (!text) { msgEl.innerText = '内容不能为空哦！'; return; }
+
+        const btn = document.getElementById('btn-text');
+        const orig = btn.innerHTML;
+        closeTextModal();
+        btn.innerHTML = '⏳ 上传中…'; btn.disabled = true;
+
+        const { error } = await supabaseClient.from('moments').insert([{ type: 'text', content: text, author: currentAuthor }]);
+        btn.innerHTML = orig; btn.disabled = false;
+        if (error) alert('保存失败: ' + error.message);
+        else fetchMoments();
+    }
+
+    document.getElementById('textInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && e.ctrlKey) submitText();
+    });
+
+    // --- 上传照片 ---
+    async function handlePhotoUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const btn = document.getElementById('btn-photo');
+        const orig = btn.innerHTML;
+        btn.innerHTML = '⏳ 图片上传中…'; btn.disabled = true;
+
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2,9)}.${fileExt}`;
+
+        const { error: uploadError } = await supabaseClient.storage.from('photos').upload(fileName, file);
+        if (uploadError) {
+            alert('图片上传失败: ' + uploadError.message);
+            btn.innerHTML = orig; btn.disabled = false;
+            return;
+        }
+
+        const { data: publicUrlData } = supabaseClient.storage.from('photos').getPublicUrl(fileName);
+        const publicUrl = publicUrlData.publicUrl;
+
+        const { error: dbError } = await supabaseClient.from('moments').insert([{ type: 'photo', content: publicUrl, author: currentAuthor }]);
+        btn.innerHTML = orig; btn.disabled = false;
+        document.getElementById('photo-input').value = '';
+        if (dbError) alert('记录保存失败: ' + dbError.message);
+        else fetchMoments();
+    }
+
+    // --- 时光轴 ---
+    async function fetchMoments() {
+        const contentDiv = document.getElementById('timeline-content');
+        const { data, error } = await supabaseClient.from('moments')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            contentDiv.innerHTML = `<p style="color:#b5737a;text-align:center;">读取数据失败: ${error.message}</p>`;
+            return;
+        }
+
+        if (data.length === 0) {
+            contentDiv.innerHTML = '<div class="empty-state">还没有记录哦，快去添加第一条回忆吧！</div>';
+            return;
+        }
+
+        const now = Date.now();
+        let html = '';
+        data.forEach(item => {
+            const dateStr = new Date(item.created_at).toLocaleString('zh-CN', { hour12: false });
+            const canDelete = (now - new Date(item.created_at).getTime()) < 86400000;
+            const deleteBtn = canDelete
+                ? `<button class="delete-btn" onclick="confirmDelete(${item.id})">撤回</button>`
+                : '';
+
+            const authorBadge = item.author === '小蛇'
+                ? `<span class="author-badge author-snake">🐍 小蛇</span>`
+                : item.author === '小奚'
+                ? `<span class="author-badge author-xi">🐟 小奚</span>`
+                : '';
+
+            html += `<div class="moment-card" id="card-${item.id}">
+                <div class="card-header">
+                    <div class="card-meta">
+                        <span class="time-text">${dateStr}</span>
+                        ${authorBadge}
+                    </div>
+                    ${deleteBtn}
+                </div>`;
+
+            if (item.type === 'text') {
+                html += `<div class="card-text">${item.content}</div>`;
+            } else if (item.type === 'photo') {
+                html += `<img class="card-img" src="${item.content}" alt="我们的回忆" onclick="openLightbox(this.src)">`;
+            }
+            html += `</div>`;
+        });
+
+        contentDiv.innerHTML = html;
+    }
+
+    // --- 删除 ---
+    let pendingDeleteId = null;
+
+    function confirmDelete(id) {
+        pendingDeleteId = id;
+        currentAction = 'delete';
+        const modal = document.getElementById('customModal');
+        const input = document.getElementById('modalInput');
+        const msgEl = document.getElementById('modalMsg');
+        msgEl.innerText = '撤回需要验证暗号 💖';
+        msgEl.style.color = '#b5737a';
+        input.value = '';
+        modal.classList.add('show');
+        setTimeout(() => input.focus(), 100);
+    }
+
+    async function deleteMoment(id) {
+        const { error } = await supabaseClient.from('moments').delete().eq('id', id);
+        if (error) {
+            alert('撤回失败: ' + error.message);
+        } else {
+            const card = document.getElementById('card-' + id);
+            if (card) {
+                card.style.transition = 'opacity 0.3s, transform 0.3s';
+                card.style.opacity = '0';
+                card.style.transform = 'translateX(-16px)';
+                setTimeout(() => fetchMoments(), 300);
+            }
+        }
+    }
+
+    // --- 灯箱 ---
+    function openLightbox(src) {
+        document.getElementById('lightbox-img').src = src;
+        document.getElementById('lightbox').classList.add('show');
+    }
+
+    function closeLightbox() {
+        document.getElementById('lightbox').classList.remove('show');
+    }
+
+
+    // ==========================================
+    // 纪念日
+    // ==========================================
+    function renderAnniversaries() {
+        const grid = document.getElementById('anniv-grid');
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        grid.innerHTML = ANNIVERSARIES.map(a => {
+            let next = new Date(now.getFullYear(), a.month - 1, a.day);
+            if (next < today) next.setFullYear(next.getFullYear() + 1);
+            const diff = Math.round((next - today) / 86400000);
+            const isToday = diff === 0;
+            return `<div class="anniv-card ${isToday ? 'today' : ''}">
+                <span class="anniv-icon">${a.icon}</span>
+                <div class="anniv-name">${a.name}</div>
+                <div class="anniv-days">${isToday ? '🎉今天！' : diff}</div>
+                ${!isToday ? '<div class="anniv-unit">天后</div>' : ''}
+            </div>`;
+        }).join('');
+    }
+
+    // ==========================================
+    // 心情打卡
+    // ==========================================
+    const MOOD_EMOJIS = ['', '😢', '😕', '😊', '😄', '🥰'];
+    const MOOD_COLORS = ['', '#e8c0c0', '#d4b8d4', '#b8d4c0', '#b8cce8', '#e8b8d0'];
+    let selectedMoodScore = 0;
+
+    function openMoodModal() {
+        selectedMoodScore = 0;
+        document.querySelectorAll('.mood-emoji-btn').forEach(b => b.classList.remove('selected'));
+        document.getElementById('moodNote').value = '';
+        document.getElementById('moodModalMsg').innerText = '';
+        document.getElementById('moodModal').classList.add('show');
+    }
+
+    function closeMoodModal() {
+        document.getElementById('moodModal').classList.remove('show');
+    }
+
+    function selectMood(score) {
+        selectedMoodScore = score;
+        document.querySelectorAll('.mood-emoji-btn').forEach(b => {
+            b.classList.toggle('selected', parseInt(b.dataset.score) === score);
+        });
+    }
+
+    async function submitMood() {
+        const msgEl = document.getElementById('moodModalMsg');
+        if (!selectedMoodScore) { msgEl.innerText = '请先选择今天的心情哦！'; return; }
+
+        const note = document.getElementById('moodNote').value.trim();
+        const today = new Date().toISOString().slice(0, 10);
+
+        const { error } = await supabaseClient.from('moods').insert([{
+            date: today,
+            author: currentAuthor,
+            score: selectedMoodScore,
+            note: note || null
+        }]);
+
+        if (error) { msgEl.innerText = '保存失败: ' + error.message; return; }
+        closeMoodModal();
+        loadMoods();
+    }
+
+    async function loadMoods() {
+        const heatmap = document.getElementById('mood-heatmap');
+        const days = 28;
+        const today = new Date();
+
+        const dates = [];
+        for (let i = days - 1; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            dates.push(d.toISOString().slice(0, 10));
+        }
+
+        const from = dates[0];
+        const { data, error } = await supabaseClient.from('moods')
+            .select('date, score, author, note')
+            .gte('date', from)
+            .order('date', { ascending: true });
+
+        if (error) return;
+
+        const map = {};
+        (data || []).forEach(m => {
+            if (!map[m.date]) map[m.date] = [];
+            map[m.date].push(m);
+        });
+
+        heatmap.innerHTML = dates.map(d => {
+            const entries = map[d] || [];
+            if (!entries.length) return `<div class="mood-empty-dot" title="${d}"></div>`;
+            const avg = Math.round(entries.reduce((s, e) => s + e.score, 0) / entries.length);
+            const labels = entries.map(e => `${e.author || ''}${MOOD_EMOJIS[e.score]}${e.note ? ' ' + e.note : ''}`).join(' / ');
+            return `<div class="mood-dot" style="background:${MOOD_COLORS[avg]};" title="${d} ${labels}">${MOOD_EMOJIS[avg]}</div>`;
+        }).join('');
+    }
+
+    window.onload = function() { fetchMoments(); renderAnniversaries(); loadMoods(); };
+</script>
+</body>
+</html>
