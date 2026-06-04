@@ -971,6 +971,87 @@
             letter-spacing: 0.5px;
         }
         .comment-cancel-btn:hover { background: rgba(200,155,155,0.08); transform: none; box-shadow: none; color: var(--text); }
+
+        /* ── AI 悬浮球及面板 ── */
+        .fab-ai {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f7d2d7, #e3b0b8);
+            color: #fff;
+            font-size: 1.6em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            box-shadow: 0 4px 16px rgba(227, 176, 184, 0.4);
+            cursor: pointer;
+            z-index: 99;
+            transition: all 0.3s;
+            animation: float 3s ease-in-out infinite;
+            padding: 0;
+        }
+        .fab-ai:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(227, 176, 184, 0.6);
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .ai-modal-box {
+            width: 95%;
+            max-width: 450px;
+            min-height: 300px;
+        }
+        .ai-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+            overflow-x: auto;
+        }
+        .ai-tab {
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            box-shadow: none;
+            font-size: 0.9em;
+            padding: 8px 12px;
+            white-space: nowrap;
+        }
+        .ai-tab.active {
+            color: var(--primary);
+            font-weight: bold;
+            border-bottom: 2px solid var(--primary);
+            border-radius: 0;
+        }
+        .ai-content-area {
+            background: rgba(255,255,255,0.4);
+            border-radius: 12px;
+            padding: 16px;
+            min-height: 150px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 0.95em;
+            line-height: 1.6;
+            color: var(--text);
+            white-space: pre-wrap;
+        }
+        .ai-loading {
+            color: var(--primary);
+            text-align: center;
+            margin-top: 50px;
+            animation: pulse 1.5s infinite;
+        }
     </style>
 </head>
 <body>
@@ -1151,6 +1232,28 @@
 </div>
 
 <button class="fab-filter" id="fab-filter" onclick="openFilterModal()" title="检索回忆">🔍</button>
+
+<!-- AI悬浮球 -->
+<button class="fab-ai" id="fab-ai" onclick="openAIModal()" title="AI专属助理">🤖</button>
+
+<!-- AI面板 -->
+<div class="modal-overlay" id="aiModal">
+    <div class="modal-box ai-modal-box">
+        <h3 class="modal-title">🤖 专属情感助理</h3>
+        <div class="ai-tabs">
+            <button class="ai-tab active" onclick="switchAITab('topic')">今日话题</button>
+            <button class="ai-tab" onclick="switchAITab('anniversary')">纪念日</button>
+            <button class="ai-tab" onclick="switchAITab('mood')">心情分析</button>
+            <button class="ai-tab" onclick="switchAITab('summary')">回忆总结</button>
+        </div>
+        <div class="ai-content-area" id="aiContentArea">
+            <div class="ai-loading">思考中，请稍候... ✨</div>
+        </div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeAIModal()">关闭</button>
+        </div>
+    </div>
+</div>
 
 <!-- 灯箱 -->
 <div id="lightbox" onclick="closeLightbox()">
@@ -2198,6 +2301,176 @@
         loadMoods(); 
         initPresence();
     };
+
+    // ==========================================
+    // 6. DeepSeek AI 专属助手逻辑
+    // ==========================================
+    const DEEPSEEK_API_KEY = 'sk-3f0bcea6abec43eba903d4b9091b6e76';
+
+    async function callDeepSeek(systemPrompt, userPrompt) {
+        try {
+            const response = await fetch('https://api.deepseek.com/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: "deepseek-chat",
+                    messages: [
+                        {"role": "system", "content": systemPrompt},
+                        {"role": "user", "content": userPrompt}
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 800
+                })
+            });
+            const data = await response.json();
+            if (data.choices && data.choices.length > 0) {
+                return data.choices[0].message.content;
+            } else {
+                throw new Error("AI 返回了空数据");
+            }
+        } catch (error) {
+            console.error("DeepSeek API 错误:", error);
+            return "糟糕，脑电波连接失败啦，待会儿再试吧 🥺";
+        }
+    }
+
+    function openAIModal() {
+        document.getElementById('aiModal').classList.add('show');
+        switchAITab('topic');
+    }
+
+    function closeAIModal() {
+        document.getElementById('aiModal').classList.remove('show');
+    }
+
+    async function switchAITab(tabName) {
+        // 更新 Tab 样式
+        document.querySelectorAll('.ai-tab').forEach(btn => btn.classList.remove('active'));
+        const tabBtn = Array.from(document.querySelectorAll('.ai-tab')).find(b => b.getAttribute('onclick').includes(tabName));
+        if (tabBtn) tabBtn.classList.add('active');
+
+        const contentArea = document.getElementById('aiContentArea');
+        contentArea.innerHTML = '<div class="ai-loading">思考中，请稍候... ✨</div>';
+
+        try {
+            const today = new Date().toISOString().split('T')[0]; 
+            
+            let validTimeStr = new Date();
+            if (tabName === 'summary') {
+                validTimeStr.setDate(validTimeStr.getDate() - 7); 
+            } else {
+                validTimeStr.setHours(0,0,0,0); 
+            }
+            
+            const { data: existingData, error: qErr } = await supabaseClient
+                .from('ai_content')
+                .select('*')
+                .eq('type', tabName)
+                .gte('created_at', validTimeStr.toISOString())
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (!qErr && existingData && existingData.length > 0) {
+                contentArea.innerHTML = escapeHtml(existingData[0].content);
+                return;
+            }
+
+            let systemPrompt = "";
+            let userPrompt = "";
+            let generatedText = "";
+
+            if (tabName === 'topic') {
+                systemPrompt = "你是一个温暖、可爱的情感小助手。你的任务是给一对情侣（小蛇和小奚）提供每天的专属互动话题。话题要有趣、能增进感情、或者带来回忆。";
+                userPrompt = "请生成今天的每日话题，直接输出话题本身，语言要亲切、带点俏皮，200字以内。";
+                generatedText = await callDeepSeek(systemPrompt, userPrompt);
+            } 
+            else if (tabName === 'anniversary') {
+                const now = new Date();
+                const currentYear = now.getFullYear();
+                let annivDate = new Date(currentYear, 4, 23); // 5月23日
+                if (now > annivDate) {
+                    annivDate = new Date(currentYear + 1, 4, 23);
+                }
+                const diffDays = Math.ceil((annivDate - now) / (1000 * 60 * 60 * 24));
+                
+                if (diffDays <= 7) {
+                    systemPrompt = "你是一个深情的爱情文案专家。这对情侣（小蛇和小奚）即将在" + diffDays + "天后迎来他们的相爱纪念日。";
+                    userPrompt = "请为他们写一段充满期待和爱意的纪念日倒计时文案。要求：感情真挚，提到还有几天就是纪念日了，300字以内。";
+                    generatedText = await callDeepSeek(systemPrompt, userPrompt);
+                } else {
+                    contentArea.innerHTML = `距离下一个纪念日（5月23日）还有 ${diffDays} 天，等到只剩7天的时候，我再来给你们写专属情话吧~ 💖`;
+                    return; 
+                }
+            } 
+            else if (tabName === 'mood') {
+                const twoDaysAgo = new Date();
+                twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+                const { data: moodData } = await supabaseClient
+                    .from('moments')
+                    .select('author, content, created_at')
+                    .eq('type', 'mood')
+                    .gte('created_at', twoDaysAgo.toISOString())
+                    .order('created_at', { ascending: true });
+                
+                if (!moodData || moodData.length === 0) {
+                    contentArea.innerHTML = "最近两天你们都没有打卡心情哦，快去打个卡，让我来给你们做心情分析吧！";
+                    return;
+                }
+                
+                let moodLog = moodData.map(m => `${m.author}在${new Date(m.created_at).toLocaleString('zh-CN')} 打卡了心情：${m.content}`).join('\n');
+                systemPrompt = "你是一个懂心理学、充满同理心的知心姐姐。你的任务是阅读这对情侣（小蛇和小奚）最近两天的打卡心情，给出一小段温暖的解读和建议。如果有负面情绪请安慰，如果是好心情就一起开心。";
+                userPrompt = "以下是他们最近两天的心情打卡记录：\n" + moodLog + "\n\n请进行简单的分析和互动（不超过400字）。";
+                generatedText = await callDeepSeek(systemPrompt, userPrompt);
+            } 
+            else if (tabName === 'summary') {
+                const { data: textData } = await supabaseClient
+                    .from('moments')
+                    .select('author, content, created_at')
+                    .eq('type', 'text')
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+                
+                if (!textData || textData.length === 0) {
+                    contentArea.innerHTML = "目前还没有太多文字记录呢，多写点日记，下周我来帮你们做故事总结！";
+                    return;
+                }
+                
+                let storyLog = textData.reverse().map(m => `${m.author} 说：${m.content}`).join('\n');
+                systemPrompt = "你是一个感情故事的记录员。请根据情侣（小蛇和小奚）最近的文字日记，以第一人称（作为他们回忆的守护者）总结他们近期的感情状态和生活片段。";
+                userPrompt = "日记如下：\n" + storyLog + "\n\n请写一篇优美、温情的“我们的近期故事总结”（400字以内）。";
+                generatedText = await callDeepSeek(systemPrompt, userPrompt);
+            }
+
+            contentArea.innerHTML = escapeHtml(generatedText);
+
+            if (generatedText) {
+                await supabaseClient.from('ai_content').insert([{ type: tabName, content: generatedText }]);
+                
+                const retainDate = new Date();
+                retainDate.setDate(retainDate.getDate() - 7);
+                await supabaseClient
+                    .from('ai_content')
+                    .delete()
+                    .neq('type', 'summary')
+                    .lt('created_at', retainDate.toISOString());
+                
+                const retainSummaryDate = new Date();
+                retainSummaryDate.setDate(retainSummaryDate.getDate() - 30);
+                await supabaseClient
+                    .from('ai_content')
+                    .delete()
+                    .eq('type', 'summary')
+                    .lt('created_at', retainSummaryDate.toISOString());
+            }
+
+        } catch (err) {
+            console.error("AI 模块出错:", err);
+            contentArea.innerHTML = "不好意思，我的小脑袋刚才卡住了，稍后再试一下吧~ 🐛";
+        }
+    }
 
     // ==========================================
     // 注册 Service Worker (PWA)
