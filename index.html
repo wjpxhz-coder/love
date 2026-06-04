@@ -1221,6 +1221,10 @@
     // ==========================================
     let currentAction = '';
     let currentAuthor = localStorage.getItem('lover_identity') || '';
+    let pendingDeleteId = null;
+    let pendingCommentMomentId = null;
+    let pendingDeleteCommentId = null;
+    let pendingDeleteCommentMomentId = null;
 
     function checkPassword(actionType) {
         currentAction = actionType;
@@ -1259,6 +1263,8 @@
                     openMoodModal();
                 } else if (currentAction === 'comment') {
                     showCommentInput(pendingCommentMomentId);
+                } else if (currentAction === 'delete_comment') {
+                    deleteComment(pendingDeleteCommentId, pendingDeleteCommentMomentId);
                 }
             }, 500);
         } else if (inputVal.trim() === '') {
@@ -1576,9 +1582,6 @@
     }
 
     // --- 删除 ---
-    let pendingDeleteId = null;
-    let pendingCommentMomentId = null;
-
     function confirmDelete(id) {
         pendingDeleteId = id;
         currentAction = 'delete';
@@ -1670,14 +1673,49 @@
             const dateStr = new Date(c.created_at).toLocaleString('zh-CN', { hour12: false });
             const badgeClass = c.author === '小蛇' ? 'author-snake' : 'author-xi';
             const emoji = c.author === '小蛇' ? '🐍' : '🐟';
-            return `<div class="comment-item">
+            return `<div class="comment-item" id="comment-${c.id}">
                 <span class="comment-author-badge author-badge ${badgeClass}">${emoji} ${c.author}</span>
                 <div style="flex:1;">
                     <div class="comment-bubble">${escapeHtml(c.content)}</div>
-                    <div class="comment-time">${dateStr}</div>
+                    <div class="comment-time">
+                        ${dateStr} 
+                        <span style="color:#d4a0a8; cursor:pointer; margin-left:8px;" onclick="confirmDeleteComment(${c.id}, ${momentId})">撤回</span>
+                    </div>
                 </div>
             </div>`;
         }).join('');
+    }
+
+    function confirmDeleteComment(commentId, momentId) {
+        pendingDeleteCommentId = commentId;
+        pendingDeleteCommentMomentId = momentId;
+        currentAction = 'delete_comment';
+        const modal = document.getElementById('customModal');
+        const input = document.getElementById('modalInput');
+        const msgEl = document.getElementById('modalMsg');
+        msgEl.innerText = '撤回评论需要验证暗号 💬';
+        msgEl.style.color = '#b5737a';
+        input.value = '';
+        modal.classList.add('show');
+        setTimeout(() => input.focus(), 100);
+    }
+
+    async function deleteComment(commentId, momentId) {
+        const { error } = await supabaseClient.from('comments').delete().eq('id', commentId);
+        if (error) {
+            alert('撤回失败: ' + error.message);
+        } else {
+            const item = document.getElementById('comment-' + commentId);
+            if (item) {
+                item.style.transition = 'opacity 0.3s, transform 0.3s';
+                item.style.opacity = '0';
+                item.style.transform = 'translateX(-10px)';
+                setTimeout(() => {
+                    loadComments(momentId);
+                    loadCommentCounts([momentId]);
+                }, 300);
+            }
+        }
     }
 
     async function loadCommentCounts(momentIds) {
