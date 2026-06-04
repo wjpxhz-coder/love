@@ -1331,7 +1331,7 @@
             return `<div class="comment-item">
                 <span class="comment-author-badge author-badge ${badgeClass}">${emoji} ${c.author}</span>
                 <div style="flex:1;">
-                    <div class="comment-bubble">${c.content}</div>
+                    <div class="comment-bubble">${escapeHtml(c.content)}</div>
                     <div class="comment-time">${dateStr}</div>
                 </div>
             </div>`;
