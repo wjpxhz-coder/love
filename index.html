@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小蛇 ♡ 小奚 甜蜜记</title>
+    <meta name="description" content="小蛇和小奚的甜蜜纪念空间">
+    <meta name="theme-color" content="#b5737a">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Nunito:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1499,6 +1506,15 @@
     }
 
     window.onload = function() { fetchMoments(); renderAnniversaries(); loadMoods(); };
+
+    // ==========================================
+    // 注册 Service Worker (PWA)
+    // ==========================================
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+            .then(() => console.log('SW registered'))
+            .catch(err => console.log('SW registration failed:', err));
+    }
 </script>
 </body>
 </html>
