@@ -1050,6 +1050,33 @@
         }
         .comment-cancel-btn:hover { background: rgba(200,155,155,0.08); transform: none; box-shadow: none; color: var(--text); }
 
+        /* ── 评论点赞 ── */
+        .comment-like-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 0;
+            font-size: 0.85em;
+            cursor: pointer;
+            box-shadow: none;
+            margin-left: 12px;
+            transition: color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .comment-like-btn:hover { color: #e74c6f; transform: none; box-shadow: none; }
+        .comment-like-btn.liked { color: #e74c6f; }
+        .comment-like-btn::after { display: none; }
+        .comment-like-btn .like-heart { transition: transform 0.3s; display: inline-block; }
+        .comment-like-btn.liked .like-heart { animation: likePopIn 0.4s ease; }
+        @keyframes likePopIn {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.5); }
+            100% { transform: scale(1); }
+        }
+
 
         @keyframes pulse {
             0%, 100% { opacity: 1; }
@@ -2247,17 +2274,39 @@
             return;
         }
 
+        // 获取点赞数据（处理表不存在的情况）
+        const commentIds = data.map(c => c.id);
+        const { data: likesData, error: likesError } = await supabaseClient.from('comment_likes')
+            .select('comment_id, author')
+            .in('comment_id', commentIds);
+
+        const likesMap = {};
+        const userLikedMap = {};
+        if (!likesError && likesData) {
+            likesData.forEach(l => {
+                likesMap[l.comment_id] = (likesMap[l.comment_id] || 0) + 1;
+                if (l.author === currentAuthor) userLikedMap[l.comment_id] = true;
+            });
+        }
+
         listEl.innerHTML = data.map(c => {
             const dateStr = new Date(c.created_at).toLocaleString('zh-CN', { hour12: false });
             const badgeClass = c.author === '小蛇' ? 'author-snake' : 'author-xi';
             const emoji = c.author === '小蛇' ? '🐍' : '🐟';
+            const likeCount = likesMap[c.id] || 0;
+            const isLiked = userLikedMap[c.id] || false;
+            
             return `<div class="comment-item" id="comment-${c.id}">
                 <span class="comment-author-badge author-badge ${badgeClass}">${emoji} ${c.author}</span>
                 <div style="flex:1;">
                     <div class="comment-bubble">${escapeHtml(c.content)}</div>
                     <div class="comment-time">
                         ${dateStr} 
-                        <span style="color:#d4a0a8; cursor:pointer; margin-left:8px;" onclick="confirmDeleteComment(${c.id}, ${momentId})">撤回</span>
+                        <button class="comment-like-btn${isLiked ? ' liked' : ''}" id="like-btn-${c.id}" onclick="toggleCommentLike(${c.id}, ${momentId})">
+                            <span class="like-heart">${isLiked ? '❤️' : '🤍'}</span>
+                            <span class="like-count" id="like-count-${c.id}">${likeCount > 0 ? likeCount : '赞'}</span>
+                        </button>
+                        <span style="color:#d4a0a8; cursor:pointer; margin-left:12px;" onclick="confirmDeleteComment(${c.id}, ${momentId})">撤回</span>
                     </div>
                 </div>
             </div>`;
@@ -2276,6 +2325,61 @@
         input.value = '';
         modal.classList.add('show');
         setTimeout(() => input.focus(), 100);
+    }
+
+    // --- 评论点赞 ---
+    async function toggleCommentLike(commentId, momentId) {
+        if (!currentAuthor) {
+            pendingCommentMomentId = momentId;
+            checkPassword('comment');
+            return;
+        }
+
+        const btn = document.getElementById(`like-btn-${commentId}`);
+        const isLiked = btn && btn.classList.contains('liked');
+
+        let error = null;
+        if (isLiked) {
+            // 取消点赞
+            const res = await supabaseClient.from('comment_likes')
+                .delete()
+                .eq('comment_id', commentId)
+                .eq('author', currentAuthor);
+            error = res.error;
+        } else {
+            // 点赞
+            const res = await supabaseClient.from('comment_likes')
+                .insert([{ comment_id: commentId, author: currentAuthor }]);
+            error = res.error;
+        }
+
+        if (error) {
+            alert('点赞失败，请确保在 Supabase 创建了 comment_likes 表哦！\n错误信息：' + error.message);
+            return;
+        }
+
+        // 刷新该评论的点赞状态
+        updateSingleLike(commentId);
+    }
+
+    async function updateSingleLike(commentId) {
+        const btn = document.getElementById(`like-btn-${commentId}`);
+        if (!btn) return;
+
+        const { data, error } = await supabaseClient.from('comment_likes')
+            .select('author')
+            .eq('comment_id', commentId);
+
+        if (error) return;
+
+        const count = data ? data.length : 0;
+        const userLiked = data ? data.some(l => l.author === currentAuthor) : false;
+
+        const heart = btn.querySelector('.like-heart');
+        const countEl = btn.querySelector('.like-count');
+        if (heart) heart.textContent = userLiked ? '❤️' : '🤍';
+        if (countEl) countEl.textContent = count > 0 ? count : '赞';
+        btn.classList.toggle('liked', userLiked);
     }
 
     async function deleteComment(commentId, momentId) {
