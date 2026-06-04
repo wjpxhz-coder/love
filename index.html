@@ -1021,6 +1021,14 @@
     <div class="btn-group">
         <button id="btn-photo" onclick="checkPassword('photo')">📷 上传心情照片</button>
         <button id="btn-text" onclick="checkPassword('text')">✍️ 记录今日总结</button>
+        <button id="btn-audio" 
+            onmousedown="startRecording(event)" 
+            onmouseup="stopRecording(event)" 
+            onmouseleave="cancelRecording(event)" 
+            ontouchstart="startRecording(event)" 
+            ontouchend="stopRecording(event)" 
+            ontouchcancel="cancelRecording(event)" 
+            style="background: linear-gradient(135deg, #a0d4c6, #7ab87a); position: relative; user-select: none; -webkit-user-select: none;">🎙️ 长按留声</button>
         <button id="btn-blindbox" onclick="triggerBlindBox(true)" style="background: linear-gradient(135deg, #e3b0b8, #d4a0a8);">🎲 摇一摇盲盒</button>
         <input type="file" id="photo-input" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event)">
     </div>
@@ -1118,6 +1126,7 @@
             <div class="filter-row">
                 <label class="filter-checkbox-label"><input type="checkbox" value="text" id="chkTypeText"> 文字</label>
                 <label class="filter-checkbox-label"><input type="checkbox" value="photo" id="chkTypePhoto"> 照片</label>
+                <label class="filter-checkbox-label"><input type="checkbox" value="audio" id="chkTypeAudio"> 声音</label>
             </div>
         </div>
 
@@ -1323,6 +1332,8 @@
                     showCommentInput(pendingCommentMomentId);
                 } else if (currentAction === 'delete_comment') {
                     deleteComment(pendingDeleteCommentId, pendingDeleteCommentMomentId);
+                } else if (currentAction === 'audio_auth') {
+                    alert('验证成功！请再次长按留声按钮进行录音 🎙️');
                 }
             }, 500);
         } else if (inputVal.trim() === '') {
@@ -1437,6 +1448,8 @@
             html += `<div class="card-text">${escapeHtml(item.content)}</div>`;
         } else if (item.type === 'photo') {
             html += `<img class="card-img" src="${item.content}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)">`;
+        } else if (item.type === 'audio') {
+            html += `<div style="margin-top:10px;"><audio controls src="${item.content}" style="width:100%; height: 40px; border-radius: 20px; outline: none;"></audio></div>`;
         }
         html += `
                 <button class="comment-toggle-btn" onclick="toggleComments(${item.id})">
@@ -1481,6 +1494,7 @@
         document.getElementById('chkAuthorXi').checked = false;
         document.getElementById('chkTypeText').checked = false;
         document.getElementById('chkTypePhoto').checked = false;
+        document.getElementById('chkTypeAudio').checked = false;
         document.getElementById('filterKeyword').value = '';
     }
 
@@ -1494,6 +1508,7 @@
         currentFilters.types = [];
         if (document.getElementById('chkTypeText').checked) currentFilters.types.push('text');
         if (document.getElementById('chkTypePhoto').checked) currentFilters.types.push('photo');
+        if (document.getElementById('chkTypeAudio').checked) currentFilters.types.push('audio');
         
         currentFilters.keyword = document.getElementById('filterKeyword').value.trim();
 
@@ -1519,7 +1534,11 @@
         }
         if (currentFilters.types.length > 0) {
             active = true;
-            let typeNames = currentFilters.types.map(t => t === 'text' ? '文字' : '照片');
+            let typeNames = currentFilters.types.map(t => {
+                if (t === 'text') return '文字';
+                if (t === 'photo') return '照片';
+                if (t === 'audio') return '声音';
+            });
             details.push(typeNames.join('或'));
         }
         if (currentFilters.keyword) {
@@ -2042,7 +2061,9 @@
         const contentBox = document.getElementById('blindBoxContent');
         contentBox.innerHTML = '<div style="color:var(--text-muted); font-size: 0.9em;">✨ 魔法生效中，正在抽取回忆...</div>';
         
-        let preferType = Math.random() < 0.8 ? 'photo' : 'text'; // 80% 图片, 20% 文字
+        let rand = Math.random();
+        let preferType = rand < 0.7 ? 'photo' : (rand < 0.9 ? 'text' : 'audio'); // 70% 图片, 20% 文字, 10% 声音
+        
         
         let { data: ids, error } = await supabaseClient.from('moments').select('id, type');
         
@@ -2074,6 +2095,8 @@
         let html = '';
         if (momentData.type === 'photo') {
             html += `<img class="blind-box-img" src="${momentData.content}" alt="回忆照片">`;
+        } else if (momentData.type === 'audio') {
+            html += `<div style="margin: 20px 0; width: 100%;"><audio controls src="${momentData.content}" style="width:100%; height: 40px; border-radius: 20px;"></audio></div>`;
         } else {
             html += `<div class="blind-box-text">${escapeHtml(momentData.content)}</div>`;
         }
