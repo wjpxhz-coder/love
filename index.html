@@ -612,6 +612,49 @@
             45% { transform: scale(1.15); }
         }
 
+        /* ── 盲盒 UI ── */
+        #blindBoxModal .modal-box {
+            text-align: center;
+            background: linear-gradient(135deg, #fff9fb, #fff);
+            border: 2px solid rgba(255, 182, 193, 0.4);
+        }
+        .blind-box-content {
+            margin: 15px 0;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .blind-box-img {
+            max-width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 12px;
+        }
+        .blind-box-text {
+            font-size: 0.95em;
+            color: var(--text);
+            background: rgba(255,255,255,0.7);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            word-wrap: break-word;
+            width: 100%;
+        }
+        .blind-box-meta {
+            font-size: 0.8em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .blind-box-prompt {
+            color: #d46b7a;
+            font-weight: 600;
+            font-size: 1.05em;
+            letter-spacing: 1px;
+            margin-top: 10px;
+        }
+
         /* ── 响应式 ── */
         @media (max-width: 480px) {
             .site-header h1 { font-size: 2.1em; }
@@ -978,6 +1021,7 @@
     <div class="btn-group">
         <button id="btn-photo" onclick="checkPassword('photo')">📷 上传心情照片</button>
         <button id="btn-text" onclick="checkPassword('text')">✍️ 记录今日总结</button>
+        <button id="btn-blindbox" onclick="triggerBlindBox(true)" style="background: linear-gradient(135deg, #e3b0b8, #d4a0a8);">🎲 摇一摇盲盒</button>
         <input type="file" id="photo-input" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event)">
     </div>
 
@@ -1086,6 +1130,20 @@
             <button class="btn-cancel" onclick="clearFilters(); applyFilters();">重置</button>
             <button class="btn-cancel" onclick="closeFilterModal()">取消</button>
             <button onclick="applyFilters()">筛选</button>
+        </div>
+    </div>
+</div>
+
+<!-- 回忆盲盒弹窗 -->
+<div class="modal-overlay" id="blindBoxModal">
+    <div class="modal-box" style="width: 92%; max-width: 400px;">
+        <h3 class="modal-title">🎲 开启回忆盲盒...</h3>
+        <div class="blind-box-content" id="blindBoxContent">
+            <div style="color:var(--text-muted); font-size: 0.9em;">闭上眼睛，正在穿越时空... ✨</div>
+        </div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeBlindBox()">关上盒子</button>
+            <button onclick="triggerBlindBox(false)">再摇一次</button>
         </div>
     </div>
 </div>
@@ -1916,6 +1974,115 @@
             user: currentAuthor,
             online_at: new Date().toISOString(),
         });
+    }
+
+    // ==========================================
+    // 5. 回忆盲盒与摇一摇
+    // ==========================================
+    let isBlindBoxLoading = false;
+    let shakeLastTime = 0;
+    let lastX = 0, lastY = 0, lastZ = 0;
+    
+    async function triggerBlindBox(requestPermission = false) {
+        if (requestPermission && typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            try {
+                const permissionState = await DeviceMotionEvent.requestPermission();
+                if (permissionState === 'granted') {
+                    window.addEventListener('devicemotion', handleShake, false);
+                }
+            } catch (e) {
+                console.log('Request device motion failed', e);
+            }
+        } else if (requestPermission) {
+            // Android / older iOS
+            window.addEventListener('devicemotion', handleShake, false);
+        }
+
+        const modal = document.getElementById('blindBoxModal');
+        modal.classList.add('show');
+        fetchRandomMoment();
+    }
+
+    function closeBlindBox() {
+        document.getElementById('blindBoxModal').classList.remove('show');
+    }
+
+    function handleShake(event) {
+        let now = Date.now();
+        const acc = event.accelerationIncludingGravity || event.acceleration;
+        if (!acc) return;
+
+        let x = acc.x || 0;
+        let y = acc.y || 0;
+        let z = acc.z || 0;
+        
+        if (lastX === 0 && lastY === 0 && lastZ === 0) {
+            lastX = x; lastY = y; lastZ = z;
+            return;
+        }
+        
+        let delta = Math.abs(x - lastX) + Math.abs(y - lastY) + Math.abs(z - lastZ);
+        lastX = x; lastY = y; lastZ = z;
+
+        if (delta > 20) {
+            if ((now - shakeLastTime) < 2500) return; // 2.5s 防抖
+            shakeLastTime = now;
+            
+            const modal = document.getElementById('blindBoxModal');
+            if (!modal.classList.contains('show')) {
+                modal.classList.add('show');
+            }
+            fetchRandomMoment();
+        }
+    }
+
+    async function fetchRandomMoment() {
+        if (isBlindBoxLoading) return;
+        isBlindBoxLoading = true;
+        const contentBox = document.getElementById('blindBoxContent');
+        contentBox.innerHTML = '<div style="color:var(--text-muted); font-size: 0.9em;">✨ 魔法生效中，正在抽取回忆...</div>';
+        
+        let preferType = Math.random() < 0.8 ? 'photo' : 'text'; // 80% 图片, 20% 文字
+        
+        let { data: ids, error } = await supabaseClient.from('moments').select('id, type');
+        
+        if (error || !ids || ids.length === 0) {
+            contentBox.innerHTML = '<div style="color:var(--text-muted); font-size: 0.9em;">回忆库空空如也，快去多记录一些吧！</div>';
+            isBlindBoxLoading = false;
+            return;
+        }
+
+        let preferredIds = ids.filter(item => item.type === preferType);
+        if (preferredIds.length === 0) {
+            preferredIds = ids;
+        }
+
+        const randomIndex = Math.floor(Math.random() * preferredIds.length);
+        const randomId = preferredIds[randomIndex].id;
+
+        const { data: momentData, error: mError } = await supabaseClient.from('moments').select('*').eq('id', randomId).single();
+
+        if (mError || !momentData) {
+            contentBox.innerHTML = '<div style="color:var(--text-muted); font-size: 0.9em;">拉取失败了，再试一次吧...</div>';
+            isBlindBoxLoading = false;
+            return;
+        }
+
+        const dateStr = new Date(momentData.created_at).toLocaleString('zh-CN', { hour12: false });
+        let badge = momentData.author === '小蛇' ? '🐍 小蛇' : '🐟 小奚';
+        
+        let html = '';
+        if (momentData.type === 'photo') {
+            html += `<img class="blind-box-img" src="${momentData.content}" alt="回忆照片">`;
+        } else {
+            html += `<div class="blind-box-text">${escapeHtml(momentData.content)}</div>`;
+        }
+        
+        html += `<div class="blind-box-meta">${dateStr} · 来自 ${badge}</div>`;
+        html += `<div class="blind-box-prompt">✨ 还记得这一天吗？</div>`;
+        
+        contentBox.innerHTML = html;
+        isBlindBoxLoading = false;
     }
 
     window.onload = function() { 
