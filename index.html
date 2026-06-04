@@ -1021,14 +1021,7 @@
     <div class="btn-group">
         <button id="btn-photo" onclick="checkPassword('photo')">📷 上传心情照片</button>
         <button id="btn-text" onclick="checkPassword('text')">✍️ 记录今日总结</button>
-        <button id="btn-audio" 
-            onmousedown="startRecording(event)" 
-            onmouseup="stopRecording(event)" 
-            onmouseleave="cancelRecording(event)" 
-            ontouchstart="startRecording(event)" 
-            ontouchend="stopRecording(event)" 
-            ontouchcancel="cancelRecording(event)" 
-            style="background: linear-gradient(135deg, #a0d4c6, #7ab87a); position: relative; user-select: none; -webkit-user-select: none;">🎙️ 长按留声</button>
+        <button id="btn-audio" onclick="toggleRecording()" style="background: linear-gradient(135deg, #a0d4c6, #7ab87a); position: relative; user-select: none; -webkit-user-select: none;">🎙️ 点击留声</button>
         <button id="btn-blindbox" onclick="triggerBlindBox(true)" style="background: linear-gradient(135deg, #e3b0b8, #d4a0a8);">🎲 摇一摇盲盒</button>
         <input type="file" id="photo-input" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event)">
     </div>
@@ -1333,7 +1326,7 @@
                 } else if (currentAction === 'delete_comment') {
                     deleteComment(pendingDeleteCommentId, pendingDeleteCommentMomentId);
                 } else if (currentAction === 'audio_auth') {
-                    alert('验证成功！请再次长按留声按钮进行录音 🎙️');
+                    alert('验证成功！请再次点击留声按钮开始录音 🎙️');
                 }
             }, 500);
         } else if (inputVal.trim() === '') {
@@ -1409,6 +1402,98 @@
         btn.innerHTML = orig; btn.disabled = false;
         document.getElementById('photo-input').value = '';
         if (dbError) alert('记录保存失败: ' + dbError.message);
+        else fetchMoments();
+    }
+
+    // --- 录音功能（点击切换） ---
+    let mediaRecorder;
+    let audioChunks = [];
+    let recordingStartTime = 0;
+    let isRecording = false;
+
+    async function toggleRecording() {
+        if (!currentAuthor) {
+            checkPassword('audio_auth');
+            return;
+        }
+
+        if (isRecording) {
+            // 停止录音
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            isRecording = false;
+            resetAudioBtn();
+            return;
+        }
+
+        // 开始录音
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const duration = Date.now() - recordingStartTime;
+                stream.getTracks().forEach(track => track.stop()); // 关闭麦克风
+                
+                if (duration < 1000) {
+                    alert('录音时间太短啦，至少要1秒哦！');
+                    resetAudioBtn();
+                    return;
+                }
+
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                await handleAudioUpload(audioBlob);
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            recordingStartTime = Date.now();
+            
+            const btn = document.getElementById('btn-audio');
+            btn.innerHTML = '🔴 正在录音... 点击结束';
+            btn.style.boxShadow = '0 0 15px rgba(255,100,100,0.6)';
+        } catch (err) {
+            alert('无法访问麦克风，请检查设备权限设置！\n' + err.message);
+            isRecording = false;
+        }
+    }
+
+    function resetAudioBtn() {
+        const btn = document.getElementById('btn-audio');
+        if (btn) {
+            btn.innerHTML = '🎙️ 点击留声';
+            btn.style.boxShadow = '';
+        }
+    }
+
+    async function handleAudioUpload(blob) {
+        const btn = document.getElementById('btn-audio');
+        const orig = btn.innerHTML;
+        btn.innerHTML = '⏳ 声音保存中…'; btn.disabled = true;
+
+        const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+        const fileName = `audio_${Date.now()}_${Math.random().toString(36).substring(2,9)}.${ext}`;
+
+        const { error: uploadError } = await supabaseClient.storage.from('photos').upload(fileName, blob);
+        if (uploadError) {
+            alert('声音上传失败: ' + uploadError.message);
+            btn.innerHTML = orig; btn.disabled = false;
+            return;
+        }
+
+        const { data: publicUrlData } = supabaseClient.storage.from('photos').getPublicUrl(fileName);
+        const publicUrl = publicUrlData.publicUrl;
+
+        const { error: dbError } = await supabaseClient.from('moments').insert([{ type: 'audio', content: publicUrl, author: currentAuthor }]);
+        btn.innerHTML = orig; btn.disabled = false;
+        
+        if (dbError) alert('留声保存失败: ' + dbError.message);
         else fetchMoments();
     }
 
