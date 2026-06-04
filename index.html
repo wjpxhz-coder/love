@@ -427,6 +427,30 @@
             letter-spacing: 1px;
         }
 
+        .load-more-indicator {
+            text-align: center;
+            padding: 24px 0;
+            color: var(--text-muted);
+            font-size: 0.85em;
+            letter-spacing: 1px;
+        }
+
+        .load-more-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary-light);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         /* ── 响应式 ── */
         @media (max-width: 480px) {
             .site-header h1 { font-size: 2.1em; }
@@ -862,6 +886,11 @@
         "5211314": "小蛇"
     };
 
+    const PAGE_SIZE = 10;
+    let currentPage = 0;
+    let isLoading = false;
+    let hasMore = true;
+
 
     const ANNIVERSARIES = [
         { name: '在一起', icon: '💑', month: 5,  day: 23 },
@@ -1076,39 +1105,30 @@
         else fetchMoments();
     }
 
-    // --- 时光轴 ---
-    async function fetchMoments() {
-        const contentDiv = document.getElementById('timeline-content');
-        const { data, error } = await supabaseClient.from('moments')
-            .select('*')
-            .order('created_at', { ascending: false });
+    // --- 时光轴（无限滚动） ---
+    let scrollObserver = null;
 
-        if (error) {
-            contentDiv.innerHTML = `<p style="color:#b5737a;text-align:center;">读取数据失败: ${error.message}</p>`;
-            return;
-        }
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
 
-        if (data.length === 0) {
-            contentDiv.innerHTML = '<div class="empty-state">还没有记录哦，快去添加第一条回忆吧！</div>';
-            return;
-        }
-
+    function renderMomentCard(item) {
         const now = Date.now();
-        let html = '';
-        data.forEach(item => {
-            const dateStr = new Date(item.created_at).toLocaleString('zh-CN', { hour12: false });
-            const canDelete = (now - new Date(item.created_at).getTime()) < 86400000;
-            const deleteBtn = canDelete
-                ? `<button class="delete-btn" onclick="confirmDelete(${item.id})">撤回</button>`
-                : '';
+        const dateStr = new Date(item.created_at).toLocaleString('zh-CN', { hour12: false });
+        const canDelete = (now - new Date(item.created_at).getTime()) < 86400000;
+        const deleteBtn = canDelete
+            ? `<button class="delete-btn" onclick="confirmDelete(${item.id})">撤回</button>`
+            : '';
 
-            const authorBadge = item.author === '小蛇'
-                ? `<span class="author-badge author-snake">🐍 小蛇</span>`
-                : item.author === '小奚'
-                ? `<span class="author-badge author-xi">🐟 小奚</span>`
-                : '';
+        const authorBadge = item.author === '小蛇'
+            ? `<span class="author-badge author-snake">🐍 小蛇</span>`
+            : item.author === '小奚'
+            ? `<span class="author-badge author-xi">🐟 小奚</span>`
+            : '';
 
-            html += `<div class="moment-card" id="card-${item.id}">
+        let html = `<div class="moment-card" id="card-${item.id}">
                 <div class="card-header">
                     <div class="card-meta">
                         <span class="time-text">${dateStr}</span>
@@ -1117,12 +1137,12 @@
                     ${deleteBtn}
                 </div>`;
 
-            if (item.type === 'text') {
-                html += `<div class="card-text">${item.content}</div>`;
-            } else if (item.type === 'photo') {
-                html += `<img class="card-img" src="${item.content}" alt="我们的回忆" onclick="openLightbox(this.src)">`;
-            }
-            html += `
+        if (item.type === 'text') {
+            html += `<div class="card-text">${escapeHtml(item.content)}</div>`;
+        } else if (item.type === 'photo') {
+            html += `<img class="card-img" src="${item.content}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)">`;
+        }
+        html += `
                 <button class="comment-toggle-btn" onclick="toggleComments(${item.id})">
                     💬 <span id="comment-count-${item.id}">评论</span>
                 </button>
@@ -1138,10 +1158,79 @@
                     </div>
                 </div>
             </div>`;
-        });
+        return html;
+    }
 
-        contentDiv.innerHTML = html;
-        data.forEach(item => loadCommentCount(item.id));
+    async function fetchMoments(append = false) {
+        if (isLoading) return;
+        if (append && !hasMore) return;
+
+        isLoading = true;
+        const contentDiv = document.getElementById('timeline-content');
+
+        if (!append) {
+            currentPage = 0;
+            hasMore = true;
+            contentDiv.innerHTML = '<div class="empty-state">正在加载甜蜜回忆…</div>';
+        }
+
+        const from = currentPage * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
+        const { data, error } = await supabaseClient.from('moments')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .range(from, to);
+
+        isLoading = false;
+
+        if (error) {
+            if (!append) contentDiv.innerHTML = `<p style="color:#b5737a;text-align:center;">读取数据失败: ${error.message}</p>`;
+            return;
+        }
+
+        if (data.length < PAGE_SIZE) hasMore = false;
+
+        if (!append && data.length === 0) {
+            contentDiv.innerHTML = '<div class="empty-state">还没有记录哦，快去添加第一条回忆吧！</div>';
+            return;
+        }
+
+        if (!append) contentDiv.innerHTML = '';
+
+        // 移除已有的加载指示器
+        const existingLoader = contentDiv.querySelector('.load-more-indicator');
+        if (existingLoader) existingLoader.remove();
+
+        // 渲染新卡片
+        const html = data.map(item => renderMomentCard(item)).join('');
+        contentDiv.insertAdjacentHTML('beforeend', html);
+
+        // 添加加载更多提示
+        if (hasMore) {
+            contentDiv.insertAdjacentHTML('beforeend',
+                '<div class="load-more-indicator"><span class="load-more-spinner"></span>下滑加载更多回忆…</div>');
+        }
+
+        currentPage++;
+
+        // 批量加载评论计数
+        loadCommentCounts(data.map(item => item.id));
+
+        // 设置滚动观察器
+        setupScrollObserver();
+    }
+
+    function setupScrollObserver() {
+        if (scrollObserver) scrollObserver.disconnect();
+        const loader = document.querySelector('.load-more-indicator');
+        if (!loader || !hasMore) return;
+        scrollObserver = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && !isLoading && hasMore) {
+                fetchMoments(true);
+            }
+        }, { rootMargin: '200px' });
+        scrollObserver.observe(loader);
     }
 
     // --- 删除 ---
@@ -1249,17 +1338,24 @@
         }).join('');
     }
 
-    async function loadCommentCount(momentId) {
-        const countEl = document.getElementById(`comment-count-${momentId}`);
-        if (!countEl) return;
-        const { count, error } = await supabaseClient.from('comments')
-            .select('*', { count: 'exact', head: true })
-            .eq('moment_id', momentId);
-        if (!error && count > 0) {
-            countEl.innerText = `${count} 条评论`;
-        } else {
-            countEl.innerText = '评论';
-        }
+    async function loadCommentCounts(momentIds) {
+        if (!momentIds.length) return;
+        const { data, error } = await supabaseClient.from('comments')
+            .select('moment_id')
+            .in('moment_id', momentIds);
+
+        if (error) return;
+
+        const counts = {};
+        data.forEach(c => { counts[c.moment_id] = (counts[c.moment_id] || 0) + 1; });
+
+        momentIds.forEach(id => {
+            const countEl = document.getElementById(`comment-count-${id}`);
+            if (countEl) {
+                const count = counts[id] || 0;
+                countEl.innerText = count > 0 ? `${count} 条评论` : '评论';
+            }
+        });
     }
 
     async function submitComment(momentId) {
@@ -1286,7 +1382,7 @@
 
         cancelCommentInput(momentId);
         loadComments(momentId);
-        loadCommentCount(momentId);
+        loadCommentCounts([momentId]);
     }
 
     // --- 灯箱 ---
