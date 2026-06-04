@@ -565,6 +565,53 @@
         }
         .filter-active-indicator.show { display: block; }
 
+        /* ── 同频共振 UI ── */
+        .resonance-ui {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 10px 24px;
+            border-radius: 30px;
+            box-shadow: 0 4px 20px rgba(255, 182, 193, 0.6);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255, 215, 0, 0.4);
+        }
+        .resonance-ui.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+        .resonance-hearts {
+            font-size: 1.5em;
+            display: flex;
+            gap: -5px;
+            animation: heartbeat 1.2s infinite;
+        }
+        .resonance-text {
+            font-size: 0.9em;
+            color: #d46b7a;
+            font-weight: 600;
+            letter-spacing: 1px;
+            background: linear-gradient(90deg, #d46b7a, #c9a970);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            15% { transform: scale(1.15); }
+            30% { transform: scale(1); }
+            45% { transform: scale(1.15); }
+        }
+
         /* ── 响应式 ── */
         @media (max-width: 480px) {
             .site-header h1 { font-size: 2.1em; }
@@ -885,6 +932,12 @@
 </head>
 <body>
 
+<!-- 同频共振 UI -->
+<div class="resonance-ui" id="resonance-ui">
+    <div class="resonance-hearts">💖💖</div>
+    <div class="resonance-text">此刻，TA 也在陪你看回忆 ✨</div>
+</div>
+
 <canvas id="sakura-canvas"></canvas>
 
 <div class="container">
@@ -1077,6 +1130,9 @@
     // ==========================================
     // 2. 樱花动画
     // ==========================================
+    let bothOnline = false;
+    let sakuraColor = '#f2b8c0'; // Default pink
+
     (function() {
         const canvas = document.getElementById('sakura-canvas');
         const ctx = canvas.getContext('2d');
@@ -1118,7 +1174,11 @@
             ctx.globalAlpha = p.alpha;
             ctx.beginPath();
             ctx.ellipse(0, 0, p.size, p.size * 0.55, 0, 0, Math.PI * 2);
-            ctx.fillStyle = '#f2b8c0';
+            ctx.fillStyle = sakuraColor;
+            if (bothOnline) {
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = sakuraColor;
+            }
             ctx.fill();
             ctx.restore();
         }
@@ -1126,10 +1186,10 @@
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             petals.forEach((p, i) => {
-                p.sway += p.swaySpeed;
-                p.x += p.speedX + Math.sin(p.sway) * 0.5;
-                p.y += p.speedY;
-                p.rot += p.rotSpeed;
+                p.sway += p.swaySpeed * (bothOnline ? 1.5 : 1);
+                p.x += p.speedX + Math.sin(p.sway) * (bothOnline ? 0.8 : 0.5);
+                p.y += p.speedY * (bothOnline ? 1.3 : 1);
+                p.rot += p.rotSpeed * (bothOnline ? 1.5 : 1);
                 if (p.y > canvas.height + 20) petals[i] = newPetal();
                 drawPetal(p);
             });
@@ -1160,7 +1220,7 @@
     // 4. 交互逻辑
     // ==========================================
     let currentAction = '';
-    let currentAuthor = '';
+    let currentAuthor = localStorage.getItem('lover_identity') || '';
 
     function checkPassword(actionType) {
         currentAction = actionType;
@@ -1182,6 +1242,9 @@
 
         if (USERS[inputVal]) {
             currentAuthor = USERS[inputVal];
+            localStorage.setItem('lover_identity', currentAuthor);
+            if (presenceChannel) updatePresence();
+
             msgEl.style.color = '#7ab87a';
             msgEl.innerText = `暗号正确，${currentAuthor} 💖`;
             setTimeout(() => {
@@ -1777,7 +1840,52 @@
         }).join('');
     }
 
-    window.onload = function() { fetchMoments(); renderAnniversaries(); loadMoods(); };
+    // --- 同频共振 (Presence) ---
+    let presenceChannel = null;
+
+    function initPresence() {
+        presenceChannel = supabaseClient.channel('lovers_room');
+        presenceChannel.on('presence', { event: 'sync' }, () => {
+            const state = presenceChannel.presenceState();
+            let snakeOnline = false;
+            let xiOnline = false;
+            for (const key in state) {
+                state[key].forEach(presence => {
+                    if (presence.user === '小蛇') snakeOnline = true;
+                    if (presence.user === '小奚') xiOnline = true;
+                });
+            }
+            
+            bothOnline = snakeOnline && xiOnline;
+            const ui = document.getElementById('resonance-ui');
+            if (bothOnline) {
+                ui.classList.add('show');
+                sakuraColor = '#ffd700'; // 金粉色
+            } else {
+                ui.classList.remove('show');
+                sakuraColor = '#f2b8c0'; // 恢复平常粉色
+            }
+        }).subscribe(async (status) => {
+            if (status === 'SUBSCRIBED' && currentAuthor) {
+                updatePresence();
+            }
+        });
+    }
+
+    async function updatePresence() {
+        if (!presenceChannel || !currentAuthor) return;
+        await presenceChannel.track({
+            user: currentAuthor,
+            online_at: new Date().toISOString(),
+        });
+    }
+
+    window.onload = function() { 
+        fetchMoments(); 
+        renderAnniversaries(); 
+        loadMoods(); 
+        initPresence();
+    };
 
     // ==========================================
     // 注册 Service Worker (PWA)
