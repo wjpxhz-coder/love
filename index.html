@@ -458,6 +458,113 @@
             to { transform: rotate(360deg); }
         }
 
+        /* ── 筛选悬浮按钮 ── */
+        .fab-filter {
+            position: fixed;
+            bottom: 30px;
+            right: 20px;
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4em;
+            box-shadow: 0 6px 20px rgba(181, 115, 122, 0.4);
+            cursor: pointer;
+            z-index: 100;
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: none;
+            padding: 0;
+        }
+        .fab-filter:hover {
+            transform: translateY(-4px) scale(1.05);
+            box-shadow: 0 10px 25px rgba(181, 115, 122, 0.5);
+        }
+        .fab-filter.active {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(181, 115, 122, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(181, 115, 122, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(181, 115, 122, 0); }
+        }
+
+        /* ── 筛选弹窗内部 ── */
+        .filter-section {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+        .filter-section-title {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .filter-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .filter-select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            outline: none;
+            background: rgba(255,255,255,0.8);
+            color: var(--text);
+            font-size: 0.9em;
+        }
+        .filter-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9em;
+            color: var(--text);
+            cursor: pointer;
+        }
+        .filter-checkbox-label input[type="checkbox"] {
+            accent-color: var(--primary);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .filter-keyword {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            outline: none;
+            background: rgba(255,255,255,0.8);
+            color: var(--text);
+            margin-top: 4px;
+            font-size: 0.9em;
+        }
+        .filter-keyword:focus, .filter-select:focus {
+            border-color: var(--primary-light);
+        }
+        .filter-active-indicator {
+            display: none;
+            font-size: 0.8em;
+            color: var(--primary);
+            background: rgba(212, 160, 168, 0.15);
+            padding: 8px 14px;
+            border-radius: 20px;
+            margin-bottom: 18px;
+            text-align: center;
+            border: 1px dashed var(--primary-light);
+            transition: background 0.2s;
+        }
+        .filter-active-indicator:hover {
+            background: rgba(212, 160, 168, 0.25);
+        }
+        .filter-active-indicator.show { display: block; }
+
         /* ── 响应式 ── */
         @media (max-width: 480px) {
             .site-header h1 { font-size: 2.1em; }
@@ -823,6 +930,7 @@
 
     <section class="timeline-section">
         <h3 class="timeline-title">⏳ 时光足迹</h3>
+        <div id="filter-indicator" class="filter-active-indicator" style="cursor: pointer;" onclick="openFilterModal()">当前已开启筛选 (点击修改)</div>
         <div class="timeline-track" id="timeline-content">
             <div class="empty-state">正在加载甜蜜回忆…</div>
         </div>
@@ -876,6 +984,60 @@
         </div>
     </div>
 </div>
+
+<!-- 检索筛选弹窗 -->
+<div class="modal-overlay" id="filterModal">
+    <div class="modal-box" style="width: 92%; max-width: 380px;">
+        <h3 class="modal-title">检索回忆 📂</h3>
+        
+        <div class="filter-section" style="margin-top: 16px;">
+            <div class="filter-section-title">📅 按时间</div>
+            <div class="filter-row">
+                <select id="filterYear" class="filter-select">
+                    <option value="">所有年份</option>
+                    <option value="2026">2026年</option>
+                    <option value="2027">2027年</option>
+                    <option value="2028">2028年</option>
+                </select>
+                <select id="filterMonth" class="filter-select">
+                    <option value="">所有月份</option>
+                    <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4">4月</option>
+                    <option value="5">5月</option><option value="6">6月</option><option value="7">7月</option><option value="8">8月</option>
+                    <option value="9">9月</option><option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="filter-section">
+            <div class="filter-section-title">👤 按发布人</div>
+            <div class="filter-row">
+                <label class="filter-checkbox-label"><input type="checkbox" value="小蛇" id="chkAuthorSnake"> 小蛇</label>
+                <label class="filter-checkbox-label"><input type="checkbox" value="小奚" id="chkAuthorXi"> 小奚</label>
+            </div>
+        </div>
+
+        <div class="filter-section">
+            <div class="filter-section-title">🏷️ 按类型</div>
+            <div class="filter-row">
+                <label class="filter-checkbox-label"><input type="checkbox" value="text" id="chkTypeText"> 文字</label>
+                <label class="filter-checkbox-label"><input type="checkbox" value="photo" id="chkTypePhoto"> 照片</label>
+            </div>
+        </div>
+
+        <div class="filter-section">
+            <div class="filter-section-title">🔍 按关键词 / 标签</div>
+            <input type="text" id="filterKeyword" class="filter-keyword" placeholder="例如：约会 或 #旅游">
+        </div>
+
+        <div class="modal-btns" style="margin-top: 24px;">
+            <button class="btn-cancel" onclick="clearFilters(); applyFilters();">重置</button>
+            <button class="btn-cancel" onclick="closeFilterModal()">取消</button>
+            <button onclick="applyFilters()">筛选</button>
+        </div>
+    </div>
+</div>
+
+<button class="fab-filter" id="fab-filter" onclick="openFilterModal()" title="检索回忆">🔍</button>
 
 <!-- 灯箱 -->
 <div id="lightbox" onclick="closeLightbox()">
@@ -1168,6 +1330,86 @@
         return html;
     }
 
+    // --- 高级检索/筛选 ---
+    let currentFilters = {
+        year: '',
+        month: '',
+        authors: [],
+        types: [],
+        keyword: ''
+    };
+
+    function openFilterModal() {
+        document.getElementById('filterModal').classList.add('show');
+    }
+
+    function closeFilterModal() {
+        document.getElementById('filterModal').classList.remove('show');
+    }
+
+    function clearFilters() {
+        document.getElementById('filterYear').value = '';
+        document.getElementById('filterMonth').value = '';
+        document.getElementById('chkAuthorSnake').checked = false;
+        document.getElementById('chkAuthorXi').checked = false;
+        document.getElementById('chkTypeText').checked = false;
+        document.getElementById('chkTypePhoto').checked = false;
+        document.getElementById('filterKeyword').value = '';
+    }
+
+    function applyFilters() {
+        currentFilters.year = document.getElementById('filterYear').value;
+        currentFilters.month = document.getElementById('filterMonth').value;
+        currentFilters.authors = [];
+        if (document.getElementById('chkAuthorSnake').checked) currentFilters.authors.push('小蛇');
+        if (document.getElementById('chkAuthorXi').checked) currentFilters.authors.push('小奚');
+        
+        currentFilters.types = [];
+        if (document.getElementById('chkTypeText').checked) currentFilters.types.push('text');
+        if (document.getElementById('chkTypePhoto').checked) currentFilters.types.push('photo');
+        
+        currentFilters.keyword = document.getElementById('filterKeyword').value.trim();
+
+        closeFilterModal();
+        updateFilterIndicator();
+        fetchMoments(false); // 重置并根据新条件拉取
+    }
+
+    function updateFilterIndicator() {
+        const indicator = document.getElementById('filter-indicator');
+        const fab = document.getElementById('fab-filter');
+        let active = false;
+        let text = '已开启筛选: ';
+        let details = [];
+
+        if (currentFilters.year || currentFilters.month) {
+            active = true;
+            details.push(`${currentFilters.year || '所有'}年${currentFilters.month ? currentFilters.month + '月' : ''}`);
+        }
+        if (currentFilters.authors.length > 0) {
+            active = true;
+            details.push(currentFilters.authors.join('或'));
+        }
+        if (currentFilters.types.length > 0) {
+            active = true;
+            let typeNames = currentFilters.types.map(t => t === 'text' ? '文字' : '照片');
+            details.push(typeNames.join('或'));
+        }
+        if (currentFilters.keyword) {
+            active = true;
+            details.push(`包含"${currentFilters.keyword}"`);
+        }
+
+        if (active) {
+            indicator.innerText = text + details.join(' | ') + ' (点击修改或重置)';
+            indicator.classList.add('show');
+            fab.classList.add('active');
+        } else {
+            indicator.classList.remove('show');
+            fab.classList.remove('active');
+        }
+    }
+
     async function fetchMoments(append = false) {
         if (isLoading) return;
         if (append && !hasMore) return;
@@ -1184,10 +1426,40 @@
         const from = currentPage * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
-        const { data, error } = await supabaseClient.from('moments')
+        let query = supabaseClient.from('moments')
             .select('*')
             .order('created_at', { ascending: false })
             .range(from, to);
+
+        // 应用筛选条件
+        if (currentFilters.authors.length > 0) {
+            query = query.in('author', currentFilters.authors);
+        }
+        if (currentFilters.types.length > 0) {
+            query = query.in('type', currentFilters.types);
+        }
+        if (currentFilters.keyword) {
+            query = query.ilike('content', `%${currentFilters.keyword}%`);
+        }
+        if (currentFilters.year) {
+            let startYear = parseInt(currentFilters.year);
+            // JavaScript 月份是 0-11
+            let startMonth = currentFilters.month ? parseInt(currentFilters.month) - 1 : 0;
+            let endYear = startMonth === 11 ? startYear + 1 : startYear;
+            let endMonth = startMonth === 11 ? 0 : startMonth + 1;
+            
+            if (!currentFilters.month) {
+                endYear = startYear + 1;
+                endMonth = 0;
+            }
+
+            // ISO string, assuming server time is UTC or similar, this local date bound is generally fine
+            let startDateStr = new Date(startYear, startMonth, 1).toISOString();
+            let endDateStr = new Date(endYear, endMonth, 1).toISOString();
+            query = query.gte('created_at', startDateStr).lt('created_at', endDateStr);
+        }
+
+        const { data, error } = await query;
 
         isLoading = false;
 
