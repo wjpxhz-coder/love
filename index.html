@@ -458,34 +458,72 @@
             to { transform: rotate(360deg); }
         }
 
-        /* ── 筛选悬浮按钮 ── */
-        .fab-filter {
+        /* ── 统一悬浮球及菜单 ── */
+        .fab-container {
             position: fixed;
             bottom: 30px;
             right: 20px;
-            width: 54px;
-            height: 54px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .fab-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(20px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .fab-menu.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        .fab-main {
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
             background: linear-gradient(135deg, var(--primary-light), var(--primary));
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.4em;
+            font-size: 1.6em;
             box-shadow: 0 6px 20px rgba(181, 115, 122, 0.4);
             cursor: pointer;
-            z-index: 100;
             transition: transform 0.3s, box-shadow 0.3s;
             border: none;
             padding: 0;
-        }
-        .fab-filter:hover {
-            transform: translateY(-4px) scale(1.05);
-            box-shadow: 0 10px 25px rgba(181, 115, 122, 0.5);
-        }
-        .fab-filter.active {
             animation: pulse 2s infinite;
         }
+        .fab-main:hover {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 8px 25px rgba(181, 115, 122, 0.5);
+        }
+        .fab-item {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3em;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: transform 0.2s;
+            padding: 0;
+            color: #fff;
+        }
+        .fab-item:hover {
+            transform: scale(1.1);
+        }
+        .fab-item-filter { background: linear-gradient(135deg, #a0d4c6, #7ab87a); }
+        .fab-item-ai { background: linear-gradient(135deg, #f7d2d7, #e3b0b8); }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(181, 115, 122, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(181, 115, 122, 0); }
@@ -972,36 +1010,7 @@
         }
         .comment-cancel-btn:hover { background: rgba(200,155,155,0.08); transform: none; box-shadow: none; color: var(--text); }
 
-        /* ── AI 悬浮球及面板 ── */
-        .fab-ai {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #f7d2d7, #e3b0b8);
-            color: #fff;
-            font-size: 1.6em;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: none;
-            box-shadow: 0 4px 16px rgba(227, 176, 184, 0.4);
-            cursor: pointer;
-            z-index: 99;
-            transition: all 0.3s;
-            animation: float 3s ease-in-out infinite;
-            padding: 0;
-        }
-        .fab-ai:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(227, 176, 184, 0.6);
-        }
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-8px); }
-        }
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -1231,10 +1240,13 @@
     </div>
 </div>
 
-<button class="fab-filter" id="fab-filter" onclick="openFilterModal()" title="检索回忆">🔍</button>
-
-<!-- AI悬浮球 -->
-<button class="fab-ai" id="fab-ai" onclick="openAIModal()" title="AI专属助理">🤖</button>
+<div class="fab-container" id="fab-container">
+    <div class="fab-menu" id="fab-menu">
+        <button class="fab-item fab-item-ai" onclick="openAIModal(); toggleFabMenu();" title="AI专属助理">🤖</button>
+        <button class="fab-item fab-item-filter" onclick="openFilterModal(); toggleFabMenu();" title="检索回忆">🔍</button>
+    </div>
+    <button class="fab-main" onclick="toggleFabMenu()" title="功能菜单">✨</button>
+</div>
 
 <!-- AI面板 -->
 <div class="modal-overlay" id="aiModal">
@@ -2344,6 +2356,15 @@
 
     function closeAIModal() {
         document.getElementById('aiModal').classList.remove('show');
+    }
+
+    function toggleFabMenu() {
+        const menu = document.getElementById('fab-menu');
+        if (menu.classList.contains('show')) {
+            menu.classList.remove('show');
+        } else {
+            menu.classList.add('show');
+        }
     }
 
     async function switchAITab(tabName) {
