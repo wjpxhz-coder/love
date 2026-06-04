@@ -1325,8 +1325,8 @@
                     showCommentInput(pendingCommentMomentId);
                 } else if (currentAction === 'delete_comment') {
                     deleteComment(pendingDeleteCommentId, pendingDeleteCommentMomentId);
-                } else if (currentAction === 'audio_auth') {
-                    alert('验证成功！请再次点击留声按钮开始录音 🎙️');
+                } else if (currentAction === 'audio_start') {
+                    executeStartRecording();
                 }
             }, 500);
         } else if (inputVal.trim() === '') {
@@ -1412,11 +1412,6 @@
     let isRecording = false;
 
     async function toggleRecording() {
-        if (!currentAuthor) {
-            checkPassword('audio_auth');
-            return;
-        }
-
         if (isRecording) {
             // 停止录音
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
@@ -1427,7 +1422,11 @@
             return;
         }
 
-        // 开始录音
+        // 未在录音，则需要验证身份才能开始
+        checkPassword('audio_start');
+    }
+
+    async function executeStartRecording() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaRecorder = new MediaRecorder(stream);
