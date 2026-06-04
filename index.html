@@ -14,6 +14,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Nunito:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        (function() {
+            var saved = localStorage.getItem('theme_preference');
+            var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <style>
         :root {
             --primary: #b5737a;
@@ -25,12 +32,22 @@
             --card: rgba(255, 252, 250, 0.9);
             --border: rgba(200, 155, 155, 0.22);
             --shadow: rgba(180, 120, 120, 0.13);
+            --glass-bg: rgba(255, 252, 250, 0.5);
+            --glass-border: rgba(255, 255, 255, 0.45);
+            --glass-highlight: rgba(255, 255, 255, 0.5);
+            --moment-bg: rgba(255, 250, 248, 0.45);
+            --bg-1: #fdf8f6;
+            --bg-2: #f5e6f0;
+            --bg-3: #e8ddf5;
+            --bg-4: #fef5ec;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            background: var(--bg);
+            background: linear-gradient(-45deg, var(--bg-1), var(--bg-2), var(--bg-3), var(--bg-4));
+            background-size: 400% 400%;
+            animation: gradientShift 20s ease infinite;
             font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
             color: var(--text);
             min-height: 100vh;
@@ -66,10 +83,14 @@
         .site-header h1 {
             font-family: 'ZCOOL KuaiLe', cursive;
             font-size: 2.8em;
-            color: var(--primary);
+            background: linear-gradient(135deg, var(--primary), var(--gold), var(--primary));
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             letter-spacing: 4px;
             line-height: 1.2;
-            text-shadow: 0 2px 20px rgba(181, 115, 122, 0.18);
+            animation: titleAppear 1.2s cubic-bezier(0.4, 0, 0.2, 1) both, shimmerText 4s ease 1.2s infinite;
         }
 
         .site-header .tagline {
@@ -78,6 +99,7 @@
             color: var(--gold);
             letter-spacing: 3px;
             font-weight: 400;
+            animation: taglineAppear 1s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both;
         }
 
         .header-divider {
@@ -107,12 +129,13 @@
         }
 
         .timer-card {
-            background: var(--card);
-            border: 1px solid var(--border);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
             border-radius: 16px;
             padding: 18px 8px 14px;
-            box-shadow: 0 4px 24px var(--shadow);
-            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 24px var(--shadow), inset 0 1px 0 var(--glass-highlight);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             position: relative;
             overflow: hidden;
         }
@@ -167,6 +190,8 @@
             display: flex;
             align-items: center;
             gap: 7px;
+            position: relative;
+            overflow: hidden;
         }
 
         button:hover {
@@ -179,12 +204,13 @@
 
         /* ── 时光轴 ── */
         .timeline-section {
-            background: var(--card);
-            border: 1px solid var(--border);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
             border-radius: 24px;
             padding: 32px 28px;
-            box-shadow: 0 8px 40px var(--shadow);
-            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 40px var(--shadow), inset 0 1px 0 var(--glass-highlight);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
         }
 
         .timeline-title {
@@ -216,12 +242,22 @@
         /* ── 记录卡片 ── */
         .moment-card {
             position: relative;
-            background: rgba(255, 250, 248, 0.7);
-            border: 1px solid var(--border);
+            background: var(--moment-bg);
+            border: 1px solid var(--glass-border);
             border-radius: 16px;
             padding: 16px 18px;
             margin-bottom: 20px;
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 2px 12px var(--shadow);
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
+        }
+
+        .moment-card.visible {
+            opacity: 1;
+            transform: translateY(0);
         }
 
         .moment-card::before {
@@ -233,7 +269,7 @@
             color: var(--primary-light);
         }
 
-        .moment-card:hover {
+        .moment-card.visible:hover {
             transform: translateX(4px);
             box-shadow: 0 6px 24px var(--shadow);
         }
@@ -720,15 +756,17 @@
         }
 
         .anniv-card {
-            background: var(--card);
-            border: 1px solid var(--border);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
             border-radius: 16px;
             padding: 14px 10px;
             text-align: center;
-            box-shadow: 0 3px 16px var(--shadow);
+            box-shadow: 0 3px 16px var(--shadow), inset 0 1px 0 var(--glass-highlight);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
             position: relative;
             overflow: hidden;
-            transition: transform 0.2s;
+            transition: transform 0.2s, box-shadow 0.3s;
         }
 
         .anniv-card:hover { transform: translateY(-2px); }
@@ -760,11 +798,13 @@
 
         /* ── 心情打卡 ── */
         .mood-section {
-            background: var(--card);
-            border: 1px solid var(--border);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
             border-radius: 24px;
             padding: 24px 24px 20px;
-            box-shadow: 0 8px 40px var(--shadow);
+            box-shadow: 0 8px 40px var(--shadow), inset 0 1px 0 var(--glass-highlight);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             margin-bottom: 24px;
         }
 
@@ -1061,6 +1101,250 @@
             margin-top: 50px;
             animation: pulse 1.5s infinite;
         }
+        /* ── 动态渐变背景动画 ── */
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* ── 星光粒子层 ── */
+        #star-field {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .star {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            animation: twinkle var(--duration, 3s) ease-in-out infinite;
+        }
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.15; transform: scale(0.8); }
+            50% { opacity: 0.8; transform: scale(1.4); }
+        }
+
+        /* ── 爱心粒子 ── */
+        .love-particle {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            font-size: 16px;
+            animation: floatUp 1.2s ease-out forwards;
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
+            100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.3) rotate(var(--rot)); }
+        }
+
+        /* ── 渐变文字 shimmer ── */
+        @keyframes shimmerText {
+            0% { background-position: 0% center; }
+            100% { background-position: 200% center; }
+        }
+
+        /* ── 按钮光扫效果 ── */
+        button::after {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%);
+            transform: rotate(25deg) translateX(-150%);
+            transition: transform 0.65s ease;
+            pointer-events: none;
+        }
+        button:hover::after {
+            transform: rotate(25deg) translateX(100%);
+        }
+        /* 禁用一些小按钮的光扫 */
+        .delete-btn::after, .comment-toggle-btn::after, .comment-write-btn::after,
+        .comment-cancel-btn::after, .btn-cancel::after, .mood-emoji-btn::after,
+        .ai-tab::after, .theme-toggle::after { display: none; }
+
+        /* ── 计时器翻页动画 ── */
+        .timer-card .num.flip {
+            animation: flipDigit 0.5s ease;
+        }
+        @keyframes flipDigit {
+            0% { transform: rotateX(0) scale(1); }
+            30% { transform: rotateX(90deg) scale(0.9); opacity: 0.3; }
+            60% { transform: rotateX(-20deg) scale(1.05); opacity: 0.8; }
+            100% { transform: rotateX(0) scale(1); opacity: 1; }
+        }
+
+        /* ── 纪念日脉冲发光 ── */
+        .anniv-card.today {
+            animation: pulseBorder 2s ease-in-out infinite;
+        }
+        @keyframes pulseBorder {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(201, 169, 112, 0.4), 0 3px 16px var(--shadow); }
+            50% { box-shadow: 0 0 0 8px rgba(201, 169, 112, 0), 0 3px 16px var(--shadow); }
+        }
+
+        /* ── 纪念日卡片光晕 ── */
+        .anniv-card .glow {
+            position: absolute;
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(212, 160, 168, 0.3), transparent 70%);
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .anniv-card:hover .glow { opacity: 1; }
+
+        /* ── 时光轴流光 ── */
+        .timeline-track::after {
+            content: '';
+            position: absolute;
+            left: 6.5px;
+            top: 0;
+            width: 2px;
+            height: 40px;
+            background: linear-gradient(to bottom, transparent, var(--gold), transparent);
+            border-radius: 2px;
+            animation: flowingLight 3.5s linear infinite;
+            z-index: 1;
+        }
+        @keyframes flowingLight {
+            0% { top: -40px; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: calc(100% + 40px); opacity: 0; }
+        }
+
+        /* ── 标题入场动画 ── */
+        @keyframes titleAppear {
+            0% { opacity: 0; transform: scale(0.85) translateY(20px); filter: blur(8px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+        }
+        @keyframes taglineAppear {
+            0% { opacity: 0; transform: translateY(12px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── 深色模式切换按钮 ── */
+        .theme-toggle {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 500;
+            width: 42px; height: 42px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--card);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            box-shadow: 0 2px 12px var(--shadow);
+            transition: all 0.4s ease;
+            padding: 0;
+            color: var(--text);
+        }
+        .theme-toggle:hover {
+            transform: rotate(20deg) scale(1.1);
+            box-shadow: 0 4px 18px var(--shadow);
+        }
+
+        /* ── 深色模式 ── */
+        [data-theme="dark"] {
+            --primary: #e8a0b0;
+            --primary-light: #d07888;
+            --gold: #dcc080;
+            --text: #e8dde8;
+            --text-muted: #a090a8;
+            --card: rgba(30, 20, 50, 0.7);
+            --border: rgba(160, 120, 180, 0.2);
+            --shadow: rgba(80, 40, 100, 0.3);
+            --glass-bg: rgba(30, 20, 50, 0.5);
+            --glass-border: rgba(160, 120, 200, 0.15);
+            --glass-highlight: rgba(255, 255, 255, 0.05);
+            --moment-bg: rgba(25, 15, 45, 0.45);
+            --bg-1: #0f0a1a;
+            --bg-2: #1a1030;
+            --bg-3: #0d0820;
+            --bg-4: #1a0828;
+        }
+
+        [data-theme="dark"] .modal-overlay {
+            background: rgba(10, 5, 20, 0.5);
+        }
+        [data-theme="dark"] .modal-box {
+            background: rgba(30, 20, 50, 0.92);
+            border-color: rgba(160, 120, 180, 0.3);
+        }
+        [data-theme="dark"] .modal-input,
+        [data-theme="dark"] .filter-keyword,
+        [data-theme="dark"] .filter-select,
+        [data-theme="dark"] .comment-textarea {
+            background: rgba(20, 12, 35, 0.8);
+            color: var(--text);
+            border-color: var(--border);
+        }
+        [data-theme="dark"] .comment-bubble {
+            background: rgba(40, 25, 65, 0.5);
+            border-color: rgba(160, 120, 180, 0.15);
+        }
+        [data-theme="dark"] #lightbox {
+            background: rgba(5, 2, 12, 0.92);
+        }
+        [data-theme="dark"] #blindBoxModal .modal-box {
+            background: linear-gradient(135deg, rgba(30, 15, 50, 0.95), rgba(25, 12, 40, 0.95));
+            border-color: rgba(200, 150, 200, 0.3);
+        }
+        [data-theme="dark"] .blind-box-text {
+            background: rgba(40, 25, 65, 0.5);
+        }
+        [data-theme="dark"] .btn-cancel {
+            color: var(--text-muted);
+            border-color: var(--border);
+        }
+        [data-theme="dark"] .delete-btn {
+            border-color: rgba(160, 120, 180, 0.3);
+            color: var(--text-muted);
+        }
+        [data-theme="dark"] .author-snake {
+            background: rgba(220, 120, 160, 0.15);
+            color: #e8a0b8;
+            border-color: rgba(220, 120, 160, 0.3);
+        }
+        [data-theme="dark"] .author-xi {
+            background: rgba(120, 150, 220, 0.15);
+            color: #a0b8e8;
+            border-color: rgba(120, 150, 220, 0.3);
+        }
+        [data-theme="dark"] .anniv-card.today {
+            border-color: var(--gold);
+            background: linear-gradient(135deg, rgba(50, 40, 20, 0.6), rgba(40, 30, 50, 0.6));
+        }
+        [data-theme="dark"] .resonance-ui {
+            background: rgba(30, 20, 50, 0.85);
+            border-color: rgba(255, 215, 0, 0.3);
+        }
+        [data-theme="dark"] .ai-content-area {
+            background: rgba(20, 12, 35, 0.5);
+        }
+        [data-theme="dark"] .filter-active-indicator {
+            background: rgba(160, 120, 200, 0.12);
+            border-color: var(--primary-light);
+        }
+        [data-theme="dark"] .mood-empty-dot {
+            background: rgba(100, 70, 140, 0.15);
+            border-color: rgba(160, 120, 200, 0.2);
+        }
+        [data-theme="dark"] .star {
+            background: rgba(200, 180, 255, 0.7);
+        }
     </style>
 </head>
 <body>
@@ -1070,6 +1354,10 @@
     <div class="resonance-hearts">💖💖</div>
     <div class="resonance-text">此刻，TA 也在陪你看回忆 ✨</div>
 </div>
+
+<button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+
+<div id="star-field"></div>
 
 <canvas id="sakura-canvas"></canvas>
 
@@ -1376,6 +1664,17 @@
     // ==========================================
     // 3. 计时器
     // ==========================================
+    function flipUpdate(id, newVal) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.innerText !== newVal) {
+            el.innerText = newVal;
+            el.classList.remove('flip');
+            void el.offsetWidth;
+            el.classList.add('flip');
+        }
+    }
+
     function updateTimer() {
         const now = new Date();
         const diff = Math.floor((now - startDate) / 1000);
@@ -1383,10 +1682,10 @@
         const hours   = Math.floor((diff % 86400) / 3600);
         const minutes = Math.floor((diff % 3600) / 60);
         const seconds = diff % 60;
-        document.getElementById('t-days').innerText    = days;
-        document.getElementById('t-hours').innerText   = String(hours).padStart(2,'0');
-        document.getElementById('t-minutes').innerText = String(minutes).padStart(2,'0');
-        document.getElementById('t-seconds').innerText = String(seconds).padStart(2,'0');
+        flipUpdate('t-days', String(days));
+        flipUpdate('t-hours', String(hours).padStart(2,'0'));
+        flipUpdate('t-minutes', String(minutes).padStart(2,'0'));
+        flipUpdate('t-seconds', String(seconds).padStart(2,'0'));
     }
     setInterval(updateTimer, 1000);
     updateTimer();
@@ -1830,6 +2129,9 @@
         const html = data.map(item => renderMomentCard(item)).join('');
         contentDiv.insertAdjacentHTML('beforeend', html);
 
+        // 触发滚动入场
+        setTimeout(() => initScrollReveal(), 50);
+
         // 添加加载更多提示
         if (hasMore) {
             contentDiv.insertAdjacentHTML('beforeend',
@@ -2174,10 +2476,11 @@
             const ui = document.getElementById('resonance-ui');
             if (bothOnline) {
                 ui.classList.add('show');
-                sakuraColor = '#ffd700'; // 金粉色
+                sakuraColor = '#ffd700';
             } else {
                 ui.classList.remove('show');
-                sakuraColor = '#f2b8c0'; // 恢复平常粉色
+                const theme = document.documentElement.getAttribute('data-theme');
+                sakuraColor = theme === 'dark' ? '#c8a8d8' : '#f2b8c0';
             }
         }).subscribe(async (status) => {
             if (status === 'SUBSCRIBED' && currentAuthor) {
@@ -2308,10 +2611,13 @@
     }
 
     window.onload = function() { 
+        initTheme();
+        createStarField();
         fetchMoments(); 
         renderAnniversaries(); 
         loadMoods(); 
         initPresence();
+        setTimeout(initCardGlow, 600);
     };
 
     // ==========================================
@@ -2491,6 +2797,125 @@
             console.error("AI 模块出错:", err);
             contentArea.innerHTML = "不好意思，我的小脑袋刚才卡住了，稍后再试一下吧~ 🐛";
         }
+    }
+
+    // ==========================================
+    // 7. 视觉升级模块
+    // ==========================================
+
+    // --- 深色模式 ---
+    function getSystemTheme() {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    function initTheme() {
+        const saved = localStorage.getItem('theme_preference');
+        const theme = saved || getSystemTheme();
+        applyTheme(theme);
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme_preference')) {
+                applyTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+    }
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        updateThemeIcon(theme);
+        if (!bothOnline) {
+            sakuraColor = theme === 'dark' ? '#c8a8d8' : '#f2b8c0';
+        }
+    }
+
+    function toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme') || 'light';
+        const next = current === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('theme_preference', next);
+        applyTheme(next);
+    }
+
+    function updateThemeIcon(theme) {
+        const btn = document.getElementById('theme-toggle');
+        if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+
+    // --- 星光粒子 ---
+    function createStarField() {
+        const field = document.getElementById('star-field');
+        if (!field) return;
+        field.innerHTML = '';
+        const count = 45;
+        for (let i = 0; i < count; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = Math.random() * 100 + '%';
+            star.style.top = Math.random() * 100 + '%';
+            star.style.setProperty('--duration', (2 + Math.random() * 4) + 's');
+            star.style.animationDelay = Math.random() * 4 + 's';
+            const size = (1 + Math.random() * 2) + 'px';
+            star.style.width = size;
+            star.style.height = size;
+            field.appendChild(star);
+        }
+    }
+
+    // --- 滚动入场观察器 ---
+    function initScrollReveal() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry, index) => {
+                if (entry.isIntersecting) {
+                    setTimeout(() => {
+                        entry.target.classList.add('visible');
+                    }, index * 80);
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { rootMargin: '0px 0px -30px 0px', threshold: 0.05 });
+        document.querySelectorAll('.moment-card:not(.visible)').forEach(card => {
+            observer.observe(card);
+        });
+    }
+
+    // --- 爱心粒子 ---
+    function spawnHearts(x, y) {
+        const hearts = ['💕', '💖', '💗', '✨', '🌸', '💘'];
+        const count = 4 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < count; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'love-particle';
+            particle.textContent = hearts[Math.floor(Math.random() * hearts.length)];
+            const tx = (Math.random() - 0.5) * 120;
+            const ty = -(40 + Math.random() * 80);
+            const rot = (Math.random() - 0.5) * 90;
+            particle.style.left = x + 'px';
+            particle.style.top = y + 'px';
+            particle.style.setProperty('--tx', tx + 'px');
+            particle.style.setProperty('--ty', ty + 'px');
+            particle.style.setProperty('--rot', rot + 'deg');
+            particle.style.fontSize = (14 + Math.random() * 10) + 'px';
+            document.body.appendChild(particle);
+            setTimeout(() => particle.remove(), 1300);
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, .fab-container')) return;
+        spawnHearts(e.clientX, e.clientY);
+    });
+
+    // --- 纪念日卡片光晕 ---
+    function initCardGlow() {
+        document.querySelectorAll('.anniv-card').forEach(card => {
+            if (card.querySelector('.glow')) return;
+            const glow = document.createElement('div');
+            glow.className = 'glow';
+            card.appendChild(glow);
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                glow.style.left = (e.clientX - rect.left) + 'px';
+                glow.style.top = (e.clientY - rect.top) + 'px';
+            });
+        });
     }
 
     // ==========================================
