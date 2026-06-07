@@ -3180,8 +3180,7 @@
         contentBox.innerHTML = '<div style="color:var(--text-muted); font-size: 0.9em;">✨ 魔法生效中，正在抽取回忆...</div>';
         
         let rand = Math.random();
-        let preferType = rand < 0.7 ? 'photo' : (rand < 0.9 ? 'text' : 'audio'); // 70% 图片, 20% 文字, 10% 声音
-        
+        let preferTypes = rand < 0.7 ? ['photo', 'moment'] : (rand < 0.9 ? ['text'] : ['audio']);
         
         let { data: ids, error } = await supabaseClient.from('moments').select('id, type');
         
@@ -3191,7 +3190,7 @@
             return;
         }
 
-        let preferredIds = ids.filter(item => item.type === preferType);
+        let preferredIds = ids.filter(item => preferTypes.includes(item.type));
         if (preferredIds.length === 0) {
             preferredIds = ids;
         }
@@ -3215,6 +3214,26 @@
             html += `<img class="blind-box-img" src="${momentData.content}" alt="回忆照片">`;
         } else if (momentData.type === 'audio') {
             html += `<div style="margin: 20px 0; width: 100%;"><audio controls src="${momentData.content}" style="width:100%; height: 40px; border-radius: 20px;"></audio></div>`;
+        } else if (momentData.type === 'moment') {
+            try {
+                const data = JSON.parse(momentData.content);
+                if (data.text) {
+                    html += `<div class="blind-box-text">${escapeHtml(data.text)}</div>`;
+                }
+                if (data.images && data.images.length > 0) {
+                    if (data.images.length === 1) {
+                        html += `<img class="blind-box-img" src="${data.images[0]}" alt="回忆照片" style="margin-top:10px;">`;
+                    } else {
+                        html += `<div class="moment-grid" style="margin-top:10px;">`;
+                        data.images.forEach(imgUrl => {
+                            html += `<img class="moment-grid-item" src="${imgUrl}" alt="回忆照片">`;
+                        });
+                        html += `</div>`;
+                    }
+                }
+            } catch (e) {
+                console.error("解析 moment 失败", e);
+            }
         } else {
             html += `<div class="blind-box-text">${escapeHtml(momentData.content)}</div>`;
         }
