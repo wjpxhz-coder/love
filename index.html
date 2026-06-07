@@ -547,6 +547,25 @@
             object-fit: contain;
         }
 
+        .show-all-images-btn {
+            background: rgba(200, 155, 155, 0.1);
+            color: var(--primary);
+            border: 1px dashed var(--primary-light);
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-top: 10px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s;
+            box-shadow: none;
+            display: block;
+        }
+        .show-all-images-btn:hover {
+            background: rgba(200, 155, 155, 0.2);
+            transform: translateY(-1px);
+        }
+
         /* ── 空状态 ── */
         .empty-state {
             text-align: center;
@@ -2438,11 +2457,17 @@
                     if (data.images.length === 1) {
                         html += `<img class="moment-single-image" src="${data.images[0]}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)">`;
                     } else {
-                        html += `<div class="moment-grid">`;
-                        data.images.forEach(imgUrl => {
-                            html += `<img class="moment-grid-item" src="${imgUrl}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)">`;
+                        html += `<div class="moment-grid" id="moment-grid-${item.id}">`;
+                        data.images.forEach((imgUrl, idx) => {
+                            let displayStyle = idx >= 4 ? 'style="display:none;"' : '';
+                            let extraClass = idx >= 4 ? 'hidden-image' : '';
+                            html += `<img class="moment-grid-item ${extraClass}" src="${imgUrl}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)" ${displayStyle}>`;
                         });
                         html += `</div>`;
+                        if (data.images.length > 4) {
+                            let hiddenCount = data.images.length - 4;
+                            html += `<button class="show-all-images-btn" id="show-images-btn-${item.id}" onclick="showAllImages(${item.id})">展开剩余 ${hiddenCount} 张照片 ↓</button>`;
+                        }
                     }
                 }
             } catch (e) {
@@ -2467,6 +2492,17 @@
             </div>`;
         return html;
     }
+
+    window.showAllImages = function(id) {
+        const grid = document.getElementById(`moment-grid-${id}`);
+        if (!grid) return;
+        const hiddenImgs = grid.querySelectorAll('.hidden-image');
+        hiddenImgs.forEach(img => {
+            img.style.display = 'block';
+        });
+        const btn = document.getElementById(`show-images-btn-${id}`);
+        if (btn) btn.style.display = 'none';
+    };
 
     // --- 高级检索/筛选 ---
     let currentFilters = {
