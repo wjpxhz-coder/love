@@ -1566,6 +1566,130 @@
             100% { opacity: 1; transform: translateY(0); }
         }
 
+        /* ── 通知铃铛及面板 ── */
+        .notification-bell {
+            position: fixed;
+            top: 16px;
+            right: 68px;
+            z-index: 500;
+            width: 42px; height: 42px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--card);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            box-shadow: 0 2px 12px var(--shadow);
+            transition: all 0.4s ease;
+            padding: 0;
+            color: var(--text);
+        }
+        .notification-bell:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 18px var(--shadow);
+        }
+        .notification-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 10px;
+            height: 10px;
+            background: #ff4b4b;
+            border-radius: 50%;
+            display: none;
+            box-shadow: 0 0 4px rgba(255, 75, 75, 0.5);
+        }
+        .notification-badge.show {
+            display: block;
+            animation: pulse 2s infinite;
+        }
+        .notification-panel {
+            position: fixed;
+            top: 68px;
+            right: 16px;
+            z-index: 600;
+            width: 320px;
+            max-width: calc(100vw - 32px);
+            max-height: 60vh;
+            background: var(--card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px var(--shadow);
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            text-align: left;
+        }
+        .notification-panel.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        .notification-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 1.05em;
+        }
+        .notification-read-all {
+            font-size: 0.8em;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-weight: 400;
+            transition: color 0.2s;
+        }
+        .notification-read-all:hover {
+            color: var(--primary);
+        }
+        .notification-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+        .notification-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9em;
+            color: var(--text);
+            transition: background 0.2s;
+        }
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+        .notification-item:hover {
+            background: var(--glass-highlight);
+        }
+        .notification-item.unread {
+            background: rgba(212, 160, 168, 0.1);
+        }
+        .notification-time {
+            font-size: 0.75em;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .notification-empty {
+            padding: 24px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9em;
+        }
+
         /* ── 深色模式切换按钮 ── */
         .theme-toggle {
             position: fixed;
@@ -1690,6 +1814,21 @@
 <div class="resonance-ui" id="resonance-ui">
     <div class="resonance-hearts">💖💖</div>
     <div class="resonance-text">此刻，TA 也在陪你看回忆 ✨</div>
+</div>
+
+<!-- 通知铃铛及面板 -->
+<button id="notification-bell" class="notification-bell" onclick="toggleNotificationPanel()">
+    🔔
+    <span id="notification-badge" class="notification-badge"></span>
+</button>
+<div id="notification-panel" class="notification-panel">
+    <div class="notification-header">
+        <span>消息通知</span>
+        <span class="notification-read-all" onclick="markAllNotificationsRead()">全部标为已读</span>
+    </div>
+    <ul id="notification-list" class="notification-list">
+        <li class="notification-empty">暂无通知</li>
+    </ul>
 </div>
 
 <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
@@ -3699,7 +3838,13 @@
     }
 
     document.addEventListener('click', (e) => {
-        if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, .fab-container')) return;
+        const panel = document.getElementById('notification-panel');
+        const bell = document.getElementById('notification-bell');
+        if (panel && panel.classList.contains('show') && !panel.contains(e.target) && !bell.contains(e.target)) {
+            panel.classList.remove('show');
+        }
+        
+        if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, .fab-container, .notification-panel')) return;
         spawnHearts(e.clientX, e.clientY);
     });
 
@@ -3717,6 +3862,105 @@
             });
         });
     }
+
+    // ==========================================
+    // 通知功能逻辑
+    // ==========================================
+    async function loadNotifications() {
+        if (!currentAuthor) return;
+        const { data, error } = await supabaseClient
+            .from('notifications')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (error) {
+            console.error('加载通知失败:', error);
+            return;
+        }
+
+        const listEl = document.getElementById('notification-list');
+        const badgeEl = document.getElementById('notification-badge');
+        listEl.innerHTML = '';
+        
+        // 过滤出除了自己产生的之外的通知
+        const validNotifications = data.filter(n => n.actor !== currentAuthor);
+        
+        let hasUnread = false;
+        
+        if (validNotifications.length === 0) {
+            listEl.innerHTML = '<li class="notification-empty">暂无通知</li>';
+            badgeEl.classList.remove('show');
+            return;
+        }
+        
+        validNotifications.forEach(n => {
+            const isRead = n.read_by && n.read_by.includes(currentAuthor);
+            if (!isRead) hasUnread = true;
+            
+            const li = document.createElement('li');
+            li.className = `notification-item ${isRead ? '' : 'unread'}`;
+            
+            let actionText = '';
+            if (n.type === 'moment') actionText = '发布了新动态';
+            else if (n.type === 'comment') actionText = '发表了评论';
+            else if (n.type === 'like') actionText = '点赞了评论';
+            
+            const contentText = n.content ? `<div style="color: var(--text-muted); font-size: 0.85em; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${n.content}</div>` : '';
+            
+            const d = new Date(n.created_at);
+            const timeStr = `${d.getMonth()+1}-${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            
+            li.innerHTML = `
+                <div><strong>${n.actor}</strong> ${actionText}</div>
+                ${contentText}
+                <div class="notification-time">${timeStr}</div>
+            `;
+            listEl.appendChild(li);
+        });
+        
+        if (hasUnread) {
+            badgeEl.classList.add('show');
+        } else {
+            badgeEl.classList.remove('show');
+        }
+    }
+
+    function toggleNotificationPanel() {
+        if (!currentAuthor) {
+            alert('请先打卡心情或发布动态，确认您的身份后才能查看通知。');
+            return;
+        }
+        const panel = document.getElementById('notification-panel');
+        panel.classList.toggle('show');
+        if (panel.classList.contains('show')) {
+            loadNotifications();
+        }
+    }
+
+    async function markAllNotificationsRead() {
+        if (!currentAuthor) return;
+        const { data, error } = await supabaseClient
+            .from('notifications')
+            .select('id, read_by');
+            
+        if (error) return;
+        
+        const unreadItems = data.filter(n => !(n.read_by && n.read_by.includes(currentAuthor)));
+        if (unreadItems.length === 0) {
+            loadNotifications();
+            return;
+        }
+        
+        for (const item of unreadItems) {
+            const newReadBy = item.read_by ? [...item.read_by, currentAuthor] : [currentAuthor];
+            await supabaseClient.from('notifications').update({ read_by: newReadBy }).eq('id', item.id);
+        }
+        
+        loadNotifications();
+    }
+    
+    // 初始化时尝试加载通知
+    setTimeout(loadNotifications, 1000);
 
     // ==========================================
     // 注册 Service Worker (PWA)
