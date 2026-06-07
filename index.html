@@ -3899,6 +3899,8 @@
             
             const li = document.createElement('li');
             li.className = `notification-item ${isRead ? '' : 'unread'}`;
+            li.setAttribute('onclick', `handleNotificationClick('${n.id}', '${n.type}', '${n.related_id}')`);
+            li.style.cursor = 'pointer';
             
             let actionText = '';
             if (n.type === 'moment') actionText = '发布了新动态';
@@ -3959,6 +3961,61 @@
         loadNotifications();
     }
     
+    async function handleNotificationClick(notificationId, type, relatedId) {
+        document.getElementById('notification-panel').classList.remove('show');
+        await markSingleNotificationRead(notificationId);
+        
+        try {
+            let targetMomentId = relatedId;
+            let targetCommentId = null;
+            
+            if (type === 'comment' || type === 'like') {
+                targetCommentId = relatedId;
+                const { data, error } = await supabaseClient.from('comments').select('moment_id').eq('id', relatedId).single();
+                if (data) {
+                    targetMomentId = data.moment_id;
+                }
+            }
+            
+            const card = document.getElementById(`card-${targetMomentId}`);
+            if (card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                if (targetCommentId) {
+                    const commentsSection = document.getElementById(`comments-${targetMomentId}`);
+                    if (commentsSection && commentsSection.style.display === 'none') {
+                        commentsSection.style.display = 'block';
+                        await loadComments(targetMomentId);
+                    }
+                    
+                    setTimeout(() => {
+                        const commentEl = document.getElementById(`comment-${targetCommentId}`);
+                        if (commentEl) {
+                            commentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            commentEl.style.transition = 'background-color 0.5s';
+                            commentEl.style.backgroundColor = 'rgba(212, 160, 168, 0.4)';
+                            setTimeout(() => { commentEl.style.backgroundColor = ''; }, 2000);
+                        }
+                    }, 200);
+                }
+            } else {
+                alert('该动态不在当前视图中，请先向下滑动加载更多回忆~');
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+    
+    async function markSingleNotificationRead(notificationId) {
+        if (!currentAuthor) return;
+        const { data } = await supabaseClient.from('notifications').select('read_by').eq('id', notificationId).single();
+        if (data && !(data.read_by && data.read_by.includes(currentAuthor))) {
+            const newReadBy = data.read_by ? [...data.read_by, currentAuthor] : [currentAuthor];
+            await supabaseClient.from('notifications').update({ read_by: newReadBy }).eq('id', notificationId);
+            loadNotifications();
+        }
+    }
+
     // 初始化时尝试加载通知
     setTimeout(loadNotifications, 1000);
 
