@@ -461,6 +461,92 @@
             color: var(--text);
         }
 
+        /* ── 图文动态弹窗及瀑布流样式 ── */
+        .moment-image-preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+            justify-content: flex-start;
+        }
+        .moment-image-add-btn {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.6);
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .moment-image-add-btn:hover {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: var(--primary-light);
+        }
+        .moment-preview-item {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .moment-preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .moment-preview-item .remove-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .moment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+        @media (max-width: 480px) {
+            .moment-grid {
+                grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            }
+        }
+        .moment-grid-item {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            object-fit: cover;
+            cursor: zoom-in;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            transition: opacity 0.2s;
+        }
+        .moment-grid-item:hover {
+            opacity: 0.9;
+        }
+        .moment-single-image {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-top: 10px;
+            cursor: zoom-in;
+            display: block;
+            max-height: 300px;
+            object-fit: contain;
+        }
+
         /* ── 空状态 ── */
         .empty-state {
             text-align: center;
@@ -1629,11 +1715,9 @@
     </section>
 
     <div class="btn-group">
-        <button id="btn-photo" onclick="checkPassword('photo')">📷 上传心情照片</button>
-        <button id="btn-text" onclick="checkPassword('text')">✍️ 记录今日总结</button>
+        <button id="btn-moment" onclick="checkPassword('moment')">✨ 发布动态</button>
         <button id="btn-audio" onclick="toggleRecording()" style="background: linear-gradient(135deg, #a0d4c6, #7ab87a); position: relative; user-select: none; -webkit-user-select: none;">🎙️ 点击留声</button>
         <button id="btn-blindbox" onclick="triggerBlindBox(true)" style="background: linear-gradient(135deg, #e3b0b8, #d4a0a8);">🎲 摇一摇盲盒</button>
-        <input type="file" id="photo-input" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event)">
     </div>
 
     <section class="timeline-section">
@@ -1659,15 +1743,23 @@
     </div>
 </div>
 
-<!-- 文字输入弹窗 -->
-<div class="modal-overlay" id="textModal">
-    <div class="modal-box">
-        <h3 class="modal-title">记录今日总结 ✍️</h3>
-        <textarea class="modal-input" id="textInput" placeholder="写下今天的总结或心情吧…" rows="5" style="resize:vertical;text-align:left;"></textarea>
-        <div class="modal-msg" id="textModalMsg"></div>
-        <div class="modal-btns">
-            <button class="btn-cancel" onclick="closeTextModal()">取消</button>
-            <button onclick="submitText()">保存</button>
+<!-- 图文动态发布弹窗 -->
+<div class="modal-overlay" id="momentModal">
+    <div class="modal-box" style="max-width: 400px; padding: 24px;">
+        <h3 class="modal-title" style="margin-bottom: 16px;">✨ 发布动态</h3>
+        <textarea class="modal-input" id="momentTextInput" placeholder="这一刻的想法..." rows="4" style="resize:vertical;text-align:left;margin-top:0; border: none; background: rgba(255,255,255,0.5); font-size: 1.05em;"></textarea>
+        
+        <div id="momentImagePreviewContainer" class="moment-image-preview-container">
+            <div class="moment-image-add-btn" onclick="document.getElementById('momentPhotoInput').click()">
+                <div style="font-size: 2em; color: var(--text-muted); font-weight: 300;">+</div>
+            </div>
+        </div>
+        <input type="file" id="momentPhotoInput" accept="image/*" multiple style="display:none;" onchange="handleMomentPhotoSelect(event)">
+        
+        <div class="modal-msg" id="momentModalMsg"></div>
+        <div class="modal-btns" style="margin-top: 16px;">
+            <button class="btn-cancel" onclick="closeMomentModal()">取消</button>
+            <button id="btn-submit-moment" onclick="submitMomentPost()">发布</button>
         </div>
     </div>
 </div>
@@ -1727,8 +1819,9 @@
         <div class="filter-section">
             <div class="filter-section-title">🏷️ 按类型</div>
             <div class="filter-row">
-                <label class="filter-checkbox-label"><input type="checkbox" value="text" id="chkTypeText"> 文字</label>
-                <label class="filter-checkbox-label"><input type="checkbox" value="photo" id="chkTypePhoto"> 照片</label>
+                <label class="filter-checkbox-label"><input type="checkbox" value="moment" id="chkTypeMoment"> 图文动态</label>
+                <label class="filter-checkbox-label"><input type="checkbox" value="text" id="chkTypeText"> 纯文字</label>
+                <label class="filter-checkbox-label"><input type="checkbox" value="photo" id="chkTypePhoto"> 纯照片</label>
                 <label class="filter-checkbox-label"><input type="checkbox" value="audio" id="chkTypeAudio"> 声音</label>
             </div>
         </div>
@@ -2075,10 +2168,8 @@
             msgEl.innerText = `暗号正确，${currentAuthor} 💖`;
             setTimeout(() => {
                 closeModal();
-                if (currentAction === 'photo') {
-                    document.getElementById('photo-input').click();
-                } else if (currentAction === 'text') {
-                    handleTextUpload();
+                if (currentAction === 'moment') {
+                    openMomentModal();
                 } else if (currentAction === 'delete') {
                     deleteMoment(pendingDeleteId);
                 } else if (currentAction === 'mood') {
@@ -2104,67 +2195,108 @@
         if (e.key === 'Enter') verifyCode();
     });
 
-    // --- 上传文字 ---
-    function handleTextUpload() {
-        const modal = document.getElementById('textModal');
-        const input = document.getElementById('textInput');
-        document.getElementById('textModalMsg').innerText = '';
+    // --- 发布图文动态 ---
+    let momentSelectedFiles = [];
+
+    function openMomentModal() {
+        const modal = document.getElementById('momentModal');
+        const input = document.getElementById('momentTextInput');
+        const previewContainer = document.getElementById('momentImagePreviewContainer');
+        document.getElementById('momentModalMsg').innerText = '';
         input.value = '';
+        momentSelectedFiles = [];
+        
+        // 保留添加按钮，移除已有的预览项
+        const addBtn = previewContainer.querySelector('.moment-image-add-btn');
+        previewContainer.innerHTML = '';
+        if (addBtn) previewContainer.appendChild(addBtn);
+        
         modal.classList.add('show');
         setTimeout(() => input.focus(), 100);
     }
 
-    function closeTextModal() {
-        document.getElementById('textModal').classList.remove('show');
+    function closeMomentModal() {
+        document.getElementById('momentModal').classList.remove('show');
     }
 
-    async function submitText() {
-        const text = document.getElementById('textInput').value.trim();
-        const msgEl = document.getElementById('textModalMsg');
-        if (!text) { msgEl.innerText = '内容不能为空哦！'; return; }
-
-        const btn = document.getElementById('btn-text');
-        const orig = btn.innerHTML;
-        closeTextModal();
-        btn.innerHTML = '⏳ 上传中…'; btn.disabled = true;
-
-        const { error } = await supabaseClient.from('moments').insert([{ type: 'text', content: text, author: currentAuthor }]);
-        btn.innerHTML = orig; btn.disabled = false;
-        if (error) alert('保存失败: ' + error.message);
-        else fetchMoments();
+    function handleMomentPhotoSelect(event) {
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
+        
+        const previewContainer = document.getElementById('momentImagePreviewContainer');
+        const addBtn = previewContainer.querySelector('.moment-image-add-btn');
+        
+        files.forEach(file => {
+            momentSelectedFiles.push(file);
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'moment-preview-item';
+                previewItem.innerHTML = `
+                    <img src="${e.target.result}" alt="preview">
+                    <div class="remove-btn" onclick="removeMomentPhoto(this, '${file.name}')">×</div>
+                `;
+                previewContainer.insertBefore(previewItem, addBtn);
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        // 清空 input 使得重复选择相同文件能触发 change
+        document.getElementById('momentPhotoInput').value = '';
     }
 
-    document.getElementById('textInput').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && e.ctrlKey) submitText();
-    });
+    window.removeMomentPhoto = function(btnElement, fileName) {
+        const item = btnElement.parentElement;
+        item.remove();
+        momentSelectedFiles = momentSelectedFiles.filter(f => f.name !== fileName);
+    };
 
-    // --- 上传照片 ---
-    async function handlePhotoUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const btn = document.getElementById('btn-photo');
-        const orig = btn.innerHTML;
-        btn.innerHTML = '⏳ 图片上传中…'; btn.disabled = true;
-
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2,9)}.${fileExt}`;
-
-        const { error: uploadError } = await supabaseClient.storage.from('photos').upload(fileName, file);
-        if (uploadError) {
-            alert('图片上传失败: ' + uploadError.message);
-            btn.innerHTML = orig; btn.disabled = false;
+    async function submitMomentPost() {
+        const text = document.getElementById('momentTextInput').value.trim();
+        const msgEl = document.getElementById('momentModalMsg');
+        
+        if (!text && momentSelectedFiles.length === 0) {
+            msgEl.innerText = '写点什么或者发张照片吧！';
             return;
         }
 
-        const { data: publicUrlData } = supabaseClient.storage.from('photos').getPublicUrl(fileName);
-        const publicUrl = publicUrlData.publicUrl;
+        const btn = document.getElementById('btn-submit-moment');
+        const orig = btn.innerHTML;
+        btn.innerHTML = '⏳ 发布中…'; 
+        btn.disabled = true;
 
-        const { error: dbError } = await supabaseClient.from('moments').insert([{ type: 'photo', content: publicUrl, author: currentAuthor }]);
-        btn.innerHTML = orig; btn.disabled = false;
-        document.getElementById('photo-input').value = '';
-        if (dbError) alert('记录保存失败: ' + dbError.message);
-        else fetchMoments();
+        try {
+            let uploadedUrls = [];
+            if (momentSelectedFiles.length > 0) {
+                const uploadPromises = momentSelectedFiles.map(async file => {
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2,9)}.${fileExt}`;
+                    const { error } = await supabaseClient.storage.from('photos').upload(fileName, file);
+                    if (error) throw error;
+                    const { data } = supabaseClient.storage.from('photos').getPublicUrl(fileName);
+                    return data.publicUrl;
+                });
+                uploadedUrls = await Promise.all(uploadPromises);
+            }
+
+            const momentContent = JSON.stringify({
+                text: text,
+                images: uploadedUrls
+            });
+
+            const { error: dbError } = await supabaseClient.from('moments')
+                .insert([{ type: 'moment', content: momentContent, author: currentAuthor }]);
+            
+            if (dbError) throw dbError;
+            
+            closeMomentModal();
+            fetchMoments();
+        } catch (err) {
+            msgEl.innerText = '发布失败: ' + err.message;
+        } finally {
+            btn.innerHTML = orig; 
+            btn.disabled = false;
+        }
     }
 
     // --- 录音功能（点击切换） ---
@@ -2296,6 +2428,26 @@
             html += `<img class="card-img" src="${item.content}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)">`;
         } else if (item.type === 'audio') {
             html += `<div style="margin-top:10px;"><audio controls src="${item.content}" style="width:100%; height: 40px; border-radius: 20px; outline: none;"></audio></div>`;
+        } else if (item.type === 'moment') {
+            try {
+                const data = JSON.parse(item.content);
+                if (data.text) {
+                    html += `<div class="card-text">${escapeHtml(data.text)}</div>`;
+                }
+                if (data.images && data.images.length > 0) {
+                    if (data.images.length === 1) {
+                        html += `<img class="moment-single-image" src="${data.images[0]}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)">`;
+                    } else {
+                        html += `<div class="moment-grid">`;
+                        data.images.forEach(imgUrl => {
+                            html += `<img class="moment-grid-item" src="${imgUrl}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)">`;
+                        });
+                        html += `</div>`;
+                    }
+                }
+            } catch (e) {
+                console.error("解析 moment 失败", e);
+            }
         }
         html += `
                 <button class="comment-toggle-btn" onclick="toggleComments(${item.id})">
@@ -2338,6 +2490,7 @@
         document.getElementById('filterMonth').value = '';
         document.getElementById('chkAuthorSnake').checked = false;
         document.getElementById('chkAuthorXi').checked = false;
+        document.getElementById('chkTypeMoment').checked = false;
         document.getElementById('chkTypeText').checked = false;
         document.getElementById('chkTypePhoto').checked = false;
         document.getElementById('chkTypeAudio').checked = false;
@@ -2352,6 +2505,7 @@
         if (document.getElementById('chkAuthorXi').checked) currentFilters.authors.push('小奚');
         
         currentFilters.types = [];
+        if (document.getElementById('chkTypeMoment').checked) currentFilters.types.push('moment');
         if (document.getElementById('chkTypeText').checked) currentFilters.types.push('text');
         if (document.getElementById('chkTypePhoto').checked) currentFilters.types.push('photo');
         if (document.getElementById('chkTypeAudio').checked) currentFilters.types.push('audio');
@@ -2381,6 +2535,7 @@
         if (currentFilters.types.length > 0) {
             active = true;
             let typeNames = currentFilters.types.map(t => {
+                if (t === 'moment') return '图文';
                 if (t === 'text') return '文字';
                 if (t === 'photo') return '照片';
                 if (t === 'audio') return '声音';
