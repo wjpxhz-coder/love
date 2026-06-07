@@ -2245,26 +2245,22 @@
         
         const previewContainer = document.getElementById('momentImagePreviewContainer');
         const addBtn = previewContainer.querySelector('.moment-image-add-btn');
-        
         files.forEach(file => {
             momentSelectedFiles.push(file);
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const previewItem = document.createElement('div');
-                previewItem.className = 'moment-preview-item';
-                let mediaHtml = '';
-                if (file.type.startsWith('video/')) {
-                    mediaHtml = `<video src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;" autoplay muted loop playsinline></video>`;
-                } else {
-                    mediaHtml = `<img src="${e.target.result}" alt="preview">`;
-                }
-                previewItem.innerHTML = `
-                    ${mediaHtml}
-                    <div class="remove-btn" onclick="removeMomentPhoto(this, '${file.name}')">×</div>
-                `;
-                previewContainer.insertBefore(previewItem, addBtn);
-            };
-            reader.readAsDataURL(file);
+            const objectUrl = URL.createObjectURL(file);
+            const previewItem = document.createElement('div');
+            previewItem.className = 'moment-preview-item';
+            let mediaHtml = '';
+            if (file.type.startsWith('video/')) {
+                mediaHtml = `<video src="${objectUrl}" style="width:100%;height:100%;object-fit:cover;" autoplay muted loop playsinline></video>`;
+            } else {
+                mediaHtml = `<img src="${objectUrl}" alt="preview">`;
+            }
+            previewItem.innerHTML = `
+                ${mediaHtml}
+                <div class="remove-btn" onclick="removeMomentPhoto(this, '${file.name}')">×</div>
+            `;
+            previewContainer.insertBefore(previewItem, addBtn);
         });
         
         // 清空 input 使得重复选择相同文件能触发 change
@@ -2297,7 +2293,7 @@
                 const uploadPromises = momentSelectedFiles.map(async file => {
                     const fileExt = file.name.split('.').pop();
                     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2,9)}.${fileExt}`;
-                    const { error } = await supabaseClient.storage.from('photos').upload(fileName, file);
+                    const { error } = await supabaseClient.storage.from('photos').upload(fileName, file, { contentType: file.type, upsert: false });
                     if (error) throw error;
                     const { data } = supabaseClient.storage.from('photos').getPublicUrl(fileName);
                     return data.publicUrl;
