@@ -1773,7 +1773,7 @@
                 <div style="font-size: 2em; color: var(--text-muted); font-weight: 300;">+</div>
             </div>
         </div>
-        <input type="file" id="momentPhotoInput" accept="image/*" multiple style="display:none;" onchange="handleMomentPhotoSelect(event)">
+        <input type="file" id="momentPhotoInput" accept="image/*,video/*" multiple style="display:none;" onchange="handleMomentPhotoSelect(event)">
         
         <div class="modal-msg" id="momentModalMsg"></div>
         <div class="modal-btns" style="margin-top: 16px;">
@@ -1928,8 +1928,9 @@
 </div>
 
 <!-- 灯箱 -->
-<div id="lightbox" onclick="closeLightbox()">
-    <img id="lightbox-img" src="" alt="回忆放大">
+<div id="lightbox" onclick="closeLightbox(event)">
+    <img id="lightbox-img" src="" alt="回忆放大" style="display:none;">
+    <video id="lightbox-video" src="" controls style="display:none; max-width:90%; max-height:90%; border-radius:12px; margin: auto; position: absolute; top: 0; bottom: 0; left: 0; right: 0;"></video>
 </div>
 
 <script>
@@ -2251,8 +2252,14 @@
             reader.onload = function(e) {
                 const previewItem = document.createElement('div');
                 previewItem.className = 'moment-preview-item';
+                let mediaHtml = '';
+                if (file.type.startsWith('video/')) {
+                    mediaHtml = `<video src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;" autoplay muted loop playsinline></video>`;
+                } else {
+                    mediaHtml = `<img src="${e.target.result}" alt="preview">`;
+                }
                 previewItem.innerHTML = `
-                    <img src="${e.target.result}" alt="preview">
+                    ${mediaHtml}
                     <div class="remove-btn" onclick="removeMomentPhoto(this, '${file.name}')">×</div>
                 `;
                 previewContainer.insertBefore(previewItem, addBtn);
@@ -2455,13 +2462,23 @@
                 }
                 if (data.images && data.images.length > 0) {
                     if (data.images.length === 1) {
-                        html += `<img class="moment-single-image" src="${data.images[0]}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)">`;
+                        const isVideo = data.images[0].match(/\.(mp4|mov|webm|ogg)$/i) || data.images[0].includes('video');
+                        if (isVideo) {
+                            html += `<video class="moment-single-image" src="${data.images[0]}" controls style="width:100%; border-radius:12px; margin-top:10px;"></video>`;
+                        } else {
+                            html += `<img class="moment-single-image" src="${data.images[0]}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)">`;
+                        }
                     } else {
                         html += `<div class="moment-grid" id="moment-grid-${item.id}">`;
                         data.images.forEach((imgUrl, idx) => {
                             let displayStyle = idx >= 4 ? 'style="display:none;"' : '';
                             let extraClass = idx >= 4 ? 'hidden-image' : '';
-                            html += `<img class="moment-grid-item ${extraClass}" src="${imgUrl}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)" ${displayStyle}>`;
+                            const isVideo = imgUrl.match(/\.(mp4|mov|webm|ogg)$/i) || imgUrl.includes('video');
+                            if (isVideo) {
+                                html += `<video class="moment-grid-item ${extraClass}" src="${imgUrl}" ${displayStyle} autoplay muted loop playsinline onclick="openLightbox(this.src)" style="cursor:zoom-in; object-fit:cover;"></video>`;
+                            } else {
+                                html += `<img class="moment-grid-item ${extraClass}" src="${imgUrl}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)" ${displayStyle}>`;
+                            }
                         });
                         html += `</div>`;
                         if (data.images.length > 4) {
@@ -2961,12 +2978,26 @@
 
     // --- 灯箱 ---
     function openLightbox(src) {
-        document.getElementById('lightbox-img').src = src;
+        const img = document.getElementById('lightbox-img');
+        const video = document.getElementById('lightbox-video');
+        if (src.match(/\.(mp4|mov|webm|ogg)$/i) || src.includes('video')) {
+            img.style.display = 'none';
+            video.src = src;
+            video.style.display = 'block';
+        } else {
+            video.style.display = 'none';
+            video.pause();
+            img.src = src;
+            img.style.display = 'block';
+        }
         document.getElementById('lightbox').classList.add('show');
     }
 
-    function closeLightbox() {
+    function closeLightbox(event) {
+        if (event && event.target && event.target.id === 'lightbox-video') return;
         document.getElementById('lightbox').classList.remove('show');
+        const video = document.getElementById('lightbox-video');
+        if (video) video.pause();
     }
 
 
@@ -3222,11 +3253,21 @@
                 }
                 if (data.images && data.images.length > 0) {
                     if (data.images.length === 1) {
-                        html += `<img class="blind-box-img" src="${data.images[0]}" alt="回忆照片" style="margin-top:10px;">`;
+                        const isVideo = data.images[0].match(/\.(mp4|mov|webm|ogg)$/i) || data.images[0].includes('video');
+                        if (isVideo) {
+                            html += `<video class="blind-box-img" src="${data.images[0]}" controls style="margin-top:10px; border-radius:12px; width:100%;"></video>`;
+                        } else {
+                            html += `<img class="blind-box-img" src="${data.images[0]}" alt="回忆照片" style="margin-top:10px;">`;
+                        }
                     } else {
                         html += `<div class="moment-grid" style="margin-top:10px;">`;
                         data.images.forEach(imgUrl => {
-                            html += `<img class="moment-grid-item" src="${imgUrl}" alt="回忆照片">`;
+                            const isVideo = imgUrl.match(/\.(mp4|mov|webm|ogg)$/i) || imgUrl.includes('video');
+                            if (isVideo) {
+                                html += `<video class="moment-grid-item" src="${imgUrl}" autoplay muted loop playsinline style="object-fit:cover;"></video>`;
+                            } else {
+                                html += `<img class="moment-grid-item" src="${imgUrl}" alt="回忆照片">`;
+                            }
                         });
                         html += `</div>`;
                     }
