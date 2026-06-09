@@ -3296,7 +3296,8 @@
             // 上传头像
             if (pendingAvatarFile) {
                 const ext = pendingAvatarFile.name.split('.').pop();
-                const fileName = `avatars/${currentAuthor}_${Date.now()}.${ext}`;
+                const safeAuthor = encodeURIComponent(currentAuthor);
+                const fileName = `avatars/${safeAuthor}_${Date.now()}.${ext}`;
                 const { error: uploadErr } = await supabaseClient.storage
                     .from('photos')
                     .upload(fileName, pendingAvatarFile, { contentType: pendingAvatarFile.type, upsert: true });
