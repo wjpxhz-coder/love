@@ -2657,6 +2657,24 @@
             0% { box-shadow: 0 0 5px rgba(255,100,100,0.4); transform: scale(1); }
             100% { box-shadow: 0 0 20px rgba(255,100,100,0.8); transform: scale(1.03); }
         }
+
+        /* 动态文本折叠/展开按钮 */
+        .toggle-text-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-weight: 700;
+            cursor: pointer;
+            padding: 4px 0;
+            margin-top: 4px;
+            font-size: 0.88em;
+            outline: none;
+            transition: color 0.2s ease;
+            display: inline-block;
+        }
+        .toggle-text-btn:hover {
+            color: var(--primary-light);
+        }
     </style>
 </head>
 <body>
@@ -3993,6 +4011,21 @@
         return div.innerHTML;
     }
 
+    function formatCardText(text, momentId) {
+        if (!text) return '';
+        if (text.length <= 80) {
+            return `<div class="card-text">${escapeHtml(text)}</div>`;
+        }
+        const collapsedText = text.substring(0, 80) + '...';
+        return `
+            <div class="card-text-container" id="text-container-${momentId}">
+                <div class="card-text text-collapsed" style="display: block;">${escapeHtml(collapsedText)}</div>
+                <div class="card-text text-expanded" style="display: none;">${escapeHtml(text)}</div>
+                <button class="toggle-text-btn" onclick="toggleTextCollapse(${momentId})">展开</button>
+            </div>
+        `;
+    }
+
     function renderMomentCard(item) {
         const now = Date.now();
         const dateStr = new Date(item.created_at).toLocaleString('zh-CN', { hour12: false });
@@ -4023,7 +4056,7 @@
                 </div>`;
 
         if (item.type === 'text') {
-            html += `<div class="card-text">${escapeHtml(item.content)}</div>`;
+            html += formatCardText(item.content, item.id);
         } else if (item.type === 'photo') {
             html += `<img class="card-img" src="${item.content}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)">`;
         } else if (item.type === 'audio') {
@@ -4032,7 +4065,7 @@
             try {
                 const data = JSON.parse(item.content);
                 if (data.text) {
-                    html += `<div class="card-text">${escapeHtml(data.text)}</div>`;
+                    html += formatCardText(data.text, item.id);
                 }
                 if (data.images && data.images.length > 0) {
                     if (data.images.length === 1) {
@@ -4108,6 +4141,24 @@
         });
         const btn = document.getElementById(`show-images-btn-${id}`);
         if (btn) btn.style.display = 'none';
+    };
+
+    window.toggleTextCollapse = function(id) {
+        const container = document.getElementById(`text-container-${id}`);
+        if (!container) return;
+        const collapsedEl = container.querySelector('.text-collapsed');
+        const expandedEl = container.querySelector('.text-expanded');
+        const btn = container.querySelector('.toggle-text-btn');
+        
+        if (collapsedEl.style.display === 'block') {
+            collapsedEl.style.display = 'none';
+            expandedEl.style.display = 'block';
+            btn.innerText = '收起';
+        } else {
+            collapsedEl.style.display = 'block';
+            expandedEl.style.display = 'none';
+            btn.innerText = '展开';
+        }
     };
 
     // --- 高级检索/筛选 ---
