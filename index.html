@@ -1806,6 +1806,616 @@
         [data-theme="dark"] .star {
             background: rgba(200, 180, 255, 0.7);
         }
+
+        /* ── 登录按钮 ── */
+        .login-trigger-btn {
+            position: fixed;
+            top: 16px;
+            right: 120px;
+            z-index: 500;
+            width: 42px; height: 42px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--card);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1em;
+            box-shadow: 0 2px 12px var(--shadow);
+            transition: all 0.4s ease;
+            padding: 0;
+            color: var(--text);
+        }
+        .login-trigger-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 18px var(--shadow);
+        }
+        .login-trigger-btn::after { display: none; }
+
+        /* ── 登录后头像按钮 ── */
+        .user-avatar-btn {
+            position: fixed;
+            top: 16px;
+            right: 120px;
+            z-index: 500;
+            width: 42px; height: 42px;
+            border-radius: 50%;
+            border: 2px solid var(--primary-light);
+            background: var(--card);
+            backdrop-filter: blur(12px);
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(181,115,122,0.3);
+            transition: all 0.3s ease;
+            padding: 0;
+        }
+        .user-avatar-btn:hover {
+            transform: scale(1.08);
+            box-shadow: 0 4px 20px rgba(181,115,122,0.5);
+        }
+        .user-avatar-btn img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+        .user-avatar-btn .avatar-placeholder {
+            font-size: 1.3em;
+            line-height: 1;
+        }
+        .user-avatar-btn::after { display: none; }
+
+        /* ── 用户下拉菜单 ── */
+        .user-dropdown {
+            position: fixed;
+            top: 66px;
+            right: 112px;
+            z-index: 600;
+            background: var(--card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            box-shadow: 0 8px 28px var(--shadow);
+            padding: 8px 0;
+            min-width: 120px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px) scale(0.95);
+            transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+            text-align: left;
+        }
+        .user-dropdown.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0) scale(1);
+        }
+        .user-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            font-size: 0.9em;
+            color: var(--text);
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .user-dropdown-item:hover {
+            background: rgba(212,160,168,0.12);
+            color: var(--primary);
+        }
+        .user-dropdown-item.logout {
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            margin-top: 4px;
+        }
+        .user-dropdown-item.logout:hover {
+            color: #c05050;
+            background: rgba(200,80,80,0.06);
+        }
+        .user-name-label {
+            padding: 10px 16px 6px;
+            font-size: 0.78em;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 4px;
+        }
+
+        /* ── 浪漫登录弹窗 ── */
+        .login-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.4s ease;
+        }
+        .login-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .login-bg {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 30% 40%, rgba(255,182,193,0.7) 0%, rgba(255,105,135,0.5) 40%, rgba(180,50,100,0.6) 100%);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .login-canvas {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+        .login-box {
+            position: relative;
+            z-index: 10;
+            background: rgba(255,245,250,0.18);
+            border: 1px solid rgba(255,200,210,0.5);
+            border-radius: 28px;
+            padding: 44px 36px 36px;
+            width: 88%;
+            max-width: 360px;
+            box-shadow: 0 0 60px rgba(255,80,120,0.35), 0 20px 50px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.35);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            transform: translateY(24px) scale(0.95);
+            transition: all 0.45s cubic-bezier(0.25,0.8,0.25,1);
+            text-align: center;
+        }
+        .login-overlay.show .login-box {
+            transform: translateY(0) scale(1);
+        }
+        .login-halo {
+            position: absolute;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,120,160,0.9) 0%, rgba(255,60,100,0.7) 40%, transparent 70%);
+            filter: blur(20px);
+            animation: haloPulse 3s ease-in-out infinite;
+            pointer-events: none;
+        }
+        @keyframes haloPulse {
+            0%,100% { transform: translateX(-50%) scale(1); opacity: 0.8; }
+            50% { transform: translateX(-50%) scale(1.25); opacity: 1; }
+        }
+        .login-heart-icon {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            display: block;
+            animation: heartbeat 1.6s ease-in-out infinite;
+            filter: drop-shadow(0 0 12px rgba(255,80,120,0.8));
+        }
+        .login-title {
+            font-family: 'ZCOOL KuaiLe', cursive;
+            font-size: 1.6em;
+            letter-spacing: 3px;
+            margin-bottom: 4px;
+            background: linear-gradient(135deg, #fff5f8, #ffe0ea, #ffc0d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 0 8px rgba(255,100,140,0.5));
+        }
+        .login-subtitle {
+            font-size: 0.82em;
+            color: rgba(255,220,230,0.85);
+            letter-spacing: 2px;
+            margin-bottom: 28px;
+        }
+        .login-field {
+            position: relative;
+            margin-bottom: 14px;
+        }
+        .login-field label {
+            display: block;
+            font-size: 0.78em;
+            color: rgba(255,220,235,0.9);
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            text-align: left;
+        }
+        .login-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,200,215,0.5);
+            border-radius: 14px;
+            font-size: 1em;
+            font-family: 'Nunito','PingFang SC',system-ui,sans-serif;
+            color: #fff;
+            outline: none;
+            transition: all 0.3s;
+        }
+        .login-input::placeholder {
+            color: rgba(255,200,215,0.6);
+        }
+        .login-input:focus {
+            background: rgba(255,255,255,0.22);
+            border-color: rgba(255,180,200,0.9);
+            box-shadow: 0 0 0 3px rgba(255,120,160,0.25);
+        }
+        .login-pw-wrap {
+            position: relative;
+        }
+        .login-pw-wrap .login-input {
+            padding-right: 44px;
+        }
+        .login-pw-eye {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: rgba(255,200,220,0.8);
+            cursor: pointer;
+            font-size: 1em;
+            padding: 0;
+            box-shadow: none;
+            line-height: 1;
+        }
+        .login-pw-eye:hover { color: #fff; transform: translateY(-50%) scale(1.15); }
+        .login-pw-eye::after { display: none; }
+        .login-error {
+            font-size: 0.82em;
+            color: #ffb0c0;
+            min-height: 20px;
+            text-align: center;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+            animation: shake 0.4s ease;
+        }
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            60% { transform: translateX(8px); }
+        }
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #ff6b8a, #e84393, #c2185b);
+            border: none;
+            border-radius: 50px;
+            color: #fff;
+            font-family: 'ZCOOL KuaiLe',cursive;
+            font-size: 1.1em;
+            letter-spacing: 4px;
+            cursor: pointer;
+            box-shadow: 0 6px 24px rgba(232,67,147,0.55), 0 0 20px rgba(255,80,130,0.3);
+            transition: all 0.3s;
+            margin-top: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(232,67,147,0.7);
+        }
+        .login-btn::after {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.2), transparent);
+            transform: rotate(25deg) translateX(-150%);
+            transition: transform 0.6s ease;
+        }
+        .login-btn:hover::after {
+            transform: rotate(25deg) translateX(100%);
+        }
+        .login-close-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,200,215,0.4);
+            color: rgba(255,220,235,0.9);
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            font-size: 0.9em;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0;
+            box-shadow: none;
+            transition: all 0.2s;
+        }
+        .login-close-btn:hover { background: rgba(255,255,255,0.25); color: #fff; transform: rotate(90deg); }
+        .login-close-btn::after { display: none; }
+
+        /* ── 个人主页全屏 ── */
+        .profile-page {
+            position: fixed;
+            inset: 0;
+            z-index: 1500;
+            background: linear-gradient(-45deg, var(--bg-1), var(--bg-2), var(--bg-3), var(--bg-4));
+            background-size: 400% 400%;
+            animation: gradientShift 20s ease infinite;
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .profile-page.show {
+            display: flex;
+        }
+        .profile-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+        }
+        .profile-back-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.88em;
+            cursor: pointer;
+            box-shadow: none;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .profile-back-btn:hover { background: rgba(212,160,168,0.1); color: var(--primary); transform: none; box-shadow: none; }
+        .profile-back-btn::after { display: none; }
+        .profile-topbar-title {
+            font-family: 'ZCOOL KuaiLe',cursive;
+            font-size: 1.1em;
+            color: var(--primary);
+            letter-spacing: 2px;
+        }
+        .profile-edit-btn {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            cursor: pointer;
+            box-shadow: 0 3px 12px rgba(181,115,122,0.3);
+            transition: all 0.3s;
+        }
+        .profile-edit-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(181,115,122,0.45); }
+        .profile-edit-btn::after { display: none; }
+        .profile-body {
+            flex: 1;
+            padding: 40px 20px 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 480px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        .profile-avatar-wrap {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        .profile-avatar {
+            width: 100px; height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--primary-light);
+            box-shadow: 0 6px 24px rgba(181,115,122,0.35);
+            display: block;
+        }
+        .profile-avatar-placeholder {
+            width: 100px; height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.5em;
+            border: 3px solid rgba(255,255,255,0.5);
+            box-shadow: 0 6px 24px rgba(181,115,122,0.35);
+        }
+        .profile-nickname {
+            font-family: 'ZCOOL KuaiLe', cursive;
+            font-size: 1.8em;
+            color: var(--text);
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+            text-align: center;
+        }
+        .profile-username {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+        .profile-bio {
+            font-size: 0.95em;
+            color: var(--text-muted);
+            text-align: center;
+            max-width: 280px;
+            line-height: 1.7;
+            margin-bottom: 28px;
+            font-style: italic;
+        }
+        .profile-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+        .profile-stat-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 18px 12px;
+            text-align: center;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 3px 14px var(--shadow);
+        }
+        .profile-stat-num {
+            font-family: 'ZCOOL KuaiLe',cursive;
+            font-size: 2em;
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+        .profile-stat-label {
+            font-size: 0.78em;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+        .profile-action-btn {
+            width: 100%;
+            max-width: 280px;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            border: none;
+            border-radius: 50px;
+            color: #fff;
+            font-family: 'ZCOOL KuaiLe',cursive;
+            font-size: 1.05em;
+            letter-spacing: 3px;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(181,115,122,0.35);
+            transition: all 0.3s;
+        }
+        .profile-action-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(181,115,122,0.5); }
+
+        /* ── 编辑资料全屏页 ── */
+        .edit-profile-page {
+            position: fixed;
+            inset: 0;
+            z-index: 1600;
+            background: linear-gradient(-45deg, var(--bg-1), var(--bg-2), var(--bg-3), var(--bg-4));
+            background-size: 400% 400%;
+            animation: gradientShift 20s ease infinite;
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .edit-profile-page.show { display: flex; }
+        .edit-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+        }
+        .edit-cancel-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.88em;
+            cursor: pointer;
+            box-shadow: none;
+        }
+        .edit-cancel-btn:hover { background: rgba(200,155,155,0.08); color: var(--text); transform: none; box-shadow: none; }
+        .edit-cancel-btn::after { display: none; }
+        .edit-save-btn {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.88em;
+            cursor: pointer;
+            box-shadow: 0 3px 12px rgba(181,115,122,0.3);
+            transition: all 0.3s;
+        }
+        .edit-save-btn:hover { transform: translateY(-1px); }
+        .edit-save-btn::after { display: none; }
+        .edit-body {
+            flex: 1;
+            padding: 32px 24px 60px;
+            max-width: 480px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        .edit-avatar-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        .edit-avatar-circle {
+            width: 90px; height: 90px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid var(--primary-light);
+            box-shadow: 0 5px 20px rgba(181,115,122,0.3);
+            cursor: pointer;
+            position: relative;
+            transition: opacity 0.2s;
+        }
+        .edit-avatar-circle:hover { opacity: 0.82; }
+        .edit-avatar-circle img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+        .edit-avatar-circle .avatar-ph {
+            width: 100%; height: 100%;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.2em;
+        }
+        .edit-avatar-label {
+            margin-top: 10px;
+            font-size: 0.82em;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+        .edit-field {
+            margin-bottom: 20px;
+        }
+        .edit-field label {
+            display: block;
+            font-size: 0.82em;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .edit-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            font-size: 1em;
+            font-family: 'Nunito','PingFang SC',system-ui,sans-serif;
+            color: var(--text);
+            background: rgba(255,255,255,0.7);
+            outline: none;
+            transition: all 0.3s;
+        }
+        .edit-input:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(212,160,168,0.15);
+        }
+        [data-theme="dark"] .edit-input {
+            background: rgba(20,12,35,0.8);
+            color: var(--text);
+            border-color: var(--border);
+        }
+        .edit-msg {
+            font-size: 0.85em;
+            text-align: center;
+            min-height: 22px;
+            margin-top: 16px;
+            color: var(--primary);
+        }
     </style>
 </head>
 <body>
@@ -1814,6 +2424,21 @@
 <div class="resonance-ui" id="resonance-ui">
     <div class="resonance-hearts">💖💖</div>
     <div class="resonance-text">此刻，TA 也在陪你看回忆 ✨</div>
+</div>
+
+<!-- 登录触发按钮（未登录时显示） -->
+<button id="login-trigger-btn" class="login-trigger-btn" onclick="openLoginModal()" title="登录">👤</button>
+
+<!-- 登录后头像按钮 -->
+<button id="user-avatar-btn" class="user-avatar-btn" onclick="toggleUserDropdown()" title="我的">
+    <div class="avatar-placeholder">🌸</div>
+</button>
+
+<!-- 用户下拉菜单 -->
+<div id="user-dropdown" class="user-dropdown">
+    <div id="user-name-label" class="user-name-label">已登录</div>
+    <div class="user-dropdown-item" onclick="openProfilePage(); hideUserDropdown();">🌸 个人主页</div>
+    <div class="user-dropdown-item logout" onclick="doLogout()">🚪 退出登录</div>
 </div>
 
 <!-- 通知铃铛及面板 -->
@@ -2072,16 +2697,106 @@
     <video id="lightbox-video" src="" controls style="display:none; max-width:90%; max-height:90%; border-radius:12px; margin: auto; position: absolute; top: 0; bottom: 0; left: 0; right: 0;"></video>
 </div>
 
+<!-- 浪漫登录弹窗 -->
+<div id="login-overlay" class="login-overlay">
+    <div class="login-bg"></div>
+    <canvas id="login-canvas" class="login-canvas"></canvas>
+    <div class="login-box">
+        <div class="login-halo"></div>
+        <button class="login-close-btn" onclick="closeLoginModal()">✕</button>
+        <span class="login-heart-icon">💖</span>
+        <div class="login-title">小蛇 ♡ 小奚</div>
+        <div class="login-subtitle">专属空间 · 爱的密码</div>
+        <div class="login-field">
+            <label>🌸 账号</label>
+            <input type="text" id="login-username" class="login-input" placeholder="小蛇 / 小奚" autocomplete="off">
+        </div>
+        <div class="login-field">
+            <label>🔐 密码</label>
+            <div class="login-pw-wrap">
+                <input type="password" id="login-password" class="login-input" placeholder="输入你的爱意密码…">
+                <button class="login-pw-eye" id="login-pw-eye" onclick="toggleLoginPwEye()">👁</button>
+            </div>
+        </div>
+        <div class="login-error" id="login-error"></div>
+        <button class="login-btn" id="login-btn" onclick="doLogin()">✨ 进入我们的世界</button>
+    </div>
+</div>
+
+<!-- 个人主页全屏页 -->
+<div id="profile-page" class="profile-page">
+    <div class="profile-topbar">
+        <button class="profile-back-btn" onclick="closeProfilePage()">← 返回</button>
+        <div class="profile-topbar-title">我的主页</div>
+        <button class="profile-edit-btn" onclick="openEditProfilePage()">✏️ 编辑资料</button>
+    </div>
+    <div class="profile-body">
+        <div class="profile-avatar-wrap" id="profile-avatar-wrap">
+            <div class="profile-avatar-placeholder">🌸</div>
+        </div>
+        <div class="profile-nickname" id="profile-nickname">昵称</div>
+        <div class="profile-username" id="profile-username">@账号</div>
+        <div class="profile-bio" id="profile-bio">还没有签名，快去编辑一下吧~ 💕</div>
+        <div class="profile-stats">
+            <div class="profile-stat-card">
+                <div class="profile-stat-num" id="stat-posts">0</div>
+                <div class="profile-stat-label">📝 发布动态</div>
+            </div>
+            <div class="profile-stat-card">
+                <div class="profile-stat-num" id="stat-photos">0</div>
+                <div class="profile-stat-label">📸 上传照片</div>
+            </div>
+        </div>
+        <button class="profile-action-btn" onclick="openEditProfilePage()">✨ 修改个人资料</button>
+    </div>
+</div>
+
+<!-- 编辑资料全屏页 -->
+<div id="edit-profile-page" class="edit-profile-page">
+    <div class="edit-topbar">
+        <button class="edit-cancel-btn" onclick="closeEditProfilePage()">取消</button>
+        <div style="font-family:'ZCOOL KuaiLe',cursive; color:var(--primary); font-size:1.1em; letter-spacing:2px;">编辑资料</div>
+        <button class="edit-save-btn" id="edit-save-btn" onclick="saveProfile()">保存</button>
+    </div>
+    <div class="edit-body">
+        <div class="edit-avatar-area">
+            <div class="edit-avatar-circle" onclick="document.getElementById('avatar-file-input').click()" id="edit-avatar-circle">
+                <div class="avatar-ph">🌸</div>
+            </div>
+            <div class="edit-avatar-label">点击更换头像</div>
+            <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="handleAvatarSelect(event)">
+        </div>
+        <div class="edit-field">
+            <label>昵称</label>
+            <input type="text" id="edit-nickname" class="edit-input" placeholder="你的昵称" maxlength="20">
+        </div>
+        <div class="edit-field">
+            <label>一句话签名</label>
+            <input type="text" id="edit-bio" class="edit-input" placeholder="写下你的签名…" maxlength="60">
+        </div>
+        <div class="edit-msg" id="edit-msg"></div>
+    </div>
+</div>
+
 <script>
     // ==========================================
     // 1. 配置区
     // ==========================================
     const startDate = new Date(2026, 4, 23, 1, 0, 0);
 
+    // ── 账号系统 ──
+    const AUTH = {
+        "小蛇": "5211314",
+        "小奚": "5201314"
+    };
+    // 保留旧的 USERS 兼容
     const USERS = {
         "5201314": "小奚",
         "5211314": "小蛇"
     };
+
+    // 当前登录用户的 profile
+    let currentUserProfile = null;
 
     const PAGE_SIZE = 10;
     let currentPage = 0;
@@ -2300,14 +3015,419 @@
     let pendingDeleteCommentId = null;
     let pendingDeleteCommentMomentId = null;
 
+    // ==========================================
+    // 新登录系统
+    // ==========================================
+
+    async function initAuth() {
+        // 确保 profiles 表存在（通过 upsert 触发）
+        await ensureProfilesTable();
+
+        const saved = localStorage.getItem('lover_identity');
+        if (saved && AUTH[saved]) {
+            currentAuthor = saved;
+            await onLoginSuccess(currentAuthor, false);
+        }
+    }
+
+    async function ensureProfilesTable() {
+        // 尝试查询 profiles 表，如果不存在则通过 SQL 创建
+        const { error } = await supabaseClient.from('profiles').select('username').limit(1);
+        if (error && error.code === '42P01') {
+            // 表不存在，需要在 Supabase 中创建
+            console.log('profiles 表不存在，请在 Supabase 控制台执行建表 SQL');
+        }
+    }
+
+    function openLoginModal() {
+        const overlay = document.getElementById('login-overlay');
+        document.getElementById('login-username').value = '';
+        document.getElementById('login-password').value = '';
+        document.getElementById('login-error').innerText = '';
+        overlay.classList.add('show');
+        startLoginCanvas();
+        setTimeout(() => document.getElementById('login-username').focus(), 200);
+    }
+
+    function closeLoginModal() {
+        document.getElementById('login-overlay').classList.remove('show');
+        stopLoginCanvas();
+    }
+
+    function toggleLoginPwEye() {
+        const pw = document.getElementById('login-password');
+        const eye = document.getElementById('login-pw-eye');
+        if (pw.type === 'password') {
+            pw.type = 'text';
+            eye.textContent = '🙈';
+        } else {
+            pw.type = 'password';
+            eye.textContent = '👁';
+        }
+    }
+
+    async function doLogin() {
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+        const errEl = document.getElementById('login-error');
+        const btn = document.getElementById('login-btn');
+
+        if (!username) { errEl.innerText = '请输入账号 💕'; return; }
+        if (!password) { errEl.innerText = '请输入密码 🔐'; return; }
+        if (!AUTH[username]) { errEl.innerText = '账号不存在，请输入「小蛇」或「小奚」'; return; }
+        if (AUTH[username] !== password) { errEl.innerText = '密码不对哦，再想想~ 💭'; return; }
+
+        errEl.innerText = '';
+        btn.innerHTML = '💖 登录中…';
+        btn.disabled = true;
+
+        currentAuthor = username;
+        localStorage.setItem('lover_identity', username);
+
+        await onLoginSuccess(username, true);
+        btn.innerHTML = '✨ 进入我们的世界';
+        btn.disabled = false;
+        closeLoginModal();
+    }
+
+    async function onLoginSuccess(username, isNewLogin) {
+        // 更新 UI：隐藏登录按钮，显示头像按钮
+        document.getElementById('login-trigger-btn').style.display = 'none';
+        const avatarBtn = document.getElementById('user-avatar-btn');
+        avatarBtn.style.display = 'flex';
+        document.getElementById('user-name-label').textContent = `@${username}`;
+
+        // 加载 profile
+        await loadUserProfile(username);
+
+        // 更新同频共振
+        if (presenceChannel) updatePresence();
+
+        // 加载通知
+        setTimeout(loadNotifications, 500);
+
+        if (isNewLogin) {
+            // 登录成功爱心动画
+            spawnHearts(window.innerWidth / 2, window.innerHeight / 2);
+        }
+    }
+
+    function doLogout() {
+        hideUserDropdown();
+        currentAuthor = '';
+        currentUserProfile = null;
+        localStorage.removeItem('lover_identity');
+        document.getElementById('login-trigger-btn').style.display = 'flex';
+        document.getElementById('user-avatar-btn').style.display = 'none';
+        // 重置头像
+        const avatarBtn = document.getElementById('user-avatar-btn');
+        avatarBtn.innerHTML = '<div class="avatar-placeholder">🌸</div>';
+    }
+
+    function toggleUserDropdown() {
+        const dd = document.getElementById('user-dropdown');
+        dd.classList.toggle('show');
+    }
+
+    function hideUserDropdown() {
+        document.getElementById('user-dropdown').classList.remove('show');
+    }
+
+    // 点击外部关闭下拉
+    document.addEventListener('click', (e) => {
+        const dd = document.getElementById('user-dropdown');
+        const avatarBtn = document.getElementById('user-avatar-btn');
+        if (dd && dd.classList.contains('show') && !dd.contains(e.target) && !avatarBtn.contains(e.target)) {
+            dd.classList.remove('show');
+        }
+    });
+
+    // ── 个人主页 ──
+    async function loadUserProfile(username) {
+        let loadedProfile = null;
+        try {
+            const { data, error } = await supabaseClient
+                .from('profiles')
+                .select('*')
+                .eq('username', username)
+                .single();
+
+            if (!error && data) {
+                loadedProfile = data;
+            }
+        } catch(e) {}
+
+        if (!loadedProfile) {
+            // 尝试从 localStorage 读取本地缓存（Fallback）
+            const local = localStorage.getItem('profile_' + username);
+            if (local) {
+                try { loadedProfile = JSON.parse(local); } catch(e){}
+            }
+        }
+
+        if (loadedProfile) {
+            currentUserProfile = loadedProfile;
+        } else {
+            // 初始化默认 profile
+            currentUserProfile = { username, nickname: username, bio: '', avatar_url: null };
+            // 尝试同步到服务器，失败不报错
+            supabaseClient.from('profiles').upsert([currentUserProfile], { onConflict: 'username' }).then(()=>{});
+        }
+        updateAvatarButton();
+    }
+
+    function updateAvatarButton() {
+        const avatarBtn = document.getElementById('user-avatar-btn');
+        if (!avatarBtn || !currentUserProfile) return;
+        if (currentUserProfile.avatar_url) {
+            avatarBtn.innerHTML = `<img src="${currentUserProfile.avatar_url}" alt="头像">`;
+        } else {
+            const emoji = currentUserProfile.username === '小蛇' ? '🐍' : '🐟';
+            avatarBtn.innerHTML = `<div class="avatar-placeholder">${emoji}</div>`;
+        }
+    }
+
+    function openProfilePage() {
+        if (!currentUserProfile) return;
+        const page = document.getElementById('profile-page');
+        page.classList.add('show');
+        renderProfilePage();
+        loadProfileStats();
+    }
+
+    function closeProfilePage() {
+        document.getElementById('profile-page').classList.remove('show');
+    }
+
+    function renderProfilePage() {
+        const p = currentUserProfile;
+        if (!p) return;
+        // 头像
+        const avatarWrap = document.getElementById('profile-avatar-wrap');
+        if (p.avatar_url) {
+            avatarWrap.innerHTML = `<img src="${p.avatar_url}" class="profile-avatar" alt="头像">`;
+        } else {
+            const emoji = p.username === '小蛇' ? '🐍' : '🐟';
+            avatarWrap.innerHTML = `<div class="profile-avatar-placeholder">${emoji}</div>`;
+        }
+        document.getElementById('profile-nickname').textContent = p.nickname || p.username;
+        document.getElementById('profile-username').textContent = `@${p.username}`;
+        document.getElementById('profile-bio').textContent = p.bio || '还没有签名，快去编辑一下吧~ 💕';
+    }
+
+    async function loadProfileStats() {
+        if (!currentAuthor) return;
+        // 总动态数
+        const { count: totalCount } = await supabaseClient
+            .from('moments')
+            .select('id', { count: 'exact', head: true })
+            .eq('author', currentAuthor);
+        // 照片数（moment 类型中有图片）
+        const { data: photoData } = await supabaseClient
+            .from('moments')
+            .select('content')
+            .eq('author', currentAuthor)
+            .in('type', ['photo', 'moment']);
+        let photoCount = 0;
+        if (photoData) {
+            photoData.forEach(item => {
+                try {
+                    const d = JSON.parse(item.content);
+                    if (d.images) photoCount += d.images.length;
+                } catch (e) {
+                    photoCount += 1; // photo 类型
+                }
+            });
+        }
+        document.getElementById('stat-posts').textContent = totalCount || 0;
+        document.getElementById('stat-photos').textContent = photoCount || 0;
+    }
+
+    function openEditProfilePage() {
+        const p = currentUserProfile;
+        if (!p) return;
+        const page = document.getElementById('edit-profile-page');
+        document.getElementById('edit-nickname').value = p.nickname || p.username;
+        document.getElementById('edit-bio').value = p.bio || '';
+        document.getElementById('edit-msg').innerText = '';
+        // 头像预览
+        const circle = document.getElementById('edit-avatar-circle');
+        if (p.avatar_url) {
+            circle.innerHTML = `<img src="${p.avatar_url}" alt="头像">`;
+        } else {
+            const emoji = p.username === '小蛇' ? '🐍' : '🐟';
+            circle.innerHTML = `<div class="avatar-ph">${emoji}</div>`;
+        }
+        pendingAvatarFile = null;
+        page.classList.add('show');
+    }
+
+    function closeEditProfilePage() {
+        document.getElementById('edit-profile-page').classList.remove('show');
+        pendingAvatarFile = null;
+    }
+
+    let pendingAvatarFile = null;
+
+    function handleAvatarSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        pendingAvatarFile = file;
+        const url = URL.createObjectURL(file);
+        const circle = document.getElementById('edit-avatar-circle');
+        circle.innerHTML = `<img src="${url}" alt="头像预览" style="width:100%;height:100%;object-fit:cover;">`;
+        event.target.value = '';
+    }
+
+    async function saveProfile() {
+        const nickname = document.getElementById('edit-nickname').value.trim();
+        const bio = document.getElementById('edit-bio').value.trim();
+        const msgEl = document.getElementById('edit-msg');
+        const saveBtn = document.getElementById('edit-save-btn');
+
+        if (!nickname) { msgEl.style.color = 'var(--primary)'; msgEl.innerText = '昵称不能为空哦~'; return; }
+
+        saveBtn.innerHTML = '保存中…'; saveBtn.disabled = true;
+        msgEl.innerText = '';
+
+        try {
+            let avatarUrl = currentUserProfile.avatar_url;
+
+            // 上传头像
+            if (pendingAvatarFile) {
+                const ext = pendingAvatarFile.name.split('.').pop();
+                const fileName = `avatars/${currentAuthor}_${Date.now()}.${ext}`;
+                const { error: uploadErr } = await supabaseClient.storage
+                    .from('photos')
+                    .upload(fileName, pendingAvatarFile, { contentType: pendingAvatarFile.type, upsert: true });
+                if (uploadErr) throw uploadErr;
+                const { data: urlData } = supabaseClient.storage.from('photos').getPublicUrl(fileName);
+                avatarUrl = urlData.publicUrl;
+            }
+
+            const updated = { username: currentAuthor, nickname, bio, avatar_url: avatarUrl, updated_at: new Date().toISOString() };
+            
+            // 尝试保存到服务器
+            const { error: upsertErr } = await supabaseClient.from('profiles').upsert([updated], { onConflict: 'username' });
+            
+            // 无论服务器是否成功，都在本地更新并保存到 localStorage（兼容无表状态）
+            currentUserProfile = { ...currentUserProfile, ...updated };
+            localStorage.setItem('profile_' + currentAuthor, JSON.stringify(currentUserProfile));
+            
+            updateAvatarButton();
+            renderProfilePage();
+
+            msgEl.style.color = '#7ab87a';
+            msgEl.innerText = upsertErr ? '保存成功 (仅本地缓存)' : '保存成功 ✨';
+            if (upsertErr) console.warn('Supabase profile save failed, using local cache:', upsertErr);
+            
+            pendingAvatarFile = null;
+            setTimeout(() => closeEditProfilePage(), 800);
+        } catch (err) {
+            msgEl.style.color = 'var(--primary)';
+            msgEl.innerText = '保存失败: ' + err.message;
+        } finally {
+            saveBtn.innerHTML = '保存'; saveBtn.disabled = false;
+        }
+    }
+
+    // ── 登录弹窗花瓣 Canvas ──
+    let loginCanvasAnim = null;
+
+    function startLoginCanvas() {
+        const canvas = document.getElementById('login-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const petals = [];
+        const hearts = ['💖','💗','💕','✨','🌸','💝','🌹'];
+        for (let i = 0; i < 40; i++) {
+            petals.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: 12 + Math.random() * 20,
+                speedY: 0.6 + Math.random() * 1.5,
+                speedX: (Math.random() - 0.5) * 0.8,
+                rot: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 0.04,
+                sway: Math.random() * Math.PI * 2,
+                swaySpeed: 0.01 + Math.random() * 0.02,
+                alpha: 0.4 + Math.random() * 0.6,
+                emoji: hearts[Math.floor(Math.random() * hearts.length)]
+            });
+        }
+
+        let running = true;
+        loginCanvasAnim = { running };
+
+        function animate() {
+            if (!loginCanvasAnim.running) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            petals.forEach(p => {
+                p.sway += p.swaySpeed;
+                p.x += p.speedX + Math.sin(p.sway) * 0.8;
+                p.y += p.speedY;
+                p.rot += p.rotSpeed;
+                if (p.y > canvas.height + 30) {
+                    p.y = -30;
+                    p.x = Math.random() * canvas.width;
+                }
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rot);
+                ctx.globalAlpha = p.alpha;
+                ctx.font = p.size + 'px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(p.emoji, 0, 0);
+                ctx.restore();
+            });
+            requestAnimationFrame(animate);
+        }
+        animate();
+    }
+
+    function stopLoginCanvas() {
+        if (loginCanvasAnim) loginCanvasAnim.running = false;
+    }
+
+    // 登录弹窗键盘事件
+    document.getElementById('login-password') && document.getElementById('login-password').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') doLogin();
+    });
+    document.getElementById('login-username') && document.getElementById('login-username').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') document.getElementById('login-password').focus();
+    });
+
+    // ==========================================
+    // 旧版密码弹窗（兼容保留，已登录时直通）
+    // ==========================================
     function checkPassword(actionType) {
-        currentAction = actionType;
-        const modal = document.getElementById('customModal');
-        const input = document.getElementById('modalInput');
-        document.getElementById('modalMsg').innerText = '';
-        input.value = '';
-        modal.classList.add('show');
-        setTimeout(() => input.focus(), 100);
+        // 已登录则直接执行对应动作
+        if (currentAuthor) {
+            currentAction = actionType;
+            executeAction(actionType);
+            return;
+        }
+        // 未登录则弹出登录弹窗
+        openLoginModal();
+    }
+
+    function executeAction(actionType) {
+        if (actionType === 'moment') {
+            openMomentModal();
+        } else if (actionType === 'delete') {
+            deleteMoment(pendingDeleteId);
+        } else if (actionType === 'mood') {
+            openMoodModal();
+        } else if (actionType === 'comment') {
+            showCommentInput(pendingCommentMomentId);
+        } else if (actionType === 'delete_comment') {
+            deleteComment(pendingDeleteCommentId, pendingDeleteCommentMomentId);
+        } else if (actionType === 'audio_start') {
+            executeStartRecording();
+        }
     }
 
     function closeModal() {
@@ -2322,24 +3442,13 @@
             currentAuthor = USERS[inputVal];
             localStorage.setItem('lover_identity', currentAuthor);
             if (presenceChannel) updatePresence();
+            onLoginSuccess(currentAuthor, false);
 
             msgEl.style.color = '#7ab87a';
             msgEl.innerText = `暗号正确，${currentAuthor} 💖`;
             setTimeout(() => {
                 closeModal();
-                if (currentAction === 'moment') {
-                    openMomentModal();
-                } else if (currentAction === 'delete') {
-                    deleteMoment(pendingDeleteId);
-                } else if (currentAction === 'mood') {
-                    openMoodModal();
-                } else if (currentAction === 'comment') {
-                    showCommentInput(pendingCommentMomentId);
-                } else if (currentAction === 'delete_comment') {
-                    deleteComment(pendingDeleteCommentId, pendingDeleteCommentMomentId);
-                } else if (currentAction === 'audio_start') {
-                    executeStartRecording();
-                }
+                executeAction(currentAction);
             }, 500);
         } else if (inputVal.trim() === '') {
             msgEl.style.color = '#b5737a';
@@ -2853,6 +3962,10 @@
     // --- 删除 ---
     function confirmDelete(id) {
         pendingDeleteId = id;
+        if (currentAuthor) {
+            deleteMoment(id);
+            return;
+        }
         currentAction = 'delete';
         const modal = document.getElementById('customModal');
         const input = document.getElementById('modalInput');
@@ -2882,6 +3995,10 @@
     // --- 评论 ---
     function checkPasswordForComment(momentId) {
         pendingCommentMomentId = momentId;
+        if (currentAuthor) {
+            showCommentInput(momentId);
+            return;
+        }
         currentAction = 'comment';
         const modal = document.getElementById('customModal');
         const input = document.getElementById('modalInput');
@@ -2980,6 +4097,10 @@
     function confirmDeleteComment(commentId, momentId) {
         pendingDeleteCommentId = commentId;
         pendingDeleteCommentMomentId = momentId;
+        if (currentAuthor) {
+            deleteComment(commentId, momentId);
+            return;
+        }
         currentAction = 'delete_comment';
         const modal = document.getElementById('customModal');
         const input = document.getElementById('modalInput');
@@ -3421,7 +4542,7 @@
         isBlindBoxLoading = false;
     }
 
-    window.onload = function() { 
+    window.onload = async function() { 
         initTheme();
         createStarField();
         fetchMoments(); 
@@ -3429,6 +4550,7 @@
         loadMoods(); 
         initPresence();
         setTimeout(initCardGlow, 600);
+        await initAuth();
     };
 
     // ==========================================
@@ -3929,7 +5051,7 @@
 
     function toggleNotificationPanel() {
         if (!currentAuthor) {
-            alert('请先打卡心情或发布动态，确认您的身份后才能查看通知。');
+            openLoginModal();
             return;
         }
         const panel = document.getElementById('notification-panel');
