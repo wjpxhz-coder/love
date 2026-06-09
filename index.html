@@ -4361,10 +4361,11 @@
     // --- 删除 ---
     function confirmDelete(id) {
         pendingDeleteId = id;
+        if (!confirm('确定要撤回这条回忆吗？此操作不可逆哦 💖')) {
+            return;
+        }
         if (currentAuthor) {
-            if (confirm('确定要撤回这条回忆吗？此操作不可逆哦 💖')) {
-                deleteMoment(id);
-            }
+            deleteMoment(id);
             return;
         }
         currentAction = 'delete';
@@ -4390,14 +4391,20 @@
             await supabaseClient.from('notifications')
                 .update({ type: 'recalled', content: '此动态互动已被对方撤回' })
                 .eq('type', 'moment')
-                .eq('related_id', id);
+                .eq('related_id', id.toString());
 
             // 更新本动态下所有评论的通知为已撤回状态
             if (comments && comments.length > 0) {
-                const commentIds = comments.map(c => c.id);
+                const commentIds = comments.map(c => c.id.toString());
                 await supabaseClient.from('notifications')
                     .update({ type: 'recalled', content: '此评论互动已被对方撤回' })
                     .eq('type', 'comment')
+                    .in('related_id', commentIds);
+
+                // 同时更新该动态下评论的点赞通知为已撤回状态
+                await supabaseClient.from('notifications')
+                    .update({ type: 'recalled', content: '此点赞互动已被对方撤回' })
+                    .eq('type', 'like')
                     .in('related_id', commentIds);
             }
 
@@ -4543,7 +4550,7 @@
                             <span class="like-heart">${isLiked ? '❤️' : '🤍'}</span>
                             <span class="like-count" id="like-count-${c.id}">${likeCount > 0 ? likeCount : '赞'}</span>
                         </button>
-                        <span style="color:#d4a0a8; cursor:pointer; margin-left:12px;" onclick="confirmDeleteComment(${c.id}, ${momentId})">撒回</span>
+                        <span style="color:#d4a0a8; cursor:pointer; margin-left:12px;" onclick="confirmDeleteComment(${c.id}, ${momentId})">撤回</span>
                     </div>
                 </div>
             </div>`;
@@ -4553,10 +4560,11 @@
     function confirmDeleteComment(commentId, momentId) {
         pendingDeleteCommentId = commentId;
         pendingDeleteCommentMomentId = momentId;
+        if (!confirm('确定要撤回这条评论吗？此操作不可逆哦 💬')) {
+            return;
+        }
         if (currentAuthor) {
-            if (confirm('确定要撤回这条评论吗？此操作不可逆哦 💬')) {
-                deleteComment(commentId, momentId);
-            }
+            deleteComment(commentId, momentId);
             return;
         }
         currentAction = 'delete_comment';
@@ -4593,7 +4601,7 @@
                 await supabaseClient.from('notifications')
                     .update({ type: 'recalled', content: '此点赞互动已被对方撤回' })
                     .eq('type', 'like')
-                    .eq('related_id', commentId)
+                    .eq('related_id', commentId.toString())
                     .eq('actor', currentAuthor);
             }
         } else {
@@ -4641,13 +4649,13 @@
             await supabaseClient.from('notifications')
                 .update({ type: 'recalled', content: '此评论互动已被对方撤回' })
                 .eq('type', 'comment')
-                .eq('related_id', commentId);
+                .eq('related_id', commentId.toString());
 
             // 更新本评论的所有点赞通知为已撤回状态
             await supabaseClient.from('notifications')
                 .update({ type: 'recalled', content: '此点赞互动已被对方撤回' })
                 .eq('type', 'like')
-                .eq('related_id', commentId);
+                .eq('related_id', commentId.toString());
 
             const item = document.getElementById('comment-' + commentId);
             if (item) {
