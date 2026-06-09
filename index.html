@@ -3015,11 +3015,29 @@
     let pendingDeleteCommentId = null;
     let pendingDeleteCommentMomentId = null;
 
+    let allProfilesCache = {};
+    try {
+        const cached = localStorage.getItem('all_profiles_cache');
+        if (cached) allProfilesCache = JSON.parse(cached);
+    } catch(e) {}
+
+    async function fetchAllProfiles() {
+        try {
+            const { data, error } = await supabaseClient.from('profiles').select('*');
+            if (!error && data) {
+                data.forEach(p => { allProfilesCache[p.username] = p; });
+                localStorage.setItem('all_profiles_cache', JSON.stringify(allProfilesCache));
+            }
+        } catch(e) {}
+    }
+
     // ==========================================
     // 新登录系统
     // ==========================================
 
     async function initAuth() {
+        // 预加载所有用户资料
+        fetchAllProfiles();
         // 确保 profiles 表存在（通过 upsert 触发）
         await ensureProfilesTable();
 
@@ -3678,10 +3696,16 @@
             ? `<button class="delete-btn" onclick="confirmDelete(${item.id})">撤回</button>`
             : '';
 
-        const authorBadge = item.author === '小蛇'
-            ? `<span class="author-badge author-snake">🐍 小蛇</span>`
-            : item.author === '小奚'
-            ? `<span class="author-badge author-xi">🐟 小奚</span>`
+        const authorProfile = allProfilesCache[item.author] || {};
+        const authorEmoji = item.author === '小蛇' ? '🐍' : (item.author === '小奚' ? '🐟' : '');
+        const authorAvatarHtml = authorProfile.avatar_url 
+            ? `<img src="${authorProfile.avatar_url}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" />` 
+            : authorEmoji;
+        const authorDisplayName = authorProfile.nickname || item.author;
+        const authorBadgeClass = item.author === '小蛇' ? 'author-snake' : (item.author === '小奚' ? 'author-xi' : '');
+        
+        const authorBadge = item.author
+            ? `<span class="author-badge ${authorBadgeClass}">${authorAvatarHtml} ${authorDisplayName}</span>`
             : '';
 
         let html = `<div class="moment-card" id="card-${item.id}">
@@ -4075,11 +4099,18 @@
             const dateStr = new Date(c.created_at).toLocaleString('zh-CN', { hour12: false });
             const badgeClass = c.author === '小蛇' ? 'author-snake' : 'author-xi';
             const emoji = c.author === '小蛇' ? '🐍' : '🐟';
+            
+            const p = allProfilesCache[c.author] || {};
+            const avatarHtml = p.avatar_url 
+                ? `<img src="${p.avatar_url}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" />` 
+                : emoji;
+            const displayName = p.nickname || c.author;
+            
             const likeCount = likesMap[c.id] || 0;
             const isLiked = userLikedMap[c.id] || false;
             
             return `<div class="comment-item" id="comment-${c.id}">
-                <span class="comment-author-badge author-badge ${badgeClass}">${emoji} ${c.author}</span>
+                <span class="comment-author-badge author-badge ${badgeClass}">${avatarHtml} ${displayName}</span>
                 <div style="flex:1;">
                     <div class="comment-bubble">${escapeHtml(c.content)}</div>
                     <div class="comment-time">
