@@ -67,6 +67,14 @@
             z-index: 0;
         }
 
+        #sakura-canvas-foreground {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 2; /* 浮于 container 容器 (z-index: 1) 之上，但低于弹窗和悬浮球 */
+        }
+
         .container {
             position: relative;
             z-index: 1;
@@ -2485,6 +2493,7 @@
 <div id="star-field"></div>
 
 <canvas id="sakura-canvas"></canvas>
+<canvas id="sakura-canvas-foreground"></canvas>
 
 <div class="container">
 
@@ -2849,8 +2858,10 @@
     let sakuraColor = '#f2b8c0'; // Retained for compatibility with other logic if any
 
     (function() {
-        const canvas = document.getElementById('sakura-canvas');
-        const ctx = canvas.getContext('2d');
+        const canvasBg = document.getElementById('sakura-canvas');
+        const ctxBg = canvasBg.getContext('2d');
+        const canvasFg = document.getElementById('sakura-canvas-foreground');
+        const ctxFg = canvasFg.getContext('2d');
         let particles = [];
         const PARTICLE_COUNT = 28; // 14 蝴蝶, 14 樱花
 
@@ -2862,16 +2873,20 @@
         ];
 
         function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            canvasBg.width = window.innerWidth;
+            canvasBg.height = window.innerHeight;
+            canvasFg.width = window.innerWidth;
+            canvasFg.height = window.innerHeight;
         }
         resize();
         window.addEventListener('resize', resize);
 
-        function newParticle(type) {
+        function newParticle(type, isForeground) {
+            const canvas = isForeground ? canvasFg : canvasBg;
             if (type === 'butterfly') {
                 return {
                     type: 'butterfly',
+                    isForeground: isForeground,
                     x: Math.random() * canvas.width,
                     y: -30,
                     size: 4 + Math.random() * 5,
@@ -2889,6 +2904,7 @@
             } else {
                 return {
                     type: 'petal',
+                    isForeground: isForeground,
                     x: Math.random() * canvas.width,
                     y: -20,
                     size: 6 + Math.random() * 8,
@@ -2904,12 +2920,14 @@
         }
 
         for (let i = 0; i < PARTICLE_COUNT; i++) {
-            const p = newParticle(i % 2 === 0 ? 'butterfly' : 'petal');
+            const isForeground = i % 3 === 0; // 约 1/3 的粒子在前景，2/3 在背景
+            const p = newParticle(i % 2 === 0 ? 'butterfly' : 'petal', isForeground);
+            const canvas = isForeground ? canvasFg : canvasBg;
             p.y = Math.random() * canvas.height;
             particles.push(p);
         }
 
-        function drawButterfly(b) {
+        function drawButterfly(ctx, b) {
             ctx.save();
             ctx.translate(b.x, b.y);
             const currentRot = b.rot + Math.sin(b.sway) * 0.2;
@@ -2952,7 +2970,7 @@
             ctx.restore();
         }
 
-        function drawPetal(p) {
+        function drawPetal(ctx, p) {
             ctx.save();
             ctx.translate(p.x, p.y);
             ctx.rotate(p.rot);
@@ -2969,9 +2987,13 @@
         }
 
         function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctxBg.clearRect(0, 0, canvasBg.width, canvasBg.height);
+            ctxFg.clearRect(0, 0, canvasFg.width, canvasFg.height);
             particles.forEach((p, i) => {
                 p.sway += p.swaySpeed * (bothOnline ? 1.5 : 1);
+                
+                const canvas = p.isForeground ? canvasFg : canvasBg;
+                const ctx = p.isForeground ? ctxFg : ctxBg;
                 
                 if (p.type === 'butterfly') {
                     p.wingAngle += p.wingSpeed * (bothOnline ? 1.5 : 1);
@@ -2982,18 +3004,18 @@
                     p.rot += p.rotSpeed * (bothOnline ? 1.5 : 1);
                     
                     if (p.y > canvas.height + 40 || p.x < -60 || p.x > canvas.width + 60) {
-                        particles[i] = newParticle('butterfly');
+                        particles[i] = newParticle('butterfly', p.isForeground);
                     }
-                    drawButterfly(p);
+                    drawButterfly(ctx, p);
                 } else {
                     p.x += p.speedX + Math.sin(p.sway) * (bothOnline ? 0.8 : 0.5);
                     p.y += p.speedY * (bothOnline ? 1.3 : 1);
                     p.rot += p.rotSpeed * (bothOnline ? 1.5 : 1);
                     
                     if (p.y > canvas.height + 20) {
-                        particles[i] = newParticle('petal');
+                        particles[i] = newParticle('petal', p.isForeground);
                     }
-                    drawPetal(p);
+                    drawPetal(ctx, p);
                 }
             });
             requestAnimationFrame(animate);
