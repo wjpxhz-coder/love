@@ -755,7 +755,7 @@
         /* ── 同频共振 UI ── */
         .resonance-ui {
             position: fixed;
-            top: 20px;
+            top: 76px;
             left: 50%;
             transform: translateX(-50%) translateY(-20px);
             background: rgba(255, 255, 255, 0.85);
@@ -788,9 +788,21 @@
             color: #d46b7a;
             font-weight: 600;
             letter-spacing: 1px;
+            white-space: nowrap;
             background: linear-gradient(90deg, #d46b7a, #c9a970);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+        }
+
+        @media (max-width: 480px) {
+            .resonance-ui {
+                padding: 8px 16px;
+                gap: 8px;
+                top: 70px;
+            }
+            .resonance-text {
+                font-size: 0.75em;
+            }
         }
         @keyframes heartbeat {
             0%, 100% { transform: scale(1); }
