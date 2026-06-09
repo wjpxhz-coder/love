@@ -35,7 +35,7 @@
             --glass-bg: rgba(255, 252, 250, 0.5);
             --glass-border: rgba(255, 255, 255, 0.45);
             --glass-highlight: rgba(255, 255, 255, 0.5);
-            --moment-bg: rgba(255, 250, 248, 0.45);
+            --moment-bg: rgba(255, 250, 248, 0.88);
             --bg-1: #fdf8f6;
             --bg-2: #f5e6f0;
             --bg-3: #e8ddf5;
@@ -56,6 +56,11 @@
             flex-direction: column;
             align-items: center;
             overflow-x: hidden;
+        }
+
+        /* 昼夜主题平滑过渡 */
+        body, .moment-card, .btn-mood, #btn-moment, #btn-audio, #btn-blindbox, .modal-box, .comment-bubble, .resonance-ui, .ai-tab, .ai-content-area, .profile-card, .edit-profile-page, .edit-input, .comment-textarea {
+            transition: background 0.8s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.8s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.5s ease, color 0.5s ease, box-shadow 0.5s ease;
         }
 
         /* ── 樱花粒子 canvas ── */
@@ -255,17 +260,16 @@
             border-radius: 16px;
             padding: 16px 18px;
             margin-bottom: 20px;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
             box-shadow: 0 2px 12px var(--shadow);
             opacity: 0;
-            transform: translateY(24px);
+            transform: translate3d(0, 24px, 0);
+            will-change: transform, opacity;
             transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
         }
 
         .moment-card.visible {
             opacity: 1;
-            transform: translateY(0);
+            transform: translate3d(0, 0, 0);
         }
 
         .moment-card::before {
@@ -1934,7 +1938,7 @@
             --glass-bg: rgba(30, 20, 50, 0.5);
             --glass-border: rgba(160, 120, 200, 0.15);
             --glass-highlight: rgba(255, 255, 255, 0.05);
-            --moment-bg: rgba(25, 15, 45, 0.45);
+            --moment-bg: rgba(35, 25, 50, 0.88);
             --bg-1: #0f0a1a;
             --bg-2: #1a1030;
             --bg-3: #0d0820;
@@ -2644,6 +2648,15 @@
             margin-top: 16px;
             color: var(--primary);
         }
+
+        /* 录音微动效 */
+        #btn-audio.recording-active {
+            animation: recordingPulse 1.2s infinite alternate !important;
+        }
+        @keyframes recordingPulse {
+            0% { box-shadow: 0 0 5px rgba(255,100,100,0.4); transform: scale(1); }
+            100% { box-shadow: 0 0 20px rgba(255,100,100,0.8); transform: scale(1.03); }
+        }
     </style>
 </head>
 <body>
@@ -3072,7 +3085,9 @@
         const canvasFg = document.getElementById('sakura-canvas-foreground');
         const ctxFg = canvasFg.getContext('2d');
         let particles = [];
-        const PARTICLE_COUNT = 28; // 14 蝴蝶, 14 樱花
+        
+        let isMobile = window.innerWidth < 768;
+        const PARTICLE_COUNT = isMobile ? 12 : 28;
 
         // 蝴蝶多彩调色板
         const colors = [
@@ -3086,6 +3101,7 @@
             canvasBg.height = window.innerHeight;
             canvasFg.width = window.innerWidth;
             canvasFg.height = window.innerHeight;
+            isMobile = window.innerWidth < 768;
         }
         resize();
         window.addEventListener('resize', resize);
@@ -3146,7 +3162,7 @@
             const flap = Math.abs(Math.cos(b.wingAngle)); 
             
             ctx.fillStyle = b.color;
-            if (bothOnline) {
+            if (bothOnline && !isMobile) {
                 ctx.shadowBlur = 15;
                 ctx.shadowColor = b.color;
             }
@@ -3187,7 +3203,7 @@
             ctx.beginPath();
             ctx.ellipse(0, 0, p.size, p.size * 0.55, 0, 0, Math.PI * 2);
             ctx.fillStyle = sakuraColor;
-            if (bothOnline) {
+            if (bothOnline && !isMobile) {
                 ctx.shadowBlur = 15;
                 ctx.shadowColor = sakuraColor;
             }
@@ -3195,7 +3211,9 @@
             ctx.restore();
         }
 
+        let animationActive = true;
         function animate() {
+            if (!animationActive) return;
             ctxBg.clearRect(0, 0, canvasBg.width, canvasBg.height);
             ctxFg.clearRect(0, 0, canvasFg.width, canvasFg.height);
             particles.forEach((p, i) => {
@@ -3230,6 +3248,17 @@
             requestAnimationFrame(animate);
         }
         animate();
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                animationActive = false;
+            } else {
+                if (!animationActive) {
+                    animationActive = true;
+                    animate();
+                }
+            }
+        });
     })();
 
     // ==========================================
@@ -3915,7 +3944,7 @@
             
             const btn = document.getElementById('btn-audio');
             btn.innerHTML = '🔴 正在录音... 点击结束';
-            btn.style.boxShadow = '0 0 15px rgba(255,100,100,0.6)';
+            btn.classList.add('recording-active');
         } catch (err) {
             alert('无法访问麦克风，请检查设备权限设置！\n' + err.message);
             isRecording = false;
@@ -3926,7 +3955,7 @@
         const btn = document.getElementById('btn-audio');
         if (btn) {
             btn.innerHTML = '🎙️ 点击留声';
-            btn.style.boxShadow = '';
+            btn.classList.remove('recording-active');
         }
     }
 
