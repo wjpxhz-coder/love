@@ -3489,6 +3489,12 @@
         const modal = document.getElementById('momentModal');
         const input = document.getElementById('momentTextInput');
         const previewContainer = document.getElementById('momentImagePreviewContainer');
+        const titleEl = modal.querySelector('.modal-title');
+        
+        const p = allProfilesCache[currentAuthor] || {};
+        const avatarHtml = p.avatar_url ? `<img src="${p.avatar_url}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.2);" />` : '';
+        if (titleEl) titleEl.innerHTML = `${avatarHtml}✨ 发布动态`;
+
         document.getElementById('momentModalMsg').innerText = '';
         input.value = '';
         momentSelectedFiles = [];
@@ -3768,7 +3774,10 @@
                     <div class="comment-list" id="comment-list-${item.id}"></div>
                     <button class="comment-write-btn" id="comment-write-btn-${item.id}" onclick="checkPasswordForComment(${item.id})">✏️ 写评论</button>
                     <div class="comment-input-area" id="comment-input-area-${item.id}" style="display:none;">
-                        <textarea class="comment-textarea" id="comment-text-${item.id}" placeholder="写下你的想法…" rows="2"></textarea>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <div id="comment-input-avatar-${item.id}" style="display: flex; align-items: center;"></div>
+                            <textarea class="comment-textarea" id="comment-text-${item.id}" placeholder="写下你的想法…" rows="2" style="margin-top: 0;"></textarea>
+                        </div>
                         <div class="comment-submit-row">
                             <button class="comment-cancel-btn" onclick="cancelCommentInput(${item.id})">取消</button>
                             <button class="comment-submit-btn" onclick="submitComment(${item.id})">发送 💌</button>
@@ -4041,6 +4050,16 @@
         if (writeBtn) writeBtn.style.display = 'none';
         if (inputArea) {
             inputArea.style.display = 'block';
+            
+            const avatarContainer = document.getElementById(`comment-input-avatar-${momentId}`);
+            if (avatarContainer) {
+                const p = allProfilesCache[currentAuthor] || {};
+                const emoji = currentAuthor === '小蛇' ? '🐍' : '🐟';
+                const avatarHtml = p.avatar_url ? `<img src="${p.avatar_url}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" />` : emoji;
+                const badgeClass = currentAuthor === '小蛇' ? 'author-snake' : 'author-xi';
+                avatarContainer.innerHTML = `<span class="comment-author-badge author-badge ${badgeClass}">${avatarHtml} ${p.nickname || currentAuthor}</span>`;
+            }
+
             const ta = document.getElementById(`comment-text-${momentId}`);
             if (ta) setTimeout(() => ta.focus(), 100);
         }
