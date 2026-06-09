@@ -4362,7 +4362,9 @@
     function confirmDelete(id) {
         pendingDeleteId = id;
         if (currentAuthor) {
-            deleteMoment(id);
+            if (confirm('确定要撤回这条回忆吗？此操作不可逆哦 💖')) {
+                deleteMoment(id);
+            }
             return;
         }
         currentAction = 'delete';
@@ -4377,10 +4379,28 @@
     }
 
     async function deleteMoment(id) {
+        // 先查询该动态下的所有评论 ID
+        const { data: comments } = await supabaseClient.from('comments').select('id').eq('moment_id', id);
+
         const { error } = await supabaseClient.from('moments').delete().eq('id', id);
         if (error) {
             alert('撤回失败: ' + error.message);
         } else {
+            // 更新本动态的通知为已撤回状态
+            await supabaseClient.from('notifications')
+                .update({ type: 'recalled', content: '此动态互动已被对方撤回' })
+                .eq('type', 'moment')
+                .eq('related_id', id);
+
+            // 更新本动态下所有评论的通知为已撤回状态
+            if (comments && comments.length > 0) {
+                const commentIds = comments.map(c => c.id);
+                await supabaseClient.from('notifications')
+                    .update({ type: 'recalled', content: '此评论互动已被对方撤回' })
+                    .eq('type', 'comment')
+                    .in('related_id', commentIds);
+            }
+
             const card = document.getElementById('card-' + id);
             if (card) {
                 card.style.transition = 'opacity 0.3s, transform 0.3s';
@@ -4534,7 +4554,9 @@
         pendingDeleteCommentId = commentId;
         pendingDeleteCommentMomentId = momentId;
         if (currentAuthor) {
-            deleteComment(commentId, momentId);
+            if (confirm('确定要撤回这条评论吗？此操作不可逆哦 💬')) {
+                deleteComment(commentId, momentId);
+            }
             return;
         }
         currentAction = 'delete_comment';
@@ -4567,6 +4589,13 @@
                 .eq('comment_id', commentId)
                 .eq('author', currentAuthor);
             error = res.error;
+            if (!error) {
+                await supabaseClient.from('notifications')
+                    .update({ type: 'recalled', content: '此点赞互动已被对方撤回' })
+                    .eq('type', 'like')
+                    .eq('related_id', commentId)
+                    .eq('actor', currentAuthor);
+            }
         } else {
             // 点赞
             const res = await supabaseClient.from('comment_likes')
@@ -4608,6 +4637,18 @@
         if (error) {
             alert('撤回失败: ' + error.message);
         } else {
+            // 更新本评论的通知为已撤回状态
+            await supabaseClient.from('notifications')
+                .update({ type: 'recalled', content: '此评论互动已被对方撤回' })
+                .eq('type', 'comment')
+                .eq('related_id', commentId);
+
+            // 更新本评论的所有点赞通知为已撤回状态
+            await supabaseClient.from('notifications')
+                .update({ type: 'recalled', content: '此点赞互动已被对方撤回' })
+                .eq('type', 'like')
+                .eq('related_id', commentId);
+
             const item = document.getElementById('comment-' + commentId);
             if (item) {
                 item.style.transition = 'opacity 0.3s, transform 0.3s';
@@ -5751,8 +5792,20 @@
             else if (n.type === 'comment') actionText = '发表了评论';
             else if (n.type === 'like') actionText = '点赞了评论';
             else if (n.type === 'miss') actionText = '给你发来了心电感应';
+            else if (n.type === 'recalled') actionText = '撤回了该互动';
             
-            const contentText = n.content ? `<div style="color: var(--text-muted); font-size: 0.85em; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${n.content}</div>` : '';
+            let displayContent = n.content || '';
+            if (displayContent.startsWith('{') && displayContent.endsWith('}')) {
+                try {
+                    const parsed = JSON.parse(displayContent);
+                    displayContent = parsed.text || '';
+                    if (parsed.images && parsed.images.length > 0) {
+                        displayContent += ' [🖼️图片]';
+                    }
+                } catch (e) {}
+            }
+            
+            const contentText = displayContent ? `<div style="color: var(--text-muted); font-size: 0.85em; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${displayContent}</div>` : '';
             
             const d = new Date(n.created_at);
             const timeStr = `${d.getMonth()+1}-${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
@@ -5810,7 +5863,7 @@
         document.getElementById('notification-panel').classList.remove('show');
         await markSingleNotificationRead(notificationId);
         
-        if (type === 'miss') {
+        if (type === 'miss' || type === 'recalled') {
             return;
         }
         
