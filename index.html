@@ -2140,21 +2140,19 @@
             position: fixed;
             inset: 0;
             z-index: 1500;
-            background: var(--bg-1);
+            background: linear-gradient(-45deg, #fce4ec, #f8bbd0, #ffcdd2, #f48fb1);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
             display: none;
             flex-direction: column;
             overflow-y: auto;
         }
-        .profile-page::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 240px;
-            background: linear-gradient(135deg, rgba(230,165,175,0.75), rgba(212,160,168,0.5)), url('https://images.unsplash.com/photo-1518599904199-0ca897819ddb?auto=format&fit=crop&w=600&q=80') center/cover;
-            border-bottom-left-radius: 30px;
-            border-bottom-right-radius: 30px;
+        .profile-particles-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
             z-index: 0;
-            box-shadow: 0 4px 20px rgba(181,115,122,0.15);
         }
         .profile-page.show {
             display: flex;
@@ -2185,9 +2183,9 @@
         .profile-topbar-title {
             font-family: 'ZCOOL KuaiLe',cursive;
             font-size: 1.1em;
-            color: #fff;
+            color: var(--primary);
             letter-spacing: 2px;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            text-shadow: none;
         }
         .profile-edit-btn {
             background: #fff;
@@ -2751,6 +2749,7 @@
 
 <!-- 个人主页全屏页 -->
 <div id="profile-page" class="profile-page">
+    <canvas id="profile-particles-canvas" class="profile-particles-canvas"></canvas>
     <div class="profile-topbar">
         <button class="profile-back-btn" onclick="closeProfilePage()">← 返回</button>
         <div class="profile-topbar-title" id="profile-topbar-title">我的主页</div>
@@ -3238,10 +3237,12 @@
         page.classList.add('show');
         renderProfilePage(targetAuthor);
         loadProfileStats(targetAuthor);
+        startProfileParticles();
     }
 
     function closeProfilePage() {
         document.getElementById('profile-page').classList.remove('show');
+        stopProfileParticles();
     }
 
     function renderProfilePage(targetAuthor) {
@@ -5237,6 +5238,61 @@
         navigator.serviceWorker.register('./sw.js')
             .then(() => console.log('SW registered'))
             .catch(err => console.log('SW registration failed:', err));
+    }
+    // ==========================================
+    // 个人主页专属：漫天飘落爱心和樱花粒子特效
+    // ==========================================
+    let profileParticlesReq;
+    let profileParticles = [];
+    const emojis = ['🌸', '💮', '💖', '✨', '💕'];
+    function startProfileParticles() {
+        const canvas = document.getElementById('profile-particles-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        profileParticles = [];
+        for (let i = 0; i < 40; i++) {
+            profileParticles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height - canvas.height,
+                size: Math.random() * 12 + 10,
+                speedY: Math.random() * 1.5 + 0.5,
+                speedX: (Math.random() - 0.5) * 1,
+                emoji: emojis[Math.floor(Math.random() * emojis.length)],
+                rotation: Math.random() * 360,
+                rotationSpeed: (Math.random() - 0.5) * 2
+            });
+        }
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < profileParticles.length; i++) {
+                const p = profileParticles[i];
+                p.y += p.speedY;
+                p.x += p.speedX;
+                p.rotation += p.rotationSpeed;
+                if (p.y > canvas.height + 30) {
+                    p.y = -30;
+                    p.x = Math.random() * canvas.width;
+                }
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation * Math.PI / 180);
+                ctx.font = `${p.size}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.globalAlpha = 0.8;
+                ctx.fillText(p.emoji, 0, 0);
+                ctx.restore();
+            }
+            profileParticlesReq = requestAnimationFrame(render);
+        }
+        if (profileParticlesReq) cancelAnimationFrame(profileParticlesReq);
+        render();
+    }
+
+    function stopProfileParticles() {
+        if (profileParticlesReq) cancelAnimationFrame(profileParticlesReq);
     }
 </script>
 </body>
