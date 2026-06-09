@@ -620,6 +620,7 @@
         .fab-menu {
             display: flex;
             flex-direction: column;
+            align-items: flex-end;
             gap: 12px;
             margin-bottom: 16px;
             opacity: 0;
@@ -631,6 +632,49 @@
             opacity: 1;
             visibility: visible;
             transform: translateY(0);
+        }
+        .fab-item-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            opacity: 0;
+            transform: translateX(15px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .fab-menu.show .fab-item-wrapper {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .fab-item-wrapper:nth-child(1) { transition-delay: 0.05s; }
+        .fab-item-wrapper:nth-child(2) { transition-delay: 0.1s; }
+        .fab-item-wrapper:nth-child(3) { transition-delay: 0.15s; }
+        .fab-item-wrapper:nth-child(4) { transition-delay: 0.2s; }
+
+        .fab-label {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: #d46b7a;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 0.82em;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 1px solid rgba(212, 107, 122, 0.15);
+        }
+        [data-theme="dark"] .fab-label {
+            background: rgba(40, 40, 40, 0.85);
+            color: #ff9a9e;
+            border-color: rgba(255, 154, 158, 0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .fab-menu.show .fab-label {
+            opacity: 1;
         }
         .fab-main {
             width: 56px;
@@ -673,10 +717,29 @@
         }
         .fab-item-filter { background: linear-gradient(135deg, #a0d4c6, #7ab87a); }
         .fab-item-ai { background: linear-gradient(135deg, #f7d2d7, #e3b0b8); }
+        .fab-item-miss { background: linear-gradient(135deg, #ff758c, #ff7eb3); }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(181, 115, 122, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(181, 115, 122, 0); }
             100% { box-shadow: 0 0 0 0 rgba(181, 115, 122, 0); }
+        }
+        @keyframes fallAndSway {
+            0% {
+                top: -50px;
+                opacity: 0;
+                transform: translateX(0) rotate(0deg);
+            }
+            10% {
+                opacity: 0.9;
+            }
+            90% {
+                opacity: 0.9;
+            }
+            100% {
+                top: 105vh;
+                opacity: 0;
+                transform: translateX(50px) rotate(360deg);
+            }
         }
 
         /* ── 筛选弹窗内部 ── */
@@ -2800,9 +2863,22 @@
 
 <div class="fab-container" id="fab-container">
     <div class="fab-menu" id="fab-menu">
-        <button class="fab-item fab-item-chat" onclick="openAIChatModal(); toggleFabMenu();" title="AI聊天">💬</button>
-        <button class="fab-item fab-item-ai" onclick="openAIModal(); toggleFabMenu();" title="AI专属助理">🤖</button>
-        <button class="fab-item fab-item-filter" onclick="openFilterModal(); toggleFabMenu();" title="检索回忆">🔍</button>
+        <div class="fab-item-wrapper">
+            <span class="fab-label">一键想你</span>
+            <button class="fab-item fab-item-miss" onclick="sendMissYou(); toggleFabMenu();" title="一键想你">💓</button>
+        </div>
+        <div class="fab-item-wrapper">
+            <span class="fab-label">AI 聊天</span>
+            <button class="fab-item fab-item-chat" onclick="openAIChatModal(); toggleFabMenu();" title="AI 聊天">💬</button>
+        </div>
+        <div class="fab-item-wrapper">
+            <span class="fab-label">情感助理</span>
+            <button class="fab-item fab-item-ai" onclick="openAIModal(); toggleFabMenu();" title="情感助理">🤖</button>
+        </div>
+        <div class="fab-item-wrapper">
+            <span class="fab-label">检索回忆</span>
+            <button class="fab-item fab-item-filter" onclick="openFilterModal(); toggleFabMenu();" title="检索回忆">🔍</button>
+        </div>
     </div>
     <button class="fab-main" onclick="toggleFabMenu()" title="功能菜单">✨</button>
 </div>
@@ -4667,32 +4743,41 @@
 
     function initPresence() {
         presenceChannel = supabaseClient.channel('lovers_room');
-        presenceChannel.on('presence', { event: 'sync' }, () => {
-            const state = presenceChannel.presenceState();
-            let snakeOnline = false;
-            let xiOnline = false;
-            for (const key in state) {
-                state[key].forEach(presence => {
-                    if (presence.user === '小蛇') snakeOnline = true;
-                    if (presence.user === '小奚') xiOnline = true;
-                });
-            }
-            
-            bothOnline = snakeOnline && xiOnline;
-            const ui = document.getElementById('resonance-ui');
-            if (bothOnline) {
-                ui.classList.add('show');
-                sakuraColor = '#ffd700';
-            } else {
-                ui.classList.remove('show');
-                const theme = document.documentElement.getAttribute('data-theme');
-                sakuraColor = theme === 'dark' ? '#c8a8d8' : '#f2b8c0';
-            }
-        }).subscribe(async (status) => {
-            if (status === 'SUBSCRIBED' && currentAuthor) {
-                updatePresence();
-            }
-        });
+        presenceChannel
+            .on('presence', { event: 'sync' }, () => {
+                const state = presenceChannel.presenceState();
+                let snakeOnline = false;
+                let xiOnline = false;
+                for (const key in state) {
+                    state[key].forEach(presence => {
+                        if (presence.user === '小蛇') snakeOnline = true;
+                        if (presence.user === '小奚') xiOnline = true;
+                    });
+                }
+                
+                bothOnline = snakeOnline && xiOnline;
+                const ui = document.getElementById('resonance-ui');
+                if (bothOnline) {
+                    ui.classList.add('show');
+                    sakuraColor = '#ffd700';
+                } else {
+                    ui.classList.remove('show');
+                    const theme = document.documentElement.getAttribute('data-theme');
+                    sakuraColor = theme === 'dark' ? '#c8a8d8' : '#f2b8c0';
+                }
+            })
+            .on('broadcast', { event: 'miss_you' }, (payload) => {
+                const sender = payload.payload.sender;
+                if (sender && sender !== currentAuthor) {
+                    createHeartRain();
+                    showToast(`💓 ${sender} 正在疯狂想你哦！`);
+                }
+            })
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED' && currentAuthor) {
+                    updatePresence();
+                }
+            });
     }
 
     async function updatePresence() {
@@ -5203,6 +5288,155 @@
         if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
     }
 
+    // ==========================================
+    // 一键想你与现代 Toast 提示
+    // ==========================================
+    function showToast(message, duration = 3000) {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            container.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%) translateY(-20px);
+                z-index: 9999;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+                pointer-events: none;
+                transition: all 0.3s ease;
+            `;
+            document.body.appendChild(container);
+        }
+        
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #d46b7a;
+            padding: 10px 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(212, 107, 122, 0.2);
+            font-weight: 600;
+            font-size: 0.9em;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            border: 1px solid rgba(212, 107, 122, 0.15);
+        `;
+        
+        const theme = document.documentElement.getAttribute('data-theme');
+        if (theme === 'dark') {
+            toast.style.background = 'rgba(30, 30, 30, 0.9)';
+            toast.style.color = '#ff9a9e';
+            toast.style.borderColor = 'rgba(255, 154, 158, 0.15)';
+        }
+
+        toast.innerText = message;
+        container.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+        }, 10);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(-20px)';
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }, duration);
+    }
+
+    function createHeartRain() {
+        const heartCount = 24;
+        const container = document.createElement('div');
+        container.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 9998;
+            overflow: hidden;
+        `;
+        document.body.appendChild(container);
+        
+        const hearts = ['❤️', '💖', '💝', '💓', '💕', '💗'];
+        
+        for (let i = 0; i < heartCount; i++) {
+            const heart = document.createElement('div');
+            const emoji = hearts[Math.floor(Math.random() * hearts.length)];
+            heart.innerText = emoji;
+            
+            const startLeft = Math.random() * 100;
+            const size = 16 + Math.random() * 20;
+            const duration = 2 + Math.random() * 2.5;
+            const delay = Math.random() * 1.5;
+            
+            heart.style.cssText = `
+                position: absolute;
+                top: -50px;
+                left: ${startLeft}vw;
+                font-size: ${size}px;
+                opacity: 0;
+                transform: translateY(0) rotate(0deg);
+                animation: fallAndSway ${duration}s linear ${delay}s forwards;
+                user-select: none;
+            `;
+            container.appendChild(heart);
+        }
+        
+        setTimeout(() => {
+            container.remove();
+        }, 5000);
+    }
+
+    async function sendMissYou() {
+        if (!currentAuthor) {
+            showToast('请先登录再发送想念哦~');
+            return;
+        }
+        
+        // Play local animation immediately
+        createHeartRain();
+        
+        const partner = currentAuthor === '小蛇' ? '小奚' : '小蛇';
+        
+        if (bothOnline) {
+            if (presenceChannel) {
+                presenceChannel.send({
+                    type: 'broadcast',
+                    event: 'miss_you',
+                    payload: { sender: currentAuthor }
+                });
+            }
+            showToast(`💓 已向 ${partner} 发送了实时心电感应！`);
+        } else {
+            try {
+                const { error } = await supabaseClient
+                    .from('notifications')
+                    .insert([{
+                        type: 'miss',
+                        actor: currentAuthor,
+                        content: `${currentAuthor} 正在疯狂想你 💓`
+                    }]);
+                
+                if (error) throw error;
+                showToast(`💓 已将你的思念存入时光信箱，${partner} 上线就能收到！`);
+            } catch (err) {
+                console.error('发送想念失败:', err);
+                showToast('思念发送失败，请检查网络后再试~');
+            }
+        }
+    }
+
     // --- 星光粒子 ---
     function createStarField() {
         const field = document.getElementById('star-field');
@@ -5432,6 +5666,7 @@
             if (n.type === 'moment') actionText = '发布了新动态';
             else if (n.type === 'comment') actionText = '发表了评论';
             else if (n.type === 'like') actionText = '点赞了评论';
+            else if (n.type === 'miss') actionText = '给你发来了心电感应';
             
             const contentText = n.content ? `<div style="color: var(--text-muted); font-size: 0.85em; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${n.content}</div>` : '';
             
@@ -5490,6 +5725,10 @@
     async function handleNotificationClick(notificationId, type, relatedId) {
         document.getElementById('notification-panel').classList.remove('show');
         await markSingleNotificationRead(notificationId);
+        
+        if (type === 'miss') {
+            return;
+        }
         
         try {
             let targetMomentId = relatedId;
