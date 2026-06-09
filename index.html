@@ -620,7 +620,7 @@
         .fab-menu {
             display: flex;
             flex-direction: column;
-            align-items: flex-end;
+            align-items: center;
             gap: 12px;
             margin-bottom: 16px;
             opacity: 0;
@@ -634,10 +634,12 @@
             transform: translateY(0);
         }
         .fab-item-wrapper {
+            position: relative;
+            width: 46px;
+            height: 46px;
             display: flex;
             align-items: center;
-            justify-content: flex-end;
-            gap: 10px;
+            justify-content: center;
             opacity: 0;
             transform: translateX(15px);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -652,6 +654,8 @@
         .fab-item-wrapper:nth-child(4) { transition-delay: 0.2s; }
 
         .fab-label {
+            position: absolute;
+            right: 56px;
             background: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
