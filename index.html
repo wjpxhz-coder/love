@@ -2930,7 +2930,6 @@
         <div class="ai-tabs">
             <button class="ai-tab active" onclick="switchAITab('topic')">今日话题</button>
             <button class="ai-tab" onclick="switchAITab('anniversary')">纪念日</button>
-            <button class="ai-tab" onclick="switchAITab('mood')">心情分析</button>
             <button class="ai-tab" onclick="switchAITab('summary')">回忆总结</button>
         </div>
         <div class="ai-content-area" id="aiContentArea">
@@ -5223,29 +5222,6 @@
                     contentArea.innerHTML = `距离下一个纪念日（5月23日）还有 ${diffDays} 天，等到只剩7天的时候，我再来给你们写专属情话吧~ 💖`;
                     return; 
                 }
-            } 
-            else if (tabName === 'mood') {
-                const twoDaysAgo = new Date();
-                twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-                const { data: moodData } = await supabaseClient
-                    .from('moments')
-                    .select('author, content, created_at')
-                    .eq('type', 'mood')
-                    .gte('created_at', twoDaysAgo.toISOString())
-                    .order('created_at', { ascending: true });
-                
-                if (!moodData || moodData.length === 0) {
-                    contentArea.innerHTML = "最近两天你们都没有打卡心情哦，快去打个卡，让我来给你们做心情分析吧！";
-                    return;
-                }
-                
-                let moodLog = moodData.slice(0, 10).map(m => {
-                    const shortText = m.content.length > 50 ? m.content.substring(0, 50) + '...' : m.content;
-                    return `${m.author}在${new Date(m.created_at).toLocaleString('zh-CN')} 打卡了心情：${shortText}`;
-                }).join('\n');
-                systemPrompt = "你是一个懂心理学、充满同理心的知心姐姐。你的任务是阅读这对情侣（小蛇和小奚）最近两天的打卡心情，给出一小段温暖的解读和建议。如果有负面情绪请安慰，如果是好心情就一起开心。";
-                userPrompt = "以下是他们最近两天的心情打卡记录：\n" + moodLog + "\n\n请进行简单的分析和互动（不超过400字）。";
-                generatedText = await callDeepSeek(systemPrompt, userPrompt);
             } 
             else if (tabName === 'summary') {
                 const { data: textData } = await supabaseClient
