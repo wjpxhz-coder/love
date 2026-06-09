@@ -1190,6 +1190,122 @@
             100% { transform: scale(1); }
         }
 
+        /* ── 动态点赞按钮 ── */
+        .moment-like-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 0 2px;
+            border-top: 1px dashed rgba(200,155,155,0.18);
+            margin-top: 8px;
+        }
+        .moment-like-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 4px 10px;
+            font-size: 0.82em;
+            cursor: pointer;
+            box-shadow: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            border-radius: 20px;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+        }
+        .moment-like-btn:hover {
+            background: rgba(231,76,111,0.08);
+            color: #e74c6f;
+            transform: none;
+            box-shadow: none;
+        }
+        .moment-like-btn.liked {
+            color: #e74c6f;
+            background: rgba(231,76,111,0.08);
+        }
+        .moment-like-btn::after { display: none; }
+        .moment-like-btn .ml-heart { transition: transform 0.3s; display: inline-block; }
+        .moment-like-btn.liked .ml-heart { animation: likePopIn 0.4s ease; }
+        .moment-like-likers {
+            font-size: 0.75em;
+            color: var(--text-muted);
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ── 评论图片 ── */
+        .comment-img-upload-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: none;
+            border: 1px dashed rgba(200,155,155,0.4);
+            color: var(--text-muted);
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            cursor: pointer;
+            box-shadow: none;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .comment-img-upload-btn:hover {
+            border-color: var(--primary-light);
+            color: var(--primary);
+            background: rgba(200,155,155,0.05);
+            transform: none;
+            box-shadow: none;
+        }
+        .comment-img-upload-btn::after { display: none; }
+        .comment-img-previews {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .comment-img-preview-item {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.12);
+        }
+        .comment-img-preview-item img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+        .comment-img-preview-item .rm-btn {
+            position: absolute;
+            top: 2px; right: 2px;
+            background: rgba(0,0,0,0.55);
+            color: #fff;
+            border-radius: 50%;
+            width: 16px; height: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px;
+            cursor: pointer;
+            line-height: 1;
+            border: none;
+            padding: 0;
+            box-shadow: none;
+        }
+        .comment-img-preview-item .rm-btn::after { display: none; }
+        .comment-bubble img {
+            max-width: 180px;
+            border-radius: 8px;
+            margin-top: 6px;
+            display: block;
+            cursor: zoom-in;
+            transition: opacity 0.2s;
+        }
+        .comment-bubble img:hover { opacity: 0.9; }
+
 
         @keyframes pulse {
             0%, 100% { opacity: 1; }
@@ -1509,7 +1625,8 @@
         .delete-btn::after, .comment-toggle-btn::after, .comment-write-btn::after,
         .comment-cancel-btn::after, .btn-cancel::after, .mood-emoji-btn::after,
         .ai-tab::after, .theme-toggle::after, .ai-refresh-btn::after,
-        .ai-chat-close-btn::after, .ai-chat-send-btn::after { display: none; }
+        .ai-chat-close-btn::after, .ai-chat-send-btn::after,
+        .moment-like-btn::after, .comment-img-upload-btn::after { display: none; }
 
         /* ── 计时器翻页动画 ── */
         .timer-card .num.flip {
@@ -3828,6 +3945,13 @@
             }
         }
         html += `
+                <div class="moment-like-bar">
+                    <button class="moment-like-btn" id="moment-like-btn-${item.id}" onclick="toggleMomentLike(${item.id})">
+                        <span class="ml-heart">🤍</span>
+                        <span class="ml-count" id="moment-like-count-${item.id}">喜欢</span>
+                    </button>
+                    <span class="moment-like-likers" id="moment-like-likers-${item.id}"></span>
+                </div>
                 <button class="comment-toggle-btn" onclick="toggleComments(${item.id})">
                     💬 <span id="comment-count-${item.id}">评论</span>
                 </button>
@@ -3838,9 +3962,14 @@
                         <div style="display: flex; flex-direction: column; gap: 8px;">
                             <div id="comment-input-avatar-${item.id}" style="display: flex; align-items: center;"></div>
                             <textarea class="comment-textarea" id="comment-text-${item.id}" placeholder="写下你的想法…" rows="2" style="margin-top: 0;"></textarea>
+                            <div class="comment-img-previews" id="comment-img-previews-${item.id}"></div>
                         </div>
-                        <div class="comment-submit-row">
-                            <button class="comment-cancel-btn" onclick="cancelCommentInput(${item.id})">取消</button>
+                        <div class="comment-submit-row" style="justify-content: space-between;">
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                <button class="comment-cancel-btn" onclick="cancelCommentInput(${item.id})">取消</button>
+                                <button class="comment-img-upload-btn" onclick="document.getElementById('comment-img-input-${item.id}').click()">🖼️ 图片</button>
+                                <input type="file" id="comment-img-input-${item.id}" accept="image/*" multiple style="display:none;" onchange="handleCommentImgSelect(event, ${item.id})">
+                            </div>
                             <button class="comment-submit-btn" onclick="submitComment(${item.id})">发送 💌</button>
                         </div>
                     </div>
@@ -4038,6 +4167,9 @@
         // 批量加载评论计数
         loadCommentCounts(data.map(item => item.id));
 
+        // 批量加载动态点赞
+        loadMomentLikes(data.map(item => item.id));
+
         // 设置滚动观察器
         setupScrollObserver();
     }
@@ -4133,6 +4265,12 @@
         if (ta) ta.value = '';
         if (inputArea) inputArea.style.display = 'none';
         if (writeBtn) writeBtn.style.display = 'inline-flex';
+        // 清除图片选择
+        commentImgFiles[momentId] = [];
+        const previewEl = document.getElementById(`comment-img-previews-${momentId}`);
+        if (previewEl) previewEl.innerHTML = '';
+        const fileInput = document.getElementById(`comment-img-input-${momentId}`);
+        if (fileInput) fileInput.value = '';
     }
 
     function toggleComments(momentId) {
@@ -4188,18 +4326,32 @@
             
             const likeCount = likesMap[c.id] || 0;
             const isLiked = userLikedMap[c.id] || false;
+
+            // 解析评论内容（支持图文）
+            let bubbleContent = '';
+            try {
+                const parsed = JSON.parse(c.content);
+                if (parsed.text) bubbleContent += escapeHtml(parsed.text);
+                if (parsed.images && parsed.images.length > 0) {
+                    parsed.images.forEach(imgUrl => {
+                        bubbleContent += `<img src="${imgUrl}" alt="评论图片" loading="lazy" onclick="openLightbox(this.src)">`;
+                    });
+                }
+            } catch(e) {
+                bubbleContent = escapeHtml(c.content);
+            }
             
             return `<div class="comment-item" id="comment-${c.id}">
                 <span class="comment-author-badge author-badge ${badgeClass}" onclick="openProfilePage('${c.author}')" style="cursor:pointer;" title="点击查看主页">${avatarHtml} ${displayName}</span>
                 <div style="flex:1;">
-                    <div class="comment-bubble">${escapeHtml(c.content)}</div>
+                    <div class="comment-bubble">${bubbleContent}</div>
                     <div class="comment-time">
                         ${dateStr} 
                         <button class="comment-like-btn${isLiked ? ' liked' : ''}" id="like-btn-${c.id}" onclick="toggleCommentLike(${c.id}, ${momentId})">
                             <span class="like-heart">${isLiked ? '❤️' : '🤍'}</span>
                             <span class="like-count" id="like-count-${c.id}">${likeCount > 0 ? likeCount : '赞'}</span>
                         </button>
-                        <span style="color:#d4a0a8; cursor:pointer; margin-left:12px;" onclick="confirmDeleteComment(${c.id}, ${momentId})">撤回</span>
+                        <span style="color:#d4a0a8; cursor:pointer; margin-left:12px;" onclick="confirmDeleteComment(${c.id}, ${momentId})">撒回</span>
                     </div>
                 </div>
             </div>`;
@@ -4319,8 +4471,10 @@
 
     async function submitComment(momentId) {
         const ta = document.getElementById(`comment-text-${momentId}`);
-        const content = ta ? ta.value.trim() : '';
-        if (!content) {
+        const textVal = ta ? ta.value.trim() : '';
+        const imgs = commentImgFiles[momentId] || [];
+        
+        if (!textVal && imgs.length === 0) {
             if (ta) { ta.style.borderColor = 'var(--primary)'; ta.focus(); }
             return;
         }
@@ -4329,19 +4483,44 @@
         const origText = submitBtn ? submitBtn.innerHTML : '';
         if (submitBtn) { submitBtn.innerHTML = '发送中…'; submitBtn.disabled = true; }
 
-        const { error } = await supabaseClient.from('comments').insert([{
-            moment_id: momentId,
-            author: currentAuthor,
-            content: content
-        }]);
+        try {
+            let uploadedImgUrls = [];
+            if (imgs.length > 0) {
+                const uploadPromises = imgs.map(async file => {
+                    const ext = file.name.split('.').pop();
+                    const fileName = `comments/${Date.now()}_${Math.random().toString(36).substring(2,8)}.${ext}`;
+                    const { error: upErr } = await supabaseClient.storage.from('photos').upload(fileName, file, { contentType: file.type, upsert: false });
+                    if (upErr) throw upErr;
+                    const { data } = supabaseClient.storage.from('photos').getPublicUrl(fileName);
+                    return data.publicUrl;
+                });
+                uploadedImgUrls = await Promise.all(uploadPromises);
+            }
 
-        if (submitBtn) { submitBtn.innerHTML = origText; submitBtn.disabled = false; }
+            // 如果有图片，将内容存为 JSON（兼容旧纯文本格式）
+            let content;
+            if (uploadedImgUrls.length > 0) {
+                content = JSON.stringify({ text: textVal, images: uploadedImgUrls });
+            } else {
+                content = textVal;
+            }
 
-        if (error) { alert('评论发送失败: ' + error.message); return; }
+            const { error } = await supabaseClient.from('comments').insert([{
+                moment_id: momentId,
+                author: currentAuthor,
+                content: content
+            }]);
 
-        cancelCommentInput(momentId);
-        loadComments(momentId);
-        loadCommentCounts([momentId]);
+            if (error) throw error;
+
+            cancelCommentInput(momentId);
+            loadComments(momentId);
+            loadCommentCounts([momentId]);
+        } catch(err) {
+            alert('评论发送失败: ' + err.message);
+        } finally {
+            if (submitBtn) { submitBtn.innerHTML = origText; submitBtn.disabled = false; }
+        }
     }
 
     // --- 灯箱 ---
@@ -5081,6 +5260,107 @@
         if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, .fab-container, .notification-panel')) return;
         spawnHearts(e.clientX, e.clientY);
     });
+
+    // ==========================================
+    // 评论图片选择
+    // ==========================================
+    let commentImgFiles = {}; // momentId -> File[]
+
+    window.handleCommentImgSelect = function(event, momentId) {
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
+        if (!commentImgFiles[momentId]) commentImgFiles[momentId] = [];
+        const previewEl = document.getElementById(`comment-img-previews-${momentId}`);
+        files.forEach(file => {
+            commentImgFiles[momentId].push(file);
+            const objUrl = URL.createObjectURL(file);
+            const item = document.createElement('div');
+            item.className = 'comment-img-preview-item';
+            const idx = commentImgFiles[momentId].length - 1;
+            item.innerHTML = `<img src="${objUrl}" alt="preview"><button class="rm-btn" onclick="removeCommentImg(${momentId}, ${idx}, this.parentElement)">×</button>`;
+            previewEl.appendChild(item);
+        });
+        event.target.value = '';
+    };
+
+    window.removeCommentImg = function(momentId, idx, itemEl) {
+        if (commentImgFiles[momentId]) {
+            commentImgFiles[momentId].splice(idx, 1);
+        }
+        if (itemEl) itemEl.remove();
+        // 重新编号所有预览元素的 data-idx
+    };
+
+    // ==========================================
+    // 动态点赞功能
+    // ==========================================
+    async function loadMomentLikes(momentIds) {
+        if (!momentIds.length) return;
+        try {
+            const { data, error } = await supabaseClient.from('moment_likes')
+                .select('moment_id, author')
+                .in('moment_id', momentIds);
+            if (error) return; // 表可能不存在，静默处理
+            const countMap = {};
+            const likersMap = {};
+            const userLikedMap = {};
+            (data || []).forEach(l => {
+                countMap[l.moment_id] = (countMap[l.moment_id] || 0) + 1;
+                if (!likersMap[l.moment_id]) likersMap[l.moment_id] = [];
+                likersMap[l.moment_id].push(l.author);
+                if (l.author === currentAuthor) userLikedMap[l.moment_id] = true;
+            });
+            momentIds.forEach(id => {
+                const btn = document.getElementById(`moment-like-btn-${id}`);
+                const countEl = document.getElementById(`moment-like-count-${id}`);
+                const likersEl = document.getElementById(`moment-like-likers-${id}`);
+                const heartEl = btn ? btn.querySelector('.ml-heart') : null;
+                const count = countMap[id] || 0;
+                const liked = userLikedMap[id] || false;
+                if (btn) btn.classList.toggle('liked', liked);
+                if (heartEl) heartEl.textContent = liked ? '❤️' : '🤍';
+                if (countEl) countEl.textContent = count > 0 ? count : '喜欢';
+                if (likersEl) {
+                    const likers = likersMap[id] || [];
+                    likersEl.textContent = likers.length > 0 ? likers.join('、') + ' 觉得很赞 ❤' : '';
+                }
+            });
+        } catch(e) {}
+    }
+
+    async function toggleMomentLike(momentId) {
+        if (!currentAuthor) {
+            openLoginModal();
+            return;
+        }
+        const btn = document.getElementById(`moment-like-btn-${momentId}`);
+        const isLiked = btn && btn.classList.contains('liked');
+        try {
+            let res;
+            if (isLiked) {
+                res = await supabaseClient.from('moment_likes')
+                    .delete()
+                    .eq('moment_id', momentId)
+                    .eq('author', currentAuthor);
+            } else {
+                res = await supabaseClient.from('moment_likes')
+                    .insert([{ moment_id: momentId, author: currentAuthor }]);
+                // 点赞时播放爱心动画
+                if (btn && !isLiked) {
+                    const rect = btn.getBoundingClientRect();
+                    spawnHearts(rect.left + rect.width / 2, rect.top);
+                }
+            }
+            if (res.error) {
+                alert('点赞失败，请确保在 Supabase 创建了 moment_likes 表！\n错误信息：' + res.error.message);
+                return;
+            }
+            // 刷新当前动态点赞显示
+            loadMomentLikes([momentId]);
+        } catch(e) {
+            console.error('点赞异常:', e);
+        }
+    }
 
     // --- 纪念日卡片光晕 ---
     function initCardGlow() {
