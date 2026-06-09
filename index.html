@@ -2727,8 +2727,8 @@
 <div id="profile-page" class="profile-page">
     <div class="profile-topbar">
         <button class="profile-back-btn" onclick="closeProfilePage()">← 返回</button>
-        <div class="profile-topbar-title">我的主页</div>
-        <button class="profile-edit-btn" onclick="openEditProfilePage()">✏️ 编辑资料</button>
+        <div class="profile-topbar-title" id="profile-topbar-title">我的主页</div>
+        <button class="profile-edit-btn" id="profile-edit-btn-top" onclick="openEditProfilePage()">✏️ 编辑资料</button>
     </div>
     <div class="profile-body">
         <div class="profile-avatar-wrap" id="profile-avatar-wrap">
@@ -2747,7 +2747,7 @@
                 <div class="profile-stat-label">📸 上传照片</div>
             </div>
         </div>
-        <button class="profile-action-btn" onclick="openEditProfilePage()">✨ 修改个人资料</button>
+        <button class="profile-action-btn" id="profile-edit-btn-bottom" onclick="openEditProfilePage()">✨ 修改个人资料</button>
     </div>
 </div>
 
@@ -3205,20 +3205,21 @@
         }
     }
 
-    function openProfilePage() {
-        if (!currentUserProfile) return;
+    function openProfilePage(targetAuthor) {
+        if (!targetAuthor) targetAuthor = currentAuthor;
+        if (!targetAuthor) return;
         const page = document.getElementById('profile-page');
         page.classList.add('show');
-        renderProfilePage();
-        loadProfileStats();
+        renderProfilePage(targetAuthor);
+        loadProfileStats(targetAuthor);
     }
 
     function closeProfilePage() {
         document.getElementById('profile-page').classList.remove('show');
     }
 
-    function renderProfilePage() {
-        const p = currentUserProfile;
+    function renderProfilePage(targetAuthor) {
+        const p = allProfilesCache[targetAuthor] || { username: targetAuthor, nickname: targetAuthor, bio: '' };
         if (!p) return;
         // 头像
         const avatarWrap = document.getElementById('profile-avatar-wrap');
@@ -3231,20 +3232,31 @@
         document.getElementById('profile-nickname').textContent = p.nickname || p.username;
         document.getElementById('profile-username').textContent = `@${p.username}`;
         document.getElementById('profile-bio').textContent = p.bio || '还没有签名，快去编辑一下吧~ 💕';
+
+        // 视图切换（本人 / 他人）
+        const isSelf = (targetAuthor === currentAuthor);
+        document.getElementById('profile-topbar-title').textContent = isSelf ? '我的主页' : 'TA的主页';
+        
+        const editBtnTop = document.getElementById('profile-edit-btn-top');
+        const editBtnBottom = document.getElementById('profile-edit-btn-bottom');
+        if (editBtnTop) editBtnTop.style.display = isSelf ? 'block' : 'none';
+        if (editBtnBottom) editBtnBottom.style.display = isSelf ? 'block' : 'none';
     }
 
-    async function loadProfileStats() {
-        if (!currentAuthor) return;
+    async function loadProfileStats(targetAuthor) {
+        if (!targetAuthor) return;
+        document.getElementById('stat-posts').textContent = '...';
+        document.getElementById('stat-photos').textContent = '...';
         // 总动态数
         const { count: totalCount } = await supabaseClient
             .from('moments')
             .select('id', { count: 'exact', head: true })
-            .eq('author', currentAuthor);
+            .eq('author', targetAuthor);
         // 照片数（moment 类型中有图片）
         const { data: photoData } = await supabaseClient
             .from('moments')
             .select('content')
-            .eq('author', currentAuthor)
+            .eq('author', targetAuthor)
             .in('type', ['photo', 'moment']);
         let photoCount = 0;
         if (photoData) {
@@ -3711,7 +3723,7 @@
         const authorBadgeClass = item.author === '小蛇' ? 'author-snake' : (item.author === '小奚' ? 'author-xi' : '');
         
         const authorBadge = item.author
-            ? `<span class="author-badge ${authorBadgeClass}">${authorAvatarHtml} ${authorDisplayName}</span>`
+            ? `<span class="author-badge ${authorBadgeClass}" onclick="openProfilePage('${item.author}')" style="cursor:pointer;" title="点击查看主页">${authorAvatarHtml} ${authorDisplayName}</span>`
             : '';
 
         let html = `<div class="moment-card" id="card-${item.id}">
@@ -4129,7 +4141,7 @@
             const isLiked = userLikedMap[c.id] || false;
             
             return `<div class="comment-item" id="comment-${c.id}">
-                <span class="comment-author-badge author-badge ${badgeClass}">${avatarHtml} ${displayName}</span>
+                <span class="comment-author-badge author-badge ${badgeClass}" onclick="openProfilePage('${c.author}')" style="cursor:pointer;" title="点击查看主页">${avatarHtml} ${displayName}</span>
                 <div style="flex:1;">
                     <div class="comment-bubble">${escapeHtml(c.content)}</div>
                     <div class="comment-time">
