@@ -22,25 +22,32 @@
         })();
     </script>
     <style>
-        :root {
-            --primary: #b5737a;
-            --primary-light: #d4a0a8;
-            --gold: #c9a970;
-            --bg: #fdf8f6;
-            --text: #4a3535;
-            --text-muted: #a08888;
-            --card: rgba(255, 252, 250, 0.9);
-            --border: rgba(200, 155, 155, 0.22);
-            --shadow: rgba(180, 120, 120, 0.13);
-            --glass-bg: rgba(255, 252, 250, 0.5);
-            --glass-border: rgba(255, 255, 255, 0.45);
-            --glass-highlight: rgba(255, 255, 255, 0.5);
-            --moment-bg: rgba(255, 250, 248, 0.88);
-            --bg-1: #fdf8f6;
-            --bg-2: #f5e6f0;
-            --bg-3: #e8ddf5;
-            --bg-4: #fef5ec;
+                :root {
+            color-scheme: light dark;
+            --primary: light-dark(#b5737a, #e8a0b0);
+            --primary-light: light-dark(#d4a0a8, #d07888);
+            --gold: light-dark(#c9a970, #dcc080);
+            --bg: light-dark(#fdf8f6, #0f0a1a);
+            --text: light-dark(#4a3535, #e8dde8);
+            --text-muted: light-dark(#a08888, #a090a8);
+            --card: light-dark(rgba(255, 252, 250, 0.9), rgba(30, 20, 50, 0.7));
+            --border: light-dark(rgba(200, 155, 155, 0.22), rgba(160, 120, 180, 0.2));
+            --shadow: light-dark(rgba(180, 120, 120, 0.13), rgba(80, 40, 100, 0.3));
+            --glass-bg: light-dark(rgba(255, 252, 250, 0.5), rgba(30, 20, 50, 0.5));
+            --glass-border: light-dark(rgba(255, 255, 255, 0.45), rgba(160, 120, 200, 0.15));
+            --glass-highlight: light-dark(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.05));
+            --moment-bg: light-dark(rgba(255, 250, 248, 0.88), rgba(35, 25, 50, 0.88));
+            --bg-1: light-dark(#fdf8f6, #0f0a1a);
+            --bg-2: light-dark(#f5e6f0, #1a1030);
+            --bg-3: light-dark(#e8ddf5, #0d0820);
+            --bg-4: light-dark(#fef5ec, #1a0828);
         }
+
+        html {
+            scrollbar-color: var(--primary-light) transparent;
+            scrollbar-width: thin;
+        }
+
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -104,7 +111,8 @@
             letter-spacing: 4px;
             line-height: 1.2;
             animation: titleAppear 1.2s cubic-bezier(0.4, 0, 0.2, 1) both, shimmerText 4s ease 1.2s infinite;
-        }
+        
+            text-wrap: balance;}
 
         .site-header .tagline {
             margin-top: 12px;
@@ -242,7 +250,7 @@
             padding-left: 28px;
         }
 
-        .timeline-track::before {
+                .timeline-track::before {
             content: '';
             position: absolute;
             left: 7px;
@@ -250,7 +258,16 @@
             bottom: 6px;
             width: 1px;
             background: linear-gradient(to bottom, var(--primary-light), transparent);
+            transform-origin: top;
+            animation: growLine linear;
+            animation-timeline: scroll(block nearest);
         }
+
+        @keyframes growLine {
+            from { transform: scaleY(0); }
+            to { transform: scaleY(1); }
+        }
+
 
         /* ── 记录卡片 ── */
         .moment-card {
@@ -410,9 +427,7 @@
             transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
         }
 
-        [data-theme="dark"] dialog.native-dialog::backdrop {
-            background: rgba(30, 18, 22, 0.5);
-        }
+        
 
         @starting-style {
             dialog.native-dialog[open] {
@@ -441,7 +456,8 @@
             margin-bottom: 6px;
             font-size: 1.3em;
             letter-spacing: 2px;
-        }
+        
+            text-wrap: balance;}
 
         .modal-input {
             width: 100%;
@@ -690,12 +706,7 @@
             transition: opacity 0.3s;
             border: 1px solid rgba(212, 107, 122, 0.15);
         }
-        [data-theme="dark"] .fab-label {
-            background: rgba(40, 40, 40, 0.85);
-            color: #ff9a9e;
-            border-color: rgba(255, 154, 158, 0.15);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
+        
         .fab-menu.show .fab-label {
             opacity: 1;
         }
@@ -942,7 +953,8 @@
 
         /* ── 响应式 ── */
         @media (max-width: 480px) {
-            .site-header h1 { font-size: 2.1em; }
+            .site-header h1 { font-size: 2.1em; 
+            text-wrap: balance;}
             .timer-card .num { font-size: 1.7em; }
             .timeline-section { padding: 24px 16px; }
             .timeline-track { padding-left: 22px; }
@@ -1493,7 +1505,7 @@
         }
         .ai-chat-overlay { margin: auto; padding: 0; border: none; background: transparent; width: 100vw; height: 100vh; max-width: none; max-height: none; overflow: hidden; transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete; }
         
-        [data-theme="dark"] .ai-chat-overlay { background: rgba(10, 5, 20, 0.5); }
+        
         .ai-chat-box {
             background: rgba(255, 252, 250, 0.95);
             border-radius: 24px;
@@ -1509,10 +1521,7 @@
             transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             overflow: hidden;
         }
-        [data-theme="dark"] .ai-chat-box {
-            background: rgba(30, 20, 50, 0.95);
-            border-color: rgba(160, 120, 180, 0.3);
-        }
+        
         
         .ai-chat-header {
             display: flex;
@@ -1584,10 +1593,7 @@
             border: 1px solid var(--border);
             border-bottom-left-radius: 4px;
         }
-        [data-theme="dark"] .chat-msg.ai {
-            background: rgba(40, 25, 65, 0.5);
-            border-color: rgba(160, 120, 180, 0.2);
-        }
+        
         .chat-msg.ai.typing {
             color: var(--text-muted);
             font-style: italic;
@@ -1599,9 +1605,7 @@
             border-top: 1px solid var(--border);
             background: rgba(255, 252, 250, 0.6);
         }
-        [data-theme="dark"] .ai-chat-input-row {
-            background: rgba(20, 12, 35, 0.4);
-        }
+        
         .ai-chat-input {
             flex: 1;
             padding: 10px 14px;
@@ -1617,11 +1621,7 @@
             max-height: 80px;
             min-height: 40px;
         }
-        [data-theme="dark"] .ai-chat-input {
-            background: rgba(20, 12, 35, 0.8);
-            color: var(--text);
-            border-color: var(--border);
-        }
+        
         .ai-chat-input:focus {
             border-color: var(--primary-light);
             box-shadow: 0 0 0 3px rgba(212, 160, 168, 0.15);
@@ -1929,94 +1929,25 @@
         }
 
         /* ── 深色模式 ── */
-        [data-theme="dark"] {
-            --primary: #e8a0b0;
-            --primary-light: #d07888;
-            --gold: #dcc080;
-            --text: #e8dde8;
-            --text-muted: #a090a8;
-            --card: rgba(30, 20, 50, 0.7);
-            --border: rgba(160, 120, 180, 0.2);
-            --shadow: rgba(80, 40, 100, 0.3);
-            --glass-bg: rgba(30, 20, 50, 0.5);
-            --glass-border: rgba(160, 120, 200, 0.15);
-            --glass-highlight: rgba(255, 255, 255, 0.05);
-            --moment-bg: rgba(35, 25, 50, 0.88);
-            --bg-1: #0f0a1a;
-            --bg-2: #1a1030;
-            --bg-3: #0d0820;
-            --bg-4: #1a0828;
-        }
+        
 
-        [data-theme="dark"] .modal-overlay {
-            background: rgba(10, 5, 20, 0.5);
-        }
-        [data-theme="dark"] .modal-box {
-            background: rgba(30, 20, 50, 0.92);
-            border-color: rgba(160, 120, 180, 0.3);
-        }
-        [data-theme="dark"] .modal-input,
-        [data-theme="dark"] .filter-keyword,
-        [data-theme="dark"] .filter-select,
-        [data-theme="dark"] .comment-textarea {
-            background: rgba(20, 12, 35, 0.8);
-            color: var(--text);
-            border-color: var(--border);
-        }
-        [data-theme="dark"] .comment-bubble {
-            background: rgba(40, 25, 65, 0.5);
-            border-color: rgba(160, 120, 180, 0.15);
-        }
-        [data-theme="dark"] #lightbox {
-            background: rgba(5, 2, 12, 0.92);
-        }
-        [data-theme="dark"] #blindBoxModal .modal-box {
-            background: linear-gradient(135deg, rgba(30, 15, 50, 0.95), rgba(25, 12, 40, 0.95));
-            border-color: rgba(200, 150, 200, 0.3);
-        }
-        [data-theme="dark"] .blind-box-text {
-            background: rgba(40, 25, 65, 0.5);
-        }
-        [data-theme="dark"] .btn-cancel {
-            color: var(--text-muted);
-            border-color: var(--border);
-        }
-        [data-theme="dark"] .delete-btn {
-            border-color: rgba(160, 120, 180, 0.3);
-            color: var(--text-muted);
-        }
-        [data-theme="dark"] .author-snake {
-            background: rgba(220, 120, 160, 0.15);
-            color: #e8a0b8;
-            border-color: rgba(220, 120, 160, 0.3);
-        }
-        [data-theme="dark"] .author-xi {
-            background: rgba(120, 150, 220, 0.15);
-            color: #a0b8e8;
-            border-color: rgba(120, 150, 220, 0.3);
-        }
-        [data-theme="dark"] .anniv-card.today {
-            border-color: var(--gold);
-            background: linear-gradient(135deg, rgba(50, 40, 20, 0.6), rgba(40, 30, 50, 0.6));
-        }
-        [data-theme="dark"] .resonance-ui {
-            background: rgba(30, 20, 50, 0.85);
-            border-color: rgba(255, 215, 0, 0.3);
-        }
-        [data-theme="dark"] .ai-content-area {
-            background: rgba(20, 12, 35, 0.5);
-        }
-        [data-theme="dark"] .filter-active-indicator {
-            background: rgba(160, 120, 200, 0.12);
-            border-color: var(--primary-light);
-        }
-        [data-theme="dark"] .mood-empty-dot {
-            background: rgba(100, 70, 140, 0.15);
-            border-color: rgba(160, 120, 200, 0.2);
-        }
-        [data-theme="dark"] .star {
-            background: rgba(200, 180, 255, 0.7);
-        }
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
 
         /* ── 登录按钮 ── */
         .login-trigger-btn {
@@ -2624,11 +2555,7 @@
             border-color: var(--primary-light);
             box-shadow: 0 0 0 3px rgba(212,160,168,0.15);
         }
-        [data-theme="dark"] .edit-input {
-            background: rgba(20,12,35,0.8);
-            color: var(--text);
-            border-color: var(--border);
-        }
+        
         .edit-msg {
             font-size: 0.85em;
             text-align: center;
