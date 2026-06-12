@@ -389,36 +389,51 @@
         }
 
         /* ── 弹窗 ── */
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(250, 235, 235, 0.35);
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
+        
+        /* ── 弹窗 (Native Dialog) ── */
+        dialog.native-dialog {
+            margin: auto;
+            border: none;
+            background: transparent;
+            padding: 0;
+            overflow: visible;
+            max-width: 100vw;
+            max-height: 100vh;
+            /* Animation setup */
+            transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            transform: scale(1);
         }
 
-        .modal-overlay.show { opacity: 1; visibility: visible; }
+        dialog.native-dialog::backdrop {
+            background: rgba(250, 235, 235, 0.35);
+            backdrop-filter: blur(10px);
+            transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
+        }
+
+        [data-theme="dark"] dialog.native-dialog::backdrop {
+            background: rgba(30, 18, 22, 0.5);
+        }
+
+        @starting-style {
+            dialog.native-dialog[open] {
+                transform: scale(0.95);
+            }
+            dialog.native-dialog[open]::backdrop {
+                background: rgba(250, 235, 235, 0);
+            }
+        }
 
         .modal-box {
             background: rgba(255, 252, 250, 0.92);
             border-radius: 24px;
             padding: 34px 30px;
-            width: 88%;
+            width: 88vw;
             max-width: 340px;
             box-shadow: 0 20px 50px rgba(181, 115, 122, 0.22);
             text-align: center;
-            transform: translateY(16px) scale(0.97);
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             border: 1px solid rgba(255, 255, 255, 0.7);
         }
 
-        .modal-overlay.show .modal-box { transform: translateY(0) scale(1); }
 
         .modal-title {
             font-family: 'ZCOOL KuaiLe', cursive;
@@ -1476,20 +1491,8 @@
         .ai-refresh-btn.spinning {
             animation: spin 0.8s linear infinite;
         }
-        .ai-chat-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(250, 235, 235, 0.35);
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1100;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-        }
-        .ai-chat-overlay.show { opacity: 1; visibility: visible; }
+        .ai-chat-overlay { margin: auto; padding: 0; border: none; background: transparent; width: 100vw; height: 100vh; max-width: none; max-height: none; overflow: hidden; transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete; }
+        
         [data-theme="dark"] .ai-chat-overlay { background: rgba(10, 5, 20, 0.5); }
         .ai-chat-box {
             background: rgba(255, 252, 250, 0.95);
@@ -1510,7 +1513,7 @@
             background: rgba(30, 20, 50, 0.95);
             border-color: rgba(160, 120, 180, 0.3);
         }
-        .ai-chat-overlay.show .ai-chat-box { transform: translateY(0) scale(1); }
+        
         .ai-chat-header {
             display: flex;
             align-items: center;
@@ -2137,21 +2140,8 @@
         }
 
         /* ── 浪漫登录弹窗 ── */
-        .login-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 2000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.4s ease;
-        }
-        .login-overlay.show {
-            opacity: 1;
-            visibility: visible;
-        }
+        .login-overlay { margin: 0; padding: 0; border: none; background: transparent; width: 100vw; height: 100vh; max-width: none; max-height: none; overflow: hidden; transition: display 0.4s allow-discrete, overlay 0.4s allow-discrete; }
+        
         .login-bg {
             position: absolute;
             inset: 0;
@@ -2180,9 +2170,7 @@
             transition: all 0.45s cubic-bezier(0.25,0.8,0.25,1);
             text-align: center;
         }
-        .login-overlay.show .login-box {
-            transform: translateY(0) scale(1);
-        }
+        
         .login-halo {
             position: absolute;
             top: -60px;
@@ -2774,7 +2762,7 @@
 </div>
 
 <!-- 密码弹窗 -->
-<div class="modal-overlay" id="customModal">
+<dialog class="native-dialog" id="customModal">
     <div class="modal-box">
         <h3 class="modal-title">请输入专属暗号 💖</h3>
         <input type="password" class="modal-input" id="modalInput" placeholder="请输入暗号…">
@@ -2784,10 +2772,10 @@
             <button onclick="verifyCode()">确认</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <!-- 图文动态发布弹窗 -->
-<div class="modal-overlay" id="momentModal">
+<dialog class="native-dialog" id="momentModal">
     <div class="modal-box" style="max-width: 400px; padding: 24px;">
         <h3 class="modal-title" style="margin-bottom: 16px;">✨ 发布动态</h3>
         <textarea class="modal-input" id="momentTextInput" placeholder="这一刻的想法..." rows="4" style="resize:vertical;text-align:left;margin-top:0; border: none; background: rgba(255,255,255,0.5); font-size: 1.05em;"></textarea>
@@ -2805,11 +2793,11 @@
             <button id="btn-submit-moment" onclick="submitMomentPost()">发布</button>
         </div>
     </div>
-</div>
+</dialog>
 
 
 <!-- 心情打卡弹窗 -->
-<div class="modal-overlay" id="moodModal">
+<dialog class="native-dialog" id="moodModal">
     <div class="modal-box">
         <h3 class="modal-title">今日心情打卡 🌈</h3>
         <div class="mood-emoji-row" id="moodEmojiRow">
@@ -2826,10 +2814,10 @@
             <button onclick="submitMood()">记录</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <!-- 检索筛选弹窗 -->
-<div class="modal-overlay" id="filterModal">
+<dialog class="native-dialog" id="filterModal">
     <div class="modal-box" style="width: 92%; max-width: 380px;">
         <h3 class="modal-title">检索回忆 📂</h3>
         
@@ -2880,10 +2868,10 @@
             <button onclick="applyFilters()">筛选</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <!-- 回忆盲盒弹窗 -->
-<div class="modal-overlay" id="blindBoxModal">
+<dialog class="native-dialog" id="blindBoxModal">
     <div class="modal-box" style="width: 92%; max-width: 400px;">
         <h3 class="modal-title">🎲 开启回忆盲盒...</h3>
         <div class="blind-box-content" id="blindBoxContent">
@@ -2894,7 +2882,7 @@
             <button onclick="triggerBlindBox(false)">再摇一次</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <div class="fab-container" id="fab-container">
     <div class="fab-menu" id="fab-menu">
@@ -2919,7 +2907,7 @@
 </div>
 
 <!-- AI面板 -->
-<div class="modal-overlay" id="aiModal">
+<dialog class="native-dialog" id="aiModal">
     <div class="modal-box ai-modal-box">
         <div class="ai-header-row">
             <h3 class="modal-title" style="margin-bottom:0;">🤖 专属情感助理</h3>
@@ -2939,10 +2927,10 @@
             <button class="btn-cancel" onclick="closeAIModal()">关闭</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <!-- AI 对话框 -->
-<div class="ai-chat-overlay" id="aiChatOverlay">
+<dialog class="native-dialog ai-chat-dialog" id="aiChatOverlay">
     <div class="ai-chat-box">
         <div class="ai-chat-header">
             <h3>💬 和小助理聊聊</h3>
@@ -2961,7 +2949,7 @@
             <button class="ai-chat-send-btn" id="aiChatSendBtn" onclick="sendChatMessage()">💌</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <!-- 灯箱 -->
 <div id="lightbox" onclick="closeLightbox(event)">
@@ -2970,7 +2958,7 @@
 </div>
 
 <!-- 浪漫登录弹窗 -->
-<div id="login-overlay" class="login-overlay">
+<dialog class="native-dialog login-dialog" id="login-overlay">
     <div class="login-bg"></div>
     <canvas id="login-canvas" class="login-canvas"></canvas>
     <div class="login-box">
@@ -2993,7 +2981,7 @@
         <div class="login-error" id="login-error"></div>
         <button class="login-btn" id="login-btn" onclick="doLogin()">✨ 进入我们的世界</button>
     </div>
-</div>
+</dialog>
 
 <!-- 个人主页全屏页 -->
 <div id="profile-page" class="profile-page">
@@ -3357,13 +3345,13 @@
         document.getElementById('login-username').value = '';
         document.getElementById('login-password').value = '';
         document.getElementById('login-error').innerText = '';
-        overlay.classList.add('show');
+        overlay.showModal();
         startLoginCanvas();
         setTimeout(() => document.getElementById('login-username').focus(), 200);
     }
 
     function closeLoginModal() {
-        document.getElementById('login-overlay').classList.remove('show');
+        document.getElementById('login-overlay').close();
         stopLoginCanvas();
     }
 
@@ -3509,18 +3497,30 @@
         }
     }
 
+    function withViewTransition(action) {
+        if (document.startViewTransition) {
+            document.startViewTransition(action);
+        } else {
+            action();
+        }
+    }
+
     function openProfilePage(targetAuthor) {
         if (!targetAuthor) targetAuthor = currentAuthor;
         if (!targetAuthor) return;
-        const page = document.getElementById('profile-page');
-        page.classList.add('show');
-        renderProfilePage(targetAuthor);
-        loadProfileStats(targetAuthor);
+        withViewTransition(() => {
+            const page = document.getElementById('profile-page');
+            page.classList.add('show');
+            renderProfilePage(targetAuthor);
+            loadProfileStats(targetAuthor);
+        });
         startProfileParticles();
     }
 
     function closeProfilePage() {
-        document.getElementById('profile-page').classList.remove('show');
+        withViewTransition(() => {
+            document.getElementById('profile-page').classList.remove('show');
+        });
         stopProfileParticles();
     }
 
@@ -3595,11 +3595,15 @@
             circle.innerHTML = `<div class="avatar-ph">${emoji}</div>`;
         }
         pendingAvatarFile = null;
-        page.classList.add('show');
+        withViewTransition(() => {
+            page.classList.add('show');
+        });
     }
 
     function closeEditProfilePage() {
-        document.getElementById('edit-profile-page').classList.remove('show');
+        withViewTransition(() => {
+            document.getElementById('edit-profile-page').classList.remove('show');
+        });
         pendingAvatarFile = null;
     }
 
@@ -3768,7 +3772,7 @@
     }
 
     function closeModal() {
-        document.getElementById('customModal').classList.remove('show');
+        document.getElementById('customModal').close();
     }
 
     async function verifyCode() {
@@ -3833,7 +3837,7 @@
     }
 
     function closeMomentModal() {
-        document.getElementById('momentModal').classList.remove('show');
+        document.getElementById('momentModal').close();
     }
 
     function handleMomentPhotoSelect(event) {
@@ -4178,11 +4182,11 @@
     };
 
     function openFilterModal() {
-        document.getElementById('filterModal').classList.add('show');
+        document.getElementById('filterModal').showModal();
     }
 
     function closeFilterModal() {
-        document.getElementById('filterModal').classList.remove('show');
+        document.getElementById('filterModal').close();
     }
 
     function clearFilters() {
@@ -4810,11 +4814,11 @@
         document.querySelectorAll('.mood-emoji-btn').forEach(b => b.classList.remove('selected'));
         document.getElementById('moodNote').value = '';
         document.getElementById('moodModalMsg').innerText = '';
-        document.getElementById('moodModal').classList.add('show');
+        document.getElementById('moodModal').showModal();
     }
 
     function closeMoodModal() {
-        document.getElementById('moodModal').classList.remove('show');
+        document.getElementById('moodModal').close();
     }
 
     function selectMood(score) {
@@ -4951,12 +4955,12 @@
         }
 
         const modal = document.getElementById('blindBoxModal');
-        modal.classList.add('show');
+        modal.showModal();
         fetchRandomMoment();
     }
 
     function closeBlindBox() {
-        document.getElementById('blindBoxModal').classList.remove('show');
+        document.getElementById('blindBoxModal').close();
     }
 
     function handleShake(event) {
@@ -5129,12 +5133,12 @@
     let currentAITab = 'topic';
 
     function openAIModal() {
-        document.getElementById('aiModal').classList.add('show');
+        document.getElementById('aiModal').showModal();
         switchAITab('topic');
     }
 
     function closeAIModal() {
-        document.getElementById('aiModal').classList.remove('show');
+        document.getElementById('aiModal').close();
     }
 
     function toggleFabMenu() {
@@ -5280,12 +5284,12 @@
     const CHAT_SYSTEM_PROMPT = "你是小蛇和小奚的专属情感小助理，语气温暖、俏皮、可爱。你的任务是帮助这对情侣聊天解闷、提供恋爱建议、推荐约会点子、帮忙化解小矛盾，或者只是陪他们聊聊天。回答要简洁温馨，每次不超过200字。可以适当使用emoji。";
 
     function openAIChatModal() {
-        document.getElementById('aiChatOverlay').classList.add('show');
+        document.getElementById('aiChatOverlay').showModal();
         document.getElementById('aiChatInput').focus();
     }
 
     function closeAIChatModal() {
-        document.getElementById('aiChatOverlay').classList.remove('show');
+        document.getElementById('aiChatOverlay').close();
     }
 
     function handleChatKeyDown(e) {
