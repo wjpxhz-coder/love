@@ -3058,15 +3058,8 @@
     const startDate = new Date(2026, 4, 23, 1, 0, 0);
 
     // ── 账号系统 ──
-    const AUTH = {
-        "小蛇": "5211314",
-        "小奚": "5201314"
-    };
-    // 保留旧的 USERS 兼容
-    const USERS = {
-        "5201314": "小奚",
-        "5211314": "小蛇"
-    };
+    // 合法用户名列表（密码验证已迁移到服务端）
+    const VALID_USERS = ["小蛇", "小奚"];
 
     // 当前登录用户的 profile
     let currentUserProfile = null;
@@ -3344,7 +3337,7 @@
         await ensureProfilesTable();
 
         const saved = localStorage.getItem('lover_identity');
-        if (saved && AUTH[saved]) {
+        if (saved && VALID_USERS.includes(saved)) {
             currentAuthor = saved;
             await onLoginSuccess(currentAuthor, false);
         }
@@ -3394,8 +3387,17 @@
 
         if (!username) { errEl.innerText = '请输入账号 💕'; return; }
         if (!password) { errEl.innerText = '请输入密码 🔐'; return; }
-        if (!AUTH[username]) { errEl.innerText = '账号不存在，请输入「小蛇」或「小奚」'; return; }
-        if (AUTH[username] !== password) { errEl.innerText = '密码不对哦，再想想~ 💭'; return; }
+        if (!VALID_USERS.includes(username)) { errEl.innerText = '账号不存在，请输入「小蛇」或「小奚」'; return; }
+
+        const { data: isValid, error } = await supabaseClient.rpc('verify_login', {
+            p_username: username,
+            p_password: password
+        });
+
+        if (error || !isValid) { 
+            errEl.innerText = '密码不对哦，再想想~ 💭'; 
+            return; 
+        }
 
         errEl.innerText = '';
         btn.innerHTML = '💖 登录中…';
@@ -3769,12 +3771,18 @@
         document.getElementById('customModal').classList.remove('show');
     }
 
-    function verifyCode() {
+    async function verifyCode() {
         const inputVal = document.getElementById('modalInput').value;
         const msgEl = document.getElementById('modalMsg');
 
-        if (USERS[inputVal]) {
-            currentAuthor = USERS[inputVal];
+        let matched = null;
+        for (const u of VALID_USERS) {
+            const { data } = await supabaseClient.rpc('verify_login', { p_username: u, p_password: inputVal });
+            if (data) { matched = u; break; }
+        }
+
+        if (matched) {
+            currentAuthor = matched;
             localStorage.setItem('lover_identity', currentAuthor);
             if (presenceChannel) updatePresence();
             onLoginSuccess(currentAuthor, false);
@@ -5076,58 +5084,45 @@
     // ==========================================
     // 6. DeepSeek AI 专属助手逻辑
     // ==========================================
-    const AI_API_KEY = 'sk-yWGyld4R6wTclB78TU2HWgGGL4XAC7HfGhznwAsfydYdTFBl';
 
     async function callDeepSeek(systemPrompt, userPrompt) {
-        const response = await fetch('https://api.chatanywhere.tech/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${AI_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: "gpt-3.5-turbo",
+        const { data, error } = await supabaseClient.functions.invoke('ai-chat', {
+            body: {
                 messages: [
                     {"role": "system", "content": systemPrompt},
                     {"role": "user", "content": userPrompt}
                 ],
                 temperature: 0.7,
                 max_tokens: 800
-            })
+            }
         });
-        if (!response.ok) {
-            throw new Error(`API request failed: ${response.status}`);
+        
+        if (error) {
+            throw new Error(`API request failed: ${error.message}`);
         }
-        const data = await response.json();
-        if (data.choices && data.choices.length > 0) {
+        if (data && data.choices && data.choices.length > 0) {
             return data.choices[0].message.content;
         } else {
-            throw new Error(data.error?.message || "AI returned empty data");
+            throw new Error(data?.error?.message || "AI returned empty data");
         }
     }
 
     async function callDeepSeekChat(messages) {
-        const response = await fetch('https://api.chatanywhere.tech/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${AI_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: "gpt-3.5-turbo",
+        const { data, error } = await supabaseClient.functions.invoke('ai-chat', {
+            body: {
                 messages: messages,
                 temperature: 0.8,
                 max_tokens: 600
-            })
+            }
         });
-        if (!response.ok) {
-            throw new Error(`API request failed: ${response.status}`);
+        
+        if (error) {
+            throw new Error(`API request failed: ${error.message}`);
         }
-        const data = await response.json();
-        if (data.choices && data.choices.length > 0) {
+        if (data && data.choices && data.choices.length > 0) {
             return data.choices[0].message.content;
         } else {
-            throw new Error(data.error?.message || "AI returned empty data");
+            throw new Error(data?.error?.message || "AI returned empty data");
         }
     }
 
