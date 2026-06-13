@@ -2081,13 +2081,15 @@
             max-width: none;
             max-height: none;
             overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             position: fixed;
             top: 0;
             left: 0;
             transition: display 0.4s allow-discrete, overlay 0.4s allow-discrete;
+        }
+        #login-overlay[open] {
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .login-bg {
