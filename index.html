@@ -17,12 +17,14 @@
     <script>
         (function() {
             var saved = localStorage.getItem('theme_preference');
-            var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            var theme = saved || 'light';
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
     <style>
-                :root {
+                :root[data-theme="light"] { color-scheme: light; }
+        :root[data-theme="dark"] { color-scheme: dark; }
+        :root {
             color-scheme: light dark;
             --primary: light-dark(#b5737a, #e8a0b0);
             --primary-light: light-dark(#d4a0a8, #d07888);
@@ -5303,19 +5305,10 @@ document.addEventListener('visibilitychange', () => {
     // ==========================================
 
     // --- 深色模式 ---
-    function getSystemTheme() {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-
     function initTheme() {
         const saved = localStorage.getItem('theme_preference');
-        const theme = saved || getSystemTheme();
+        const theme = saved || 'light';
         applyTheme(theme);
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-            if (!localStorage.getItem('theme_preference')) {
-                applyTheme(e.matches ? 'dark' : 'light');
-            }
-        });
     }
 
     function applyTheme(theme) {
