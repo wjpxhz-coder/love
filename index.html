@@ -3778,7 +3778,7 @@
         previewContainer.innerHTML = '';
         if (addBtn) previewContainer.appendChild(addBtn);
         
-        modal.classList.add('show');
+        modal.showModal();
         setTimeout(() => input.focus(), 100);
     }
 
@@ -4332,7 +4332,7 @@
         msgEl.innerText = '撤回需要验证暗号 💖';
         msgEl.style.color = '#b5737a';
         input.value = '';
-        modal.classList.add('show');
+        modal.showModal();
         setTimeout(() => input.focus(), 100);
     }
 
@@ -4389,7 +4389,7 @@
         msgEl.innerText = '写评论需要验证暗号 💬';
         msgEl.style.color = '#b5737a';
         input.value = '';
-        modal.classList.add('show');
+        modal.showModal();
         setTimeout(() => input.focus(), 100);
     }
 
@@ -4531,7 +4531,7 @@
         msgEl.innerText = '撤回评论需要验证暗号 💬';
         msgEl.style.color = '#b5737a';
         input.value = '';
-        modal.classList.add('show');
+        modal.showModal();
         setTimeout(() => input.focus(), 100);
     }
 
@@ -4931,8 +4931,8 @@
             shakeLastTime = now;
             
             const modal = document.getElementById('blindBoxModal');
-            if (!modal.classList.contains('show')) {
-                modal.classList.add('show');
+            if (!modal.open) {
+                modal.showModal();
             }
             fetchRandomMoment();
         }
