@@ -1,0 +1,9 @@
+{
+  "name": "keep-alive",
+  "version": "1.0.0",
+  "description": "Script to keep Supabase database active",
+  "main": "scripts/keep_alive.js",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0"
+  }
+}
