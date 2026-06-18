@@ -52,9 +52,8 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            background: linear-gradient(-45deg, var(--bg-1), var(--bg-2), var(--bg-3), var(--bg-4));
-            background-size: 400% 400%;
-            animation: gradientShift 20s ease infinite;
+            background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+            background-attachment: fixed;
             font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
             color: var(--text);
             min-height: 100vh;
@@ -67,7 +66,7 @@
 
         /* 昼夜主题平滑过渡 */
         body, .moment-card, .btn-mood, #btn-moment, #btn-audio, #btn-blindbox, .modal-box, .comment-bubble, .resonance-ui, .ai-tab, .ai-content-area, .profile-card, .edit-profile-page, .edit-input, .comment-textarea {
-            transition: background 0.8s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.8s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.5s ease, color 0.5s ease, box-shadow 0.5s ease;
+            transition: background 0.3s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.3s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.3s ease, color 0.5s ease, box-shadow 0.5s ease;
         }
 
         /* ── 樱花粒子 canvas ── */
@@ -155,8 +154,6 @@
             border-radius: 16px;
             padding: 18px 8px 14px;
             box-shadow: 0 4px 24px var(--shadow), inset 0 1px 0 var(--glass-highlight);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
             position: relative;
             overflow: hidden;
         }
@@ -230,8 +227,6 @@
             border-radius: 24px;
             padding: 32px 28px;
             box-shadow: 0 8px 40px var(--shadow), inset 0 1px 0 var(--glass-highlight);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
         }
 
         .timeline-title {
@@ -384,7 +379,6 @@
             position: fixed;
             inset: 0;
             background: rgba(40, 20, 20, 0.85);
-            backdrop-filter: blur(6px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -692,8 +686,6 @@
             position: absolute;
             right: 56px;
             background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
             color: #d46b7a;
             padding: 4px 10px;
             border-radius: 8px;
@@ -856,7 +848,6 @@
             left: 50%;
             transform: translateX(-50%) translateY(-20px);
             background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(10px);
             padding: 10px 24px;
             border-radius: 30px;
             box-shadow: 0 4px 20px rgba(255, 182, 193, 0.6);
@@ -985,8 +976,6 @@
             padding: 14px 10px;
             text-align: center;
             box-shadow: 0 3px 16px var(--shadow), inset 0 1px 0 var(--glass-highlight);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
             position: relative;
             overflow: hidden;
             transition: transform 0.2s, box-shadow 0.3s;
@@ -1026,8 +1015,6 @@
             border-radius: 24px;
             padding: 24px 24px 20px;
             box-shadow: 0 8px 40px var(--shadow), inset 0 1px 0 var(--glass-highlight);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
             margin-bottom: 24px;
         }
 
@@ -1787,8 +1774,6 @@
             border-radius: 50%;
             border: 1px solid var(--border);
             background: var(--card);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -1827,8 +1812,6 @@
             max-width: calc(100vw - 32px);
             max-height: 60vh;
             background: var(--card);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--border);
             border-radius: 16px;
             box-shadow: 0 8px 32px var(--shadow);
@@ -1911,8 +1894,6 @@
             border-radius: 50%;
             border: 1px solid var(--border);
             background: var(--card);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -1959,8 +1940,6 @@
             border-radius: 50%;
             border: 1px solid var(--border);
             background: var(--card);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -1987,7 +1966,6 @@
             border-radius: 50%;
             border: 2px solid var(--primary-light);
             background: var(--card);
-            backdrop-filter: blur(12px);
             cursor: pointer;
             display: none;
             align-items: center;
@@ -2019,8 +1997,6 @@
             right: 112px;
             z-index: 600;
             background: var(--card);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--border);
             border-radius: 14px;
             box-shadow: 0 8px 28px var(--shadow);
@@ -2096,8 +2072,6 @@
             position: absolute;
             inset: 0;
             background: radial-gradient(ellipse at 30% 40%, rgba(255,182,193,0.7) 0%, rgba(255,105,135,0.5) 40%, rgba(180,50,100,0.6) 100%);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
         }
         .login-canvas {
             position: absolute;
@@ -2114,8 +2088,6 @@
             width: 88%;
             max-width: 360px;
             box-shadow: 0 0 60px rgba(255,80,120,0.35), 0 20px 50px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.35);
-            backdrop-filter: blur(30px);
-            -webkit-backdrop-filter: blur(30px);
             transform: translateY(24px) scale(0.95);
             transition: all 0.45s cubic-bezier(0.25,0.8,0.25,1);
             text-align: center;
@@ -2286,9 +2258,8 @@
             position: fixed;
             inset: 0;
             z-index: 1500;
-            background: linear-gradient(-45deg, #fce4ec, #f8bbd0, #ffcdd2, #f48fb1);
-            background-size: 400% 400%;
-            animation: gradientShift 15s ease infinite;
+            background: linear-gradient(135deg, #fce4ec, #f8bbd0, #ffcdd2, #f48fb1);
+            background-attachment: fixed;
             display: none;
             flex-direction: column;
             overflow-y: auto;
@@ -2322,7 +2293,6 @@
             cursor: pointer;
             box-shadow: none;
             display: flex; align-items: center; gap: 6px;
-            backdrop-filter: blur(4px);
         }
         .profile-back-btn:hover { background: rgba(255,255,255,0.4); color: #fff; }
         .profile-back-btn::after { display: none; }
@@ -2420,7 +2390,6 @@
             border-radius: 20px;
             padding: 20px 12px;
             text-align: center;
-            backdrop-filter: blur(16px);
             box-shadow: 0 4px 14px rgba(181,115,122,0.08);
             transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             position: relative;
@@ -2465,9 +2434,8 @@
             position: fixed;
             inset: 0;
             z-index: 1600;
-            background: linear-gradient(-45deg, var(--bg-1), var(--bg-2), var(--bg-3), var(--bg-4));
-            background-size: 400% 400%;
-            animation: gradientShift 20s ease infinite;
+            background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+            background-attachment: fixed;
             display: none;
             flex-direction: column;
             overflow-y: auto;
@@ -2480,7 +2448,6 @@
             padding: 16px 20px;
             border-bottom: 1px solid var(--border);
             background: var(--glass-bg);
-            backdrop-filter: blur(20px);
         }
         .edit-cancel-btn {
             background: none;
@@ -3031,7 +2998,7 @@
         let particles = [];
         
         let isMobile = window.innerWidth < 768;
-        const PARTICLE_COUNT = isMobile ? 12 : 28;
+        const PARTICLE_COUNT = isMobile ? 6 : 15;
 
         // 蝴蝶多彩调色板
         const colors = [
@@ -3048,7 +3015,11 @@
             isMobile = window.innerWidth < 768;
         }
         resize();
-        window.addEventListener('resize', resize);
+        let resizeTimer;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(resize, 200);
+});
 
         function newParticle(type, isForeground) {
             const canvas = isForeground ? canvasFg : canvasBg;
@@ -3107,8 +3078,7 @@
             
             ctx.fillStyle = b.color;
             if (bothOnline && !isMobile) {
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = b.color;
+                // 移除 shadowBlur 优化性能
             }
 
             ctx.save();
@@ -3148,16 +3118,21 @@
             ctx.ellipse(0, 0, p.size, p.size * 0.55, 0, 0, Math.PI * 2);
             ctx.fillStyle = sakuraColor;
             if (bothOnline && !isMobile) {
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = sakuraColor;
+                // 移除 shadowBlur 优化性能
             }
             ctx.fill();
             ctx.restore();
         }
 
         let animationActive = true;
+        let frameCount = 0;
         function animate() {
             if (!animationActive) return;
+            frameCount++;
+            if (isMobile && frameCount % 2 !== 0) {
+                requestAnimationFrame(animate);
+                return;
+            }
             ctxBg.clearRect(0, 0, canvasBg.width, canvasBg.height);
             ctxFg.clearRect(0, 0, canvasFg.width, canvasFg.height);
             particles.forEach((p, i) => {
@@ -3231,7 +3206,15 @@
         flipUpdate('t-minutes', String(minutes).padStart(2,'0'));
         flipUpdate('t-seconds', String(seconds).padStart(2,'0'));
     }
-    setInterval(updateTimer, 1000);
+    let timerInterval = setInterval(updateTimer, 1000);
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        clearInterval(timerInterval);
+    } else {
+        updateTimer();
+        timerInterval = setInterval(updateTimer, 1000);
+    }
+});
     updateTimer();
 
     // ==========================================
@@ -3560,6 +3543,8 @@
         if (!file) return;
         pendingAvatarFile = file;
         const url = URL.createObjectURL(file);
+            if(window.lastAvatarUrl) URL.revokeObjectURL(window.lastAvatarUrl);
+            window.lastAvatarUrl = url;
         const circle = document.getElementById('edit-avatar-circle');
         circle.innerHTML = `<img src="${url}" alt="头像预览" style="width:100%;height:100%;object-fit:cover;">`;
         event.target.value = '';
@@ -3629,7 +3614,7 @@
 
         const petals = [];
         const hearts = ['💖','💗','💕','✨','🌸','💝','🌹'];
-        for (let i = 0; i < 40; i++) {
+        for (let i = 0; i < (window.innerWidth < 768 ? 10 : 20); i++) {
             petals.push({
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height,
@@ -3648,8 +3633,14 @@
         let running = true;
         loginCanvasAnim = { running };
 
+        let frameCount = 0;
         function animate() {
             if (!loginCanvasAnim.running) return;
+            frameCount++;
+            if (window.innerWidth < 768 && frameCount % 2 !== 0) {
+                requestAnimationFrame(animate);
+                return;
+            }
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             petals.forEach(p => {
                 p.sway += p.swaySpeed;
@@ -4885,19 +4876,24 @@
     let shakeLastTime = 0;
     let lastX = 0, lastY = 0, lastZ = 0;
     
+    let deviceMotionRegistered = false;
     async function triggerBlindBox(requestPermission = false) {
-        if (requestPermission && typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-            try {
-                const permissionState = await DeviceMotionEvent.requestPermission();
-                if (permissionState === 'granted') {
-                    window.addEventListener('devicemotion', handleShake, false);
+        if (requestPermission && !deviceMotionRegistered) {
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                try {
+                    const permissionState = await DeviceMotionEvent.requestPermission();
+                    if (permissionState === 'granted') {
+                        window.addEventListener('devicemotion', handleShake, false);
+                        deviceMotionRegistered = true;
+                    }
+                } catch (e) {
+                    console.log('Request device motion failed', e);
                 }
-            } catch (e) {
-                console.log('Request device motion failed', e);
+            } else {
+                // Android / older iOS
+                window.addEventListener('devicemotion', handleShake, false);
+                deviceMotionRegistered = true;
             }
-        } else if (requestPermission) {
-            // Android / older iOS
-            window.addEventListener('devicemotion', handleShake, false);
         }
 
         const modal = document.getElementById('blindBoxModal');
@@ -5369,8 +5365,6 @@
         const toast = document.createElement('div');
         toast.style.cssText = `
             background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
             color: #d46b7a;
             padding: 10px 20px;
             border-radius: 20px;
@@ -5496,7 +5490,7 @@
         const field = document.getElementById('star-field');
         if (!field) return;
         field.innerHTML = '';
-        const count = 45;
+        const count = window.innerWidth < 768 ? 12 : 25;
         for (let i = 0; i < count; i++) {
             const star = document.createElement('div');
             star.className = 'star';
@@ -5685,7 +5679,7 @@
         const { data, error } = await supabaseClient
             .from('notifications')
             .select('*')
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false }).limit(50);
         
         if (error) {
             console.error('加载通知失败:', error);
@@ -5780,10 +5774,10 @@
             return;
         }
         
-        for (const item of unreadItems) {
+        await Promise.all(unreadItems.map(item => {
             const newReadBy = item.read_by ? [...item.read_by, currentAuthor] : [currentAuthor];
-            await supabaseClient.from('notifications').update({ read_by: newReadBy }).eq('id', item.id);
-        }
+            return supabaseClient.from('notifications').update({ read_by: newReadBy }).eq('id', item.id);
+        }));
         
         loadNotifications();
     }
@@ -5871,7 +5865,7 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         profileParticles = [];
-        for (let i = 0; i < 40; i++) {
+        for (let i = 0; i < (window.innerWidth < 768 ? 10 : 20); i++) {
             profileParticles.push({
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height - canvas.height,
@@ -5883,7 +5877,13 @@
                 rotationSpeed: (Math.random() - 0.5) * 2
             });
         }
+        let frameCount = 0;
         function render() {
+            frameCount++;
+            if (window.innerWidth < 768 && frameCount % 2 !== 0) {
+                profileParticlesReq = requestAnimationFrame(render);
+                return;
+            }
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             for (let i = 0; i < profileParticles.length; i++) {
                 const p = profileParticles[i];
