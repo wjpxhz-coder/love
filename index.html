@@ -3634,7 +3634,6 @@ document.addEventListener('visibilitychange', () => {
 
         function animate() {
             if (!loginCanvasAnim.running) return;
-            requestAnimationFrame(animate);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             petals.forEach(p => {
                 p.sway += p.swaySpeed;
@@ -5863,7 +5862,6 @@ document.addEventListener('visibilitychange', () => {
             });
         }
         function render() {
-            profileParticlesReq = requestAnimationFrame(render);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             for (let i = 0; i < profileParticles.length; i++) {
                 const p = profileParticles[i];
