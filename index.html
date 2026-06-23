@@ -73,8 +73,6 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
-            background-attachment: fixed;
             font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
             color: var(--text);
             min-height: 100vh;
@@ -85,8 +83,16 @@
             overflow-x: hidden;
         }
 
+        #bg-layer {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+            pointer-events: none;
+        }
+
         /* 昼夜主题平滑过渡 */
-        body, .moment-card, .btn-mood, #btn-moment, #btn-audio, #btn-blindbox, .modal-box, .comment-bubble, .resonance-ui, .ai-tab, .ai-content-area, .profile-card, .edit-profile-page, .edit-input, .comment-textarea {
+        body, #bg-layer, .moment-card, .btn-mood, #btn-moment, #btn-audio, #btn-blindbox, .modal-box, .comment-bubble, .resonance-ui, .ai-tab, .ai-content-area, .profile-card, .edit-profile-page, .edit-input, .comment-textarea {
             transition: background 0.3s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.3s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.3s ease, color 0.5s ease, box-shadow 0.5s ease;
         }
 
@@ -97,6 +103,7 @@
             width: 100%; height: 100%;
             pointer-events: none;
             z-index: 0;
+            will-change: transform;
         }
 
         #sakura-canvas-foreground {
@@ -105,6 +112,7 @@
             width: 100%; height: 100%;
             pointer-events: none;
             z-index: 2; /* 浮于 container 容器 (z-index: 1) 之上，但低于弹窗和悬浮球 */
+            will-change: transform;
         }
 
         .container {
@@ -441,6 +449,12 @@
             backdrop-filter: blur(10px);
             transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
         }
+        @media (max-width: 768px) {
+            dialog.native-dialog::backdrop {
+                backdrop-filter: blur(4px);
+                background: rgba(200, 185, 185, 0.45);
+            }
+        }
 
         
 
@@ -724,6 +738,7 @@
             opacity: 1;
         }
         .fab-main {
+            position: relative;
             width: 56px;
             height: 56px;
             border-radius: 50%;
@@ -738,7 +753,16 @@
             transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.3s;
             border: none;
             padding: 0;
-            animation: pulse 2s infinite;
+        }
+        .fab-main::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: rgba(181, 115, 122, 0.5);
+            z-index: -1;
+            animation: pulseHW 2s ease-out infinite;
+            pointer-events: none;
         }
         .fab-main:hover {
             transform: translateY(-2px) scale(1.05);
@@ -765,10 +789,10 @@
         .fab-item-filter { background: linear-gradient(135deg, #a0d4c6, #7ab87a); }
         .fab-item-ai { background: linear-gradient(135deg, #f7d2d7, #e3b0b8); }
         .fab-item-miss { background: linear-gradient(135deg, #ff758c, #ff7eb3); }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(181, 115, 122, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(181, 115, 122, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(181, 115, 122, 0); }
+        @keyframes pulseHW {
+            0% { transform: scale(1); opacity: 0.8; }
+            70% { transform: scale(1.35); opacity: 0; }
+            100% { transform: scale(1); opacity: 0; }
         }
         @keyframes fallAndSway {
             0% {
@@ -2108,6 +2132,7 @@
             position: absolute;
             inset: 0;
             pointer-events: none;
+            will-change: transform;
         }
         .login-box {
             position: relative;
@@ -2137,8 +2162,8 @@
             pointer-events: none;
         }
         @keyframes haloPulse {
-            0%,100% { transform: translateX(-50%) scale(1); opacity: 0.8; }
-            50% { transform: translateX(-50%) scale(1.25); opacity: 1; }
+            0%,100% { transform: translateX(-50%) scale(1); opacity: 0.4; }
+            50% { transform: translateX(-50%) scale(1); opacity: 0.9; }
         }
         .login-heart-icon {
             font-size: 2.8em;
@@ -2290,7 +2315,6 @@
             inset: 0;
             z-index: 1500;
             background: linear-gradient(135deg, #fce4ec, #f8bbd0, #ffcdd2, #f48fb1);
-            background-attachment: fixed;
             display: none;
             flex-direction: column;
             overflow-y: auto;
@@ -2301,6 +2325,7 @@
             width: 100%; height: 100%;
             pointer-events: none;
             z-index: 0;
+            will-change: transform;
         }
         .profile-page.show {
             display: flex;
@@ -2610,6 +2635,7 @@
     </style>
 </head>
 <body>
+<div id="bg-layer"></div>
 
 <!-- 同频共振 UI -->
 <div class="resonance-ui" id="resonance-ui">
@@ -2987,6 +3013,16 @@
     // ==========================================
     // 1. 配置区
     // ==========================================
+    let isCanvasScrolling = false;
+    let canvasScrollTimeout;
+    window.addEventListener('scroll', () => {
+        isCanvasScrolling = true;
+        clearTimeout(canvasScrollTimeout);
+        canvasScrollTimeout = setTimeout(() => {
+            isCanvasScrolling = false;
+        }, 150);
+    }, { passive: true });
+
     const startDate = new Date(2026, 4, 23, 1, 0, 0);
 
     // ── 账号系统 ──
@@ -3158,6 +3194,10 @@ window.addEventListener('resize', () => {
         let animationActive = true;
         function animate() {
             if (!animationActive) return;
+            if (isCanvasScrolling) {
+                requestAnimationFrame(animate);
+                return;
+            }
             particles.forEach((p, i) => {
                 p.sway += p.swaySpeed * (bothOnline ? 1.5 : 1);
                 
@@ -3663,6 +3703,10 @@ document.addEventListener('visibilitychange', () => {
 
         function animate() {
             if (!loginCanvasAnim.running) return;
+            if (isCanvasScrolling) {
+                requestAnimationFrame(animate);
+                return;
+            }
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             petals.forEach(p => {
                 p.sway += p.swaySpeed;
@@ -5922,6 +5966,10 @@ document.addEventListener('visibilitychange', () => {
             });
         }
         function render() {
+            if (isCanvasScrolling) {
+                profileParticlesReq = requestAnimationFrame(render);
+                return;
+            }
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             for (let i = 0; i < profileParticles.length; i++) {
                 const p = profileParticles[i];
