@@ -929,10 +929,20 @@
         .blind-box-content {
             margin: 15px 0;
             min-height: 100px;
+            max-height: 60vh;
+            overflow-y: auto;
+            overflow-x: hidden;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
+        }
+        .blind-box-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        .blind-box-content::-webkit-scrollbar-thumb {
+            background: var(--primary-light);
+            border-radius: 4px;
         }
         .blind-box-img {
             max-width: 100%;
@@ -5023,9 +5033,40 @@ document.addEventListener('visibilitychange', () => {
         
         html += `<div class="blind-box-meta">${dateStr} · 来自 ${badge}</div>`;
         html += `<div class="blind-box-prompt">✨ 还记得这一天吗？</div>`;
+        html += `<button class="btn-cancel" onclick="locateToMoment()" style="margin-top: 15px; font-size: 0.85em; padding: 6px 16px;">📍 定位到原文</button>`;
         
+        window.currentBlindBoxMoment = momentData;
         contentBox.innerHTML = html;
         isBlindBoxLoading = false;
+    }
+
+    window.locateToMoment = function() {
+        closeBlindBox();
+        const contentDiv = document.getElementById('timeline-content');
+        if (!contentDiv || !window.currentBlindBoxMoment) return;
+        
+        contentDiv.innerHTML = `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <button onclick="fetchMoments()" style="padding: 8px 16px; font-size: 0.9em; background: rgba(200, 155, 155, 0.1); color: var(--primary); border: 1px dashed var(--primary-light); border-radius: 20px; box-shadow: none; display: inline-flex; cursor: pointer;">🔙 返回全部回忆</button>
+            </div>
+        `;
+        
+        const html = renderMomentCard(window.currentBlindBoxMoment);
+        contentDiv.insertAdjacentHTML('beforeend', html);
+        
+        hasMore = false; // 移除加载指示器，防止下滑误触
+
+        setTimeout(() => {
+            if (typeof initScrollReveal === 'function') initScrollReveal();
+            if (typeof loadCommentCounts === 'function') loadCommentCounts([window.currentBlindBoxMoment.id]);
+            
+            const card = document.getElementById('card-' + window.currentBlindBoxMoment.id);
+            if (card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                card.style.boxShadow = '0 0 20px rgba(181, 115, 122, 0.6)';
+                setTimeout(() => card.style.boxShadow = '', 2500);
+            }
+        }, 50);
     }
 
     window.onload = async function() { 
