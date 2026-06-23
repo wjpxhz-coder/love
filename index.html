@@ -5103,6 +5103,7 @@ document.addEventListener('visibilitychange', () => {
         setTimeout(() => {
             if (typeof initScrollReveal === 'function') initScrollReveal();
             if (typeof loadCommentCounts === 'function') loadCommentCounts([window.currentBlindBoxMoment.id]);
+            if (typeof loadMomentLikes === 'function') loadMomentLikes([window.currentBlindBoxMoment.id]);
             
             const card = document.getElementById('card-' + window.currentBlindBoxMoment.id);
             if (card) {
