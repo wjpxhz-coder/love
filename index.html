@@ -3264,7 +3264,7 @@ window.addEventListener('resize', () => {
 
     function updateTimer() {
         const now = new Date();
-        const diff = Math.floor((now - startDate) / 1000);
+        const diff = Math.max(0, Math.floor((now - startDate) / 1000));
         const days    = Math.floor(diff / 86400);
         const hours   = Math.floor((diff % 86400) / 3600);
         const minutes = Math.floor((diff % 3600) / 60);
@@ -4427,7 +4427,7 @@ document.addEventListener('visibilitychange', () => {
                 card.style.transition = 'opacity 0.3s, transform 0.3s';
                 card.style.opacity = '0';
                 card.style.transform = 'translateX(-16px)';
-                setTimeout(() => fetchMoments(), 300);
+                setTimeout(() => card.remove(), 300);
             }
         }
     }
@@ -4544,11 +4544,15 @@ document.addEventListener('visibilitychange', () => {
             let bubbleContent = '';
             try {
                 const parsed = JSON.parse(c.content);
-                if (parsed.text) bubbleContent += escapeHtml(parsed.text);
-                if (parsed.images && parsed.images.length > 0) {
-                    parsed.images.forEach(imgUrl => {
-                        bubbleContent += `<img src="${imgUrl}" alt="评论图片" loading="lazy" onclick="openLightbox(this.src)">`;
-                    });
+                if (typeof parsed === 'object' && parsed !== null) {
+                    if (parsed.text) bubbleContent += escapeHtml(parsed.text);
+                    if (parsed.images && parsed.images.length > 0) {
+                        parsed.images.forEach(imgUrl => {
+                            bubbleContent += `<img src="${imgUrl}" alt="评论图片" loading="lazy" onclick="openLightbox(this.src)">`;
+                        });
+                    }
+                } else {
+                    bubbleContent = escapeHtml(c.content);
                 }
             } catch(e) {
                 bubbleContent = escapeHtml(c.content);
@@ -5117,12 +5121,12 @@ document.addEventListener('visibilitychange', () => {
     window.onload = async function() { 
         initTheme();
         createStarField();
+        await initAuth();
         fetchMoments(); 
         renderAnniversaries(); 
         loadMoods(); 
         initPresence();
         setTimeout(initCardGlow, 600);
-        await initAuth();
     };
 
     // ==========================================
@@ -5655,23 +5659,24 @@ document.addEventListener('visibilitychange', () => {
         if (!commentImgFiles[momentId]) commentImgFiles[momentId] = [];
         const previewEl = document.getElementById(`comment-img-previews-${momentId}`);
         files.forEach(file => {
+            // 给每个文件分配一个独一无二的 id
+            const fileId = Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+            file._uniqueId = fileId;
             commentImgFiles[momentId].push(file);
             const objUrl = URL.createObjectURL(file);
             const item = document.createElement('div');
             item.className = 'comment-img-preview-item';
-            const idx = commentImgFiles[momentId].length - 1;
-            item.innerHTML = `<img src="${objUrl}" alt="preview"><button class="rm-btn" onclick="removeCommentImg(${momentId}, ${idx}, this.parentElement)">×</button>`;
+            item.innerHTML = `<img src="${objUrl}" alt="preview"><button class="rm-btn" onclick="removeCommentImg(${momentId}, '${fileId}', this.parentElement)">×</button>`;
             previewEl.appendChild(item);
         });
         event.target.value = '';
     };
 
-    window.removeCommentImg = function(momentId, idx, itemEl) {
+    window.removeCommentImg = function(momentId, fileId, itemEl) {
         if (commentImgFiles[momentId]) {
-            commentImgFiles[momentId].splice(idx, 1);
+            commentImgFiles[momentId] = commentImgFiles[momentId].filter(f => f._uniqueId !== fileId);
         }
         if (itemEl) itemEl.remove();
-        // 重新编号所有预览元素的 data-idx
     };
 
     // ==========================================
