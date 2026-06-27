@@ -1,0 +1,9 @@
+        /* ── 响应式 ── */
+        @media (max-width: 480px) {
+            .site-header h1 { font-size: 2.1em; 
+            text-wrap: balance;}
+            .timer-card .num { font-size: 1.7em; }
+            .timeline-section { padding: 24px 16px; }
+            .timeline-track { padding-left: 22px; }
+            button { padding: 12px 20px; font-size: 0.88em; }
+        }

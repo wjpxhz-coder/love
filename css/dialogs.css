@@ -1,0 +1,201 @@
+        /* ── 灯箱 ── */
+        #lightbox {
+            position: fixed;
+            inset: 0;
+            background: rgba(40, 20, 20, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+            cursor: zoom-out;
+        }
+
+        #lightbox.show { opacity: 1; visibility: visible; }
+
+        #lightbox img {
+            max-width: 90vw;
+            max-height: 88vh;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            object-fit: contain;
+        }
+
+        /* ── 弹窗 ── */
+        
+        /* ── 弹窗 (Native Dialog) ── */
+        dialog.native-dialog {
+            margin: auto;
+            border: none;
+            background: transparent;
+            padding: 0;
+            overflow: visible;
+            max-width: 100vw;
+            max-height: 100vh;
+            /* Animation setup */
+            transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            transform: scale(1);
+        }
+
+        dialog.native-dialog::backdrop {
+            background: rgba(250, 235, 235, 0.35);
+            backdrop-filter: blur(10px);
+            transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
+        }
+        @media (max-width: 768px) {
+            dialog.native-dialog::backdrop {
+                backdrop-filter: blur(4px);
+                background: rgba(200, 185, 185, 0.45);
+            }
+        }
+
+        
+
+        @starting-style {
+            dialog.native-dialog[open] {
+                transform: scale(0.95);
+            }
+            dialog.native-dialog[open]::backdrop {
+                background: rgba(250, 235, 235, 0);
+            }
+        }
+
+        .modal-box {
+            background: rgba(255, 252, 250, 0.92);
+            border-radius: 24px;
+            padding: 34px 30px;
+            width: 88vw;
+            max-width: 340px;
+            box-shadow: 0 20px 50px rgba(181, 115, 122, 0.22);
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+        }
+
+
+        .modal-title {
+            font-family: 'ZCOOL KuaiLe', cursive;
+            color: var(--primary);
+            margin-bottom: 6px;
+            font-size: 1.3em;
+            letter-spacing: 2px;
+        
+            text-wrap: balance;}
+
+        .modal-input {
+            width: 100%;
+            padding: 12px 16px;
+            margin: 14px 0;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 1em;
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            text-align: center;
+            color: var(--text);
+            background: rgba(255,255,255,0.9);
+        }
+
+        .modal-input:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(212, 160, 168, 0.15);
+        }
+
+        .modal-msg {
+            font-size: 0.88em;
+            min-height: 20px;
+            margin-bottom: 14px;
+            color: var(--primary);
+        }
+
+        .modal-btns { display: flex; gap: 10px; justify-content: center; }
+
+        .modal-btns button { padding: 10px 22px; font-size: 0.9em; }
+
+        .btn-cancel {
+            background: transparent;
+            color: var(--text-muted);
+            box-shadow: none;
+            border: 1px solid var(--border);
+        }
+
+        .btn-cancel:hover {
+            background: rgba(200,155,155,0.08);
+            box-shadow: none;
+            transform: none;
+            color: var(--text);
+        }
+        /* ── 筛选弹窗内部 ── */
+        .filter-section {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+        .filter-section-title {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .filter-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .filter-select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            outline: none;
+            background: rgba(255,255,255,0.8);
+            color: var(--text);
+            font-size: 0.9em;
+        }
+        .filter-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9em;
+            color: var(--text);
+            cursor: pointer;
+        }
+        .filter-checkbox-label input[type="checkbox"] {
+            accent-color: var(--primary);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .filter-keyword {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            outline: none;
+            background: rgba(255,255,255,0.8);
+            color: var(--text);
+            margin-top: 4px;
+            font-size: 0.9em;
+        }
+        .filter-keyword:focus, .filter-select:focus {
+            border-color: var(--primary-light);
+        }
+        .filter-active-indicator {
+            display: none;
+            font-size: 0.8em;
+            color: var(--primary);
+            background: rgba(212, 160, 168, 0.15);
+            padding: 8px 14px;
+            border-radius: 20px;
+            margin-bottom: 18px;
+            text-align: center;
+            border: 1px dashed var(--primary-light);
+            transition: background 0.2s;
+        }
+        .filter-active-indicator:hover {
+            background: rgba(212, 160, 168, 0.25);
+        }
+        .filter-active-indicator.show { display: block; }

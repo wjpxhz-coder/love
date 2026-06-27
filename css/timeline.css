@@ -1,0 +1,325 @@
+        /* ── 按钮 ── */
+        .btn-group {
+            display: flex;
+            gap: 14px;
+            justify-content: center;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            color: #fff;
+            border: none;
+            padding: 13px 26px;
+            border-radius: 40px;
+            font-size: 0.95em;
+            font-weight: 400;
+            cursor: pointer;
+            letter-spacing: 1px;
+            box-shadow: 0 6px 20px rgba(181, 115, 122, 0.3);
+            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(181, 115, 122, 0.42);
+        }
+
+        button:active { transform: translateY(1px); }
+        button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; transform: none; }
+        /* ── 时光轴 ── */
+        .timeline-section {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 32px 28px;
+            box-shadow: 0 8px 40px var(--shadow), inset 0 1px 0 var(--glass-highlight);
+        }
+
+        .timeline-title {
+            font-family: 'ZCOOL KuaiLe', cursive;
+            font-size: 1.4em;
+            color: var(--primary);
+            text-align: center;
+            letter-spacing: 3px;
+            margin-bottom: 28px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .timeline-track {
+            position: relative;
+            padding-left: 28px;
+        }
+
+                .timeline-track::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 6px;
+            bottom: 6px;
+            width: 1px;
+            background: linear-gradient(to bottom, var(--primary-light), transparent);
+            transform-origin: top;
+            animation: growLine linear;
+            animation-timeline: scroll(block nearest);
+        }
+
+        @keyframes growLine {
+            from { transform: scaleY(0); }
+            to { transform: scaleY(1); }
+        }
+
+
+        /* ── 记录卡片 ── */
+        .moment-card {
+            position: relative;
+            background: var(--moment-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 16px 18px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 12px var(--shadow);
+            opacity: 0;
+            transform: translate3d(0, 24px, 0);
+            will-change: transform, opacity;
+            transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
+        }
+
+        .moment-card.visible {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+        }
+
+        .moment-card::before {
+            content: '♡';
+            position: absolute;
+            left: -24px;
+            top: 14px;
+            font-size: 0.75em;
+            color: var(--primary-light);
+        }
+
+        .moment-card.visible:hover {
+            transform: translateX(4px);
+            box-shadow: 0 6px 24px var(--shadow);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+        .time-text {
+            font-size: 0.75em;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .author-badge {
+            font-size: 0.72em;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .author-snake {
+            background: rgba(220, 155, 180, 0.18);
+            color: #b0527a;
+            border: 1px solid rgba(220, 155, 180, 0.35);
+        }
+
+        .author-xi {
+            background: rgba(160, 185, 220, 0.18);
+            color: #4a72a0;
+            border: 1px solid rgba(160, 185, 220, 0.35);
+        }
+
+        .delete-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: none;
+            border: 1px solid rgba(200, 155, 155, 0.4);
+            color: var(--text-muted);
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 0.72em;
+            cursor: pointer;
+            box-shadow: none;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+            flex-shrink: 0;
+        }
+
+        .delete-btn:hover {
+            background: rgba(200, 155, 155, 0.1);
+            color: var(--primary);
+            border-color: var(--primary-light);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .card-text {
+            font-size: 0.95em;
+            line-height: 1.8;
+            color: var(--text);
+            white-space: pre-wrap;
+        }
+
+        .card-img {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-top: 10px;
+            cursor: zoom-in;
+            transition: opacity 0.2s;
+            display: block;
+        }
+
+        .card-img:hover { opacity: 0.92; }
+        /* ── 图文动态弹窗及瀑布流样式 ── */
+        .moment-image-preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+            justify-content: flex-start;
+        }
+        .moment-image-add-btn {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.6);
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .moment-image-add-btn:hover {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: var(--primary-light);
+        }
+        .moment-preview-item {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .moment-preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .moment-preview-item .remove-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .moment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+        @media (max-width: 480px) {
+            .moment-grid {
+                grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            }
+        }
+        .moment-grid-item {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            object-fit: cover;
+            cursor: zoom-in;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            transition: opacity 0.2s;
+        }
+        .moment-grid-item:hover {
+            opacity: 0.9;
+        }
+        .moment-single-image {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-top: 10px;
+            cursor: zoom-in;
+            display: block;
+            max-height: 300px;
+            object-fit: contain;
+        }
+
+        .show-all-images-btn {
+            background: rgba(200, 155, 155, 0.1);
+            color: var(--primary);
+            border: 1px dashed var(--primary-light);
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-top: 10px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s;
+            box-shadow: none;
+            display: block;
+        }
+        .show-all-images-btn:hover {
+            background: rgba(200, 155, 155, 0.2);
+            transform: translateY(-1px);
+        }
+
+        /* ── 空状态 ── */
+        .empty-state {
+            text-align: center;
+            padding: 30px 0;
+            color: var(--text-muted);
+            font-size: 0.9em;
+            letter-spacing: 1px;
+        }
+
+        .load-more-indicator {
+            text-align: center;
+            padding: 24px 0;
+            color: var(--text-muted);
+            font-size: 0.85em;
+            letter-spacing: 1px;
+        }
+
+        .load-more-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary-light);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }

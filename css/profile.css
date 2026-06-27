@@ -1,0 +1,296 @@
+        /* ── 个人主页全屏 ── */
+        .profile-page {
+            position: fixed;
+            inset: 0;
+            z-index: 1500;
+            background: linear-gradient(135deg, #fce4ec, #f8bbd0, #ffcdd2, #f48fb1);
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .profile-particles-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            will-change: transform;
+        }
+        .profile-page.show {
+            display: flex;
+        }
+        .profile-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: transparent;
+            position: relative;
+            z-index: 1;
+        }
+        .profile-back-btn {
+            background: rgba(255,255,255,0.25);
+            border: 1px solid rgba(255,255,255,0.4);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.88em;
+            cursor: pointer;
+            box-shadow: none;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .profile-back-btn:hover { background: rgba(255,255,255,0.4); color: #fff; }
+        .profile-back-btn::after { display: none; }
+        .profile-topbar-title {
+            font-family: 'ZCOOL KuaiLe',cursive;
+            font-size: 1.1em;
+            color: var(--primary);
+            letter-spacing: 2px;
+            text-shadow: none;
+        }
+        .profile-edit-btn {
+            background: #fff;
+            color: var(--primary);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .profile-edit-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(0,0,0,0.15); }
+        .profile-edit-btn::after { display: none; }
+        .profile-body {
+            flex: 1;
+            padding: 20px 20px 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 480px;
+            margin: 0 auto;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+        }
+        .profile-avatar-wrap {
+            position: relative;
+            margin-bottom: 20px;
+            margin-top: 20px;
+        }
+        .profile-avatar {
+            width: 110px; height: 110px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #fff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: block;
+            background: #fff;
+        }
+        .profile-avatar-placeholder {
+            width: 110px; height: 110px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.5em;
+            border: 4px solid #fff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .profile-nickname {
+            font-family: 'ZCOOL KuaiLe', cursive;
+            font-size: 2em;
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+            text-align: center;
+            background: linear-gradient(135deg, var(--primary), #d96677);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 2px 4px rgba(217,102,119,0.15);
+        }
+        .profile-username {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+        .profile-bio {
+            font-size: 0.95em;
+            color: var(--text-muted);
+            text-align: center;
+            max-width: 280px;
+            line-height: 1.7;
+            margin-bottom: 28px;
+            font-style: italic;
+        }
+        .profile-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+        .profile-stat-card {
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            border-radius: 20px;
+            padding: 20px 12px;
+            text-align: center;
+            box-shadow: 0 4px 14px rgba(181,115,122,0.08);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .profile-stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(181,115,122,0.15);
+            background: rgba(255, 255, 255, 0.9);
+        }
+        .profile-stat-num {
+            font-family: 'ZCOOL KuaiLe',cursive;
+            font-size: 2em;
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+        .profile-stat-label {
+            font-size: 0.78em;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+        .profile-action-btn {
+            width: 100%;
+            max-width: 280px;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            border: none;
+            border-radius: 50px;
+            color: #fff;
+            font-family: 'ZCOOL KuaiLe',cursive;
+            font-size: 1.05em;
+            letter-spacing: 3px;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(181,115,122,0.35);
+            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .profile-action-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(181,115,122,0.5); }
+
+        /* ── 编辑资料全屏页 ── */
+        .edit-profile-page {
+            position: fixed;
+            inset: 0;
+            z-index: 1600;
+            background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+            background-attachment: fixed;
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .edit-profile-page.show { display: flex; }
+        .edit-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--glass-bg);
+        }
+        .edit-cancel-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.88em;
+            cursor: pointer;
+            box-shadow: none;
+        }
+        .edit-cancel-btn:hover { background: rgba(200,155,155,0.08); color: var(--text); transform: none; box-shadow: none; }
+        .edit-cancel-btn::after { display: none; }
+        .edit-save-btn {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.88em;
+            cursor: pointer;
+            box-shadow: 0 3px 12px rgba(181,115,122,0.3);
+            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .edit-save-btn:hover { transform: translateY(-1px); }
+        .edit-save-btn::after { display: none; }
+        .edit-body {
+            flex: 1;
+            padding: 32px 24px 60px;
+            max-width: 480px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        .edit-avatar-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        .edit-avatar-circle {
+            width: 90px; height: 90px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid var(--primary-light);
+            box-shadow: 0 5px 20px rgba(181,115,122,0.3);
+            cursor: pointer;
+            position: relative;
+            transition: opacity 0.2s;
+        }
+        .edit-avatar-circle:hover { opacity: 0.82; }
+        .edit-avatar-circle img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+        .edit-avatar-circle .avatar-ph {
+            width: 100%; height: 100%;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.2em;
+        }
+        .edit-avatar-label {
+            margin-top: 10px;
+            font-size: 0.82em;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+        .edit-field {
+            margin-bottom: 20px;
+        }
+        .edit-field label {
+            display: block;
+            font-size: 0.82em;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .edit-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            font-size: 1em;
+            font-family: 'Nunito','PingFang SC',system-ui,sans-serif;
+            color: var(--text);
+            background: rgba(255,255,255,0.7);
+            outline: none;
+            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .edit-input:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(212,160,168,0.15);
+        }
+        
+        .edit-msg {
+            font-size: 0.85em;
+            text-align: center;
+            min-height: 22px;
+            margin-top: 16px;
+            color: var(--primary);
+        }

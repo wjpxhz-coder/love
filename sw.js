@@ -1,9 +1,17 @@
-const CACHE_NAME = 'love-diary-v1';
+const CACHE_NAME = 'love-diary-v2';
 const STATIC_ASSETS = [
     './',
     './index.html',
     './manifest.json',
     'https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Nunito:wght@400;500;600&display=swap',
+    './css/variables.css', './css/base.css', './css/header.css', './css/timer.css', './css/timeline.css',
+    './css/dialogs.css', './css/comments.css', './css/ai-panel.css', './css/fab.css', './css/auth.css',
+    './css/profile.css', './css/notifications.css', './css/mood.css', './css/anniversary.css',
+    './css/effects.css', './css/responsive.css',
+    './js/config.js', './js/animations.js', './js/timer.js', './js/auth.js', './js/profile.js',
+    './js/moments.js', './js/comments.js', './js/likes.js', './js/mood.js', './js/anniversary.js',
+    './js/lightbox.js', './js/ai.js', './js/blindbox.js', './js/presence.js', './js/theme.js',
+    './js/notifications.js', './js/effects.js', './js/app.js'
 ];
 
 // 安装 — 缓存静态资源

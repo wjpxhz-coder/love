@@ -1,0 +1,50 @@
+        /* ── 计时器 ── */
+        .timer-section { text-align: center; margin-bottom: 32px; }
+
+        .timer-label {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            letter-spacing: 2px;
+            margin-bottom: 18px;
+        }
+
+        .timer-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .timer-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 18px 8px 14px;
+            box-shadow: 0 4px 24px var(--shadow), inset 0 1px 0 var(--glass-highlight);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .timer-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(to right, var(--primary-light), var(--gold));
+            opacity: 0.6;
+        }
+
+        .timer-card .num {
+            display: block;
+            font-family: 'ZCOOL KuaiLe', cursive;
+            font-size: 2.2em;
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .timer-card .unit {
+            display: block;
+            font-size: 0.72em;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }

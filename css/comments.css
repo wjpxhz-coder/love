@@ -1,0 +1,284 @@
+        /* ── 评论区 ── */
+        .comment-toggle-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 0 2px;
+            font-size: 0.78em;
+            cursor: pointer;
+            box-shadow: none;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: color 0.2s;
+            width: 100%;
+            justify-content: flex-start;
+        }
+        .comment-toggle-btn:hover { color: var(--primary); transform: none; box-shadow: none; }
+
+        .comment-section {
+            border-top: 1px dashed rgba(200, 155, 155, 0.25);
+            margin-top: 6px;
+            padding-top: 12px;
+        }
+
+        .comment-item {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            align-items: flex-start;
+        }
+
+        .comment-author-badge {
+            font-size: 0.68em;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-weight: 500;
+            flex-shrink: 0;
+            margin-top: 3px;
+        }
+
+        .comment-bubble {
+            background: rgba(245, 235, 235, 0.55);
+            border-radius: 10px;
+            padding: 7px 11px;
+            font-size: 0.87em;
+            line-height: 1.65;
+            color: var(--text);
+            flex: 1;
+            border: 1px solid rgba(200, 155, 155, 0.12);
+        }
+
+        .comment-time {
+            font-size: 0.67em;
+            color: var(--text-muted);
+            margin-top: 3px;
+            padding-left: 2px;
+        }
+
+        .comment-write-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: none;
+            border: 1px dashed rgba(200, 155, 155, 0.4);
+            color: var(--text-muted);
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            cursor: pointer;
+            box-shadow: none;
+            margin-top: 6px;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .comment-write-btn:hover {
+            border-color: var(--primary-light);
+            color: var(--primary);
+            background: rgba(200, 155, 155, 0.05);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .comment-textarea {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.88em;
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            outline: none;
+            resize: none;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.8);
+            margin-top: 10px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .comment-textarea:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(212, 160, 168, 0.12);
+        }
+
+        .comment-submit-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 7px;
+        }
+
+        .comment-submit-btn {
+            padding: 7px 18px;
+            font-size: 0.82em;
+            border-radius: 20px;
+            box-shadow: 0 3px 12px rgba(181, 115, 122, 0.22);
+        }
+
+        .comment-empty {
+            font-size: 0.8em;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 8px 0 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .comment-cancel-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 7px 16px;
+            border-radius: 20px;
+            font-size: 0.82em;
+            cursor: pointer;
+            box-shadow: none;
+            margin-right: 8px;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+        }
+        .comment-cancel-btn:hover { background: rgba(200,155,155,0.08); transform: none; box-shadow: none; color: var(--text); }
+
+        /* ── 评论点赞 ── */
+        .comment-like-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 0;
+            font-size: 0.85em;
+            cursor: pointer;
+            box-shadow: none;
+            margin-left: 12px;
+            transition: color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .comment-like-btn:hover { color: #e74c6f; transform: none; box-shadow: none; }
+        .comment-like-btn.liked { color: #e74c6f; }
+        .comment-like-btn::after { display: none; }
+        .comment-like-btn .like-heart { transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1); display: inline-block; }
+        .comment-like-btn.liked .like-heart { animation: likePopIn 0.4s ease; }
+        @keyframes likePopIn {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.5); }
+            100% { transform: scale(1); }
+        }
+
+        /* ── 动态点赞按钮 ── */
+        .moment-like-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 0 2px;
+            border-top: 1px dashed rgba(200,155,155,0.18);
+            margin-top: 8px;
+        }
+        .moment-like-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 4px 10px;
+            font-size: 0.82em;
+            cursor: pointer;
+            box-shadow: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            border-radius: 20px;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+        }
+        .moment-like-btn:hover {
+            background: rgba(231,76,111,0.08);
+            color: #e74c6f;
+            transform: none;
+            box-shadow: none;
+        }
+        .moment-like-btn.liked {
+            color: #e74c6f;
+            background: rgba(231,76,111,0.08);
+        }
+        .moment-like-btn::after { display: none; }
+        .moment-like-btn .ml-heart { transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1); display: inline-block; }
+        .moment-like-btn.liked .ml-heart { animation: likePopIn 0.4s ease; }
+        .moment-like-likers {
+            font-size: 0.75em;
+            color: var(--text-muted);
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ── 评论图片 ── */
+        .comment-img-upload-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: none;
+            border: 1px dashed rgba(200,155,155,0.4);
+            color: var(--text-muted);
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            cursor: pointer;
+            box-shadow: none;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .comment-img-upload-btn:hover {
+            border-color: var(--primary-light);
+            color: var(--primary);
+            background: rgba(200,155,155,0.05);
+            transform: none;
+            box-shadow: none;
+        }
+        .comment-img-upload-btn::after { display: none; }
+        .comment-img-previews {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .comment-img-preview-item {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.12);
+        }
+        .comment-img-preview-item img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+        .comment-img-preview-item .rm-btn {
+            position: absolute;
+            top: 2px; right: 2px;
+            background: rgba(0,0,0,0.55);
+            color: #fff;
+            border-radius: 50%;
+            width: 16px; height: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px;
+            cursor: pointer;
+            line-height: 1;
+            border: none;
+            padding: 0;
+            box-shadow: none;
+        }
+        .comment-img-preview-item .rm-btn::after { display: none; }
+        .comment-bubble img {
+            max-width: 180px;
+            border-radius: 8px;
+            margin-top: 6px;
+            display: block;
+            cursor: zoom-in;
+            transition: opacity 0.2s;
+        }
+        .comment-bubble img:hover { opacity: 0.9; }
+

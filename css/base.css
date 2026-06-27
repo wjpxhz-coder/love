@@ -1,0 +1,57 @@
+        html {
+            scrollbar-color: var(--primary-light) transparent;
+            scrollbar-width: thin;
+        }
+
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            color: var(--text);
+            min-height: 100vh;
+            padding: 30px 16px 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        #bg-layer {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+            pointer-events: none;
+        }
+
+        /* 昼夜主题平滑过渡 */
+        body, #bg-layer, .moment-card, .btn-mood, #btn-moment, #btn-audio, #btn-blindbox, .modal-box, .comment-bubble, .resonance-ui, .ai-tab, .ai-content-area, .profile-card, .edit-profile-page, .edit-input, .comment-textarea {
+            transition: background 0.3s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.3s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.3s ease, color 0.5s ease, box-shadow 0.5s ease;
+        }
+
+        /* ── 樱花粒子 canvas ── */
+        #sakura-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            will-change: transform;
+        }
+
+        #sakura-canvas-foreground {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 2; /* 浮于 container 容器 (z-index: 1) 之上，但低于弹窗和悬浮球 */
+            will-change: transform;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 620px;
+            width: 100%;
+        }
