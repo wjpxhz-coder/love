@@ -137,6 +137,9 @@ function doLogout() {
     currentAuthor = '';
     currentUserProfile = null;
     localStorage.removeItem('lover_identity');
+    if (typeof processedMissIds !== 'undefined') {
+        processedMissIds.clear();
+    }
     document.getElementById('login-trigger-btn').style.display = 'flex';
     document.getElementById('user-avatar-btn').style.display = 'none';
     // 重置头像

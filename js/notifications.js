@@ -1,6 +1,8 @@
 // ==========================================
 // 通知功能逻辑
 // ==========================================
+let processedMissIds = new Set();
+
 async function loadNotifications() {
     if (!currentAuthor) return;
     const { data, error } = await supabaseClient
@@ -19,6 +21,41 @@ async function loadNotifications() {
     
     // 过滤出除了自己产生的之外的通知
     const validNotifications = data.filter(n => n.actor !== currentAuthor);
+    
+    // 检测是否有未读的他人发送的 'miss' 想念通知（且本地尚未处理过）
+    const unreadMissNotifications = validNotifications.filter(n => {
+        const isRead = n.read_by && n.read_by.includes(currentAuthor);
+        return n.type === 'miss' && !isRead && !processedMissIds.has(n.id);
+    });
+
+    if (unreadMissNotifications.length > 0) {
+        // 立刻加入已处理缓存，防止异步请求在 1.5 秒延时内多次调用导致特效重叠播放
+        unreadMissNotifications.forEach(n => processedMissIds.add(n.id));
+        
+        // 延时 1.5 秒触发，避免同登录界面的爱心粒子特效冲突
+        setTimeout(async () => {
+            if (typeof createHeartRain === 'function') {
+                createHeartRain();
+            }
+            unreadMissNotifications.forEach(n => {
+                if (typeof showToast === 'function') {
+                    showToast(`💓 ${n.actor} 在离线期间给你发来了心电感应，正在疯狂想你！`);
+                }
+            });
+
+            // 自动在 Supabase 中标记为已读，避免下一次登录刷新时再次触发
+            try {
+                await Promise.all(unreadMissNotifications.map(async (n) => {
+                    const newReadBy = n.read_by ? [...n.read_by, currentAuthor] : [currentAuthor];
+                    return supabaseClient.from('notifications').update({ read_by: newReadBy }).eq('id', n.id);
+                }));
+                // 重载通知刷新 UI 未读红点
+                loadNotifications();
+            } catch (dbErr) {
+                console.error('标记想念通知为已读失败:', dbErr);
+            }
+        }, 1500);
+    }
     
     let hasUnread = false;
     
