@@ -1,5 +1,6 @@
 // --- 发布图文动态 ---
 let momentSelectedFiles = [];
+let momentAudioBlob = null;
 
 function openMomentModal() {
     const modal = document.getElementById('momentModal');
@@ -14,6 +15,23 @@ function openMomentModal() {
     document.getElementById('momentModalMsg').innerText = '';
     input.value = '';
     momentSelectedFiles = [];
+    
+    // 重置录音状态与预览
+    momentAudioBlob = null;
+    const btnAudio = document.getElementById('btn-moment-audio');
+    const previewAudio = document.getElementById('momentAudioPreview');
+    const playerAudio = document.getElementById('momentAudioPlayer');
+    if (btnAudio) {
+        btnAudio.style.display = 'flex';
+        const txt = btnAudio.querySelector('.audio-text');
+        if (txt) txt.innerText = '录制声音';
+        const icon = btnAudio.querySelector('.audio-icon');
+        if (icon) icon.innerText = '🎙️';
+        btnAudio.classList.remove('recording-active');
+        btnAudio.disabled = false;
+    }
+    if (previewAudio) previewAudio.style.display = 'none';
+    if (playerAudio) playerAudio.src = '';
     
     // 保留添加按钮，移除已有的预览项
     const addBtn = previewContainer.querySelector('.moment-image-add-btn');
@@ -66,8 +84,8 @@ async function submitMomentPost() {
     const text = document.getElementById('momentTextInput').value.trim();
     const msgEl = document.getElementById('momentModalMsg');
     
-    if (!text && momentSelectedFiles.length === 0) {
-        msgEl.innerText = '写点什么或者发张照片吧！';
+    if (!text && momentSelectedFiles.length === 0 && !momentAudioBlob) {
+        msgEl.innerText = '写点什么、发张照片或录段声音吧！';
         return;
     }
 
@@ -90,9 +108,19 @@ async function submitMomentPost() {
             uploadedUrls = await Promise.all(uploadPromises);
         }
 
+        let audioUrl = null;
+        if (momentAudioBlob) {
+            const fileName = `audio_${Date.now()}_${Math.random().toString(36).substring(2,9)}.webm`;
+            const { error: audioUploadError } = await supabaseClient.storage.from('photos').upload(fileName, momentAudioBlob, { contentType: 'audio/webm', upsert: false });
+            if (audioUploadError) throw audioUploadError;
+            const { data: audioData } = supabaseClient.storage.from('photos').getPublicUrl(fileName);
+            audioUrl = audioData.publicUrl;
+        }
+
         const momentContent = JSON.stringify({
             text: text,
-            images: uploadedUrls
+            images: uploadedUrls,
+            audio: audioUrl
         });
 
         const { error: dbError } = await supabaseClient.from('moments')
@@ -110,28 +138,22 @@ async function submitMomentPost() {
     }
 }
 
-// --- 录音功能（点击切换） ---
-let mediaRecorder;
-let audioChunks = [];
-let recordingStartTime = 0;
-let isRecording = false;
-
-async function toggleRecording() {
+// --- 录音功能（发布动态弹窗内部整合） ---
+async function toggleMomentRecording() {
     if (isRecording) {
         // 停止录音
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
             mediaRecorder.stop();
         }
         isRecording = false;
-        resetAudioBtn();
         return;
     }
 
-    // 未在录音，则需要验证身份才能开始
-    checkPassword('audio_start');
+    // 开始录音
+    executeMomentRecording();
 }
 
-async function executeStartRecording() {
+async function executeMomentRecording() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
@@ -145,60 +167,69 @@ async function executeStartRecording() {
             const duration = Date.now() - recordingStartTime;
             stream.getTracks().forEach(track => track.stop()); // 关闭麦克风
             
+            const btn = document.getElementById('btn-moment-audio');
             if (duration < 1000) {
                 alert('录音时间太短啦，至少要1秒哦！');
-                resetAudioBtn();
+                resetMomentAudioBtn();
                 return;
             }
 
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            await handleAudioUpload(audioBlob);
+            momentAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            
+            // 展示预览播放器，隐藏录制按钮
+            const previewEl = document.getElementById('momentAudioPreview');
+            const playerEl = document.getElementById('momentAudioPlayer');
+            if (playerEl) {
+                playerEl.src = URL.createObjectURL(momentAudioBlob);
+            }
+            if (previewEl) {
+                previewEl.style.display = 'flex';
+            }
+            if (btn) {
+                btn.style.display = 'none';
+            }
+            resetMomentAudioBtn();
         };
 
         mediaRecorder.start();
         isRecording = true;
         recordingStartTime = Date.now();
         
-        const btn = document.getElementById('btn-audio');
-        btn.innerHTML = '🔴 正在录音... 点击结束';
-        btn.classList.add('recording-active');
+        const btn = document.getElementById('btn-moment-audio');
+        if (btn) {
+            const txt = btn.querySelector('.audio-text');
+            if (txt) txt.innerText = '正在录音... 点击结束';
+            const icon = btn.querySelector('.audio-icon');
+            if (icon) icon.innerText = '🔴';
+            btn.classList.add('recording-active');
+        }
     } catch (err) {
         alert('无法访问麦克风，请检查设备权限设置！\n' + err.message);
         isRecording = false;
+        resetMomentAudioBtn();
     }
 }
 
-function resetAudioBtn() {
-    const btn = document.getElementById('btn-audio');
+function resetMomentAudioBtn() {
+    const btn = document.getElementById('btn-moment-audio');
     if (btn) {
-        btn.innerHTML = '🎙️ 点击留声';
+        const txt = btn.querySelector('.audio-text');
+        if (txt) txt.innerText = '录制声音';
+        const icon = btn.querySelector('.audio-icon');
+        if (icon) icon.innerText = '🎙️';
         btn.classList.remove('recording-active');
     }
 }
 
-async function handleAudioUpload(blob) {
-    const btn = document.getElementById('btn-audio');
-    const orig = btn.innerHTML;
-    btn.innerHTML = '⏳ 声音保存中…'; btn.disabled = true;
-
-    const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-    const fileName = `audio_${Date.now()}_${Math.random().toString(36).substring(2,9)}.${ext}`;
-
-    const { error: uploadError } = await supabaseClient.storage.from('photos').upload(fileName, blob);
-    if (uploadError) {
-        alert('声音上传失败: ' + uploadError.message);
-        btn.innerHTML = orig; btn.disabled = false;
-        return;
-    }
-
-    const { data: publicUrlData } = supabaseClient.storage.from('photos').getPublicUrl(fileName);
-    const publicUrl = publicUrlData.publicUrl;
-
-    const { error: dbError } = await supabaseClient.from('moments').insert([{ type: 'audio', content: publicUrl, author: currentAuthor }]);
-    btn.innerHTML = orig; btn.disabled = false;
+function deleteRecordedAudio() {
+    momentAudioBlob = null;
+    const previewEl = document.getElementById('momentAudioPreview');
+    const playerEl = document.getElementById('momentAudioPlayer');
+    const btn = document.getElementById('btn-moment-audio');
     
-    if (dbError) alert('留声保存失败: ' + dbError.message);
-    else fetchMoments();
+    if (playerEl) playerEl.src = '';
+    if (previewEl) previewEl.style.display = 'none';
+    if (btn) btn.style.display = 'flex';
 }
 // --- 时光轴（无限滚动） ---
 let scrollObserver = null;
@@ -264,6 +295,9 @@ function renderMomentCard(item) {
             const data = JSON.parse(item.content);
             if (data.text) {
                 html += formatCardText(data.text, item.id);
+            }
+            if (data.audio) {
+                html += `<div style="margin-top:10px;"><audio controls src="${data.audio}" style="width:100%; height: 40px; border-radius: 20px; outline: none;"></audio></div>`;
             }
             if (data.images && data.images.length > 0) {
                 if (data.images.length === 1) {
@@ -474,7 +508,18 @@ async function fetchMoments(append = false) {
         query = query.in('author', currentFilters.authors);
     }
     if (currentFilters.types.length > 0) {
-        query = query.in('type', currentFilters.types);
+        if (currentFilters.types.includes('audio')) {
+            if (currentFilters.types.length === 1) {
+                // 如果只筛选声音类型，查找旧的 audio 类型，以及带有 audio 属性的 moment 类型
+                query = query.or('type.eq.audio,and(type.eq.moment,content.ilike.%\"audio\"%)');
+            } else {
+                // 如果筛选了多种类型（包括声音），则查找相应的类型集合
+                // 因为 types 里面包含了 'moment' 等其他类型，已经能够拉取出 moment 类型的记录
+                query = query.in('type', currentFilters.types);
+            }
+        } else {
+            query = query.in('type', currentFilters.types);
+        }
     }
     if (currentFilters.keyword) {
         query = query.ilike('content', `%${currentFilters.keyword}%`);

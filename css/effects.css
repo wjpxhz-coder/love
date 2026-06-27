@@ -238,7 +238,7 @@
             100% { opacity: 1; transform: translateY(0); }
         }
         /* 录音微动效 */
-        #btn-audio.recording-active {
+        .recording-active {
             animation: recordingPulse 1.2s infinite alternate !important;
         }
         @keyframes recordingPulse {

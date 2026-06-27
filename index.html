@@ -121,7 +121,6 @@
 
     <div class="btn-group">
         <button id="btn-moment" onclick="checkPassword('moment')">✨ 发布动态</button>
-        <button id="btn-audio" onclick="toggleRecording()" style="background: linear-gradient(135deg, #a0d4c6, #7ab87a); position: relative; user-select: none; -webkit-user-select: none;">🎙️ 点击留声</button>
         <button id="btn-blindbox" onclick="triggerBlindBox(true)" style="background: linear-gradient(135deg, #e3b0b8, #d4a0a8);">🎲 摇一摇盲盒</button>
     </div>
 
@@ -160,6 +159,17 @@
             </div>
         </div>
         <input type="file" id="momentPhotoInput" accept="image/*,video/*" multiple style="display:none;" onchange="handleMomentPhotoSelect(event)">
+        
+        <!-- 新增的录音控件 -->
+        <div class="moment-audio-section" style="margin: 12px 0; display: flex; align-items: center; gap: 8px;">
+            <button id="btn-moment-audio" type="button" onclick="toggleMomentRecording()" style="background: rgba(160, 212, 198, 0.15); border: 1px solid rgba(160, 212, 198, 0.3); color: #5aa190; padding: 8px 16px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.9em; transition: all 0.2s; outline: none; font-family: inherit; user-select: none; -webkit-user-select: none;">
+                <span class="audio-icon">🎙️</span> <span class="audio-text">录制声音</span>
+            </button>
+            <div id="momentAudioPreview" style="display: none; align-items: center; gap: 8px; flex: 1;">
+                <audio id="momentAudioPlayer" controls style="height: 36px; flex: 1; border-radius: 18px; outline: none;"></audio>
+                <button id="btn-delete-audio" type="button" onclick="deleteRecordedAudio()" style="background: none; border: none; color: #ff5e7e; font-size: 1.4em; cursor: pointer; padding: 0 6px; display: flex; align-items: center; justify-content: center;">×</button>
+            </div>
+        </div>
         
         <div class="modal-msg" id="momentModalMsg"></div>
         <div class="modal-btns" style="margin-top: 16px;">

@@ -260,8 +260,6 @@ function executeAction(actionType) {
         showCommentInput(pendingCommentMomentId);
     } else if (actionType === 'delete_comment') {
         deleteComment(pendingDeleteCommentId, pendingDeleteCommentMomentId);
-    } else if (actionType === 'audio_start') {
-        executeStartRecording();
     }
 }
 
