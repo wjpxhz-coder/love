@@ -320,8 +320,10 @@ async function submitComment(momentId) {
     } catch(err) {
         alert('评论发送失败: ' + err.message);
     } finally {
-        if (submitBtn) { submitBtn.innerHTML = origText; submitBtn.disabled = false; }
+            if (submitBtn) { submitBtn.innerHTML = origText; submitBtn.disabled = false; }
     }
+}
+
 // ==========================================
 // 评论图片选择
 // ==========================================
@@ -351,4 +353,3 @@ window.removeCommentImg = function(momentId, idx, itemEl) {
     if (itemEl) itemEl.remove();
     // 重新编号所有预览元素的 data-idx
 };
-}
