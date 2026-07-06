@@ -1,4 +1,4 @@
-const CACHE_NAME = 'love-diary-v2';
+const CACHE_NAME = 'love-diary-v3';
 const STATIC_ASSETS = [
     './',
     './index.html',
@@ -55,17 +55,16 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // 静态资源（字体、图标等）— 缓存优先
+    // 静态资源（JS、CSS、字体等）— 网络优先，离线时用缓存
     event.respondWith(
-        caches.match(event.request).then(cached => {
-            if (cached) return cached;
-            return fetch(event.request).then(response => {
+        fetch(event.request)
+            .then(response => {
                 if (response.ok) {
                     const clone = response.clone();
                     caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
                 }
                 return response;
-            });
-        })
+            })
+            .catch(() => caches.match(event.request))
     );
 });
