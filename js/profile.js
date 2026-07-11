@@ -93,6 +93,9 @@ function renderProfilePage(targetAuthor) {
     const editBtnBottom = document.getElementById('profile-edit-btn-bottom');
     if (editBtnTop) editBtnTop.style.display = isSelf ? 'block' : 'none';
     if (editBtnBottom) editBtnBottom.style.display = isSelf ? 'block' : 'none';
+    
+    const settingsBtn = document.getElementById('profile-settings-btn');
+    if (settingsBtn) settingsBtn.style.display = isSelf ? 'flex' : 'none';
 }
 
 async function loadProfileStats(targetAuthor) {
@@ -219,3 +222,104 @@ async function saveProfile() {
         saveBtn.innerHTML = '保存'; saveBtn.disabled = false;
     }
 }
+
+// ==========================================
+// 系统设置弹窗控制逻辑
+// ==========================================
+function openSettingsModal() {
+    const modal = document.getElementById('settingsModal');
+    if (!modal) return;
+
+    // 显示当前版本号
+    if (typeof APP_VERSION !== 'undefined') {
+        const verEl = document.getElementById('settingsVersion');
+        if (verEl) verEl.textContent = `当前版本：${APP_VERSION}`;
+    }
+
+    // 设置当前主题按钮的 active 状态
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    const lightBtn = document.getElementById('theme-btn-light');
+    const darkBtn = document.getElementById('theme-btn-dark');
+
+    if (lightBtn && darkBtn) {
+        if (currentTheme === 'dark') {
+            lightBtn.classList.remove('active');
+            darkBtn.classList.add('active');
+        } else {
+            lightBtn.classList.add('active');
+            darkBtn.classList.remove('active');
+        }
+    }
+
+    modal.showModal();
+}
+
+function closeSettingsModal() {
+    const modal = document.getElementById('settingsModal');
+    if (modal) {
+        modal.close();
+    }
+}
+
+function setThemeDirect(theme) {
+    if (typeof applyTheme === 'function') {
+        localStorage.setItem('theme_preference', theme);
+        applyTheme(theme);
+        
+        // 更新设置弹窗内按钮的 active 状态
+        const lightBtn = document.getElementById('theme-btn-light');
+        const darkBtn = document.getElementById('theme-btn-dark');
+        if (lightBtn && darkBtn) {
+            if (theme === 'dark') {
+                lightBtn.classList.remove('active');
+                darkBtn.classList.add('active');
+            } else {
+                lightBtn.classList.add('active');
+                darkBtn.classList.remove('active');
+            }
+        }
+    }
+}
+
+async function clearSpaceCache() {
+    if (typeof showToast === 'function') {
+        showToast('正在清理缓存并刷新空间... 🧹');
+    }
+    
+    // 清除 Service Worker 各种 caches
+    if ('caches' in window) {
+        try {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(k => caches.delete(k)));
+        } catch (e) {
+            console.error('清理 caches 失败:', e);
+        }
+    }
+    
+    // 清理本地临时缓存（排除登录态 lover_identity 与主题设置）
+    const loginIdentity = localStorage.getItem('lover_identity');
+    const themePref = localStorage.getItem('theme_preference');
+    
+    localStorage.clear();
+    
+    if (loginIdentity) {
+        localStorage.setItem('lover_identity', loginIdentity);
+    }
+    if (themePref) {
+        localStorage.setItem('theme_preference', themePref);
+    }
+    
+    // 1秒后自动刷新网页以加载最新内容
+    setTimeout(() => {
+        window.location.reload(true);
+    }, 1000);
+}
+
+function doSettingsLogout() {
+    closeSettingsModal();
+    closeProfilePage();
+    if (typeof doLogout === 'function') {
+        doLogout();
+    }
+}
+

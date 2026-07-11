@@ -373,7 +373,10 @@
     <div class="profile-topbar">
         <button class="profile-back-btn" onclick="closeProfilePage()">← 返回</button>
         <div class="profile-topbar-title" id="profile-topbar-title">我的主页</div>
-        <button class="profile-edit-btn" id="profile-edit-btn-top" onclick="openEditProfilePage()">✏️ 编辑资料</button>
+        <div class="profile-topbar-right">
+            <button class="profile-settings-btn" id="profile-settings-btn" onclick="openSettingsModal()" title="设置">⚙️</button>
+            <button class="profile-edit-btn" id="profile-edit-btn-top" onclick="openEditProfilePage()">✏️ 编辑资料</button>
+        </div>
     </div>
     <div class="profile-body">
         <div class="profile-avatar-wrap" id="profile-avatar-wrap">
@@ -437,6 +440,40 @@
         </div>
         <div class="modal-btns">
             <button class="btn-version-confirm" onclick="closeVersionModal()">我知道啦 💖</button>
+        </div>
+    </div>
+</dialog>
+
+<!-- 系统设置弹窗 -->
+<dialog class="native-dialog settings-dialog" id="settingsModal">
+    <div class="modal-box settings-modal-box">
+        <h3 class="modal-title">⚙️ 系统设置</h3>
+        
+        <div class="settings-group">
+            <div class="settings-label">🎨 空间主题</div>
+            <div class="theme-options">
+                <button class="theme-opt-btn" id="theme-btn-light" onclick="setThemeDirect('light')">☀️ 浅色</button>
+                <button class="theme-opt-btn" id="theme-btn-dark" onclick="setThemeDirect('dark')">🌙 深色</button>
+            </div>
+        </div>
+        
+        <div class="settings-group">
+            <div class="settings-label">🧹 空间存储</div>
+            <button class="btn-settings-action" onclick="clearSpaceCache()">清理缓存并重载</button>
+            <div class="settings-tip">清理后将自动刷新页面重新获取最新内容，并保留您的登录状态。</div>
+        </div>
+        
+        <div class="settings-group">
+            <div class="settings-label">🚪 退出登录</div>
+            <button class="btn-settings-action logout" onclick="doSettingsLogout()">退出登录</button>
+        </div>
+        
+        <div class="settings-footer">
+            <span id="settingsVersion">当前版本：v3.1.0</span>
+        </div>
+        
+        <div class="modal-btns" style="margin-top: 24px;">
+            <button class="btn-cancel" onclick="closeSettingsModal()">关闭</button>
         </div>
     </div>
 </dialog>

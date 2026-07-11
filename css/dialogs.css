@@ -333,3 +333,145 @@
             transform: translateY(0);
         }
 
+        /* ── 系统设置弹窗专属样式 ── */
+        .settings-modal-box {
+            background: rgba(255, 252, 252, 0.95);
+            border: 2px solid rgba(255, 180, 190, 0.35);
+            box-shadow: 0 20px 50px rgba(181, 115, 122, 0.22);
+            text-align: left;
+            max-width: 360px;
+        }
+
+        [data-theme='dark'] .settings-modal-box {
+            background: rgba(30, 25, 25, 0.96);
+            border-color: rgba(255, 154, 158, 0.25);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .settings-modal-box .modal-title {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .settings-group {
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(212, 160, 168, 0.15);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+            transition: background 0.3s;
+        }
+
+        [data-theme='dark'] .settings-group {
+            background: rgba(45, 35, 35, 0.4);
+            border-color: rgba(255, 154, 158, 0.1);
+        }
+
+        .settings-label {
+            font-weight: 600;
+            font-size: 0.9em;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        /* 主题选项 */
+        .theme-options {
+            display: flex;
+            gap: 12px;
+        }
+
+        .theme-opt-btn {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1.5px solid var(--border);
+            color: var(--text);
+            padding: 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+            box-shadow: none;
+            outline: none;
+        }
+
+        [data-theme='dark'] .theme-opt-btn {
+            background: rgba(30, 30, 30, 0.8);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .theme-opt-btn:hover {
+            border-color: var(--primary-light);
+            background: var(--bg);
+        }
+
+        .theme-opt-btn.active {
+            border-color: var(--primary);
+            background: rgba(212, 160, 168, 0.15);
+            color: var(--primary);
+            font-weight: 600;
+            box-shadow: 0 4px 10px rgba(212, 107, 122, 0.1);
+        }
+
+        [data-theme='dark'] .theme-opt-btn.active {
+            background: rgba(212, 160, 168, 0.2);
+            color: #ff9a9e;
+            border-color: #ff9a9e;
+        }
+
+        /* 设置操作按钮 */
+        .btn-settings-action {
+            width: 100%;
+            background: linear-gradient(135deg, #f5a8b0, var(--primary));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            padding: 10px 16px;
+            font-size: 0.9em;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(212, 107, 122, 0.15);
+            transition: all 0.3s ease;
+            outline: none;
+            text-align: center;
+        }
+
+        .btn-settings-action:hover {
+            transform: translateY(-1.5px);
+            box-shadow: 0 6px 16px rgba(212, 107, 122, 0.35);
+        }
+
+        .btn-settings-action:active {
+            transform: translateY(0);
+        }
+
+        .btn-settings-action.logout {
+            background: linear-gradient(135deg, #ff8a9a, #e91e63);
+            box-shadow: 0 4px 12px rgba(233, 30, 99, 0.15);
+        }
+
+        .btn-settings-action.logout:hover {
+            box-shadow: 0 6px 16px rgba(233, 30, 99, 0.35);
+        }
+
+        .settings-tip {
+            font-size: 0.78em;
+            color: var(--text-muted);
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+
+        .settings-footer {
+            text-align: center;
+            font-size: 0.8em;
+            color: var(--text-muted);
+            margin-top: 20px;
+            border-top: 1px dashed rgba(212, 107, 122, 0.15);
+            padding-top: 12px;
+        }
+
+

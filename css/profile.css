@@ -48,6 +48,36 @@
             letter-spacing: 2px;
             text-shadow: none;
         }
+        .profile-topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .profile-settings-btn {
+            background: rgba(255, 255, 255, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: #fff;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            outline: none;
+            box-shadow: none;
+            padding: 0;
+            line-height: 1;
+        }
+        .profile-settings-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+            transform: rotate(45deg);
+        }
+        .profile-settings-btn::after {
+            display: none;
+        }
         .profile-edit-btn {
             background: #fff;
             color: var(--primary);
