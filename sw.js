@@ -1,4 +1,4 @@
-const CACHE_NAME = 'love-diary-v3.2.0';
+const CACHE_NAME = 'love-diary-v3.3.0';
 const STATIC_ASSETS = [
     './',
     './index.html',
@@ -9,7 +9,7 @@ const STATIC_ASSETS = [
     './css/profile.css', './css/notifications.css', './css/mood.css', './css/anniversary.css',
     './css/effects.css', './css/responsive.css',
     './js/config.js', './js/animations.js', './js/timer.js', './js/auth.js', './js/profile.js',
-    './js/moments.js', './js/comments.js', './js/likes.js', './js/mood.js', './js/anniversary.js',
+    './js/moments.js', './js/milestones.js', './js/comments.js', './js/likes.js', './js/mood.js', './js/anniversary.js',
     './js/lightbox.js', './js/ai.js', './js/blindbox.js', './js/presence.js', './js/theme.js',
     './js/notifications.js', './js/effects.js', './js/app.js'
 ];

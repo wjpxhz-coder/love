@@ -117,10 +117,14 @@ async function submitMomentPost() {
             audioUrl = audioData.publicUrl;
         }
 
+        const chkIsMilestone = document.getElementById('momentIsMilestone');
+        const isMilestone = chkIsMilestone ? chkIsMilestone.checked : false;
+
         const momentContent = JSON.stringify({
             text: text,
             images: uploadedUrls,
-            audio: audioUrl
+            audio: audioUrl,
+            is_milestone: isMilestone
         });
 
         const { error: dbError } = await supabaseClient.from('moments')
@@ -275,11 +279,21 @@ function renderMomentCard(item) {
         ? `<span class="author-badge ${authorBadgeClass}" onclick="openProfilePage('${item.author}')" style="cursor:pointer;" title="点击查看主页">${authorAvatarHtml} ${authorDisplayName}</span>`
         : '';
 
-    let html = `<div class="moment-card" id="card-${item.id}">
+    let isMilestone = false;
+    if (item.type === 'moment') {
+        try {
+            const parsed = JSON.parse(item.content);
+            isMilestone = parsed.is_milestone || false;
+        } catch (e) {}
+    }
+    const milestoneBadge = isMilestone ? `<span class="milestone-badge-timeline">🏆 大事记</span>` : '';
+
+    let html = `<div class="moment-card ${isMilestone ? 'milestone' : ''}" id="card-${item.id}">
             <div class="card-header">
                 <div class="card-meta">
                     <span class="time-text">${dateStr}</span>
                     ${authorBadge}
+                    ${milestoneBadge}
                 </div>
                 ${deleteBtn}
             </div>`;
@@ -330,11 +344,15 @@ function renderMomentCard(item) {
             console.error("解析 moment 失败", e);
         }
     }
+    const hasStarred = (typeof starredMomentIds !== 'undefined' && starredMomentIds.has(item.id));
     html += `
             <div class="moment-like-bar">
                 <button class="moment-like-btn" id="moment-like-btn-${item.id}" onclick="toggleMomentLike(${item.id})">
                     <span class="ml-heart">🤍</span>
                     <span class="ml-count" id="moment-like-count-${item.id}">喜欢</span>
+                </button>
+                <button class="moment-star-btn ${hasStarred ? 'starred' : ''}" id="moment-star-btn-${item.id}" onclick="toggleMomentStar(${item.id})">
+                    ${hasStarred ? '⭐ 已收藏' : '☆ 收藏'}
                 </button>
                 <span class="moment-like-likers" id="moment-like-likers-${item.id}"></span>
             </div>
@@ -563,6 +581,11 @@ async function fetchMoments(append = false) {
     // 移除已有的加载指示器
     const existingLoader = contentDiv.querySelector('.load-more-indicator');
     if (existingLoader) existingLoader.remove();
+
+    // 加载星标收藏数据以供渲染
+    if (typeof loadMomentStars === 'function') {
+        await loadMomentStars();
+    }
 
     // 渲染新卡片
     const html = data.map(item => renderMomentCard(item)).join('');

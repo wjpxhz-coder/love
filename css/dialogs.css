@@ -474,4 +474,283 @@
             padding-top: 12px;
         }
 
+        /* ── 大事记记录板弹窗专属样式 ── */
+        .milestones-modal-box {
+            background: rgba(255, 252, 252, 0.95);
+            border: 2px solid rgba(255, 180, 190, 0.35);
+            box-shadow: 0 20px 50px rgba(181, 115, 122, 0.22);
+            text-align: left;
+            width: 90vw;
+            max-width: 520px;
+            padding: 30px 24px;
+        }
+
+        [data-theme='dark'] .milestones-modal-box {
+            background: rgba(30, 25, 25, 0.96);
+            border-color: rgba(255, 154, 158, 0.25);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .milestones-header {
+            border-bottom: 1px dashed rgba(212, 107, 122, 0.15);
+            padding-bottom: 14px;
+            margin-bottom: 16px;
+        }
+
+        .milestones-tabs {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .milestone-tab {
+            flex: 1;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-muted);
+            padding: 8px 0;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s ease;
+            box-shadow: none;
+            border-radius: 0;
+            outline: none;
+        }
+
+        .milestone-tab:hover {
+            color: var(--primary-light);
+        }
+
+        .milestone-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .milestones-content {
+            max-height: 50vh;
+            overflow-y: auto;
+            padding-right: 6px;
+        }
+
+        /* 自定义滚动条 */
+        .milestones-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        .milestones-content::-webkit-scrollbar-thumb {
+            background: var(--primary-light);
+            border-radius: 4px;
+        }
+
+        /* ── 大事记时间轴列表 ── */
+        .milestone-timeline {
+            position: relative;
+            padding: 10px 0;
+        }
+
+        .milestone-list-item {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .milestone-dot-line {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 14px;
+        }
+
+        .milestone-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--primary-light);
+            border: 2px solid var(--bg);
+            z-index: 2;
+            box-shadow: 0 0 0 2px var(--primary-light);
+        }
+
+        .milestone-dot.gold {
+            background: #f5a623;
+            box-shadow: 0 0 0 2px #f5a623;
+        }
+
+        .milestone-line {
+            width: 2px;
+            flex: 1;
+            background: rgba(212, 160, 168, 0.25);
+            margin-top: 4px;
+        }
+
+        .milestone-list-item:last-child .milestone-line {
+            display: none;
+        }
+
+        .milestone-item-card {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(212, 160, 168, 0.15);
+            border-radius: 16px;
+            padding: 14px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        [data-theme='dark'] .milestone-item-card {
+            background: rgba(45, 35, 35, 0.4);
+            border-color: rgba(255, 154, 158, 0.1);
+        }
+
+        .milestone-item-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(212, 107, 122, 0.1);
+        }
+
+        .milestone-item-header {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 0.85em;
+        }
+
+        .milestone-item-date {
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .milestone-badge-top {
+            background: linear-gradient(135deg, #ffd861, #f5a623);
+            color: white;
+            font-size: 0.72em;
+            padding: 1px 6px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+
+        .milestone-badge-top.star {
+            background: linear-gradient(135deg, #ff758c, #ff7eb3);
+        }
+
+        .milestone-days {
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.82em;
+            margin-left: auto;
+        }
+
+        [data-theme='dark'] .milestone-days {
+            color: #ff9a9e;
+        }
+
+        .milestone-item-body {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .milestone-item-text {
+            flex: 1;
+            font-size: 0.9em;
+            color: var(--text);
+            line-height: 1.4;
+            word-break: break-all;
+        }
+
+        .milestone-item-img {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            background-size: cover;
+            background-position: center;
+            cursor: zoom-in;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+            transition: opacity 0.2s;
+        }
+
+        .milestone-item-img:hover {
+            opacity: 0.9;
+        }
+
+        /* ── 拍立得照片墙 ── */
+        .polaroid-wall {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            padding: 10px 5px;
+        }
+
+        @media (max-width: 480px) {
+            .polaroid-wall {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+
+        .polaroid-card {
+            background: #fff;
+            padding: 10px 10px 20px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        [data-theme='dark'] .polaroid-card {
+            background: #faf8f5; /* 保持拍立得纸张的淡白黄色复古质感，使照片更有味道 */
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        .polaroid-card:hover {
+            transform: scale(1.04) rotate(0deg) !important;
+            z-index: 10;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .polaroid-img-wrapper {
+            width: 100%;
+            aspect-ratio: 1.1;
+            overflow: hidden;
+            background: #eee;
+            cursor: zoom-in;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .polaroid-img-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s;
+        }
+
+        .polaroid-img-wrapper img:hover {
+            transform: scale(1.05);
+        }
+
+        .polaroid-caption {
+            font-family: 'ZCOOL KuaiLe', cursive, sans-serif;
+            font-size: 0.85em;
+            color: #555;
+            margin-top: 10px;
+            text-align: center;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .polaroid-date {
+            font-size: 0.72em;
+            color: #888;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+
 

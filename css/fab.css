@@ -43,6 +43,7 @@
         .fab-item-wrapper:nth-child(2) { transition-delay: 0.1s; }
         .fab-item-wrapper:nth-child(3) { transition-delay: 0.15s; }
         .fab-item-wrapper:nth-child(4) { transition-delay: 0.2s; }
+        .fab-item-wrapper:nth-child(5) { transition-delay: 0.25s; }
 
         .fab-label {
             position: absolute;
@@ -116,6 +117,7 @@
         .fab-item-filter { background: linear-gradient(135deg, #a0d4c6, #7ab87a); }
         .fab-item-ai { background: linear-gradient(135deg, #f7d2d7, #e3b0b8); }
         .fab-item-miss { background: linear-gradient(135deg, #ff758c, #ff7eb3); }
+        .fab-item-milestones { background: linear-gradient(135deg, #ffd861, #f5a623); }
         @keyframes pulseHW {
             0% { transform: scale(1); opacity: 0.8; }
             70% { transform: scale(1.35); opacity: 0; }

@@ -171,6 +171,11 @@
             </div>
         </div>
         
+        <!-- 是否为大事记选项 -->
+        <label class="milestone-checkbox-label" style="display: flex; align-items: center; gap: 6px; margin: 12px 0; font-size: 0.9em; color: var(--primary); cursor: pointer; user-select: none; -webkit-user-select: none;">
+            <input type="checkbox" id="momentIsMilestone" style="accent-color: var(--primary); width: 16px; height: 16px; cursor: pointer;"> 🏆 设为重大事件 (大事记)
+        </label>
+        
         <div class="modal-msg" id="momentModalMsg"></div>
         <div class="modal-btns" style="margin-top: 16px;">
             <button class="btn-cancel" onclick="closeMomentModal()">取消</button>
@@ -285,6 +290,10 @@
         <div class="fab-item-wrapper">
             <span class="fab-label">检索回忆</span>
             <button class="fab-item fab-item-filter" onclick="openFilterModal(); toggleFabMenu();" title="检索回忆">🔍</button>
+        </div>
+        <div class="fab-item-wrapper">
+            <span class="fab-label">大事记</span>
+            <button class="fab-item fab-item-milestones" onclick="openMilestonesModal(); toggleFabMenu();" title="重大事件">🏆</button>
         </div>
     </div>
     <button class="fab-main" onclick="toggleFabMenu()" title="功能菜单">✨</button>
@@ -478,12 +487,35 @@
     </div>
 </dialog>
 
+<!-- 大事记/重大事件记录板弹窗 -->
+<dialog class="native-dialog milestones-dialog" id="milestonesModal">
+    <div class="modal-box milestones-modal-box">
+        <div class="milestones-header">
+            <h3 class="modal-title" style="margin-bottom: 12px;">🏆 大事记记录板</h3>
+            <div class="milestones-tabs">
+                <button class="milestone-tab active" id="tab-milestone-list" onclick="switchMilestoneTab('list')">⌛ 事件时间轴</button>
+                <button class="milestone-tab" id="tab-milestone-gallery" onclick="switchMilestoneTab('gallery')">📸 拍立得墙</button>
+            </div>
+        </div>
+        
+        <div class="milestones-content" id="milestonesContent">
+            <!-- 动态渲染大事记列表或照片墙 -->
+        </div>
+
+        <div class="modal-btns" style="margin-top: 20px;">
+            <button class="btn-settings-action" id="btn-add-milestone-direct" onclick="openAddMilestoneDirect()" style="max-width: 160px;">✨ 记录新大事记</button>
+            <button class="btn-cancel" onclick="closeMilestonesModal()">关闭</button>
+        </div>
+    </div>
+</dialog>
+
 <script src="js/config.js"></script>
 <script src="js/animations.js"></script>
 <script src="js/timer.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/profile.js"></script>
 <script src="js/moments.js"></script>
+<script src="js/milestones.js"></script>
 <script src="js/comments.js"></script>
 <script src="js/likes.js"></script>
 <script src="js/mood.js"></script>

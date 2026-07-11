@@ -323,3 +323,65 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        /* ── 重大事件(大事记)卡片视觉强化 ── */
+        .moment-card.milestone {
+            border: 2px solid rgba(245, 166, 35, 0.4);
+            box-shadow: 0 8px 30px rgba(245, 166, 35, 0.12), 0 4px 15px rgba(212, 107, 122, 0.08);
+            position: relative;
+            background: linear-gradient(180deg, rgba(255, 252, 250, 0.98), rgba(255, 248, 240, 0.98));
+        }
+
+        [data-theme='dark'] .moment-card.milestone {
+            border-color: rgba(245, 166, 35, 0.3);
+            box-shadow: 0 8px 35px rgba(0, 0, 0, 0.4), 0 4px 15px rgba(245, 166, 35, 0.05);
+            background: linear-gradient(180deg, rgba(35, 30, 30, 0.98), rgba(40, 32, 25, 0.98));
+        }
+
+        /* 大事记标签徽章 */
+        .milestone-badge-timeline {
+            display: inline-block;
+            background: linear-gradient(135deg, #ffd861, #f5a623);
+            color: #fff;
+            font-size: 0.72em;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(245, 166, 35, 0.25);
+            vertical-align: middle;
+            margin-left: 6px;
+            letter-spacing: 0.5px;
+            text-shadow: none;
+        }
+
+        /* 收藏按钮 */
+        .moment-star-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            transition: all 0.2s ease;
+            outline: none;
+            box-shadow: none;
+        }
+
+        .moment-star-btn:hover {
+            background: rgba(245, 166, 35, 0.08);
+            color: #f5a623;
+        }
+
+        .moment-star-btn.starred {
+            color: #f5a623;
+        }
+        
+        .moment-star-btn.starred:hover {
+            background: rgba(245, 166, 35, 0.15);
+        }
+
