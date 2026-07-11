@@ -31,9 +31,10 @@
             border: none;
             background: transparent;
             padding: 0;
-            overflow: visible;
+            overflow: hidden;
             max-width: 100vw;
             max-height: 100vh;
+            overscroll-behavior: contain;
             /* Animation setup */
             transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             transform: scale(1);
@@ -126,6 +127,14 @@
             box-shadow: none;
             transform: none;
             color: var(--text);
+        }
+
+        /* ── 发布动态弹窗：图片过多时可滚动 ── */
+        #momentModal .modal-box {
+            max-height: 80vh;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
         }
         /* ── 筛选弹窗内部 ── */
         .filter-section {
