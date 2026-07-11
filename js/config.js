@@ -40,14 +40,15 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, 
 });
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.1.0';
+const APP_VERSION = 'v3.3.0';
 const UPDATE_LOG = {
-    version: 'v3.1.0',
+    version: 'v3.3.0',
     date: '2026-07-11',
     title: '空间甜蜜升级 💖',
     features: [
+        '新增「重大事件记录板 (大事记)」：收藏回忆、回顾我们的里程碑，还有浪漫拍立得照片墙与已过天数计时 🏆',
+        '新增「系统设置」：个人主页右上角可快速切换浅深色主题、清理缓存并重载 ⚙️',
         '新增「声音录制」：可以在发布动态时录制并分享你们的专属语音啦 🎙️',
-        '新增「版本更新通知」：每次空间升级后，登录时即可查看最新功能 💝',
         '优化「页面性能与体验」：修复了部分设备上按钮遮挡与排版问题 ✨'
     ]
 };
