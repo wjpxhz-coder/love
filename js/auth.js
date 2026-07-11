@@ -131,17 +131,35 @@ async function onLoginSuccess(username, isNewLogin) {
         spawnHearts(window.innerWidth / 2, window.innerHeight / 2);
     }
 
-    // 检测版本更新，并在 1 秒后展示，防止视觉冲突
-    setTimeout(() => {
-        if (typeof APP_VERSION !== 'undefined') {
-            const lastSeen = localStorage.getItem('last_seen_version');
-            if (lastSeen !== APP_VERSION) {
-                if (typeof showVersionModal === 'function') {
-                    showVersionModal();
+    // 自动检测版本更新，并在 1.2 秒后展示，防止视觉冲突
+    setTimeout(async () => {
+        try {
+            const res = await fetch('./sw.js?t=' + Date.now());
+            if (!res.ok) return;
+            const text = await res.text();
+            const match = text.match(/const\s+CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
+            if (match && match[1]) {
+                const currentCacheVersion = match[1]; // 例如 'love-diary-v3.3.0'
+                const lastSeen = localStorage.getItem('last_seen_version');
+                
+                // 如果本地已记录过版本，且与当前的 SW 缓存名称不一致，说明发生了更新！
+                if (lastSeen && lastSeen !== currentCacheVersion) {
+                    // 兼容判断：去除 'love-diary-' 前缀后比对，确保 config.js 中的 APP_VERSION 与 SW 中的 CACHE_NAME 匹配
+                    const useConfigLog = (typeof APP_VERSION !== 'undefined' && 
+                        (currentCacheVersion === APP_VERSION || 
+                         currentCacheVersion.replace('love-diary-', '') === APP_VERSION.replace('love-diary-', '')));
+                    if (typeof showVersionModal === 'function') {
+                        showVersionModal(currentCacheVersion, useConfigLog);
+                    }
+                } else if (!lastSeen) {
+                    // 第一次进入网站，做个初始化记录，不频繁弹窗打扰用户
+                    localStorage.setItem('last_seen_version', currentCacheVersion);
                 }
             }
+        } catch (e) {
+            console.error('自动检测更新失败:', e);
         }
-    }, 1000);
+    }, 1200);
 }
 
 function doLogout() {
