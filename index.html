@@ -423,6 +423,24 @@
     </div>
 </div>
 
+<!-- 版本更新弹窗 -->
+<dialog class="native-dialog version-dialog" id="versionModal">
+    <div class="modal-box version-modal-box">
+        <div class="version-decor-heart">💝</div>
+        <h3 class="modal-title" id="versionTitle">空间甜蜜升级 💖</h3>
+        <div class="version-tag" id="versionNumber">v3.1.0</div>
+        <div class="version-body">
+            <div class="version-date" id="versionDate">更新时间：2026-07-11</div>
+            <ul class="version-changelog" id="versionChangelogList">
+                <!-- 动态插入更新特性 -->
+            </ul>
+        </div>
+        <div class="modal-btns">
+            <button class="btn-version-confirm" onclick="closeVersionModal()">我知道啦 💖</button>
+        </div>
+    </div>
+</dialog>
+
 <script src="js/config.js"></script>
 <script src="js/animations.js"></script>
 <script src="js/timer.js"></script>

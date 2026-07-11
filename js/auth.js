@@ -130,6 +130,18 @@ async function onLoginSuccess(username, isNewLogin) {
         // 登录成功爱心动画
         spawnHearts(window.innerWidth / 2, window.innerHeight / 2);
     }
+
+    // 检测版本更新，并在 1 秒后展示，防止视觉冲突
+    setTimeout(() => {
+        if (typeof APP_VERSION !== 'undefined') {
+            const lastSeen = localStorage.getItem('last_seen_version');
+            if (lastSeen !== APP_VERSION) {
+                if (typeof showVersionModal === 'function') {
+                    showVersionModal();
+                }
+            }
+        }
+    }, 1000);
 }
 
 function doLogout() {
