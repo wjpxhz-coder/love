@@ -1,4 +1,4 @@
-const CACHE_NAME = 'love-diary-v3.3.0';
+const CACHE_NAME = 'love-diary-v3.4.0';
 const STATIC_ASSETS = [
     './',
     './index.html',

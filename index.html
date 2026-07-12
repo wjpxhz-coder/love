@@ -112,23 +112,37 @@
 
     <section class="mood-section">
         <div class="mood-section-title">🌈 心情日历</div>
-        <div class="mood-heatmap" id="mood-heatmap"></div>
-        <div class="mood-checkin-row">
-            <span class="mood-checkin-label">今天心情怎么样？</span>
-            <button class="btn-mood" onclick="checkPassword('mood')">✨ 打卡心情</button>
+        <div id="mood-unlocked-content">
+            <div class="mood-heatmap" id="mood-heatmap"></div>
+            <div class="mood-checkin-row">
+                <span class="mood-checkin-label">今天心情怎么样？</span>
+                <button class="btn-mood" onclick="checkPassword('mood')">✨ 打卡心情</button>
+            </div>
+        </div>
+        <div class="locked-card" id="mood-locked-card" style="display: none;">
+            <div class="locked-icon">🔒</div>
+            <div class="locked-text">输入我们的专属暗号，即可开启心情日历 🌈</div>
+            <button class="btn-locked-login" onclick="openLoginModal()">✨ 立即进入</button>
         </div>
     </section>
 
-    <div class="btn-group">
+    <div class="btn-group" id="main-btn-group" style="display: none;">
         <button id="btn-moment" onclick="checkPassword('moment')">✨ 发布动态</button>
         <button id="btn-blindbox" onclick="triggerBlindBox(true)" style="background: linear-gradient(135deg, #e3b0b8, #d4a0a8);">🎲 摇一摇盲盒</button>
     </div>
 
     <section class="timeline-section">
         <h3 class="timeline-title">⏳ 时光足迹</h3>
-        <div id="filter-indicator" class="filter-active-indicator" style="cursor: pointer;" onclick="openFilterModal()">当前已开启筛选 (点击修改)</div>
-        <div class="timeline-track" id="timeline-content">
-            <div class="empty-state">正在加载甜蜜回忆…</div>
+        <div id="timeline-unlocked-content">
+            <div id="filter-indicator" class="filter-active-indicator" style="cursor: pointer;" onclick="openFilterModal()">当前已开启筛选 (点击修改)</div>
+            <div class="timeline-track" id="timeline-content">
+                <div class="empty-state">正在加载甜蜜回忆…</div>
+            </div>
+        </div>
+        <div class="locked-card" id="timeline-locked-card" style="display: none;">
+            <div class="locked-icon">🔒</div>
+            <div class="locked-text">进入我们的专属空间，解锁全部甜蜜回忆时光… ⏳</div>
+            <button class="btn-locked-login" onclick="openLoginModal()">✨ 解锁空间</button>
         </div>
     </section>
 

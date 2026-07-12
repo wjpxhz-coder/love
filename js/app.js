@@ -1,11 +1,15 @@
 window.onload = async function() { 
     initTheme();
     createStarField();
-    fetchMoments(); 
     renderAnniversaries(); 
-    loadMoods(); 
     initPresence();
     setTimeout(initCardGlow, 600);
+
+    // 如果未登录，初始化展示锁定占位卡片
+    if (!localStorage.getItem('lover_identity') && typeof showLockedUI === 'function') {
+        showLockedUI();
+    }
+
     await initAuth();
 };
 // ==========================================

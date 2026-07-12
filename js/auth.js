@@ -120,6 +120,11 @@ async function onLoginSuccess(username, isNewLogin) {
     // 加载 profile
     await loadUserProfile(username);
 
+    // 解锁私密板块 UI 并获取真实数据
+    if (typeof hideLockedUI === 'function') hideLockedUI();
+    if (typeof fetchMoments === 'function') fetchMoments();
+    if (typeof loadMoods === 'function') loadMoods();
+
     // 更新同频共振
     if (presenceChannel) updatePresence();
 
@@ -175,6 +180,17 @@ function doLogout() {
     // 重置头像
     const avatarBtn = document.getElementById('user-avatar-btn');
     avatarBtn.innerHTML = '<div class="avatar-placeholder">🌸</div>';
+
+    // 重新锁定私密板块，并清除当前加载的私密数据，防止残留展示
+    if (typeof showLockedUI === 'function') showLockedUI();
+    const contentDiv = document.getElementById('timeline-content');
+    if (contentDiv) {
+        contentDiv.innerHTML = '<div class="empty-state">正在加载甜蜜回忆…</div>';
+    }
+    const heatmap = document.getElementById('mood-heatmap');
+    if (heatmap) {
+        heatmap.innerHTML = '';
+    }
 }
 
 function toggleUserDropdown() {
@@ -334,3 +350,43 @@ async function verifyCode() {
 document.getElementById('modalInput').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') verifyCode();
 });
+
+// ── 锁定与解锁私密板块 UI 控制 ──
+function showLockedUI() {
+    const moodUnlocked = document.getElementById('mood-unlocked-content');
+    const moodLocked = document.getElementById('mood-locked-card');
+    const mainBtnGroup = document.getElementById('main-btn-group');
+    const timelineUnlocked = document.getElementById('timeline-unlocked-content');
+    const timelineLocked = document.getElementById('timeline-locked-card');
+
+    if (moodUnlocked) moodUnlocked.style.display = 'none';
+    if (moodLocked) moodLocked.style.display = 'flex';
+    if (mainBtnGroup) mainBtnGroup.style.display = 'none';
+    if (timelineUnlocked) timelineUnlocked.style.display = 'none';
+    if (timelineLocked) timelineLocked.style.display = 'flex';
+}
+
+function hideLockedUI() {
+    const moodUnlocked = document.getElementById('mood-unlocked-content');
+    const moodLocked = document.getElementById('mood-locked-card');
+    const mainBtnGroup = document.getElementById('main-btn-group');
+    const timelineUnlocked = document.getElementById('timeline-unlocked-content');
+    const timelineLocked = document.getElementById('timeline-locked-card');
+
+    if (moodUnlocked) {
+        moodUnlocked.style.display = 'block';
+        moodUnlocked.classList.add('fade-in-section');
+    }
+    if (moodLocked) moodLocked.style.display = 'none';
+    
+    if (mainBtnGroup) {
+        mainBtnGroup.style.display = 'flex';
+        mainBtnGroup.classList.add('fade-in-section');
+    }
+    
+    if (timelineUnlocked) {
+        timelineUnlocked.style.display = 'block';
+        timelineUnlocked.classList.add('fade-in-section');
+    }
+    if (timelineLocked) timelineLocked.style.display = 'none';
+}

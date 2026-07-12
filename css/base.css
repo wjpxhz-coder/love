@@ -55,3 +55,83 @@
             max-width: 620px;
             width: 100%;
         }
+
+        /* ── 原始未登录界面锁定卡片样式 ── */
+        .locked-card {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 2px dashed rgba(255, 180, 190, 0.4);
+            border-radius: 24px;
+            padding: 40px 24px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            box-shadow: 0 10px 30px rgba(181, 115, 122, 0.08);
+            margin: 15px 0;
+            transition: all 0.3s ease;
+        }
+
+        [data-theme='dark'] .locked-card {
+            background: rgba(45, 35, 35, 0.45);
+            border-color: rgba(255, 154, 158, 0.2);
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.2);
+        }
+
+        .locked-icon {
+            font-size: 2.8em;
+            animation: lockFloat 3s ease-in-out infinite;
+            filter: drop-shadow(0 4px 10px rgba(212, 107, 122, 0.2));
+            user-select: none;
+        }
+
+        .locked-text {
+            color: var(--text-muted);
+            font-size: 0.95em;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            line-height: 1.5;
+            max-width: 85%;
+        }
+
+        .btn-locked-login {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            color: #fff;
+            border: none;
+            padding: 8px 24px;
+            border-radius: 20px;
+            font-size: 0.88em;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(181, 115, 122, 0.25);
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        .btn-locked-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(181, 115, 122, 0.45);
+        }
+
+        .btn-locked-login:active {
+            transform: translateY(0);
+        }
+
+        @keyframes lockFloat {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-6px) scale(1.05); }
+        }
+
+        /* 隐藏和淡入容器动画 */
+        .fade-in-section {
+            opacity: 0;
+            transform: translateY(10px);
+            animation: fadeInUp 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
+        @keyframes fadeInUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
