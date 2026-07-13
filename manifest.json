@@ -1,25 +1,22 @@
 {
-  "name": "小蛇 ♡ 小奚 甜蜜记",
+  "name": "甜蜜记",
   "short_name": "甜蜜记",
-  "description": "小蛇和小奚的甜蜜纪念空间",
+  "description": "私人纪念空间",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#fdf8f6",
-  "theme_color": "#b5737a",
+  "theme_color": "#8f4654",
   "orientation": "portrait",
   "icons": [
     {
       "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

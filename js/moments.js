@@ -1,26 +1,192 @@
 // --- 发布图文动态 ---
 let momentSelectedFiles = [];
 let momentAudioBlob = null;
+let momentMediaRecorder = null;
+let momentMediaStream = null;
+let momentAudioChunks = [];
+let momentRecordingStartTime = 0;
+let momentRecordingSessionId = 0;
+let momentRecordingShouldDiscard = false;
+let isMomentRecording = false;
+let momentAudioPreviewUrl = null;
+const momentPhotoPreviewUrls = new Set();
+let isMomentSubmitting = false;
+const MAX_MOMENT_TEXT_LENGTH = 2000;
+const MAX_MOMENT_MEDIA_COUNT = 9;
+const MAX_MOMENT_MEDIA_BYTES = 20 * 1024 * 1024;
+const ALLOWED_MOMENT_MEDIA_TYPES = new Set([
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+    'video/mp4', 'video/webm', 'video/quicktime'
+]);
+
+function hasMomentAuthContext() {
+    return typeof currentAuthUser !== 'undefined' && Boolean(currentAuthUser) && Boolean(currentAuthor);
+}
+
+function getMomentAuthEpoch() {
+    return typeof authEpoch === 'number' ? authEpoch : 0;
+}
+
+function isMomentAuthEpochCurrent(epoch) {
+    return hasMomentAuthContext() && getMomentAuthEpoch() === epoch;
+}
+
+function getMomentProfileAvatarUrl(profile) {
+    if (typeof getProfileAvatarUrl === 'function') return getProfileAvatarUrl(profile);
+    return sanitizeMediaUrl(profile && profile.avatar_url);
+}
+
+function getMomentStorageDirectory() {
+    const spaceId = currentUserProfile && String(currentUserProfile.space_id || '');
+    const userId = currentAuthUser && String(currentAuthUser.id || '');
+    const isSafeSegment = value => /^[A-Za-z0-9_-]+$/.test(value);
+    if (!isSafeSegment(spaceId) || !isSafeSegment(userId)) return '';
+    return `${spaceId}/${userId}/moments`;
+}
+
+function getMomentFileExtension(file) {
+    const nameExtension = String(file && file.name || '').split('.').pop().toLowerCase();
+    if (/^[a-z0-9]{1,8}$/.test(nameExtension)) return nameExtension;
+    const typeExtension = String(file && file.type || '').split('/').pop().split(';')[0].toLowerCase();
+    return /^[a-z0-9]{1,8}$/.test(typeExtension) ? typeExtension : 'bin';
+}
+
+async function removeUploadedMomentObjects(paths) {
+    if (!paths.length) return;
+    const { error } = await supabaseClient.storage.from('photos').remove(paths);
+    if (error) console.error('清理未完成的动态媒体失败:', error);
+}
+
+function revokeMomentObjectUrl(url) {
+    if (!url) return;
+    URL.revokeObjectURL(url);
+    momentPhotoPreviewUrls.delete(url);
+}
+
+function clearMomentPhotoPreviews() {
+    momentPhotoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    momentPhotoPreviewUrls.clear();
+    momentSelectedFiles = [];
+
+    const previewContainer = document.getElementById('momentImagePreviewContainer');
+    if (!previewContainer) return;
+    previewContainer.querySelectorAll('.moment-preview-item').forEach(item => item.remove());
+}
+
+function clearMomentAudioPreview() {
+    if (momentAudioPreviewUrl) {
+        URL.revokeObjectURL(momentAudioPreviewUrl);
+        momentAudioPreviewUrl = null;
+    }
+    const player = document.getElementById('momentAudioPlayer');
+    if (player) {
+        player.pause();
+        player.removeAttribute('src');
+        player.load();
+    }
+}
+
+function stopMomentMediaStream() {
+    if (momentMediaStream) {
+        momentMediaStream.getTracks().forEach(track => track.stop());
+        momentMediaStream = null;
+    }
+}
+
+function cancelMomentRecording() {
+    momentRecordingSessionId += 1;
+    momentRecordingShouldDiscard = true;
+    isMomentRecording = false;
+    if (momentMediaRecorder && momentMediaRecorder.state !== 'inactive') {
+        try {
+            momentMediaRecorder.stop();
+        } catch (error) {
+            console.warn('停止录音失败:', error);
+        }
+    }
+    stopMomentMediaStream();
+    momentMediaRecorder = null;
+    momentAudioChunks = [];
+    resetMomentAudioBtn();
+}
+
+function resetMomentComposer(options = {}) {
+    const { clearPhotos = true, clearAudio = true, clearText = true } = options;
+    cancelMomentRecording();
+    if (clearPhotos) clearMomentPhotoPreviews();
+    if (clearAudio) {
+        momentAudioBlob = null;
+        clearMomentAudioPreview();
+    }
+
+    const previewAudio = document.getElementById('momentAudioPreview');
+    const btnAudio = document.getElementById('btn-moment-audio');
+    if (previewAudio) previewAudio.style.display = 'none';
+    if (btnAudio) btnAudio.style.display = 'flex';
+    if (clearText) {
+        const textInput = document.getElementById('momentTextInput');
+        if (textInput) textInput.value = '';
+        const milestone = document.getElementById('momentIsMilestone');
+        if (milestone) milestone.checked = false;
+        const message = document.getElementById('momentModalMsg');
+        if (message) message.textContent = '';
+        const title = document.getElementById('moment-modal-title');
+        if (title) title.textContent = '✨ 发布动态';
+    }
+}
+
+function bindMomentModalLifecycle() {
+    const modal = document.getElementById('momentModal');
+    if (!modal || modal.dataset.lifecycleBound === 'true') return;
+    modal.dataset.lifecycleBound = 'true';
+    modal.addEventListener('cancel', event => {
+        if (isMomentSubmitting) {
+            event.preventDefault();
+            const message = document.getElementById('momentModalMsg');
+            if (message) message.textContent = '正在发布，请稍候…';
+            return;
+        }
+        resetMomentComposer();
+    });
+    modal.addEventListener('close', () => resetMomentComposer());
+    window.addEventListener('pagehide', () => resetMomentComposer());
+}
 
 function openMomentModal() {
     const modal = document.getElementById('momentModal');
     const input = document.getElementById('momentTextInput');
     const previewContainer = document.getElementById('momentImagePreviewContainer');
+    if (!modal || !input || !previewContainer || !hasMomentAuthContext()) return;
+    bindMomentModalLifecycle();
+    resetMomentComposer();
+
     const titleEl = modal.querySelector('.modal-title');
     
     const p = allProfilesCache[currentAuthor] || {};
-    const avatarHtml = p.avatar_url ? `<img src="${p.avatar_url}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.2);" />` : '';
-    if (titleEl) titleEl.innerHTML = `${avatarHtml}✨ 发布动态`;
+    if (titleEl) {
+        titleEl.replaceChildren();
+        const avatarUrl = getMomentProfileAvatarUrl(p);
+        if (avatarUrl) {
+            const avatar = document.createElement('img');
+            avatar.src = avatarUrl;
+            avatar.alt = '';
+            Object.assign(avatar.style, {
+                width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover',
+                verticalAlign: 'middle', marginRight: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
+            });
+            titleEl.appendChild(avatar);
+        }
+        titleEl.appendChild(document.createTextNode('✨ 发布动态'));
+    }
 
     document.getElementById('momentModalMsg').innerText = '';
     input.value = '';
-    momentSelectedFiles = [];
-    
+    const milestoneCheckbox = document.getElementById('momentIsMilestone');
+    if (milestoneCheckbox) milestoneCheckbox.checked = false;
+
     // 重置录音状态与预览
-    momentAudioBlob = null;
     const btnAudio = document.getElementById('btn-moment-audio');
     const previewAudio = document.getElementById('momentAudioPreview');
-    const playerAudio = document.getElementById('momentAudioPlayer');
     if (btnAudio) {
         btnAudio.style.display = 'flex';
         const txt = btnAudio.querySelector('.audio-text');
@@ -31,19 +197,20 @@ function openMomentModal() {
         btnAudio.disabled = false;
     }
     if (previewAudio) previewAudio.style.display = 'none';
-    if (playerAudio) playerAudio.src = '';
-    
-    // 保留添加按钮，移除已有的预览项
-    const addBtn = previewContainer.querySelector('.moment-image-add-btn');
-    previewContainer.innerHTML = '';
-    if (addBtn) previewContainer.appendChild(addBtn);
     
     modal.showModal();
     setTimeout(() => input.focus(), 100);
 }
 
-function closeMomentModal() {
-    document.getElementById('momentModal').close();
+function closeMomentModal(force = false) {
+    const modal = document.getElementById('momentModal');
+    if (isMomentSubmitting && !force) {
+        const message = document.getElementById('momentModalMsg');
+        if (message) message.textContent = '正在发布，请稍候…';
+        return;
+    }
+    resetMomentComposer();
+    if (modal && modal.open) modal.close();
 }
 
 function handleMomentPhotoSelect(event) {
@@ -51,22 +218,47 @@ function handleMomentPhotoSelect(event) {
     if (!files.length) return;
     
     const previewContainer = document.getElementById('momentImagePreviewContainer');
+    if (!previewContainer) return;
     const addBtn = previewContainer.querySelector('.moment-image-add-btn');
-    files.forEach(file => {
+    const availableSlots = Math.max(0, MAX_MOMENT_MEDIA_COUNT - momentSelectedFiles.length - (momentAudioBlob ? 1 : 0));
+    const validFiles = files.filter(file => ALLOWED_MOMENT_MEDIA_TYPES.has(file.type) && file.size <= MAX_MOMENT_MEDIA_BYTES);
+    const acceptedFiles = validFiles.slice(0, availableSlots);
+    if (acceptedFiles.length !== files.length) {
+        const msgEl = document.getElementById('momentModalMsg');
+        if (msgEl) msgEl.textContent = '最多添加 9 个媒体；单个文件不超过 20MB，仅支持常见 JPG/PNG/WebP/GIF、MP4/WebM/MOV。';
+    }
+    acceptedFiles.forEach(file => {
         momentSelectedFiles.push(file);
         const objectUrl = URL.createObjectURL(file);
+        momentPhotoPreviewUrls.add(objectUrl);
         const previewItem = document.createElement('div');
         previewItem.className = 'moment-preview-item';
-        let mediaHtml = '';
+        let media;
         if (file.type.startsWith('video/')) {
-            mediaHtml = `<video src="${objectUrl}" style="width:100%;height:100%;object-fit:cover;" autoplay muted loop playsinline></video>`;
+            media = document.createElement('video');
+            media.autoplay = true;
+            media.muted = true;
+            media.loop = true;
+            media.playsInline = true;
+            Object.assign(media.style, { width: '100%', height: '100%', objectFit: 'cover' });
         } else {
-            mediaHtml = `<img src="${objectUrl}" alt="preview">`;
+            media = document.createElement('img');
+            media.alt = '预览';
         }
-        previewItem.innerHTML = `
-            ${mediaHtml}
-            <div class="remove-btn" onclick="removeMomentPhoto(this, '${file.name}')">×</div>
-        `;
+        media.src = objectUrl;
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-btn';
+        removeBtn.textContent = '×';
+        removeBtn.setAttribute('aria-label', `移除 ${file.name}`);
+        Object.assign(removeBtn.style, { border: '0', padding: '0' });
+        removeBtn.addEventListener('click', () => {
+            const fileIndex = momentSelectedFiles.indexOf(file);
+            if (fileIndex >= 0) momentSelectedFiles.splice(fileIndex, 1);
+            revokeMomentObjectUrl(objectUrl);
+            previewItem.remove();
+        });
+        previewItem.append(media, removeBtn);
         previewContainer.insertBefore(previewItem, addBtn);
     });
     
@@ -74,13 +266,9 @@ function handleMomentPhotoSelect(event) {
     document.getElementById('momentPhotoInput').value = '';
 }
 
-window.removeMomentPhoto = function(btnElement, fileName) {
-    const item = btnElement.parentElement;
-    item.remove();
-    momentSelectedFiles = momentSelectedFiles.filter(f => f.name !== fileName);
-};
-
 async function submitMomentPost() {
+    if (!hasMomentAuthContext() || isMomentSubmitting) return;
+    const requestAuthEpoch = getMomentAuthEpoch();
     const text = document.getElementById('momentTextInput').value.trim();
     const msgEl = document.getElementById('momentModalMsg');
     
@@ -88,34 +276,57 @@ async function submitMomentPost() {
         msgEl.innerText = '写点什么、发张照片或录段声音吧！';
         return;
     }
+    if (text.length > MAX_MOMENT_TEXT_LENGTH) {
+        msgEl.textContent = '正文最多 2000 个字符。';
+        return;
+    }
+    if (momentSelectedFiles.length + (momentAudioBlob ? 1 : 0) > MAX_MOMENT_MEDIA_COUNT
+        || momentSelectedFiles.some(file => !ALLOWED_MOMENT_MEDIA_TYPES.has(file.type) || file.size > MAX_MOMENT_MEDIA_BYTES)
+        || (momentAudioBlob && momentAudioBlob.size > MAX_MOMENT_MEDIA_BYTES)) {
+        msgEl.textContent = '媒体数量、格式或大小不符合要求，请重新选择。';
+        return;
+    }
+
+    const storageDirectory = getMomentStorageDirectory();
+    if (!storageDirectory || typeof createStorageReference !== 'function') {
+        msgEl.innerText = '当前会话缺少空间信息，请重新登录后再试。';
+        return;
+    }
 
     const btn = document.getElementById('btn-submit-moment');
-    const orig = btn.innerHTML;
-    btn.innerHTML = '⏳ 发布中…'; 
+    const orig = btn.textContent;
+    isMomentSubmitting = true;
+    btn.textContent = '⏳ 发布中…';
     btn.disabled = true;
+    const uploadedObjectPaths = [];
+    let databaseCommitted = false;
 
     try {
         let uploadedUrls = [];
         if (momentSelectedFiles.length > 0) {
-            const uploadPromises = momentSelectedFiles.map(async file => {
-                const fileExt = file.name.split('.').pop();
-                const fileName = `${Date.now()}_${Math.random().toString(36).substring(2,9)}.${fileExt}`;
+            for (const file of momentSelectedFiles) {
+                const fileExt = getMomentFileExtension(file);
+                const fileName = `${storageDirectory}/${Date.now()}_${Math.random().toString(36).substring(2,9)}.${fileExt}`;
                 const { error } = await supabaseClient.storage.from('photos').upload(fileName, file, { contentType: file.type, upsert: false });
                 if (error) throw error;
-                const { data } = supabaseClient.storage.from('photos').getPublicUrl(fileName);
-                return data.publicUrl;
-            });
-            uploadedUrls = await Promise.all(uploadPromises);
+                uploadedObjectPaths.push(fileName);
+                uploadedUrls.push(createStorageReference(fileName));
+            }
         }
 
         let audioUrl = null;
         if (momentAudioBlob) {
-            const fileName = `audio_${Date.now()}_${Math.random().toString(36).substring(2,9)}.webm`;
-            const { error: audioUploadError } = await supabaseClient.storage.from('photos').upload(fileName, momentAudioBlob, { contentType: 'audio/webm', upsert: false });
+            const audioType = momentAudioBlob.type || 'audio/webm';
+            const audioMime = audioType.split(';', 1)[0].trim().toLowerCase() || 'audio/webm';
+            const audioExtension = audioMime.includes('ogg') ? 'ogg' : (audioMime.includes('mp4') ? 'm4a' : 'webm');
+            const fileName = `${storageDirectory}/audio_${Date.now()}_${Math.random().toString(36).substring(2,9)}.${audioExtension}`;
+            const { error: audioUploadError } = await supabaseClient.storage.from('photos').upload(fileName, momentAudioBlob, { contentType: audioMime, upsert: false });
             if (audioUploadError) throw audioUploadError;
-            const { data: audioData } = supabaseClient.storage.from('photos').getPublicUrl(fileName);
-            audioUrl = audioData.publicUrl;
+            uploadedObjectPaths.push(fileName);
+            audioUrl = createStorageReference(fileName);
         }
+
+        if (!isMomentAuthEpochCurrent(requestAuthEpoch)) throw new Error('AUTH_CONTEXT_CHANGED');
 
         const chkIsMilestone = document.getElementById('momentIsMilestone');
         const isMilestone = chkIsMilestone ? chkIsMilestone.checked : false;
@@ -128,28 +339,35 @@ async function submitMomentPost() {
         });
 
         const { error: dbError } = await supabaseClient.from('moments')
-            .insert([{ type: 'moment', content: momentContent, author: currentAuthor }]);
+            .insert([{ type: 'moment', content: momentContent }]);
         
         if (dbError) throw dbError;
+        databaseCommitted = true;
+        if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
         
-        closeMomentModal();
+        closeMomentModal(true);
         fetchMoments();
     } catch (err) {
-        msgEl.innerText = '发布失败: ' + err.message;
+        if (!databaseCommitted) await removeUploadedMomentObjects(uploadedObjectPaths);
+        console.error('发布动态失败:', err);
+        if (isMomentAuthEpochCurrent(requestAuthEpoch)) msgEl.textContent = '发布失败，请稍后重试。';
     } finally {
-        btn.innerHTML = orig; 
+        isMomentSubmitting = false;
+        btn.textContent = orig;
         btn.disabled = false;
     }
 }
 
 // --- 录音功能（发布动态弹窗内部整合） ---
 async function toggleMomentRecording() {
-    if (isRecording) {
+    if (!hasMomentAuthContext()) return;
+    if (isMomentRecording) {
         // 停止录音
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
+        if (momentMediaRecorder && momentMediaRecorder.state !== 'inactive') {
+            momentRecordingShouldDiscard = false;
+            momentMediaRecorder.stop();
         }
-        isRecording = false;
+        isMomentRecording = false;
         return;
     }
 
@@ -158,33 +376,65 @@ async function toggleMomentRecording() {
 }
 
 async function executeMomentRecording() {
+    if (momentSelectedFiles.length >= MAX_MOMENT_MEDIA_COUNT) {
+        alert('一条动态最多包含 9 个媒体，请先移除一个文件再录音。');
+        return;
+    }
+    const sessionId = ++momentRecordingSessionId;
+    momentRecordingShouldDiscard = false;
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
+        const modal = document.getElementById('momentModal');
+        if (sessionId !== momentRecordingSessionId || !modal || !modal.open || !hasMomentAuthContext()) {
+            stream.getTracks().forEach(track => track.stop());
+            return;
+        }
+        momentMediaStream = stream;
+        const recorder = new MediaRecorder(stream);
+        const chunks = [];
+        const recorderMimeType = recorder.mimeType || 'audio/webm';
+        const recordingStartedAt = Date.now();
+        momentMediaRecorder = recorder;
+        momentAudioChunks = chunks;
 
-        mediaRecorder.ondataavailable = event => {
-            if (event.data.size > 0) audioChunks.push(event.data);
+        recorder.ondataavailable = event => {
+            if (event.data.size > 0) chunks.push(event.data);
         };
 
-        mediaRecorder.onstop = async () => {
-            const duration = Date.now() - recordingStartTime;
-            stream.getTracks().forEach(track => track.stop()); // 关闭麦克风
+        recorder.onstop = () => {
+            stream.getTracks().forEach(track => track.stop());
+            const isCurrentRecorder = sessionId === momentRecordingSessionId
+                && momentMediaRecorder === recorder;
+            if (!isCurrentRecorder) return;
+
+            const duration = Date.now() - recordingStartedAt;
+            if (momentMediaStream === stream) momentMediaStream = null;
+            isMomentRecording = false;
+            momentMediaRecorder = null;
+            if (momentRecordingShouldDiscard) {
+                momentAudioChunks = [];
+                resetMomentAudioBtn();
+                return;
+            }
             
             const btn = document.getElementById('btn-moment-audio');
             if (duration < 1000) {
                 alert('录音时间太短啦，至少要1秒哦！');
+                momentAudioChunks = [];
                 resetMomentAudioBtn();
                 return;
             }
 
-            momentAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            momentAudioBlob = new Blob(chunks, { type: recorderMimeType });
+            momentAudioChunks = [];
             
             // 展示预览播放器，隐藏录制按钮
             const previewEl = document.getElementById('momentAudioPreview');
             const playerEl = document.getElementById('momentAudioPlayer');
             if (playerEl) {
-                playerEl.src = URL.createObjectURL(momentAudioBlob);
+                clearMomentAudioPreview();
+                momentAudioPreviewUrl = URL.createObjectURL(momentAudioBlob);
+                playerEl.src = momentAudioPreviewUrl;
             }
             if (previewEl) {
                 previewEl.style.display = 'flex';
@@ -195,9 +445,9 @@ async function executeMomentRecording() {
             resetMomentAudioBtn();
         };
 
-        mediaRecorder.start();
-        isRecording = true;
-        recordingStartTime = Date.now();
+        recorder.start();
+        isMomentRecording = true;
+        momentRecordingStartTime = recordingStartedAt;
         
         const btn = document.getElementById('btn-moment-audio');
         if (btn) {
@@ -206,10 +456,13 @@ async function executeMomentRecording() {
             const icon = btn.querySelector('.audio-icon');
             if (icon) icon.innerText = '🔴';
             btn.classList.add('recording-active');
+            btn.setAttribute('aria-pressed', 'true');
         }
     } catch (err) {
+        if (sessionId !== momentRecordingSessionId) return;
         alert('无法访问麦克风，请检查设备权限设置！\n' + err.message);
-        isRecording = false;
+        isMomentRecording = false;
+        stopMomentMediaStream();
         resetMomentAudioBtn();
     }
 }
@@ -222,165 +475,358 @@ function resetMomentAudioBtn() {
         const icon = btn.querySelector('.audio-icon');
         if (icon) icon.innerText = '🎙️';
         btn.classList.remove('recording-active');
+        btn.setAttribute('aria-pressed', 'false');
     }
 }
 
 function deleteRecordedAudio() {
+    cancelMomentRecording();
     momentAudioBlob = null;
     const previewEl = document.getElementById('momentAudioPreview');
     const playerEl = document.getElementById('momentAudioPlayer');
     const btn = document.getElementById('btn-moment-audio');
     
-    if (playerEl) playerEl.src = '';
+    clearMomentAudioPreview();
     if (previewEl) previewEl.style.display = 'none';
     if (btn) btn.style.display = 'flex';
 }
 // --- 时光轴（无限滚动） ---
 let scrollObserver = null;
 
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+function createMomentNode(tagName, className, text) {
+    const element = document.createElement(tagName);
+    if (className) element.className = className;
+    if (text !== undefined) element.textContent = String(text);
+    return element;
 }
 
-function formatCardText(text, momentId) {
-    if (!text) return '';
-    if (text.length <= 80) {
-        return `<div class="card-text">${escapeHtml(text)}</div>`;
+function normalizeMomentId(value) {
+    const id = Number(value);
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+function isVideoMediaUrl(url) {
+    try {
+        const parsed = new URL(url);
+        return /\.(mp4|mov|webm|ogg)$/i.test(parsed.pathname) || parsed.pathname.includes('/video');
+    } catch (error) {
+        return false;
     }
-    const collapsedText = text.substring(0, 80) + '...';
-    return `
-        <div class="card-text-container" id="text-container-${momentId}">
-            <div class="card-text text-collapsed" style="display: block;">${escapeHtml(collapsedText)}</div>
-            <div class="card-text text-expanded" style="display: none;">${escapeHtml(text)}</div>
-            <button class="toggle-text-btn" onclick="toggleTextCollapse(${momentId})">展开</button>
-        </div>
-    `;
 }
 
-function renderMomentCard(item) {
-    const now = Date.now();
-    const dateStr = new Date(item.created_at).toLocaleString('zh-CN', { hour12: false });
-    const canDelete = (now - new Date(item.created_at).getTime()) < 86400000;
-    const deleteBtn = canDelete
-        ? `<button class="delete-btn" onclick="confirmDelete(${item.id})">撤回</button>`
-        : '';
+function createCardTextElement(text, momentId) {
+    const safeText = typeof text === 'string' ? text : String(text || '');
+    if (!safeText) return null;
+    if (safeText.length <= 80) return createMomentNode('div', 'card-text', safeText);
 
-    const authorProfile = allProfilesCache[item.author] || {};
-    const authorEmoji = item.author === '小蛇' ? '🐍' : (item.author === '小奚' ? '🐟' : '');
-    const authorAvatarHtml = authorProfile.avatar_url 
-        ? `<img src="${authorProfile.avatar_url}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" />` 
-        : authorEmoji;
-    const authorDisplayName = authorProfile.nickname || item.author;
-    const authorBadgeClass = item.author === '小蛇' ? 'author-snake' : (item.author === '小奚' ? 'author-xi' : '');
-    
-    const authorBadge = item.author
-        ? `<span class="author-badge ${authorBadgeClass}" onclick="openProfilePage('${item.author}')" style="cursor:pointer;" title="点击查看主页">${authorAvatarHtml} ${authorDisplayName}</span>`
-        : '';
+    const container = createMomentNode('div', 'card-text-container');
+    container.id = `text-container-${momentId}`;
+    const collapsed = createMomentNode('div', 'card-text text-collapsed', `${safeText.slice(0, 80)}...`);
+    collapsed.style.display = 'block';
+    const expanded = createMomentNode('div', 'card-text text-expanded', safeText);
+    expanded.style.display = 'none';
+    const toggle = createMomentNode('button', 'toggle-text-btn', '展开');
+    toggle.type = 'button';
+    toggle.dataset.momentAction = 'toggle-text';
+    toggle.dataset.momentId = String(momentId);
+    container.append(collapsed, expanded, toggle);
+    return container;
+}
 
-    let isMilestone = false;
+function createMomentAudio(rawUrl) {
+    const url = sanitizeMediaUrl(rawUrl);
+    if (!url) return null;
+    const wrapper = createMomentNode('div');
+    wrapper.style.marginTop = '10px';
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.src = url;
+    Object.assign(audio.style, { width: '100%', height: '40px', borderRadius: '20px' });
+    wrapper.appendChild(audio);
+    return wrapper;
+}
+
+function createMomentMedia(rawUrl, className, options = {}) {
+    const url = sanitizeMediaUrl(rawUrl);
+    if (!url) return null;
+    const isVideo = isVideoMediaUrl(url);
+    const media = document.createElement(isVideo ? 'video' : 'img');
+    media.className = className;
+    media.src = url;
+    if (isVideo) {
+        media.playsInline = true;
+        if (options.controls) media.controls = true;
+        if (options.autoplay) {
+            media.autoplay = true;
+            media.muted = true;
+            media.loop = true;
+        }
+    } else {
+        media.alt = '我们的回忆';
+        media.loading = 'lazy';
+    }
+    if (options.lightbox) {
+        media.dataset.momentAction = 'open-lightbox';
+        media.tabIndex = 0;
+        media.setAttribute('role', 'button');
+        media.setAttribute('aria-label', isVideo ? '打开视频预览' : '打开图片预览');
+    }
+    return media;
+}
+
+function createMomentCardElement(item) {
+    const momentId = normalizeMomentId(item && item.id);
+    if (!momentId) return null;
+
+    let parsedMoment = null;
     if (item.type === 'moment') {
         try {
             const parsed = JSON.parse(item.content);
-            isMilestone = parsed.is_milestone || false;
-        } catch (e) {}
-    }
-    const milestoneBadge = isMilestone ? `<span class="milestone-badge-timeline">🏆 大事记</span>` : '';
-
-    let html = `<div class="moment-card ${isMilestone ? 'milestone' : ''}" id="card-${item.id}">
-            <div class="card-header">
-                <div class="card-meta">
-                    <span class="time-text">${dateStr}</span>
-                    ${authorBadge}
-                    ${milestoneBadge}
-                </div>
-                ${deleteBtn}
-            </div>`;
-
-    if (item.type === 'text') {
-        html += formatCardText(item.content, item.id);
-    } else if (item.type === 'photo') {
-        html += `<img class="card-img" src="${item.content}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)">`;
-    } else if (item.type === 'audio') {
-        html += `<div style="margin-top:10px;"><audio controls src="${item.content}" style="width:100%; height: 40px; border-radius: 20px; outline: none;"></audio></div>`;
-    } else if (item.type === 'moment') {
-        try {
-            const data = JSON.parse(item.content);
-            if (data.text) {
-                html += formatCardText(data.text, item.id);
-            }
-            if (data.audio) {
-                html += `<div style="margin-top:10px;"><audio controls src="${data.audio}" style="width:100%; height: 40px; border-radius: 20px; outline: none;"></audio></div>`;
-            }
-            if (data.images && data.images.length > 0) {
-                if (data.images.length === 1) {
-                    const isVideo = data.images[0].match(/\.(mp4|mov|webm|ogg)$/i) || data.images[0].includes('video');
-                    if (isVideo) {
-                        html += `<video class="moment-single-image" src="${data.images[0]}" controls style="width:100%; border-radius:12px; margin-top:10px;"></video>`;
-                    } else {
-                        html += `<img class="moment-single-image" src="${data.images[0]}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)">`;
-                    }
-                } else {
-                    html += `<div class="moment-grid" id="moment-grid-${item.id}">`;
-                    data.images.forEach((imgUrl, idx) => {
-                        let displayStyle = idx >= 4 ? 'style="display:none;"' : '';
-                        let extraClass = idx >= 4 ? 'hidden-image' : '';
-                        const isVideo = imgUrl.match(/\.(mp4|mov|webm|ogg)$/i) || imgUrl.includes('video');
-                        if (isVideo) {
-                            html += `<video class="moment-grid-item ${extraClass}" src="${imgUrl}" ${displayStyle} autoplay muted loop playsinline onclick="openLightbox(this.src)" style="cursor:zoom-in; object-fit:cover;"></video>`;
-                        } else {
-                            html += `<img class="moment-grid-item ${extraClass}" src="${imgUrl}" alt="我们的回忆" loading="lazy" onclick="openLightbox(this.src)" ${displayStyle}>`;
-                        }
-                    });
-                    html += `</div>`;
-                    if (data.images.length > 4) {
-                        let hiddenCount = data.images.length - 4;
-                        html += `<button class="show-all-images-btn" id="show-images-btn-${item.id}" onclick="showAllImages(${item.id})">展开剩余 ${hiddenCount} 张照片 ↓</button>`;
-                    }
-                }
-            }
-        } catch (e) {
-            console.error("解析 moment 失败", e);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) parsedMoment = parsed;
+        } catch (error) {
+            console.warn('忽略格式无效的动态内容:', error);
         }
     }
-    const hasStarred = (typeof starredMomentIds !== 'undefined' && starredMomentIds.has(item.id));
-    html += `
-            <div class="moment-like-bar">
-                <button class="moment-like-btn" id="moment-like-btn-${item.id}" onclick="toggleMomentLike(${item.id})">
-                    <span class="ml-heart">🤍</span>
-                    <span class="ml-count" id="moment-like-count-${item.id}">喜欢</span>
-                </button>
-                <button class="moment-star-btn ${hasStarred ? 'starred' : ''}" id="moment-star-btn-${item.id}" onclick="toggleMomentStar(${item.id})">
-                    ${hasStarred ? '⭐ 已收藏' : '☆ 收藏'}
-                </button>
-                <span class="moment-like-likers" id="moment-like-likers-${item.id}"></span>
-            </div>
-            <button class="comment-toggle-btn" onclick="toggleComments(${item.id})">
-                💬 <span id="comment-count-${item.id}">评论</span>
-            </button>
-            <div class="comment-section" id="comments-${item.id}" style="display:none;">
-                <div class="comment-list" id="comment-list-${item.id}"></div>
-                <button class="comment-write-btn" id="comment-write-btn-${item.id}" onclick="checkPasswordForComment(${item.id})">✏️ 写评论</button>
-                <div class="comment-input-area" id="comment-input-area-${item.id}" style="display:none;">
-                    <div style="display: flex; flex-direction: column; gap: 8px;">
-                        <div id="comment-input-avatar-${item.id}" style="display: flex; align-items: center;"></div>
-                        <textarea class="comment-textarea" id="comment-text-${item.id}" placeholder="写下你的想法…" rows="2" style="margin-top: 0;"></textarea>
-                        <div class="comment-img-previews" id="comment-img-previews-${item.id}"></div>
-                    </div>
-                    <div class="comment-submit-row" style="justify-content: space-between;">
-                        <div style="display:flex; gap:6px; align-items:center;">
-                            <button class="comment-cancel-btn" onclick="cancelCommentInput(${item.id})">取消</button>
-                            <button class="comment-img-upload-btn" onclick="document.getElementById('comment-img-input-${item.id}').click()">🖼️ 图片</button>
-                            <input type="file" id="comment-img-input-${item.id}" accept="image/*" multiple style="display:none;" onchange="handleCommentImgSelect(event, ${item.id})">
-                        </div>
-                        <button class="comment-submit-btn" onclick="submitComment(${item.id})">发送 💌</button>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    return html;
+    const isMilestone = Boolean(parsedMoment && parsedMoment.is_milestone === true);
+    const card = createMomentNode('div', `moment-card${isMilestone ? ' milestone' : ''}`);
+    card.id = `card-${momentId}`;
+
+    const header = createMomentNode('div', 'card-header');
+    const meta = createMomentNode('div', 'card-meta');
+    const createdAt = new Date(item.created_at);
+    const dateText = Number.isNaN(createdAt.getTime())
+        ? ''
+        : createdAt.toLocaleString('zh-CN', { hour12: false });
+    meta.appendChild(createMomentNode('span', 'time-text', dateText));
+
+    const author = typeof item.author === 'string' ? item.author : '';
+    if (author) {
+        const authorProfile = allProfilesCache[author] || {};
+        const authorBadgeClass = author === '小蛇' ? 'author-snake' : (author === '小奚' ? 'author-xi' : '');
+        const authorBadge = createMomentNode('span', `author-badge${authorBadgeClass ? ` ${authorBadgeClass}` : ''}`);
+        authorBadge.dataset.momentAction = 'open-profile';
+        authorBadge.dataset.author = author;
+        authorBadge.tabIndex = 0;
+        authorBadge.setAttribute('role', 'button');
+        authorBadge.title = '点击查看主页';
+        authorBadge.style.cursor = 'pointer';
+        const avatarUrl = getMomentProfileAvatarUrl(authorProfile);
+        if (avatarUrl) {
+            const avatar = document.createElement('img');
+            avatar.src = avatarUrl;
+            avatar.alt = '';
+            Object.assign(avatar.style, {
+                width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover',
+                verticalAlign: 'middle', marginRight: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+            });
+            authorBadge.appendChild(avatar);
+        } else {
+            authorBadge.appendChild(document.createTextNode(author === '小蛇' ? '🐍 ' : (author === '小奚' ? '🐟 ' : '')));
+        }
+        authorBadge.appendChild(document.createTextNode(String(authorProfile.nickname || author)));
+        meta.appendChild(authorBadge);
+    }
+    if (isMilestone) meta.appendChild(createMomentNode('span', 'milestone-badge-timeline', '🏆 大事记'));
+    header.appendChild(meta);
+
+    const canDelete = item.user_id === currentAuthUser?.id
+        && !Number.isNaN(createdAt.getTime())
+        && Date.now() - createdAt.getTime() < 86400000;
+    if (canDelete) {
+        const deleteButton = createMomentNode('button', 'delete-btn', '撤回');
+        deleteButton.type = 'button';
+        deleteButton.dataset.momentAction = 'delete';
+        deleteButton.dataset.momentId = String(momentId);
+        header.appendChild(deleteButton);
+    }
+    card.appendChild(header);
+
+    if (item.type === 'text') {
+        const textElement = createCardTextElement(item.content, momentId);
+        if (textElement) card.appendChild(textElement);
+    } else if (item.type === 'photo') {
+        const media = createMomentMedia(item.content, 'card-img', { lightbox: true });
+        if (media) card.appendChild(media);
+    } else if (item.type === 'audio') {
+        const audio = createMomentAudio(item.content);
+        if (audio) card.appendChild(audio);
+    } else if (parsedMoment) {
+        const textElement = createCardTextElement(parsedMoment.text, momentId);
+        if (textElement) card.appendChild(textElement);
+        const audio = createMomentAudio(parsedMoment.audio);
+        if (audio) card.appendChild(audio);
+
+        const images = Array.isArray(parsedMoment.images)
+            ? parsedMoment.images.map(url => sanitizeMediaUrl(url)).filter(Boolean)
+            : [];
+        if (images.length === 1) {
+            const single = createMomentMedia(images[0], 'moment-single-image', {
+                controls: isVideoMediaUrl(images[0]),
+                lightbox: !isVideoMediaUrl(images[0])
+            });
+            if (single) {
+                if (single.tagName === 'VIDEO') Object.assign(single.style, { width: '100%', borderRadius: '12px', marginTop: '10px' });
+                card.appendChild(single);
+            }
+        } else if (images.length > 1) {
+            const grid = createMomentNode('div', 'moment-grid');
+            grid.id = `moment-grid-${momentId}`;
+            images.forEach((url, index) => {
+                const media = createMomentMedia(url, `moment-grid-item${index >= 4 ? ' hidden-image' : ''}`, {
+                    autoplay: isVideoMediaUrl(url), lightbox: true
+                });
+                if (!media) return;
+                if (index >= 4) media.style.display = 'none';
+                if (media.tagName === 'VIDEO') Object.assign(media.style, { cursor: 'zoom-in', objectFit: 'cover' });
+                grid.appendChild(media);
+            });
+            card.appendChild(grid);
+            if (images.length > 4) {
+                const showAll = createMomentNode('button', 'show-all-images-btn', `展开剩余 ${images.length - 4} 张照片 ↓`);
+                showAll.type = 'button';
+                showAll.id = `show-images-btn-${momentId}`;
+                showAll.dataset.momentAction = 'show-images';
+                showAll.dataset.momentId = String(momentId);
+                card.appendChild(showAll);
+            }
+        }
+    }
+
+    const hasStarred = typeof starredMomentIds !== 'undefined' && starredMomentIds.has(momentId);
+    const likeBar = createMomentNode('div', 'moment-like-bar');
+    const likeButton = createMomentNode('button', 'moment-like-btn');
+    likeButton.type = 'button';
+    likeButton.id = `moment-like-btn-${momentId}`;
+    likeButton.dataset.momentAction = 'toggle-like';
+    likeButton.dataset.momentId = String(momentId);
+    likeButton.append(
+        createMomentNode('span', 'ml-heart', '🤍'),
+        createMomentNode('span', 'ml-count', '喜欢')
+    );
+    likeButton.querySelector('.ml-count').id = `moment-like-count-${momentId}`;
+    const starButton = createMomentNode('button', `moment-star-btn${hasStarred ? ' starred' : ''}`, hasStarred ? '⭐ 已收藏' : '☆ 收藏');
+    starButton.type = 'button';
+    starButton.id = `moment-star-btn-${momentId}`;
+    starButton.dataset.momentAction = 'toggle-star';
+    starButton.dataset.momentId = String(momentId);
+    const likers = createMomentNode('span', 'moment-like-likers');
+    likers.id = `moment-like-likers-${momentId}`;
+    likeBar.append(likeButton, starButton, likers);
+    card.appendChild(likeBar);
+
+    const commentToggle = createMomentNode('button', 'comment-toggle-btn');
+    commentToggle.type = 'button';
+    commentToggle.id = `comment-toggle-${momentId}`;
+    commentToggle.dataset.momentAction = 'toggle-comments';
+    commentToggle.dataset.momentId = String(momentId);
+    commentToggle.setAttribute('aria-controls', `comments-${momentId}`);
+    commentToggle.setAttribute('aria-expanded', 'false');
+    commentToggle.appendChild(document.createTextNode('💬 '));
+    const commentCount = createMomentNode('span', '', '评论');
+    commentCount.id = `comment-count-${momentId}`;
+    commentToggle.appendChild(commentCount);
+    card.appendChild(commentToggle);
+
+    const commentSection = createMomentNode('div', 'comment-section');
+    commentSection.id = `comments-${momentId}`;
+    commentSection.style.display = 'none';
+    commentSection.setAttribute('aria-hidden', 'true');
+    const commentList = createMomentNode('div', 'comment-list');
+    commentList.id = `comment-list-${momentId}`;
+    const writeButton = createMomentNode('button', 'comment-write-btn', '✏️ 写评论');
+    writeButton.type = 'button';
+    writeButton.id = `comment-write-btn-${momentId}`;
+    writeButton.dataset.momentAction = 'write-comment';
+    writeButton.dataset.momentId = String(momentId);
+    commentSection.append(commentList, writeButton);
+
+    const inputArea = createMomentNode('div', 'comment-input-area');
+    inputArea.id = `comment-input-area-${momentId}`;
+    inputArea.style.display = 'none';
+    const inputColumn = createMomentNode('div');
+    Object.assign(inputColumn.style, { display: 'flex', flexDirection: 'column', gap: '8px' });
+    const inputAvatar = createMomentNode('div');
+    inputAvatar.id = `comment-input-avatar-${momentId}`;
+    Object.assign(inputAvatar.style, { display: 'flex', alignItems: 'center' });
+    const textarea = document.createElement('textarea');
+    textarea.className = 'comment-textarea';
+    textarea.id = `comment-text-${momentId}`;
+    textarea.placeholder = '写下你的想法…';
+    textarea.rows = 2;
+    textarea.style.marginTop = '0';
+    const previews = createMomentNode('div', 'comment-img-previews');
+    previews.id = `comment-img-previews-${momentId}`;
+    inputColumn.append(inputAvatar, textarea, previews);
+
+    const submitRow = createMomentNode('div', 'comment-submit-row');
+    submitRow.style.justifyContent = 'space-between';
+    const buttonGroup = createMomentNode('div');
+    Object.assign(buttonGroup.style, { display: 'flex', gap: '6px', alignItems: 'center' });
+    const cancelButton = createMomentNode('button', 'comment-cancel-btn', '取消');
+    cancelButton.type = 'button';
+    cancelButton.dataset.momentAction = 'cancel-comment';
+    cancelButton.dataset.momentId = String(momentId);
+    const imageButton = createMomentNode('button', 'comment-img-upload-btn', '🖼️ 图片');
+    imageButton.type = 'button';
+    imageButton.dataset.momentAction = 'choose-comment-images';
+    imageButton.dataset.momentId = String(momentId);
+    const imageInput = document.createElement('input');
+    imageInput.type = 'file';
+    imageInput.id = `comment-img-input-${momentId}`;
+    imageInput.accept = 'image/*';
+    imageInput.multiple = true;
+    imageInput.style.display = 'none';
+    imageInput.dataset.momentAction = 'comment-images-selected';
+    imageInput.dataset.momentId = String(momentId);
+    buttonGroup.append(cancelButton, imageButton, imageInput);
+    const submitButton = createMomentNode('button', 'comment-submit-btn', '发送 💌');
+    submitButton.type = 'button';
+    submitButton.dataset.momentAction = 'submit-comment';
+    submitButton.dataset.momentId = String(momentId);
+    submitRow.append(buttonGroup, submitButton);
+    inputArea.append(inputColumn, submitRow);
+    commentSection.appendChild(inputArea);
+    card.appendChild(commentSection);
+    return card;
 }
+
+function runMomentAction(actionElement) {
+    const momentId = normalizeMomentId(actionElement.dataset.momentId);
+    const action = actionElement.dataset.momentAction;
+    if (action !== 'open-profile' && action !== 'open-lightbox' && !momentId) return;
+    if (action === 'delete') confirmDelete(momentId);
+    else if (action === 'open-profile' && typeof openProfilePage === 'function') openProfilePage(actionElement.dataset.author || '');
+    else if (action === 'open-lightbox' && typeof openLightbox === 'function') openLightbox(actionElement.currentSrc || actionElement.src);
+    else if (action === 'show-images') showAllImages(momentId);
+    else if (action === 'toggle-text') toggleTextCollapse(momentId);
+    else if (action === 'toggle-like' && typeof toggleMomentLike === 'function') toggleMomentLike(momentId);
+    else if (action === 'toggle-star' && typeof toggleMomentStar === 'function') toggleMomentStar(momentId);
+    else if (action === 'toggle-comments' && typeof toggleComments === 'function') toggleComments(momentId);
+    else if (action === 'write-comment' && typeof checkPasswordForComment === 'function') checkPasswordForComment(momentId);
+    else if (action === 'cancel-comment' && typeof cancelCommentInput === 'function') cancelCommentInput(momentId);
+    else if (action === 'choose-comment-images') document.getElementById(`comment-img-input-${momentId}`)?.click();
+    else if (action === 'submit-comment' && typeof submitComment === 'function') submitComment(momentId);
+}
+
+document.addEventListener('click', event => {
+    const actionElement = event.target.closest('[data-moment-action]');
+    if (actionElement) runMomentAction(actionElement);
+});
+
+document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const actionElement = event.target.closest('[data-moment-action="open-profile"], [data-moment-action="open-lightbox"]');
+    if (!actionElement) return;
+    event.preventDefault();
+    runMomentAction(actionElement);
+});
+
+document.addEventListener('change', event => {
+    const input = event.target.closest('[data-moment-action="comment-images-selected"]');
+    if (!input || typeof handleCommentImgSelect !== 'function') return;
+    const momentId = normalizeMomentId(input.dataset.momentId);
+    if (momentId) handleCommentImgSelect(event, momentId);
+});
 
 window.showAllImages = function(id) {
     const grid = document.getElementById(`moment-grid-${id}`);
@@ -421,7 +867,21 @@ let currentFilters = {
 };
 
 function openFilterModal() {
+    populateFilterYears();
     document.getElementById('filterModal').showModal();
+}
+
+function populateFilterYears() {
+    const select = document.getElementById('filterYear');
+    if (!select) return;
+    const selected = select.value;
+    const firstYear = Number.isFinite(startDate?.getFullYear?.()) ? startDate.getFullYear() : new Date().getFullYear();
+    const lastYear = Math.max(firstYear, new Date().getFullYear());
+    select.replaceChildren(new Option('所有年份', ''));
+    for (let year = firstYear; year <= lastYear; year += 1) {
+        select.appendChild(new Option(`${year}年`, String(year)));
+    }
+    if ([...select.options].some(option => option.value === selected)) select.value = selected;
 }
 
 function closeFilterModal() {
@@ -441,8 +901,15 @@ function clearFilters() {
 }
 
 function applyFilters() {
-    currentFilters.year = document.getElementById('filterYear').value;
-    currentFilters.month = document.getElementById('filterMonth').value;
+    const yearSelect = document.getElementById('filterYear');
+    const monthSelect = document.getElementById('filterMonth');
+    currentFilters.year = yearSelect ? yearSelect.value : '';
+    currentFilters.month = monthSelect ? monthSelect.value : '';
+    // 单独选择月份时明确按当前自然年筛选，避免 UI 显示已筛选但查询并未生效。
+    if (currentFilters.month && !currentFilters.year) {
+        currentFilters.year = String(new Date().getFullYear());
+        if (yearSelect) yearSelect.value = currentFilters.year;
+    }
     currentFilters.authors = [];
     if (document.getElementById('chkAuthorSnake').checked) currentFilters.authors.push('小蛇');
     if (document.getElementById('chkAuthorXi').checked) currentFilters.authors.push('小奚');
@@ -462,7 +929,8 @@ function applyFilters() {
 
 function updateFilterIndicator() {
     const indicator = document.getElementById('filter-indicator');
-    const fab = document.getElementById('fab-filter');
+    const fab = document.getElementById('fab-filter') || document.querySelector('.fab-item-filter');
+    if (!indicator) return;
     let active = false;
     let text = '已开启筛选: ';
     let details = [];
@@ -493,24 +961,49 @@ function updateFilterIndicator() {
     if (active) {
         indicator.innerText = text + details.join(' | ') + ' (点击修改或重置)';
         indicator.classList.add('show');
-        fab.classList.add('active');
+        if (fab) fab.classList.add('active');
     } else {
         indicator.classList.remove('show');
-        fab.classList.remove('active');
+        if (fab) fab.classList.remove('active');
     }
 }
 
+let activeMomentFetchRequest = 0;
+let momentLoadingAuthEpoch = null;
+
 async function fetchMoments(append = false) {
-    if (isLoading) return;
+    const contentDiv = document.getElementById('timeline-content');
+    if (!hasMomentAuthContext()) {
+        if (scrollObserver) scrollObserver.disconnect();
+        if (typeof clearAllCommentImageSelections === 'function') clearAllCommentImageSelections();
+        if (contentDiv) contentDiv.replaceChildren();
+        return;
+    }
+    const requestAuthEpoch = getMomentAuthEpoch();
+    if (append && isLoading && momentLoadingAuthEpoch === requestAuthEpoch) return;
     if (append && !hasMore) return;
 
+    const requestId = ++activeMomentFetchRequest;
     isLoading = true;
-    const contentDiv = document.getElementById('timeline-content');
+    momentLoadingAuthEpoch = requestAuthEpoch;
+    if (!contentDiv) {
+        isLoading = false;
+        momentLoadingAuthEpoch = null;
+        return;
+    }
+
+    const finishRequest = () => {
+        if (requestId === activeMomentFetchRequest) {
+            isLoading = false;
+            momentLoadingAuthEpoch = null;
+        }
+    };
 
     if (!append) {
+        if (typeof clearAllCommentImageSelections === 'function') clearAllCommentImageSelections();
         currentPage = 0;
         hasMore = true;
-        contentDiv.innerHTML = '<div class="empty-state">正在加载甜蜜回忆…</div>';
+        contentDiv.replaceChildren(createMomentNode('div', 'empty-state', '正在加载甜蜜回忆…'));
     }
 
     const from = currentPage * PAGE_SIZE;
@@ -526,15 +1019,9 @@ async function fetchMoments(append = false) {
         query = query.in('author', currentFilters.authors);
     }
     if (currentFilters.types.length > 0) {
-        if (currentFilters.types.includes('audio')) {
-            if (currentFilters.types.length === 1) {
-                // 如果只筛选声音类型，查找旧的 audio 类型，以及带有 audio 属性的 moment 类型
-                query = query.or('type.eq.audio,and(type.eq.moment,content.ilike.%\"audio\"%)');
-            } else {
-                // 如果筛选了多种类型（包括声音），则查找相应的类型集合
-                // 因为 types 里面包含了 'moment' 等其他类型，已经能够拉取出 moment 类型的记录
-                query = query.in('type', currentFilters.types);
-            }
+        if (currentFilters.types.includes('audio') && !currentFilters.types.includes('moment')) {
+            // 录音既可能是旧 audio 行，也可能嵌在新版 moment JSON 中。
+            query = query.or(`type.in.(${currentFilters.types.join(',')}),and(type.eq.moment,content.ilike.%\"audio\"%)`);
         } else {
             query = query.in('type', currentFilters.types);
         }
@@ -554,29 +1041,48 @@ async function fetchMoments(append = false) {
             endMonth = 0;
         }
 
-        // ISO string, assuming server time is UTC or similar, this local date bound is generally fine
-        let startDateStr = new Date(startYear, startMonth, 1).toISOString();
-        let endDateStr = new Date(endYear, endMonth, 1).toISOString();
+        // 日记按北京时间自然月划分，显式使用 +08:00，避免浏览器时区改变边界。
+        const formatMonthStart = (year, monthIndex) =>
+            `${year}-${String(monthIndex + 1).padStart(2, '0')}-01T00:00:00+08:00`;
+        let startDateStr = new Date(formatMonthStart(startYear, startMonth)).toISOString();
+        let endDateStr = new Date(formatMonthStart(endYear, endMonth)).toISOString();
         query = query.gte('created_at', startDateStr).lt('created_at', endDateStr);
     }
 
     const { data, error } = await query;
-
-    isLoading = false;
+    if (requestId !== activeMomentFetchRequest || !isMomentAuthEpochCurrent(requestAuthEpoch)) {
+        finishRequest();
+        return;
+    }
 
     if (error) {
-        if (!append) contentDiv.innerHTML = `<p style="color:#b5737a;text-align:center;">读取数据失败: ${error.message}</p>`;
+        if (!append) {
+            console.error('读取动态失败:', error);
+            const errorText = createMomentNode('p', '', '读取数据失败，请稍后重试。');
+            Object.assign(errorText.style, { color: 'var(--primary)', textAlign: 'center' });
+            contentDiv.replaceChildren(errorText);
+        }
+        finishRequest();
         return;
     }
 
-    if (data.length < PAGE_SIZE) hasMore = false;
-
-    if (!append && data.length === 0) {
-        contentDiv.innerHTML = '<div class="empty-state">还没有记录哦，快去添加第一条回忆吧！</div>';
+    const renderData = typeof hydrateMomentMediaRecord === 'function'
+        ? await Promise.all((data || []).map(item => hydrateMomentMediaRecord(item)))
+        : (data || []);
+    if (requestId !== activeMomentFetchRequest || !isMomentAuthEpochCurrent(requestAuthEpoch)) {
+        finishRequest();
         return;
     }
 
-    if (!append) contentDiv.innerHTML = '';
+    if (renderData.length < PAGE_SIZE) hasMore = false;
+
+    if (!append && renderData.length === 0) {
+        contentDiv.replaceChildren(createMomentNode('div', 'empty-state', '还没有记录哦，快去添加第一条回忆吧！'));
+        finishRequest();
+        return;
+    }
+
+    if (!append) contentDiv.replaceChildren();
 
     // 移除已有的加载指示器
     const existingLoader = contentDiv.querySelector('.load-more-indicator');
@@ -585,31 +1091,44 @@ async function fetchMoments(append = false) {
     // 加载星标收藏数据以供渲染
     if (typeof loadMomentStars === 'function') {
         await loadMomentStars();
+        if (requestId !== activeMomentFetchRequest || !isMomentAuthEpochCurrent(requestAuthEpoch)) {
+            finishRequest();
+            return;
+        }
     }
 
     // 渲染新卡片
-    const html = data.map(item => renderMomentCard(item)).join('');
-    contentDiv.insertAdjacentHTML('beforeend', html);
+    const fragment = document.createDocumentFragment();
+    renderData.forEach(item => {
+        const card = createMomentCardElement(item);
+        if (card) fragment.appendChild(card);
+    });
+    contentDiv.appendChild(fragment);
 
     // 触发滚动入场
     setTimeout(() => initScrollReveal(), 50);
 
     // 添加加载更多提示
     if (hasMore) {
-        contentDiv.insertAdjacentHTML('beforeend',
-            '<div class="load-more-indicator"><span class="load-more-spinner"></span>下滑加载更多回忆…</div>');
+        const loader = createMomentNode('div', 'load-more-indicator');
+        loader.append(
+            createMomentNode('span', 'load-more-spinner'),
+            document.createTextNode('下滑加载更多回忆…')
+        );
+        contentDiv.appendChild(loader);
     }
 
     currentPage++;
 
     // 批量加载评论计数
-    loadCommentCounts(data.map(item => item.id));
+    loadCommentCounts(renderData.map(item => item.id));
 
     // 批量加载动态点赞
-    loadMomentLikes(data.map(item => item.id));
+    loadMomentLikes(renderData.map(item => item.id));
 
     // 设置滚动观察器
     setupScrollObserver();
+    finishRequest();
 }
 
 function setupScrollObserver() {
@@ -626,60 +1145,35 @@ function setupScrollObserver() {
 
 // --- 删除 ---
 function confirmDelete(id) {
-    pendingDeleteId = id;
+    if (!hasMomentAuthContext()) {
+        if (typeof openLoginModal === 'function') openLoginModal();
+        return;
+    }
     if (!confirm('确定要撤回这条回忆吗？此操作不可逆哦 💖')) {
         return;
     }
-    if (currentAuthor) {
-        deleteMoment(id);
-        return;
-    }
-    currentAction = 'delete';
-    const modal = document.getElementById('customModal');
-    const input = document.getElementById('modalInput');
-    const msgEl = document.getElementById('modalMsg');
-    msgEl.innerText = '撤回需要验证暗号 💖';
-    msgEl.style.color = '#b5737a';
-    input.value = '';
-    modal.showModal();
-    setTimeout(() => input.focus(), 100);
+    deleteMoment(id);
 }
 
 async function deleteMoment(id) {
-    // 先查询该动态下的所有评论 ID
-    const { data: comments } = await supabaseClient.from('comments').select('id').eq('moment_id', id);
-
-    const { error } = await supabaseClient.from('moments').delete().eq('id', id);
-    if (error) {
-        alert('撤回失败: ' + error.message);
+    if (!hasMomentAuthContext()) return;
+    const momentId = normalizeMomentId(id);
+    if (!momentId) return;
+    const requestAuthEpoch = getMomentAuthEpoch();
+    const { data: deleted, error } = await supabaseClient.rpc('recall_and_delete_moment', {
+        p_moment_id: momentId
+    });
+    if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
+    if (error || deleted !== true) {
+        console.error('撤回动态失败:', error);
+        alert('撤回失败。仅支持撤回 24 小时内由当前账号发布的动态。');
     } else {
-        // 更新本动态的通知为已撤回状态
-        await supabaseClient.from('notifications')
-            .update({ type: 'recalled', content: '此动态互动已被对方撤回' })
-            .eq('type', 'moment')
-            .eq('related_id', id.toString());
-
-        // 更新本动态下所有评论的通知为已撤回状态
-        if (comments && comments.length > 0) {
-            const commentIds = comments.map(c => c.id.toString());
-            await supabaseClient.from('notifications')
-                .update({ type: 'recalled', content: '此评论互动已被对方撤回' })
-                .eq('type', 'comment')
-                .in('related_id', commentIds);
-
-            // 同时更新该动态下评论的点赞通知为已撤回状态
-            await supabaseClient.from('notifications')
-                .update({ type: 'recalled', content: '此点赞互动已被对方撤回' })
-                .eq('type', 'like')
-                .in('related_id', commentIds);
-        }
-
-        const card = document.getElementById('card-' + id);
+        const card = document.getElementById('card-' + momentId);
         if (card) {
             card.style.transition = 'opacity 0.3s, transform 0.3s';
             card.style.opacity = '0';
             card.style.transform = 'translateX(-16px)';
             setTimeout(() => fetchMoments(), 300);
-        }
+        } else fetchMoments();
     }
 }

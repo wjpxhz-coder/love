@@ -1,178 +1,279 @@
 // ==========================================
-// 5. 回忆盲盒与摇一摇
+// 回忆盲盒与摇一摇
 // ==========================================
 let isBlindBoxLoading = false;
 let shakeLastTime = 0;
-let lastX = 0, lastY = 0, lastZ = 0;
-
+let lastX = 0;
+let lastY = 0;
+let lastZ = 0;
 let deviceMotionRegistered = false;
+let blindBoxGeneration = 0;
+
+function isBlindBoxSnapshotCurrent(epoch, userId, generation) {
+    return generation === blindBoxGeneration && isCurrentAuthSnapshot(epoch, userId);
+}
+
+function setBlindBoxMessage(message) {
+    const content = document.getElementById('blindBoxContent');
+    if (!content) return;
+    content.replaceChildren();
+    const messageElement = document.createElement('div');
+    messageElement.className = 'blind-box-status';
+    messageElement.textContent = message;
+    content.appendChild(messageElement);
+}
+
+async function registerDeviceMotion(epoch, userId, generation) {
+    if (deviceMotionRegistered) return true;
+    if (typeof DeviceMotionEvent === 'undefined') return false;
+
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+        const permission = await DeviceMotionEvent.requestPermission();
+        if (!isBlindBoxSnapshotCurrent(epoch, userId, generation)) return false;
+        if (permission !== 'granted') return false;
+    }
+
+    if (!isBlindBoxSnapshotCurrent(epoch, userId, generation)) return false;
+    window.addEventListener('devicemotion', handleShake, { passive: true });
+    deviceMotionRegistered = true;
+    return true;
+}
+
 async function triggerBlindBox(requestPermission = false) {
+    if (!isAuthenticated()) {
+        openLoginModal();
+        return;
+    }
+
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+    const generation = blindBoxGeneration;
+
     if (requestPermission && !deviceMotionRegistered) {
-        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-            try {
-                const permissionState = await DeviceMotionEvent.requestPermission();
-                if (permissionState === 'granted') {
-                    window.addEventListener('devicemotion', handleShake, false);
-                    deviceMotionRegistered = true;
-                }
-            } catch (e) {
-                console.log('Request device motion failed', e);
-            }
-        } else {
-            // Android / older iOS
-            window.addEventListener('devicemotion', handleShake, false);
-            deviceMotionRegistered = true;
+        try {
+            const registered = await registerDeviceMotion(epoch, userId, generation);
+            if (!isBlindBoxSnapshotCurrent(epoch, userId, generation)) return;
+            if (!registered && typeof showToast === 'function') showToast('未启用摇一摇，仍可点击抽取回忆');
+        } catch (error) {
+            if (!isBlindBoxSnapshotCurrent(epoch, userId, generation)) return;
+            console.error('申请体感权限失败:', error);
+            if (typeof showToast === 'function') showToast('未获得体感权限，仍可点击抽取回忆');
         }
     }
 
+    if (!isBlindBoxSnapshotCurrent(epoch, userId, generation)) return;
     const modal = document.getElementById('blindBoxModal');
-    modal.showModal();
+    if (!modal?.open) modal?.showModal();
     fetchRandomMoment();
 }
 
 function closeBlindBox() {
-    document.getElementById('blindBoxModal').close();
+    const modal = document.getElementById('blindBoxModal');
+    if (modal?.open) modal.close();
+}
+
+function cleanupBlindBox() {
+    blindBoxGeneration += 1;
+    if (deviceMotionRegistered) {
+        window.removeEventListener('devicemotion', handleShake);
+        deviceMotionRegistered = false;
+    }
+    lastX = 0;
+    lastY = 0;
+    lastZ = 0;
+    shakeLastTime = 0;
+    isBlindBoxLoading = false;
+    window.currentBlindBoxMoment = null;
+    closeBlindBox();
 }
 
 function handleShake(event) {
-    let now = Date.now();
-    const acc = event.accelerationIncludingGravity || event.acceleration;
-    if (!acc) return;
+    if (!isAuthenticated()) return;
+    const acceleration = event.accelerationIncludingGravity || event.acceleration;
+    if (!acceleration) return;
 
-    let x = acc.x || 0;
-    let y = acc.y || 0;
-    let z = acc.z || 0;
-    
+    const x = Number(acceleration.x) || 0;
+    const y = Number(acceleration.y) || 0;
+    const z = Number(acceleration.z) || 0;
     if (lastX === 0 && lastY === 0 && lastZ === 0) {
-        lastX = x; lastY = y; lastZ = z;
+        lastX = x;
+        lastY = y;
+        lastZ = z;
         return;
     }
-    
-    let delta = Math.abs(x - lastX) + Math.abs(y - lastY) + Math.abs(z - lastZ);
-    lastX = x; lastY = y; lastZ = z;
 
-    if (delta > 20) {
-        if ((now - shakeLastTime) < 2500) return; // 2.5s 防抖
-        shakeLastTime = now;
-        
-        const modal = document.getElementById('blindBoxModal');
-        if (!modal.open) {
-            modal.showModal();
+    const delta = Math.abs(x - lastX) + Math.abs(y - lastY) + Math.abs(z - lastZ);
+    lastX = x;
+    lastY = y;
+    lastZ = z;
+    const now = Date.now();
+    if (delta <= 20 || now - shakeLastTime < 2500) return;
+
+    shakeLastTime = now;
+    const modal = document.getElementById('blindBoxModal');
+    if (!modal?.open) modal?.showModal();
+    fetchRandomMoment();
+}
+
+async function fetchRandomByTypes(types = null) {
+    let countQuery = supabaseClient
+        .from('moments')
+        .select('id', { count: 'exact', head: true });
+    if (types?.length) countQuery = countQuery.in('type', types);
+    const { count, error: countError } = await countQuery;
+    if (countError) throw countError;
+    if (!count) return null;
+
+    const offset = Math.floor(Math.random() * count);
+    let itemQuery = supabaseClient
+        .from('moments')
+        .select('id, author, type, content, created_at')
+        .order('created_at', { ascending: true })
+        .range(offset, offset);
+    if (types?.length) itemQuery = itemQuery.in('type', types);
+    const { data, error } = await itemQuery.maybeSingle();
+    if (error) throw error;
+    return data || null;
+}
+
+function appendBlindBoxMedia(container, rawUrl, className, options = {}) {
+    const media = typeof createMomentMedia === 'function'
+        ? createMomentMedia(rawUrl, className, options)
+        : null;
+    if (media) container.appendChild(media);
+}
+
+function renderBlindBoxMoment(moment) {
+    const content = document.getElementById('blindBoxContent');
+    if (!content) return;
+    content.replaceChildren();
+
+    if (moment.type === 'photo') {
+        appendBlindBoxMedia(content, moment.content, 'blind-box-img', { lightbox: true });
+    } else if (moment.type === 'audio') {
+        const audio = typeof createMomentAudio === 'function' ? createMomentAudio(moment.content) : null;
+        if (audio) content.appendChild(audio);
+    } else if (moment.type === 'moment') {
+        try {
+            const parsed = JSON.parse(moment.content);
+            if (typeof parsed.text === 'string' && parsed.text.trim()) {
+                const text = document.createElement('div');
+                text.className = 'blind-box-text';
+                text.textContent = parsed.text;
+                content.appendChild(text);
+            }
+            if (parsed.audio) {
+                const audio = typeof createMomentAudio === 'function' ? createMomentAudio(parsed.audio) : null;
+                if (audio) content.appendChild(audio);
+            }
+            if (Array.isArray(parsed.images) && parsed.images.length) {
+                if (parsed.images.length === 1) {
+                    const video = typeof isVideoMediaUrl === 'function' && isVideoMediaUrl(sanitizeMediaUrl(parsed.images[0]));
+                    appendBlindBoxMedia(content, parsed.images[0], 'blind-box-img', {
+                        controls: video,
+                        lightbox: !video
+                    });
+                } else {
+                    const grid = document.createElement('div');
+                    grid.className = 'moment-grid blind-box-grid';
+                    parsed.images.slice(0, 9).forEach(rawUrl => {
+                        const url = sanitizeMediaUrl(rawUrl);
+                        const video = typeof isVideoMediaUrl === 'function' && isVideoMediaUrl(url);
+                        const media = typeof createMomentMedia === 'function'
+                            ? createMomentMedia(url, 'moment-grid-item', { autoplay: video, lightbox: !video })
+                            : null;
+                        if (media) grid.appendChild(media);
+                    });
+                    if (grid.childElementCount) content.appendChild(grid);
+                }
+            }
+        } catch (error) {
+            console.error('解析盲盒图文记录失败:', error);
         }
-        fetchRandomMoment();
+    } else {
+        const text = document.createElement('div');
+        text.className = 'blind-box-text';
+        text.textContent = String(moment.content || '');
+        content.appendChild(text);
     }
+
+    const createdAt = new Date(moment.created_at);
+    const profile = allProfilesCache[moment.author] || {};
+    const meta = document.createElement('div');
+    meta.className = 'blind-box-meta';
+    const dateText = Number.isNaN(createdAt.getTime())
+        ? ''
+        : createdAt.toLocaleString('zh-CN', { hour12: false });
+    meta.textContent = `${dateText} · 来自 ${profile.nickname || moment.author || '成员'}`;
+
+    const prompt = document.createElement('div');
+    prompt.className = 'blind-box-prompt';
+    prompt.textContent = '✨ 还记得这一天吗？';
+
+    const locateButton = document.createElement('button');
+    locateButton.type = 'button';
+    locateButton.className = 'btn-cancel blind-box-locate';
+    locateButton.textContent = '📍 定位到原文';
+    locateButton.addEventListener('click', locateToMoment);
+    content.append(meta, prompt, locateButton);
 }
 
 async function fetchRandomMoment() {
-    if (isBlindBoxLoading) return;
+    if (isBlindBoxLoading || !isAuthenticated()) return;
     isBlindBoxLoading = true;
-    const contentBox = document.getElementById('blindBoxContent');
-    contentBox.innerHTML = '<div style="color:var(--text-muted); font-size: 0.9em;">✨ 魔法生效中，正在抽取回忆...</div>';
-    
-    let rand = Math.random();
-    let preferTypes = rand < 0.7 ? ['photo', 'moment'] : (rand < 0.9 ? ['text'] : ['audio']);
-    
-    let { data: ids, error } = await supabaseClient.from('moments').select('id, type');
-    
-    if (error || !ids || ids.length === 0) {
-        contentBox.innerHTML = '<div style="color:var(--text-muted); font-size: 0.9em;">回忆库空空如也，快去多记录一些吧！</div>';
-        isBlindBoxLoading = false;
-        return;
-    }
+    setBlindBoxMessage('✨ 魔法生效中，正在抽取回忆...');
 
-    let preferredIds = ids.filter(item => preferTypes.includes(item.type));
-    if (preferredIds.length === 0) {
-        preferredIds = ids;
-    }
-
-    const randomIndex = Math.floor(Math.random() * preferredIds.length);
-    const randomId = preferredIds[randomIndex].id;
-
-    const { data: momentData, error: mError } = await supabaseClient.from('moments').select('*').eq('id', randomId).single();
-
-    if (mError || !momentData) {
-        contentBox.innerHTML = '<div style="color:var(--text-muted); font-size: 0.9em;">拉取失败了，再试一次吧...</div>';
-        isBlindBoxLoading = false;
-        return;
-    }
-
-    const dateStr = new Date(momentData.created_at).toLocaleString('zh-CN', { hour12: false });
-    let badge = momentData.author === '小蛇' ? '🐍 小蛇' : '🐟 小奚';
-    
-    let html = '';
-    if (momentData.type === 'photo') {
-        html += `<img class="blind-box-img" src="${momentData.content}" alt="回忆照片">`;
-    } else if (momentData.type === 'audio') {
-        html += `<div style="margin: 20px 0; width: 100%;"><audio controls src="${momentData.content}" style="width:100%; height: 40px; border-radius: 20px;"></audio></div>`;
-    } else if (momentData.type === 'moment') {
-        try {
-            const data = JSON.parse(momentData.content);
-            if (data.text) {
-                html += `<div class="blind-box-text">${escapeHtml(data.text)}</div>`;
-            }
-            if (data.images && data.images.length > 0) {
-                if (data.images.length === 1) {
-                    const isVideo = data.images[0].match(/\.(mp4|mov|webm|ogg)$/i) || data.images[0].includes('video');
-                    if (isVideo) {
-                        html += `<video class="blind-box-img" src="${data.images[0]}" controls style="margin-top:10px; border-radius:12px; width:100%;"></video>`;
-                    } else {
-                        html += `<img class="blind-box-img" src="${data.images[0]}" alt="回忆照片" style="margin-top:10px;">`;
-                    }
-                } else {
-                    html += `<div class="moment-grid" style="margin-top:10px;">`;
-                    data.images.forEach(imgUrl => {
-                        const isVideo = imgUrl.match(/\.(mp4|mov|webm|ogg)$/i) || imgUrl.includes('video');
-                        if (isVideo) {
-                            html += `<video class="moment-grid-item" src="${imgUrl}" autoplay muted loop playsinline style="object-fit:cover;"></video>`;
-                        } else {
-                            html += `<img class="moment-grid-item" src="${imgUrl}" alt="回忆照片">`;
-                        }
-                    });
-                    html += `</div>`;
-                }
-            }
-        } catch (e) {
-            console.error("解析 moment 失败", e);
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+    const generation = blindBoxGeneration;
+    try {
+        const random = Math.random();
+        const preferredTypes = random < 0.7
+            ? ['photo', 'moment']
+            : (random < 0.9 ? ['text'] : ['audio']);
+        const rawMoment = await fetchRandomByTypes(preferredTypes) || await fetchRandomByTypes();
+        const moment = rawMoment && typeof hydrateMomentMediaRecord === 'function'
+            ? await hydrateMomentMediaRecord(rawMoment)
+            : rawMoment;
+        if (!isBlindBoxSnapshotCurrent(epoch, userId, generation)) return;
+        if (!moment) {
+            setBlindBoxMessage('回忆库空空如也，快去多记录一些吧！');
+            return;
         }
-    } else {
-        html += `<div class="blind-box-text">${escapeHtml(momentData.content)}</div>`;
+
+        window.currentBlindBoxMoment = moment;
+        renderBlindBoxMoment(moment);
+    } catch (error) {
+        if (isBlindBoxSnapshotCurrent(epoch, userId, generation)) setBlindBoxMessage('抽取失败了，请稍后再试一次…');
+        console.error('抽取盲盒回忆失败:', error);
+    } finally {
+        if (generation === blindBoxGeneration) isBlindBoxLoading = false;
     }
-    
-    html += `<div class="blind-box-meta">${dateStr} · 来自 ${badge}</div>`;
-    html += `<div class="blind-box-prompt">✨ 还记得这一天吗？</div>`;
-    html += `<button class="btn-cancel" onclick="locateToMoment()" style="margin-top: 15px; font-size: 0.85em; padding: 6px 16px;">📍 定位到原文</button>`;
-    
-    window.currentBlindBoxMoment = momentData;
-    contentBox.innerHTML = html;
-    isBlindBoxLoading = false;
 }
 
-window.locateToMoment = function() {
+function locateToMoment() {
+    const moment = window.currentBlindBoxMoment;
+    const content = document.getElementById('timeline-content');
+    if (!isAuthenticated() || !content || !moment) return;
     closeBlindBox();
-    const contentDiv = document.getElementById('timeline-content');
-    if (!contentDiv || !window.currentBlindBoxMoment) return;
-    
-    contentDiv.innerHTML = `
-        <div style="text-align: center; margin-bottom: 20px;">
-            <button onclick="fetchMoments()" style="padding: 8px 16px; font-size: 0.9em; background: rgba(200, 155, 155, 0.1); color: var(--primary); border: 1px dashed var(--primary-light); border-radius: 20px; box-shadow: none; display: inline-flex; cursor: pointer;">🔙 返回全部回忆</button>
-        </div>
-    `;
-    
-    const html = renderMomentCard(window.currentBlindBoxMoment);
-    contentDiv.insertAdjacentHTML('beforeend', html);
-    
-    hasMore = false; // 移除加载指示器，防止下滑误触
 
-    setTimeout(() => {
-        if (typeof initScrollReveal === 'function') initScrollReveal();
-        if (typeof loadCommentCounts === 'function') loadCommentCounts([window.currentBlindBoxMoment.id]);
-        if (typeof loadMomentLikes === 'function') loadMomentLikes([window.currentBlindBoxMoment.id]);
-        
-        const card = document.getElementById('card-' + window.currentBlindBoxMoment.id);
-        if (card) {
-            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            card.style.boxShadow = '0 0 20px rgba(181, 115, 122, 0.6)';
-            setTimeout(() => card.style.boxShadow = '', 2500);
-        }
-    }, 50);
+    const backWrap = document.createElement('div');
+    backWrap.className = 'blind-box-back';
+    const backButton = document.createElement('button');
+    backButton.type = 'button';
+    backButton.textContent = '🔙 返回全部回忆';
+    backButton.addEventListener('click', () => fetchMoments());
+    backWrap.appendChild(backButton);
+
+    const card = typeof createMomentCardElement === 'function' ? createMomentCardElement(moment) : null;
+    content.replaceChildren(backWrap);
+    if (card) content.appendChild(card);
+    hasMore = false;
+
+    if (typeof initScrollReveal === 'function') initScrollReveal();
+    if (typeof loadCommentCounts === 'function') loadCommentCounts([moment.id]);
+    if (typeof loadMomentLikes === 'function') loadMomentLikes([moment.id]);
+    card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card?.classList.add('blind-box-target');
+    setTimeout(() => card?.classList.remove('blind-box-target'), 2500);
 }

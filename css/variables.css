@@ -1,11 +1,17 @@
                 :root[data-theme="light"], :root {
             color-scheme: light;
-            --primary: #b5737a;
-            --primary-light: #d4a0a8;
-            --gold: #c9a970;
+            --primary: #8f4654;
+            --primary-light: #a45f6b;
+            --gold: #806431;
             --bg: #fdf8f6;
             --text: #4a3535;
-            --text-muted: #a08888;
+            --text-muted: #735d5f;
+            --surface: #fffaf8;
+            --surface-elevated: #fffdfc;
+            --surface-subtle: rgba(255, 250, 248, 0.72);
+            --field-bg: #ffffff;
+            --on-primary: #ffffff;
+            --focus-ring: #713743;
             --card: rgba(255, 252, 250, 0.9);
             --border: rgba(200, 155, 155, 0.22);
             --shadow: rgba(180, 120, 120, 0.13);
@@ -21,14 +27,20 @@
 
         :root[data-theme="dark"] {
             color-scheme: dark;
-            --primary: #e8a0b0;
-            --primary-light: #d07888;
-            --gold: #dcc080;
+            --primary: #f0adbc;
+            --primary-light: #db8fa1;
+            --gold: #e4c780;
             --bg: #0f0a1a;
-            --text: #e8dde8;
-            --text-muted: #a090a8;
+            --text: #f2eaf2;
+            --text-muted: #c0afc4;
+            --surface: #21172f;
+            --surface-elevated: #291d38;
+            --surface-subtle: rgba(52, 38, 67, 0.78);
+            --field-bg: #171020;
+            --on-primary: #24131a;
+            --focus-ring: #ffd0db;
             --card: rgba(30, 20, 50, 0.7);
-            --border: rgba(160, 120, 180, 0.2);
+            --border: rgba(215, 180, 230, 0.34);
             --shadow: rgba(80, 40, 100, 0.3);
             --glass-bg: rgba(30, 20, 50, 0.5);
             --glass-border: rgba(160, 120, 200, 0.15);

@@ -1,11 +1,18 @@
 // ==========================================
 // 一键想你与现代 Toast 提示
 // ==========================================
+function prefersReducedMotion() {
+    return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+}
+
 function showToast(message, duration = 3000) {
     let container = document.getElementById('toast-container');
     if (!container) {
         container = document.createElement('div');
         container.id = 'toast-container';
+        container.setAttribute('role', 'status');
+        container.setAttribute('aria-live', 'polite');
+        container.setAttribute('aria-atomic', 'false');
         container.style.cssText = `
             position: fixed;
             top: 20px;
@@ -25,7 +32,7 @@ function showToast(message, duration = 3000) {
     const toast = document.createElement('div');
     toast.style.cssText = `
         background: rgba(255, 255, 255, 0.9);
-        color: #d46b7a;
+        color: var(--primary);
         padding: 10px 20px;
         border-radius: 20px;
         box-shadow: 0 4px 15px rgba(212, 107, 122, 0.2);
@@ -62,6 +69,7 @@ function showToast(message, duration = 3000) {
 }
 
 function createHeartRain() {
+    if (prefersReducedMotion()) return;
     const heartCount = 24;
     const container = document.createElement('div');
     container.style.cssText = `
@@ -69,7 +77,7 @@ function createHeartRain() {
         top: 0;
         left: 0;
         width: 100vw;
-        height: 100vh;
+        height: 100dvh;
         pointer-events: none;
         z-index: 9998;
         overflow: hidden;
@@ -106,42 +114,65 @@ function createHeartRain() {
     }, 5000);
 }
 
+let isSendingMissYou = false;
+let missYouRequestGeneration = 0;
+
+function resetMissYouRequestState() {
+    missYouRequestGeneration += 1;
+    isSendingMissYou = false;
+}
+
 async function sendMissYou() {
-    if (!currentAuthor) {
+    if (!currentAuthUser?.id || !currentAuthor) {
         showToast('请先登录再发送想念哦~');
         return;
     }
-    
-    // Play local animation immediately
-    createHeartRain();
-    
-    const partner = currentAuthor === '小蛇' ? '小奚' : '小蛇';
-    
-    if (bothOnline) {
-        if (presenceChannel) {
-            presenceChannel.send({
-                type: 'broadcast',
-                event: 'miss_you',
-                payload: { sender: currentAuthor }
-            });
+    if (isSendingMissYou) return;
+    isSendingMissYou = true;
+    const requestGeneration = ++missYouRequestGeneration;
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+    const stillCurrent = () => requestGeneration === missYouRequestGeneration
+        && isCurrentAuthSnapshot(epoch, userId);
+
+    try {
+        // Play local animation immediately
+        createHeartRain();
+
+        const partner = currentAuthor === '小蛇' ? '小奚' : '小蛇';
+
+        const channel = bothOnline ? presenceChannel : null;
+        if (channel) {
+            try {
+                const status = await channel.send({
+                    type: 'broadcast',
+                    event: 'miss_you',
+                    payload: { sender_id: currentAuthUser.id }
+                });
+                if (!stillCurrent()) return;
+                if (status !== 'ok') throw new Error(`Realtime send returned: ${status}`);
+                showToast(`💓 已向 ${partner} 发送了实时心电感应！`);
+                return;
+            } catch (err) {
+                if (!stillCurrent()) return;
+                console.warn('实时想念发送失败，改为保存通知:', err);
+            }
         }
-        showToast(`💓 已向 ${partner} 发送了实时心电感应！`);
-    } else {
+
+        if (!stillCurrent()) return;
         try {
-            const { error } = await supabaseClient
-                .from('notifications')
-                .insert([{
-                    type: 'miss',
-                    actor: currentAuthor,
-                    content: `${currentAuthor} 正在疯狂想你 💓`
-                }]);
-            
+            // The database derives sender, recipient, and space from auth.uid().
+            const { error } = await supabaseClient.rpc('send_miss_you');
+            if (!stillCurrent()) return;
             if (error) throw error;
             showToast(`💓 已将你的思念存入时光信箱，${partner} 上线就能收到！`);
         } catch (err) {
+            if (!stillCurrent()) return;
             console.error('发送想念失败:', err);
             showToast('思念发送失败，请检查网络后再试~');
         }
+    } finally {
+        if (requestGeneration === missYouRequestGeneration) isSendingMissYou = false;
     }
 }
 
@@ -149,7 +180,8 @@ async function sendMissYou() {
 function createStarField() {
     const field = document.getElementById('star-field');
     if (!field) return;
-    field.innerHTML = '';
+    field.replaceChildren();
+    if (prefersReducedMotion()) return;
     const count = window.innerWidth < 768 ? 12 : 25;
     for (let i = 0; i < count; i++) {
         const star = document.createElement('div');
@@ -167,6 +199,10 @@ function createStarField() {
 
 // --- 滚动入场观察器 ---
 function initScrollReveal() {
+    if (prefersReducedMotion()) {
+        document.querySelectorAll('.moment-card:not(.visible)').forEach(card => card.classList.add('visible'));
+        return;
+    }
     const observer = new IntersectionObserver((entries) => {
         entries.forEach((entry, index) => {
             if (entry.isIntersecting) {
@@ -184,6 +220,7 @@ function initScrollReveal() {
 
 // --- 爱心粒子 ---
 function spawnHearts(x, y) {
+    if (prefersReducedMotion()) return;
     const hearts = ['💕', '💖', '💗', '✨', '🌸', '💘'];
     const count = 4 + Math.floor(Math.random() * 3);
     for (let i = 0; i < count; i++) {

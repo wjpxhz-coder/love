@@ -114,6 +114,14 @@
             cursor: pointer;
             transition: background 0.2s;
             white-space: nowrap;
+            width: 100%;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            font-family: inherit;
+            font-weight: 400;
+            letter-spacing: normal;
         }
         .user-dropdown-item:hover {
             background: rgba(212,160,168,0.12);
@@ -144,6 +152,7 @@
             background: transparent;
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
             max-width: none;
             max-height: none;
             overflow: hidden;
@@ -182,6 +191,9 @@
             transform: translateY(24px) scale(0.95);
             transition: all 0.45s cubic-bezier(0.25,0.8,0.25,1);
             text-align: center;
+            max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+            overflow-y: auto;
+            overscroll-behavior: contain;
         }
         
         .login-halo {
@@ -264,7 +276,7 @@
         }
         .login-pw-eye {
             position: absolute;
-            right: 12px;
+            right: 0;
             top: 50%;
             transform: translateY(-50%);
             background: none;
@@ -275,6 +287,11 @@
             padding: 0;
             box-shadow: none;
             line-height: 1;
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
         .login-pw-eye:hover { color: #fff; transform: translateY(-50%) scale(1.15); }
         .login-pw-eye::after { display: none; }
@@ -332,7 +349,7 @@
             background: rgba(255,255,255,0.15);
             border: 1px solid rgba(255,200,215,0.4);
             color: rgba(255,220,235,0.9);
-            width: 30px; height: 30px;
+            width: 36px; height: 36px;
             border-radius: 50%;
             font-size: 0.9em;
             cursor: pointer;

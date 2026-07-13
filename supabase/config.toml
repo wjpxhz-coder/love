@@ -1,0 +1,5 @@
+project_id = "love-diary"
+
+[functions.ai-chat]
+verify_jwt = true
+

@@ -1,9 +1,12 @@
-const CACHE_NAME = 'love-diary-v3.4.0';
-const STATIC_ASSETS = [
-    './',
+const CACHE_PREFIX = 'love-diary-';
+const CACHE_NAME = 'love-diary-v3.5.0';
+
+// Only application-shell files are cached. Private API responses, user media,
+// and third-party resources are deliberately excluded from this allow-list.
+const PRECACHE_ASSETS = [
     './index.html',
     './manifest.json',
-    'https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Nunito:wght@400;500;600&display=swap',
+    './icon-192.png',
     './css/variables.css', './css/base.css', './css/header.css', './css/timer.css', './css/timeline.css',
     './css/dialogs.css', './css/comments.css', './css/ai-panel.css', './css/fab.css', './css/auth.css',
     './css/profile.css', './css/notifications.css', './css/mood.css', './css/anniversary.css',
@@ -14,57 +17,96 @@ const STATIC_ASSETS = [
     './js/notifications.js', './js/effects.js', './js/app.js'
 ];
 
-// 安装 — 缓存静态资源
+const PRECACHE_URLS = PRECACHE_ASSETS.map(asset => new URL(asset, self.registration.scope).href);
+const PRECACHE_BY_PATH = new Map(PRECACHE_URLS.map(url => [new URL(url).pathname, url]));
+const OFFLINE_URL = new URL('./index.html', self.registration.scope).href;
+
+async function precacheShell() {
+    const cache = await caches.open(CACHE_NAME);
+    const results = await Promise.allSettled(PRECACHE_URLS.map(async url => {
+        const request = new Request(url, { cache: 'reload', credentials: 'same-origin' });
+        const response = await fetch(request);
+        if (!response.ok) throw new Error(`${response.status} ${url}`);
+        await cache.put(request, response);
+    }));
+
+    const failed = results.filter(result => result.status === 'rejected');
+    if (failed.length) {
+        console.warn(`Service Worker: ${failed.length} shell asset(s) could not be precached.`, failed);
+    }
+}
+
 self.addEventListener('install', event => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
-    );
-    self.skipWaiting();
+    // Individual optional asset failures no longer make the whole installation fail.
+    event.waitUntil(precacheShell());
 });
 
-// 激活 — 清理旧缓存
 self.addEventListener('activate', event => {
-    event.waitUntil(
-        caches.keys().then(keys =>
-            Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-        )
-    );
-    self.clients.claim();
+    event.waitUntil((async () => {
+        const keys = await caches.keys();
+        await Promise.all(keys
+            .filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+            .map(key => caches.delete(key)));
+        await self.clients.claim();
+    })());
 });
 
-// 请求拦截
+self.addEventListener('message', event => {
+    if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+async function networkFirstNavigation(request) {
+    const cache = await caches.open(CACHE_NAME);
+    try {
+        const response = await fetch(request);
+        if (response.ok && response.type === 'basic') {
+            // Awaiting the write keeps it within the fetch event lifetime.
+            await cache.put(OFFLINE_URL, response.clone());
+            return response;
+        }
+
+        // Static hosts commonly answer deep links with 404. This is a single-page
+        // application, so fall back to the cached shell for in-scope navigations.
+        const fallback = await cache.match(OFFLINE_URL);
+        return fallback || response;
+    } catch (error) {
+        const fallback = await cache.match(OFFLINE_URL);
+        return fallback || new Response('当前处于离线状态，请恢复网络后重试。', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+    }
+}
+
+async function cacheFirstShell(request, canonicalUrl) {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(canonicalUrl);
+    if (cached) return cached;
+
+    const response = await fetch(request);
+    if (response.ok && response.type === 'basic') {
+        // Store one canonical key even if a caller supplied a cache-busting query.
+        await cache.put(canonicalUrl, response.clone());
+    }
+    return response;
+}
+
 self.addEventListener('fetch', event => {
-    const url = new URL(event.request.url);
+    const { request } = event;
+    if (request.method !== 'GET') return;
 
-    // Supabase API 请求不缓存，直接走网络
-    if (url.hostname.includes('supabase')) {
+    const url = new URL(request.url);
+
+    // Cross-origin dependencies and all API/user-content requests stay network-only.
+    if (url.origin !== self.location.origin) return;
+
+    if (request.mode === 'navigate') {
+        event.respondWith(networkFirstNavigation(request));
         return;
     }
 
-    // HTML 页面 — 网络优先，离线时用缓存
-    if (event.request.mode === 'navigate') {
-        event.respondWith(
-            fetch(event.request)
-                .then(response => {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-                    return response;
-                })
-                .catch(() => caches.match(event.request))
-        );
-        return;
-    }
+    const canonicalUrl = PRECACHE_BY_PATH.get(url.pathname);
+    if (!canonicalUrl) return;
 
-    // 静态资源（JS、CSS、字体等）— 网络优先，离线时用缓存
-    event.respondWith(
-        fetch(event.request)
-            .then(response => {
-                if (response.ok) {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-                }
-                return response;
-            })
-            .catch(() => caches.match(event.request))
-    );
+    event.respondWith(cacheFirstShell(request, canonicalUrl));
 });

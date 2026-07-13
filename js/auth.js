@@ -1,228 +1,512 @@
 // ==========================================
-// 4. 交互逻辑
+// 认证与私密 UI 状态
 // ==========================================
-let currentAction = '';
-let currentAuthor = localStorage.getItem('lover_identity') || '';
+
+let currentAuthor = '';
+let currentAuthUser = null;
+let authEpoch = 0;
+let authStateSubscription = null;
+let authHydrationPromise = null;
+let authHydrationUserId = null;
+let authHydrationGeneration = 0;
+let authResetGeneration = 0;
+let authResetPromise = null;
+
 let pendingDeleteId = null;
 let pendingCommentMomentId = null;
 let pendingDeleteCommentId = null;
 let pendingDeleteCommentMomentId = null;
 
+// 只在真实 Supabase Auth 会话建立后填充，不再持久化到 localStorage。
 let allProfilesCache = {};
-try {
-    const cached = localStorage.getItem('all_profiles_cache');
-    if (cached) allProfilesCache = JSON.parse(cached);
-} catch(e) {}
 
-async function fetchAllProfiles() {
-    try {
-        const { data, error } = await supabaseClient.from('profiles').select('*');
-        if (!error && data) {
-            data.forEach(p => { allProfilesCache[p.username] = p; });
-            localStorage.setItem('all_profiles_cache', JSON.stringify(allProfilesCache));
-        }
-    } catch(e) {}
+function isAuthenticated() {
+    return Boolean(currentAuthUser && currentAuthor);
 }
 
-// ==========================================
-// 新登录系统
-// ==========================================
+async function fetchAllProfiles() {
+    if (!currentAuthUser) return;
 
-async function initAuth() {
-    // 预加载所有用户资料
-    fetchAllProfiles();
-    // 确保 profiles 表存在（通过 upsert 触发）
-    await ensureProfilesTable();
+    const epoch = authEpoch;
+    try {
+        const { data, error } = await supabaseClient
+            .from('profiles')
+            .select('user_id, space_id, username, nickname, bio, avatar_url, avatar_path, updated_at');
 
-    const saved = localStorage.getItem('lover_identity');
-    if (saved && VALID_USERS.includes(saved)) {
-        currentAuthor = saved;
-        await onLoginSuccess(currentAuthor, false);
+        if (error) throw error;
+        if (typeof hydrateProfileAvatar === 'function') {
+            await Promise.all((data || []).map(profile => hydrateProfileAvatar(profile)));
+        }
+        if (epoch !== authEpoch || !currentAuthUser) return;
+
+        allProfilesCache = {};
+        (data || []).forEach(profile => {
+            if (profile.username) allProfilesCache[profile.username] = profile;
+        });
+    } catch (error) {
+        console.error('加载成员资料失败:', error);
     }
 }
 
-async function ensureProfilesTable() {
-    // 尝试查询 profiles 表，如果不存在则通过 SQL 创建
-    const { error } = await supabaseClient.from('profiles').select('username').limit(1);
-    if (error && error.code === '42P01') {
-        // 表不存在，需要在 Supabase 中创建
-        console.log('profiles 表不存在，请在 Supabase 控制台执行建表 SQL');
+async function resolveAuthenticatedProfile(user) {
+    const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('user_id, space_id, username, nickname, bio, avatar_url, avatar_path, updated_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+    if (error) throw error;
+    if (!data || !data.username) {
+        throw new Error('当前 Auth 用户尚未绑定情侣空间资料');
+    }
+    if (typeof hydrateProfileAvatar === 'function') await hydrateProfileAvatar(data);
+    return data;
+}
+
+async function establishAuthenticatedUser(user, isNewLogin = false) {
+    if (!user) return;
+
+    if (authHydrationPromise && authHydrationUserId === user.id) {
+        return authHydrationPromise;
+    }
+    if (currentAuthUser?.id === user.id && currentAuthor && !isNewLogin) return;
+
+    authResetGeneration += 1;
+    authEpoch += 1;
+    const epoch = authEpoch;
+    const hydrationGeneration = ++authHydrationGeneration;
+    currentAuthUser = user;
+    authHydrationUserId = user.id;
+
+    const hydrationPromise = (async () => {
+        try {
+            const profile = await resolveAuthenticatedProfile(user);
+            if (epoch !== authEpoch || currentAuthUser?.id !== user.id) return;
+
+            currentAuthor = profile.username;
+            currentUserProfile = profile;
+            allProfilesCache = { [profile.username]: profile };
+            await fetchAllProfiles();
+            if (epoch !== authEpoch) return;
+
+            await onLoginSuccess(currentAuthor, isNewLogin);
+        } catch (error) {
+            if (epoch !== authEpoch || currentAuthUser?.id !== user.id) return;
+            if (currentAuthor) {
+                console.error('登录后界面初始化失败:', error);
+                if (typeof showToast === 'function') {
+                    showToast('账号已登录，但部分内容加载失败，请刷新后重试。', 5000);
+                }
+                return;
+            }
+            console.error('认证用户资料初始化失败:', error);
+            const errorElement = document.getElementById('login-error');
+            const message = '账号已登录，但尚未绑定情侣空间资料。请先完成数据库 Auth 迁移。';
+            if (errorElement) errorElement.textContent = message;
+            if (typeof showToast === 'function') showToast(message, 5000);
+            await supabaseClient.auth.signOut({ scope: 'local' });
+            await resetAuthenticatedUI();
+        } finally {
+            if (authHydrationGeneration === hydrationGeneration) {
+                authHydrationPromise = null;
+                authHydrationUserId = null;
+            }
+        }
+    })();
+
+    authHydrationPromise = hydrationPromise;
+    return authHydrationPromise;
+}
+
+async function initAuth() {
+    showLockedUI();
+    localStorage.removeItem('lover_identity');
+    localStorage.removeItem('all_profiles_cache');
+
+    if (!supabaseClient) {
+        const message = '登录服务未加载。请检查网络连接后刷新页面；离线时仍可打开应用外壳，但私密内容保持锁定。';
+        const errorElement = document.getElementById('login-error');
+        if (errorElement) errorElement.textContent = message;
+        document.getElementById('login-trigger-btn')?.setAttribute('title', message);
+        console.warn(message);
+        return;
+    }
+
+    const { data, error } = await supabaseClient.auth.getUser();
+    if (error) {
+        const sessionMissing = error.name === 'AuthSessionMissingError'
+            || /session missing/i.test(error.message || '');
+        if (!sessionMissing) console.error('读取登录会话失败:', error);
+    } else if (data?.user) {
+        await establishAuthenticatedUser(data.user, false);
+    }
+
+    if (!authStateSubscription) {
+        const { data: listener } = supabaseClient.auth.onAuthStateChange((event, session) => {
+            // 避免在 Supabase auth 回调内部同步发起新的 Supabase 请求。
+            setTimeout(() => {
+                if (event === 'SIGNED_OUT' || !session?.user) {
+                    resetAuthenticatedUI();
+                    return;
+                }
+                if (['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
+                    establishAuthenticatedUser(session.user, event === 'SIGNED_IN');
+                }
+            }, 0);
+        });
+        authStateSubscription = listener?.subscription || null;
     }
 }
 
 function openLoginModal() {
-    const overlay = document.getElementById('login-overlay');
-    document.getElementById('login-username').value = '';
-    document.getElementById('login-password').value = '';
-    document.getElementById('login-error').innerText = '';
-    overlay.showModal();
+    const dialog = document.getElementById('login-overlay');
+    const emailInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
+    const errorElement = document.getElementById('login-error');
+
+    if (!dialog || dialog.open) return;
+    if (emailInput) emailInput.value = '';
+    if (passwordInput) passwordInput.value = '';
+    if (errorElement) errorElement.textContent = '';
+    dialog.showModal();
     startLoginCanvas();
-    setTimeout(() => document.getElementById('login-username').focus(), 200);
+    setTimeout(() => emailInput?.focus(), 100);
 }
 
 function closeLoginModal() {
-    document.getElementById('login-overlay').close();
+    const dialog = document.getElementById('login-overlay');
+    if (dialog?.open) dialog.close();
     stopLoginCanvas();
 }
 
 function toggleLoginPwEye() {
-    const pw = document.getElementById('login-password');
-    const eye = document.getElementById('login-pw-eye');
-    if (pw.type === 'password') {
-        pw.type = 'text';
-        eye.textContent = '🙈';
-    } else {
-        pw.type = 'password';
-        eye.textContent = '👁';
-    }
+    const passwordInput = document.getElementById('login-password');
+    const button = document.getElementById('login-pw-eye');
+    if (!passwordInput || !button) return;
+
+    const showing = passwordInput.type === 'text';
+    passwordInput.type = showing ? 'password' : 'text';
+    button.textContent = showing ? '👁' : '🙈';
+    button.setAttribute('aria-label', showing ? '显示密码' : '隐藏密码');
+    button.setAttribute('aria-pressed', String(!showing));
 }
 
 async function doLogin() {
-    const username = document.getElementById('login-username').value.trim();
-    const password = document.getElementById('login-password').value;
-    const errEl = document.getElementById('login-error');
-    const btn = document.getElementById('login-btn');
+    const email = document.getElementById('login-username')?.value.trim() || '';
+    const password = document.getElementById('login-password')?.value || '';
+    const errorElement = document.getElementById('login-error');
+    const button = document.getElementById('login-btn');
 
-    if (!username) { errEl.innerText = '请输入账号 💕'; return; }
-    if (!password) { errEl.innerText = '请输入密码 🔐'; return; }
-    if (!VALID_USERS.includes(username)) { errEl.innerText = '账号不存在，请输入「小蛇」或「小奚」'; return; }
-
-    const { data: isValid, error } = await supabaseClient.rpc('verify_login', {
-        p_username: username,
-        p_password: password
-    });
-
-    if (error || !isValid) { 
-        errEl.innerText = '密码不对哦，再想想~ 💭'; 
-        return; 
+    if (!supabaseClient) {
+        if (errorElement) errorElement.textContent = '登录服务未加载，请联网后刷新页面。';
+        return;
     }
 
-    errEl.innerText = '';
-    btn.innerHTML = '💖 登录中…';
-    btn.disabled = true;
+    if (!email) {
+        if (errorElement) errorElement.textContent = '请输入登录邮箱';
+        return;
+    }
+    if (!password) {
+        if (errorElement) errorElement.textContent = '请输入密码';
+        return;
+    }
 
-    currentAuthor = username;
-    localStorage.setItem('lover_identity', username);
+    const originalText = button?.textContent || '进入我们的世界';
+    if (button) {
+        button.textContent = '登录中…';
+        button.disabled = true;
+    }
+    if (errorElement) errorElement.textContent = '';
 
-    await onLoginSuccess(username, true);
-    btn.innerHTML = '✨ 进入我们的世界';
-    btn.disabled = false;
-    closeLoginModal();
+    try {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error || !data?.user) throw error || new Error('未返回登录用户');
+
+        await establishAuthenticatedUser(data.user, true);
+        if (isAuthenticated()) closeLoginModal();
+    } catch (error) {
+        console.error('登录失败:', error);
+        if (errorElement) errorElement.textContent = '登录失败，请检查邮箱、密码和网络后重试。';
+    } finally {
+        if (button) {
+            button.textContent = originalText;
+            button.disabled = false;
+        }
+    }
 }
 
 async function onLoginSuccess(username, isNewLogin) {
-    // 更新 UI：隐藏登录按钮，显示头像按钮
-    document.getElementById('login-trigger-btn').style.display = 'none';
-    const avatarBtn = document.getElementById('user-avatar-btn');
-    avatarBtn.style.display = 'flex';
-    document.getElementById('user-name-label').textContent = `@${username}`;
+    document.getElementById('login-trigger-btn')?.style.setProperty('display', 'none');
+    const avatarButton = document.getElementById('user-avatar-btn');
+    if (avatarButton) avatarButton.style.display = 'flex';
+    const nameLabel = document.getElementById('user-name-label');
+    if (nameLabel) nameLabel.textContent = `@${username}`;
 
-    // 加载 profile
-    await loadUserProfile(username);
+    if (!currentUserProfile && typeof loadUserProfile === 'function') {
+        await loadUserProfile(username);
+    } else if (typeof updateAvatarButton === 'function') {
+        updateAvatarButton();
+    }
 
-    // 解锁私密板块 UI 并获取真实数据
-    if (typeof hideLockedUI === 'function') hideLockedUI();
-    if (typeof fetchMoments === 'function') fetchMoments();
-    if (typeof loadMoods === 'function') loadMoods();
+    hideLockedUI();
 
-    // 更新同频共振
-    if (presenceChannel) updatePresence();
+    if (typeof initPresence === 'function') await initPresence();
 
-    // 加载通知
-    setTimeout(loadNotifications, 500);
+    const loaders = [];
+    if (typeof fetchMoments === 'function') loaders.push(fetchMoments());
+    if (typeof loadMoods === 'function') loaders.push(loadMoods());
+    if (typeof loadNotifications === 'function') loaders.push(loadNotifications());
+    await Promise.allSettled(loaders);
 
-    if (isNewLogin) {
-        // 登录成功爱心动画
+    if (isNewLogin && typeof spawnHearts === 'function') {
         spawnHearts(window.innerWidth / 2, window.innerHeight / 2);
     }
 
-    // 自动检测版本更新，并在 1.2 秒后展示，防止视觉冲突
+    // 保留原更新日志体验，但明确绕过 HTTP/Service Worker 缓存。
     setTimeout(async () => {
+        if (!isAuthenticated()) return;
         try {
-            const res = await fetch('./sw.js?t=' + Date.now());
-            if (!res.ok) return;
-            const text = await res.text();
-            const match = text.match(/const\s+CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
-            if (match && match[1]) {
-                const currentCacheVersion = match[1]; // 例如 'love-diary-v3.3.0'
-                const lastSeen = localStorage.getItem('last_seen_version');
-                
-                // 如果本地已记录过版本，且与当前的 SW 缓存名称不一致，说明发生了更新！
-                if (lastSeen && lastSeen !== currentCacheVersion) {
-                    // 兼容判断：去除 'love-diary-' 前缀后比对，确保 config.js 中的 APP_VERSION 与 SW 中的 CACHE_NAME 匹配
-                    const useConfigLog = (typeof APP_VERSION !== 'undefined' && 
-                        (currentCacheVersion === APP_VERSION || 
-                         currentCacheVersion.replace('love-diary-', '') === APP_VERSION.replace('love-diary-', '')));
-                    if (typeof showVersionModal === 'function') {
-                        showVersionModal(currentCacheVersion, useConfigLog);
-                    }
-                } else if (!lastSeen) {
-                    // 第一次进入网站，做个初始化记录，不频繁弹窗打扰用户
-                    localStorage.setItem('last_seen_version', currentCacheVersion);
-                }
+            const response = await fetch('./sw.js', { cache: 'no-store' });
+            if (!response.ok) return;
+            const source = await response.text();
+            const match = source.match(/const\s+CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
+            if (!match?.[1]) return;
+
+            const currentCacheVersion = match[1];
+            const lastSeen = localStorage.getItem('last_seen_version');
+            if (lastSeen && lastSeen !== currentCacheVersion && typeof showVersionModal === 'function') {
+                const normalized = currentCacheVersion.replace('love-diary-', '');
+                const useConfigLog = typeof APP_VERSION !== 'undefined'
+                    && normalized === APP_VERSION.replace('love-diary-', '');
+                showVersionModal(currentCacheVersion, useConfigLog);
+            } else if (!lastSeen) {
+                localStorage.setItem('last_seen_version', currentCacheVersion);
             }
-        } catch (e) {
-            console.error('自动检测更新失败:', e);
+        } catch (error) {
+            console.error('自动检测更新失败:', error);
         }
     }, 1200);
 }
 
-function doLogout() {
-    hideUserDropdown();
-    currentAuthor = '';
-    currentUserProfile = null;
-    localStorage.removeItem('lover_identity');
-    if (typeof processedMissIds !== 'undefined') {
-        processedMissIds.clear();
+function clearUserLocalState() {
+    const keysToRemove = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (!key) continue;
+        if (
+            key === 'lover_identity'
+            || key === 'all_profiles_cache'
+            || key.startsWith('profile_')
+            || key.startsWith('starred_moments_local_')
+        ) {
+            keysToRemove.push(key);
+        }
     }
-    document.getElementById('login-trigger-btn').style.display = 'flex';
-    document.getElementById('user-avatar-btn').style.display = 'none';
-    // 重置头像
-    const avatarBtn = document.getElementById('user-avatar-btn');
-    avatarBtn.innerHTML = '<div class="avatar-placeholder">🌸</div>';
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+}
 
-    // 重新锁定私密板块，并清除当前加载的私密数据，防止残留展示
-    if (typeof showLockedUI === 'function') showLockedUI();
-    const contentDiv = document.getElementById('timeline-content');
-    if (contentDiv) {
-        contentDiv.innerHTML = '<div class="empty-state">正在加载甜蜜回忆…</div>';
+function scrubPrivateDom() {
+    if (typeof stopProfileParticles === 'function') stopProfileParticles();
+    if (typeof closeLightbox === 'function') closeLightbox();
+
+    const profileAvatar = document.getElementById('profile-avatar-wrap');
+    if (profileAvatar) {
+        profileAvatar.replaceChildren();
+        const placeholder = document.createElement('div');
+        placeholder.className = 'profile-avatar-placeholder';
+        placeholder.textContent = '🌸';
+        profileAvatar.appendChild(placeholder);
     }
-    const heatmap = document.getElementById('mood-heatmap');
-    if (heatmap) {
-        heatmap.innerHTML = '';
+    const editAvatar = document.getElementById('edit-avatar-circle');
+    if (editAvatar) {
+        editAvatar.replaceChildren();
+        const placeholder = document.createElement('span');
+        placeholder.className = 'avatar-ph';
+        placeholder.setAttribute('aria-hidden', 'true');
+        placeholder.textContent = '🌸';
+        editAvatar.appendChild(placeholder);
+    }
+
+    const textDefaults = {
+        'profile-topbar-title': '我的主页',
+        'profile-nickname': '',
+        'profile-username': '',
+        'profile-bio': '',
+        'stat-posts': '0',
+        'stat-photos': '0',
+        'edit-msg': '',
+        'momentModalMsg': '',
+        'moodModalMsg': ''
+    };
+    Object.entries(textDefaults).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    });
+
+    ['edit-nickname', 'edit-bio', 'momentTextInput', 'moodNote', 'aiChatInput'].forEach(id => {
+        const field = document.getElementById(id);
+        if (field) field.value = '';
+    });
+    const avatarInput = document.getElementById('avatar-file-input');
+    if (avatarInput) avatarInput.value = '';
+    const momentInput = document.getElementById('momentPhotoInput');
+    if (momentInput) momentInput.value = '';
+    const milestoneCheckbox = document.getElementById('momentIsMilestone');
+    if (milestoneCheckbox) milestoneCheckbox.checked = false;
+    const aiConsent = document.getElementById('ai-service-consent');
+    if (aiConsent) aiConsent.checked = false;
+
+    const momentTitle = document.getElementById('moment-modal-title');
+    if (momentTitle) momentTitle.textContent = '✨ 发布动态';
+    if (typeof selectedMoodScore !== 'undefined') selectedMoodScore = 0;
+    document.querySelectorAll('.mood-emoji-btn').forEach(button => {
+        button.classList.remove('selected');
+        button.setAttribute('aria-pressed', 'false');
+    });
+
+    ['milestonesContent', 'blindBoxContent', 'aiContentArea', 'aiChatMessages'].forEach(id => {
+        document.getElementById(id)?.replaceChildren();
+    });
+}
+
+async function resetAuthenticatedUI() {
+    if (authResetPromise && !currentAuthUser) return authResetPromise;
+
+    const resetGeneration = ++authResetGeneration;
+    authHydrationGeneration += 1;
+    authHydrationPromise = null;
+    authHydrationUserId = null;
+    authEpoch += 1;
+    currentAuthor = '';
+    currentAuthUser = null;
+    currentUserProfile = null;
+    allProfilesCache = {};
+    pendingDeleteId = null;
+    pendingCommentMomentId = null;
+    pendingDeleteCommentId = null;
+    pendingDeleteCommentMomentId = null;
+
+    clearUserLocalState();
+    if (typeof clearSignedMediaCache === 'function') clearSignedMediaCache();
+    if (typeof resetNotificationState === 'function') resetNotificationState();
+    else if (typeof processedMissIds !== 'undefined') processedMissIds.clear();
+    const presenceCleanup = typeof cleanupPresence === 'function'
+        ? cleanupPresence()
+        : Promise.resolve();
+    if (typeof resetMomentComposer === 'function') resetMomentComposer();
+    if (typeof clearAllCommentImageSelections === 'function') clearAllCommentImageSelections();
+    if (typeof commentLoadRequests !== 'undefined') commentLoadRequests.clear();
+    if (typeof clearPendingAvatar === 'function') clearPendingAvatar();
+    if (typeof clearPrivateFeatureState === 'function') clearPrivateFeatureState();
+    if (typeof resetMissYouRequestState === 'function') resetMissYouRequestState();
+    scrubPrivateDom();
+
+    window.currentBlindBoxMoment = null;
+    if (typeof chatHistory !== 'undefined') chatHistory.length = 0;
+
+    hideUserDropdown();
+    document.getElementById('login-trigger-btn')?.style.setProperty('display', 'flex');
+    document.getElementById('user-avatar-btn')?.style.setProperty('display', 'none');
+
+    const avatarButton = document.getElementById('user-avatar-btn');
+    if (avatarButton) {
+        avatarButton.replaceChildren();
+        const placeholder = document.createElement('div');
+        placeholder.className = 'avatar-placeholder';
+        placeholder.textContent = '🌸';
+        avatarButton.appendChild(placeholder);
+    }
+
+    const timeline = document.getElementById('timeline-content');
+    if (timeline) {
+        timeline.replaceChildren();
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = '登录后查看甜蜜回忆';
+        timeline.appendChild(empty);
+    }
+    document.getElementById('mood-heatmap')?.replaceChildren();
+
+    const notificationList = document.getElementById('notification-list');
+    if (notificationList) {
+        notificationList.replaceChildren();
+        const empty = document.createElement('li');
+        empty.className = 'notification-empty';
+        empty.textContent = '暂无通知';
+        notificationList.appendChild(empty);
+    }
+    document.getElementById('notification-badge')?.classList.remove('show');
+    document.getElementById('notification-panel')?.classList.remove('show');
+    document.getElementById('profile-page')?.classList.remove('show');
+    document.getElementById('edit-profile-page')?.classList.remove('show');
+
+    document.querySelectorAll('dialog[open]').forEach(dialog => {
+        if (dialog.id !== 'login-overlay') dialog.close();
+    });
+    showLockedUI();
+
+    const resetPromise = (async () => {
+        await presenceCleanup;
+        // All private DOM was cleared synchronously above. The generation check
+        // prevents this retired reset task from doing future work after re-login.
+        if (resetGeneration !== authResetGeneration || currentAuthUser) return;
+    })();
+    authResetPromise = resetPromise;
+    try {
+        await resetPromise;
+    } finally {
+        if (authResetPromise === resetPromise) authResetPromise = null;
+    }
+}
+
+async function doLogout() {
+    try {
+        await supabaseClient.auth.signOut({ scope: 'local' });
+    } catch (error) {
+        console.error('退出登录失败:', error);
+    } finally {
+        await resetAuthenticatedUI();
     }
 }
 
 function toggleUserDropdown() {
-    const dd = document.getElementById('user-dropdown');
-    dd.classList.toggle('show');
+    if (!isAuthenticated()) return;
+    const dropdown = document.getElementById('user-dropdown');
+    if (!dropdown) return;
+    const showing = dropdown.classList.toggle('show');
+    document.getElementById('user-avatar-btn')?.setAttribute('aria-expanded', String(showing));
 }
 
 function hideUserDropdown() {
-    document.getElementById('user-dropdown').classList.remove('show');
+    document.getElementById('user-dropdown')?.classList.remove('show');
+    document.getElementById('user-avatar-btn')?.setAttribute('aria-expanded', 'false');
 }
 
-// 点击外部关闭下拉
-document.addEventListener('click', (e) => {
-    const dd = document.getElementById('user-dropdown');
-    const avatarBtn = document.getElementById('user-avatar-btn');
-    if (dd && dd.classList.contains('show') && !dd.contains(e.target) && !avatarBtn.contains(e.target)) {
-        dd.classList.remove('show');
+document.addEventListener('click', event => {
+    const dropdown = document.getElementById('user-dropdown');
+    const avatarButton = document.getElementById('user-avatar-btn');
+    if (dropdown?.classList.contains('show') && avatarButton
+        && !dropdown.contains(event.target) && !avatarButton.contains(event.target)) {
+        hideUserDropdown();
     }
 });
 
-// ── 登录弹窗花瓣 Canvas ──
+// ── 登录弹窗粒子 ──
 let loginCanvasAnim = null;
 
 function startLoginCanvas() {
+    stopLoginCanvas();
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
     const canvas = document.getElementById('login-canvas');
-    const ctx = canvas.getContext('2d');
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return;
+
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-
     const petals = [];
-    const hearts = ['💖','💗','💕','✨','🌸','💝','🌹'];
-    for (let i = 0; i < (window.innerWidth < 768 ? 10 : 20); i++) {
+    const hearts = ['💖', '💗', '💕', '✨', '🌸', '💝', '🌹'];
+    for (let index = 0; index < (window.innerWidth < 768 ? 10 : 20); index += 1) {
         petals.push({
             x: Math.random() * canvas.width,
             y: Math.random() * canvas.height,
@@ -238,155 +522,98 @@ function startLoginCanvas() {
         });
     }
 
-    let running = true;
-    loginCanvasAnim = { running };
-
-    function animate() {
-        if (!loginCanvasAnim.running) return;
-        if (isCanvasScrolling) {
-            requestAnimationFrame(animate);
-            return;
+    loginCanvasAnim = { running: true, requestId: null };
+    const animate = () => {
+        if (!loginCanvasAnim?.running) return;
+        if (!isCanvasScrolling) {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            petals.forEach(petal => {
+                petal.sway += petal.swaySpeed;
+                petal.x += petal.speedX + Math.sin(petal.sway) * 0.8;
+                petal.y += petal.speedY;
+                petal.rot += petal.rotSpeed;
+                if (petal.y > canvas.height + 30) {
+                    petal.y = -30;
+                    petal.x = Math.random() * canvas.width;
+                }
+                context.save();
+                context.translate(petal.x, petal.y);
+                context.rotate(petal.rot);
+                context.globalAlpha = petal.alpha;
+                context.font = `${petal.size}px serif`;
+                context.textAlign = 'center';
+                context.textBaseline = 'middle';
+                context.fillText(petal.emoji, 0, 0);
+                context.restore();
+            });
         }
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        petals.forEach(p => {
-            p.sway += p.swaySpeed;
-            p.x += p.speedX + Math.sin(p.sway) * 0.8;
-            p.y += p.speedY;
-            p.rot += p.rotSpeed;
-            if (p.y > canvas.height + 30) {
-                p.y = -30;
-                p.x = Math.random() * canvas.width;
-            }
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            ctx.rotate(p.rot);
-            ctx.globalAlpha = p.alpha;
-            ctx.font = p.size + 'px serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(p.emoji, 0, 0);
-            ctx.restore();
-        });
-        requestAnimationFrame(animate);
-    }
+        if (loginCanvasAnim) loginCanvasAnim.requestId = requestAnimationFrame(animate);
+    };
     animate();
 }
 
 function stopLoginCanvas() {
-    if (loginCanvasAnim) loginCanvasAnim.running = false;
+    if (!loginCanvasAnim) return;
+    loginCanvasAnim.running = false;
+    if (loginCanvasAnim.requestId) cancelAnimationFrame(loginCanvasAnim.requestId);
+    loginCanvasAnim = null;
 }
 
-// 登录弹窗键盘事件
-document.getElementById('login-password') && document.getElementById('login-password').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') doLogin();
-});
-document.getElementById('login-username') && document.getElementById('login-username').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') document.getElementById('login-password').focus();
-});
-
-// ==========================================
-// 旧版密码弹窗（兼容保留，已登录时直通）
-// ==========================================
+// ── 受保护动作 ──
 function checkPassword(actionType) {
-    // 已登录则直接执行对应动作
-    if (currentAuthor) {
-        currentAction = actionType;
-        executeAction(actionType);
+    if (!isAuthenticated()) {
+        openLoginModal();
         return;
     }
-    // 未登录则弹出登录弹窗
-    openLoginModal();
+    executeAction(actionType);
 }
 
 function executeAction(actionType) {
-    if (actionType === 'moment') {
-        openMomentModal();
-    } else if (actionType === 'delete') {
-        deleteMoment(pendingDeleteId);
-    } else if (actionType === 'mood') {
-        openMoodModal();
-    } else if (actionType === 'comment') {
-        showCommentInput(pendingCommentMomentId);
-    } else if (actionType === 'delete_comment') {
-        deleteComment(pendingDeleteCommentId, pendingDeleteCommentMomentId);
-    }
+    if (!isAuthenticated()) return;
+    if (actionType === 'moment') openMomentModal();
+    else if (actionType === 'delete') deleteMoment(pendingDeleteId);
+    else if (actionType === 'mood') openMoodModal();
+    else if (actionType === 'comment') showCommentInput(pendingCommentMomentId);
+    else if (actionType === 'delete_comment') deleteComment(pendingDeleteCommentId, pendingDeleteCommentMomentId);
 }
 
-function closeModal() {
-    document.getElementById('customModal').close();
-}
-
-async function verifyCode() {
-    const inputVal = document.getElementById('modalInput').value;
-    const msgEl = document.getElementById('modalMsg');
-
-    let matched = null;
-    for (const u of VALID_USERS) {
-        const { data } = await supabaseClient.rpc('verify_login', { p_username: u, p_password: inputVal });
-        if (data) { matched = u; break; }
-    }
-
-    if (matched) {
-        currentAuthor = matched;
-        localStorage.setItem('lover_identity', currentAuthor);
-        if (presenceChannel) updatePresence();
-        onLoginSuccess(currentAuthor, false);
-
-        msgEl.style.color = '#7ab87a';
-        msgEl.innerText = `暗号正确，${currentAuthor} 💖`;
-        setTimeout(() => {
-            closeModal();
-            executeAction(currentAction);
-        }, 500);
-    } else if (inputVal.trim() === '') {
-        msgEl.style.color = '#b5737a';
-        msgEl.innerText = '暗号不能为空哦！';
-    } else {
-        msgEl.style.color = '#b5737a';
-        msgEl.innerText = '暗号不对哦，是不是别人在偷看？😎';
-    }
-}
-
-document.getElementById('modalInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') verifyCode();
-});
-
-// ── 锁定与解锁私密板块 UI 控制 ──
 function showLockedUI() {
-    const moodUnlocked = document.getElementById('mood-unlocked-content');
-    const moodLocked = document.getElementById('mood-locked-card');
-    const mainBtnGroup = document.getElementById('main-btn-group');
-    const timelineUnlocked = document.getElementById('timeline-unlocked-content');
-    const timelineLocked = document.getElementById('timeline-locked-card');
-
-    if (moodUnlocked) moodUnlocked.style.display = 'none';
-    if (moodLocked) moodLocked.style.display = 'flex';
-    if (mainBtnGroup) mainBtnGroup.style.display = 'none';
-    if (timelineUnlocked) timelineUnlocked.style.display = 'none';
-    if (timelineLocked) timelineLocked.style.display = 'flex';
+    document.getElementById('mood-unlocked-content')?.style.setProperty('display', 'none');
+    document.getElementById('mood-locked-card')?.style.setProperty('display', 'flex');
+    document.getElementById('main-btn-group')?.style.setProperty('display', 'none');
+    document.getElementById('timeline-unlocked-content')?.style.setProperty('display', 'none');
+    document.getElementById('timeline-locked-card')?.style.setProperty('display', 'flex');
+    document.getElementById('fab-container')?.style.setProperty('display', 'none');
 }
 
 function hideLockedUI() {
-    const moodUnlocked = document.getElementById('mood-unlocked-content');
-    const moodLocked = document.getElementById('mood-locked-card');
-    const mainBtnGroup = document.getElementById('main-btn-group');
-    const timelineUnlocked = document.getElementById('timeline-unlocked-content');
-    const timelineLocked = document.getElementById('timeline-locked-card');
+    const moodContent = document.getElementById('mood-unlocked-content');
+    const mainButtons = document.getElementById('main-btn-group');
+    const timelineContent = document.getElementById('timeline-unlocked-content');
 
-    if (moodUnlocked) {
-        moodUnlocked.style.display = 'block';
-        moodUnlocked.classList.add('fade-in-section');
+    if (moodContent) {
+        moodContent.style.display = 'block';
+        moodContent.classList.add('fade-in-section');
     }
-    if (moodLocked) moodLocked.style.display = 'none';
-    
-    if (mainBtnGroup) {
-        mainBtnGroup.style.display = 'flex';
-        mainBtnGroup.classList.add('fade-in-section');
+    document.getElementById('mood-locked-card')?.style.setProperty('display', 'none');
+    if (mainButtons) {
+        mainButtons.style.display = 'flex';
+        mainButtons.classList.add('fade-in-section');
     }
-    
-    if (timelineUnlocked) {
-        timelineUnlocked.style.display = 'block';
-        timelineUnlocked.classList.add('fade-in-section');
+    if (timelineContent) {
+        timelineContent.style.display = 'block';
+        timelineContent.classList.add('fade-in-section');
     }
-    if (timelineLocked) timelineLocked.style.display = 'none';
+    document.getElementById('timeline-locked-card')?.style.setProperty('display', 'none');
+    document.getElementById('fab-container')?.style.setProperty('display', 'flex');
 }
+
+document.getElementById('login-password')?.addEventListener('keydown', event => {
+    if (event.key === 'Enter') doLogin();
+});
+document.getElementById('login-username')?.addEventListener('keydown', event => {
+    if (event.key === 'Enter') document.getElementById('login-password')?.focus();
+});
+const loginDialog = document.getElementById('login-overlay');
+loginDialog?.addEventListener('cancel', stopLoginCanvas);
+loginDialog?.addEventListener('close', stopLoginCanvas);
