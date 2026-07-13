@@ -10,7 +10,7 @@
         button {
             font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
             background: linear-gradient(135deg, var(--primary-light), var(--primary));
-            color: #fff;
+            color: var(--on-primary);
             border: none;
             padding: 13px 26px;
             border-radius: 40px;
@@ -206,6 +206,9 @@
             justify-content: center;
             cursor: pointer;
             transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+            padding: 0;
+            box-shadow: none;
+            letter-spacing: normal;
         }
         .moment-image-add-btn:hover {
             background: rgba(255, 255, 255, 0.9);

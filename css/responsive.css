@@ -6,4 +6,126 @@
             .timeline-section { padding: 24px 16px; }
             .timeline-track { padding-left: 22px; }
             button { padding: 12px 20px; font-size: 0.88em; }
+
+            .modal-box {
+                padding: 24px 20px;
+                max-width: calc(100vw - 2rem);
+                max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+                overflow-y: auto;
+            }
+
+            .version-modal-box { overflow-y: auto; }
+            .modal-btns { flex-wrap: wrap; }
+            .modal-btns button { min-height: 44px; }
+
+            :is(.modal-input, .filter-select, .filter-keyword, .ai-chat-input, .login-input, .edit-input, .comment-textarea) {
+                font-size: 16px;
+            }
+
+            .ai-chat-box {
+                width: 100%;
+                height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+                max-height: none;
+            }
+        }
+
+        body {
+            padding-top: calc(30px + env(safe-area-inset-top));
+            padding-right: calc(16px + env(safe-area-inset-right));
+            padding-bottom: calc(60px + env(safe-area-inset-bottom));
+            padding-left: calc(16px + env(safe-area-inset-left));
+        }
+
+        .theme-toggle {
+            top: calc(16px + env(safe-area-inset-top));
+            right: calc(16px + env(safe-area-inset-right));
+        }
+
+        .notification-bell {
+            top: calc(16px + env(safe-area-inset-top));
+            right: calc(68px + env(safe-area-inset-right));
+        }
+
+        .login-trigger-btn,
+        .user-avatar-btn {
+            top: calc(16px + env(safe-area-inset-top));
+            right: calc(120px + env(safe-area-inset-right));
+        }
+
+        .notification-panel { right: calc(16px + env(safe-area-inset-right)); }
+        .user-dropdown { right: calc(112px + env(safe-area-inset-right)); }
+        .fab-container {
+            right: calc(20px + env(safe-area-inset-right));
+            bottom: calc(30px + env(safe-area-inset-bottom));
+        }
+
+        :is(.theme-toggle, .notification-bell, .login-trigger-btn, .user-avatar-btn) {
+            width: 44px;
+            height: 44px;
+        }
+
+        :is(.ai-refresh-btn, .ai-chat-close-btn, .login-close-btn, .btn-locked-login) {
+            min-width: 44px;
+            min-height: 44px;
+        }
+
+        :where(button, a, input, textarea, select, [tabindex]):focus-visible {
+            outline: 3px solid var(--focus-ring) !important;
+            outline-offset: 3px;
+        }
+
+        [data-theme='dark'] dialog.native-dialog::backdrop {
+            background: rgba(8, 5, 15, 0.7);
+        }
+
+        [data-theme='dark'] :where(.modal-box, .ai-chat-box, #blindBoxModal .modal-box) {
+            background: var(--surface-elevated);
+            color: var(--text);
+            border-color: var(--border);
+        }
+
+        [data-theme='dark'] #blindBoxModal .modal-box {
+            background: var(--surface-elevated);
+            border-color: var(--border);
+        }
+
+        [data-theme='dark'] option {
+            background: var(--field-bg);
+            color: var(--text);
+        }
+
+        [data-theme='dark'] :where(.modal-input, .filter-select, .filter-keyword, .ai-chat-input, .edit-input, .comment-textarea),
+        [data-theme='dark'] #momentTextInput {
+            background: var(--field-bg) !important;
+            color: var(--text);
+            border-color: var(--border);
+        }
+
+        [data-theme='dark'] :where(.ai-content-area, .ai-chat-input-row, .chat-msg.ai, .blind-box-text) {
+            background: var(--surface-subtle);
+            color: var(--text);
+        }
+
+        [data-theme='dark'] :where(input, textarea)::placeholder {
+            color: var(--text-muted);
+            opacity: 1;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto !important; }
+
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+            }
+
+            #sakura-canvas,
+            #sakura-canvas-foreground,
+            #star-field,
+            .login-canvas,
+            .profile-particles-canvas {
+                display: none !important;
+            }
         }

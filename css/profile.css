@@ -271,6 +271,10 @@
             cursor: pointer;
             position: relative;
             transition: opacity 0.2s;
+            padding: 0;
+            background: transparent;
+            display: block;
+            letter-spacing: normal;
         }
         .edit-avatar-circle:hover { opacity: 0.82; }
         .edit-avatar-circle img {

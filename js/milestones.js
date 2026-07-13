@@ -3,96 +3,117 @@
 // ==========================================
 let starredMomentIds = new Set();
 let currentMilestoneTab = 'list'; // 'list' 或 'gallery'
+let milestoneRenderRequestId = 0;
+
+function hasMilestoneAuthContext() {
+    return typeof currentAuthUser !== 'undefined' && Boolean(currentAuthUser) && Boolean(currentAuthor);
+}
+
+function getMilestoneAuthEpoch() {
+    return typeof authEpoch === 'number' ? authEpoch : 0;
+}
+
+function isMilestoneAuthEpochCurrent(epoch) {
+    return hasMilestoneAuthContext() && getMilestoneAuthEpoch() === epoch;
+}
+
+function getMilestoneTrustedMediaUrl(value) {
+    return typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(value) : '';
+}
+
+function setMilestoneStatus(container, text, color = 'var(--text-muted)', padding = '30px') {
+    const status = document.createElement('div');
+    status.textContent = text;
+    Object.assign(status.style, { textAlign: 'center', padding, color });
+    container.replaceChildren(status);
+}
 
 async function loadMomentStars() {
-    if (!currentAuthor) return;
+    if (!hasMilestoneAuthContext()) {
+        starredMomentIds.clear();
+        return;
+    }
+    const requestAuthEpoch = getMilestoneAuthEpoch();
     try {
         const { data, error } = await supabaseClient
             .from('moment_stars')
             .select('moment_id')
-            .eq('author', currentAuthor);
-        
-        if (error) {
-            // 表不存在或报错，降级读取本地缓存
-            loadMomentStarsFromLocal();
-            return;
-        }
-        
+            .eq('user_id', currentAuthUser.id);
+
+        if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
+        if (error) throw error;
+
         starredMomentIds.clear();
-        (data || []).forEach(item => starredMomentIds.add(Number(item.moment_id)));
-        // 同步到本地做 Fallback 备份
-        localStorage.setItem('starred_moments_local_' + currentAuthor, JSON.stringify(Array.from(starredMomentIds)));
-    } catch (e) {
-        loadMomentStarsFromLocal();
+        (data || []).forEach(item => {
+            const id = Number(item.moment_id);
+            if (Number.isSafeInteger(id) && id > 0) starredMomentIds.add(id);
+        });
+    } catch (error) {
+        if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
+        starredMomentIds.clear();
+        console.error('加载收藏失败:', error);
+        if (typeof showToast === 'function') showToast('收藏加载失败，请稍后重试');
     }
 }
 
-function loadMomentStarsFromLocal() {
-    starredMomentIds.clear();
-    try {
-        const cached = localStorage.getItem('starred_moments_local_' + currentAuthor);
-        if (cached) {
-            const arr = JSON.parse(cached);
-            arr.forEach(id => starredMomentIds.add(Number(id)));
-        }
-    } catch (e) {
-        console.error('加载本地收藏失败:', e);
+function setMomentStarButtonState(button, isStarred) {
+    if (button) {
+        button.classList.toggle('starred', isStarred);
+        button.textContent = isStarred ? '⭐ 已收藏' : '☆ 收藏';
+    }
+}
+
+function showMomentStarError() {
+    if (typeof showToast === 'function') {
+        showToast('收藏操作失败，请稍后重试');
+    } else {
+        alert('收藏操作失败，请稍后重试。');
     }
 }
 
 async function toggleMomentStar(momentId) {
-    if (!currentAuthor) {
+    if (!hasMilestoneAuthContext()) {
         openLoginModal();
         return;
     }
+    const requestAuthEpoch = getMilestoneAuthEpoch();
     momentId = Number(momentId);
+    if (!Number.isSafeInteger(momentId) || momentId <= 0) return;
     const hasStarred = starredMomentIds.has(momentId);
-    
-    // 立即反馈 UI 状态
     const btn = document.getElementById(`moment-star-btn-${momentId}`);
-    if (btn) {
-        btn.classList.toggle('starred', !hasStarred);
-        btn.innerHTML = !hasStarred ? '⭐ 已收藏' : '☆ 收藏';
-    }
+    setMomentStarButtonState(btn, !hasStarred);
 
     try {
         let error = null;
         if (hasStarred) {
-            const { error: err } = await supabaseClient
+            const result = await supabaseClient
                 .from('moment_stars')
                 .delete()
                 .eq('moment_id', momentId)
-                .eq('author', currentAuthor);
-            error = err;
+                .eq('user_id', currentAuthUser.id);
+            error = result.error;
         } else {
-            const { error: err } = await supabaseClient
+            const result = await supabaseClient
                 .from('moment_stars')
-                .insert([{ moment_id: momentId, author: currentAuthor }]);
-            error = err;
-            // 收藏时在按钮中心点爆发粉红爱心雨，仪式感拉满
-            if (btn && !hasStarred) {
-                const rect = btn.getBoundingClientRect();
-                if (typeof spawnHearts === 'function') {
-                    spawnHearts(rect.left + rect.width / 2, rect.top);
-                }
-            }
+                .insert([{ moment_id: momentId }]);
+            error = result.error;
         }
 
-        if (error) {
-            console.warn('Supabase moment_stars 表查询失败，降级使用本地存储:', error);
-            toggleLocalStar(momentId, hasStarred);
-        } else {
-            // 数据库操作成功，同步本地状态
-            if (hasStarred) {
-                starredMomentIds.delete(momentId);
-            } else {
-                starredMomentIds.add(momentId);
-            }
-            localStorage.setItem('starred_moments_local_' + currentAuthor, JSON.stringify(Array.from(starredMomentIds)));
+        if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
+        if (error) throw error;
+
+        if (hasStarred) starredMomentIds.delete(momentId);
+        else starredMomentIds.add(momentId);
+
+        if (!hasStarred && btn && typeof spawnHearts === 'function') {
+            const rect = btn.getBoundingClientRect();
+            spawnHearts(rect.left + rect.width / 2, rect.top);
         }
-    } catch (e) {
-        console.warn('星标操作异常，降级本地存储:', e);
-        toggleLocalStar(momentId, hasStarred);
+    } catch (error) {
+        if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
+        setMomentStarButtonState(btn, hasStarred);
+        console.error('收藏操作失败:', error);
+        showMomentStarError();
     }
     
     // 如果大事记弹窗当前打开，刷新大事记展示
@@ -102,19 +123,10 @@ async function toggleMomentStar(momentId) {
     }
 }
 
-function toggleLocalStar(momentId, hasStarred) {
-    if (hasStarred) {
-        starredMomentIds.delete(momentId);
-    } else {
-        starredMomentIds.add(momentId);
-    }
-    localStorage.setItem('starred_moments_local_' + currentAuthor, JSON.stringify(Array.from(starredMomentIds)));
-}
-
 // ── 大事记面板控制与渲染 ──
 
 function openMilestonesModal() {
-    if (!currentAuthor) {
+    if (!hasMilestoneAuthContext()) {
         openLoginModal();
         return;
     }
@@ -146,22 +158,30 @@ function switchMilestoneTab(tabName) {
 async function renderMilestonesContent() {
     const contentContainer = document.getElementById('milestonesContent');
     if (!contentContainer) return;
-    
-    contentContainer.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">正在加载大事记... ✨</div>';
+    if (!hasMilestoneAuthContext()) {
+        contentContainer.replaceChildren();
+        return;
+    }
+    const requestAuthEpoch = getMilestoneAuthEpoch();
+    const requestId = ++milestoneRenderRequestId;
+    setMilestoneStatus(contentContainer, '正在加载大事记... ✨');
     
     // 同步加载星标状态
     await loadMomentStars();
+    if (requestId !== milestoneRenderRequestId || !isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
 
     try {
         const { data, error } = await supabaseClient
             .from('moments')
             .select('*')
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(500);
             
         if (error) throw error;
-        
+        if (requestId !== milestoneRenderRequestId || !isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
+
         // 筛选：(1) JSON中标记为 is_milestone === true  (2) 用户点击了收藏⭐
-        const items = (data || []).filter(item => {
+        const selectedItems = (data || []).filter(item => {
             let isMilestone = false;
             try {
                 const parsed = JSON.parse(item.content);
@@ -171,15 +191,20 @@ async function renderMilestonesContent() {
             const isStarred = starredMomentIds.has(item.id);
             return isMilestone || isStarred;
         });
+        const items = typeof hydrateMomentMediaRecord === 'function'
+            ? await Promise.all(selectedItems.map(item => hydrateMomentMediaRecord(item)))
+            : selectedItems;
+        if (requestId !== milestoneRenderRequestId || !isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
 
         if (items.length === 0) {
-            contentContainer.innerHTML = `
-                <div style="text-align:center; padding:50px 20px; color:var(--text-muted); font-size:0.92em; line-height: 1.6;">
-                    🌱 还没有大事记或收藏哦~<br>
-                    快去发布时勾选“重大事件”，<br>
-                    或在时间轴里点亮 ⭐ 收藏一些美好回忆吧！
-                </div>
-            `;
+            setMilestoneStatus(
+                contentContainer,
+                '🌱 还没有大事记或收藏哦~\n快去发布时勾选“重大事件”，\n或在时间轴里点亮 ⭐ 收藏一些美好回忆吧！',
+                'var(--text-muted)',
+                '50px 20px'
+            );
+            const empty = contentContainer.firstElementChild;
+            if (empty) Object.assign(empty.style, { fontSize: '0.92em', lineHeight: '1.6', whiteSpace: 'pre-line' });
             return;
         }
 
@@ -190,12 +215,14 @@ async function renderMilestonesContent() {
         }
     } catch (e) {
         console.error('加载大事记失败:', e);
-        contentContainer.innerHTML = '<div style="text-align:center; padding:30px; color:var(--primary);">加载大事记失败，请重试 😢</div>';
+        if (requestId === milestoneRenderRequestId && isMilestoneAuthEpochCurrent(requestAuthEpoch)) {
+            setMilestoneStatus(contentContainer, '加载大事记失败，请重试 😢', 'var(--primary)');
+        }
     }
 }
 
 function renderTimelineList(items, container) {
-    container.innerHTML = '';
+    container.replaceChildren();
     const timeline = document.createElement('div');
     timeline.className = 'milestone-timeline';
     
@@ -205,9 +232,11 @@ function renderTimelineList(items, container) {
         let isMilestone = false;
         try {
             const parsed = JSON.parse(item.content);
-            text = parsed.text || '';
-            images = parsed.images || [];
-            isMilestone = parsed.is_milestone || false;
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                text = typeof parsed.text === 'string' ? parsed.text : '';
+                images = Array.isArray(parsed.images) ? parsed.images : [];
+                isMilestone = parsed.is_milestone === true;
+            }
         } catch (e) {
             text = item.content || '';
         }
@@ -218,30 +247,60 @@ function renderTimelineList(items, container) {
         // 计算已过天数
         const diffMs = Date.now() - dateObj.getTime();
         const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
-        const daysHtml = `<span class="milestone-days">已过 ${diffDays} 天 💖</span>`;
-
         const itemEl = document.createElement('div');
         itemEl.className = 'milestone-list-item';
-        
-        const imgHtml = images.length > 0 ? `<div class="milestone-item-img" style="background-image: url('${images[0]}');" onclick="if(typeof openLightbox === 'function') openLightbox(event, '${images[0]}')"></div>` : '';
-        
-        itemEl.innerHTML = `
-            <div class="milestone-dot-line">
-                <div class="milestone-dot ${isMilestone ? 'gold' : ''}"></div>
-                <div class="milestone-line"></div>
-            </div>
-            <div class="milestone-item-card">
-                <div class="milestone-item-header">
-                    <span class="milestone-item-date">${dateStr}</span>
-                    ${isMilestone ? '<span class="milestone-badge-top">🏆 大事记</span>' : '<span class="milestone-badge-top star">⭐ 收藏</span>'}
-                    ${daysHtml}
-                </div>
-                <div class="milestone-item-body">
-                    <div class="milestone-item-text">${text}</div>
-                    ${imgHtml}
-                </div>
-            </div>
-        `;
+
+        const dotLine = document.createElement('div');
+        dotLine.className = 'milestone-dot-line';
+        const dot = document.createElement('div');
+        dot.className = `milestone-dot${isMilestone ? ' gold' : ''}`;
+        const line = document.createElement('div');
+        line.className = 'milestone-line';
+        dotLine.append(dot, line);
+
+        const itemCard = document.createElement('div');
+        itemCard.className = 'milestone-item-card';
+        const header = document.createElement('div');
+        header.className = 'milestone-item-header';
+        const date = document.createElement('span');
+        date.className = 'milestone-item-date';
+        date.textContent = dateStr;
+        const badge = document.createElement('span');
+        badge.className = `milestone-badge-top${isMilestone ? '' : ' star'}`;
+        badge.textContent = isMilestone ? '🏆 大事记' : '⭐ 收藏';
+        const days = document.createElement('span');
+        days.className = 'milestone-days';
+        days.textContent = `已过 ${diffDays} 天 💖`;
+        header.append(date, badge, days);
+
+        const body = document.createElement('div');
+        body.className = 'milestone-item-body';
+        const textElement = document.createElement('div');
+        textElement.className = 'milestone-item-text';
+        textElement.textContent = String(text || '');
+        body.appendChild(textElement);
+        const imageUrl = images.length > 0 ? getMilestoneTrustedMediaUrl(images[0]) : '';
+        if (imageUrl) {
+            const image = document.createElement('div');
+            image.className = 'milestone-item-img';
+            image.style.backgroundImage = `url("${imageUrl}")`;
+            image.tabIndex = 0;
+            image.setAttribute('role', 'button');
+            image.setAttribute('aria-label', '查看大事记图片');
+            const showImage = () => {
+                if (typeof openLightbox === 'function') openLightbox(imageUrl);
+            };
+            image.addEventListener('click', showImage);
+            image.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    showImage();
+                }
+            });
+            body.appendChild(image);
+        }
+        itemCard.append(header, body);
+        itemEl.append(dotLine, itemCard);
         timeline.appendChild(itemEl);
     });
     
@@ -249,18 +308,21 @@ function renderTimelineList(items, container) {
 }
 
 function renderPolaroidWall(items, container) {
-    container.innerHTML = '';
+    container.replaceChildren();
     
     // 筛选出有图片的项目
     const photoItems = [];
     items.forEach(item => {
         try {
             const parsed = JSON.parse(item.content);
-            if (parsed.images && parsed.images.length > 0) {
+            const imageUrl = parsed && Array.isArray(parsed.images)
+                ? getMilestoneTrustedMediaUrl(parsed.images[0])
+                : '';
+            if (imageUrl) {
                 photoItems.push({
                     id: item.id,
                     text: parsed.text || '',
-                    image: parsed.images[0],
+                    image: imageUrl,
                     date: new Date(item.created_at)
                 });
             }
@@ -268,12 +330,14 @@ function renderPolaroidWall(items, container) {
     });
 
     if (photoItems.length === 0) {
-        container.innerHTML = `
-            <div style="text-align:center; padding:50px 20px; color:var(--text-muted); font-size:0.92em; line-height: 1.6;">
-                📸 目前大事记中还没有包含照片的内容哦~<br>
-                请在发布重大事件或收藏动态时，上传一张照片吧！
-            </div>
-        `;
+        setMilestoneStatus(
+            container,
+            '📸 目前大事记中还没有包含照片的内容哦~\n请在发布重大事件或收藏动态时，上传一张照片吧！',
+            'var(--text-muted)',
+            '50px 20px'
+        );
+        const empty = container.firstElementChild;
+        if (empty) Object.assign(empty.style, { fontSize: '0.92em', lineHeight: '1.6', whiteSpace: 'pre-line' });
         return;
     }
 
@@ -289,13 +353,32 @@ function renderPolaroidWall(items, container) {
         const card = document.createElement('div');
         card.className = 'polaroid-card';
         card.style.transform = `rotate(${angle}deg)`;
-        card.innerHTML = `
-            <div class="polaroid-img-wrapper" onclick="if(typeof openLightbox === 'function') openLightbox(event, '${item.image}')">
-                <img src="${item.image}" alt="polaroid">
-            </div>
-            <div class="polaroid-caption">${item.text}</div>
-            <div class="polaroid-date">${dateStr}</div>
-        `;
+        const imageWrapper = document.createElement('div');
+        imageWrapper.className = 'polaroid-img-wrapper';
+        imageWrapper.tabIndex = 0;
+        imageWrapper.setAttribute('role', 'button');
+        imageWrapper.setAttribute('aria-label', '查看大事记图片');
+        const image = document.createElement('img');
+        image.src = item.image;
+        image.alt = '大事记照片';
+        imageWrapper.appendChild(image);
+        const showImage = () => {
+            if (typeof openLightbox === 'function') openLightbox(item.image);
+        };
+        imageWrapper.addEventListener('click', showImage);
+        imageWrapper.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                showImage();
+            }
+        });
+        const caption = document.createElement('div');
+        caption.className = 'polaroid-caption';
+        caption.textContent = String(item.text || '');
+        const date = document.createElement('div');
+        date.className = 'polaroid-date';
+        date.textContent = dateStr;
+        card.append(imageWrapper, caption, date);
         wall.appendChild(card);
     });
     

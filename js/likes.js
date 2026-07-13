@@ -1,70 +1,92 @@
 // ==========================================
-// 动态点赞功能
+// 动态点赞
 // ==========================================
+const pendingMomentLikes = new Set();
+
 async function loadMomentLikes(momentIds) {
-    if (!momentIds.length) return;
-    try {
-        const { data, error } = await supabaseClient.from('moment_likes')
-            .select('moment_id, author')
-            .in('moment_id', momentIds);
-        if (error) return; // 表可能不存在，静默处理
-        const countMap = {};
-        const likersMap = {};
-        const userLikedMap = {};
-        (data || []).forEach(l => {
-            countMap[l.moment_id] = (countMap[l.moment_id] || 0) + 1;
-            if (!likersMap[l.moment_id]) likersMap[l.moment_id] = [];
-            likersMap[l.moment_id].push(l.author);
-            if (l.author === currentAuthor) userLikedMap[l.moment_id] = true;
-        });
-        momentIds.forEach(id => {
-            const btn = document.getElementById(`moment-like-btn-${id}`);
-            const countEl = document.getElementById(`moment-like-count-${id}`);
-            const likersEl = document.getElementById(`moment-like-likers-${id}`);
-            const heartEl = btn ? btn.querySelector('.ml-heart') : null;
-            const count = countMap[id] || 0;
-            const liked = userLikedMap[id] || false;
-            if (btn) btn.classList.toggle('liked', liked);
-            if (heartEl) heartEl.textContent = liked ? '❤️' : '🤍';
-            if (countEl) countEl.textContent = count > 0 ? count : '喜欢';
-            if (likersEl) {
-                const likers = likersMap[id] || [];
-                likersEl.textContent = likers.length > 0 ? likers.join('、') + ' 觉得很赞 ❤' : '';
-            }
-        });
-    } catch(e) {}
+    if (!isAuthenticated() || !Array.isArray(momentIds) || !momentIds.length) return;
+    const uniqueIds = [...new Set(momentIds)].slice(0, 100);
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+
+    const { data, error } = await supabaseClient
+        .from('moment_likes')
+        .select('moment_id, user_id, author')
+        .in('moment_id', uniqueIds);
+
+    if (!isCurrentAuthSnapshot(epoch, userId)) return;
+    if (error) {
+        console.error('加载动态点赞失败:', error);
+        return;
+    }
+
+    const countByMoment = {};
+    const namesByMoment = {};
+    const likedByCurrentUser = {};
+    (data || []).forEach(like => {
+        countByMoment[like.moment_id] = (countByMoment[like.moment_id] || 0) + 1;
+        if (!namesByMoment[like.moment_id]) namesByMoment[like.moment_id] = [];
+        if (like.author) namesByMoment[like.moment_id].push(like.author);
+        if (like.user_id === userId) likedByCurrentUser[like.moment_id] = true;
+    });
+
+    uniqueIds.forEach(momentId => {
+        const button = document.getElementById(`moment-like-btn-${momentId}`);
+        const countElement = document.getElementById(`moment-like-count-${momentId}`);
+        const namesElement = document.getElementById(`moment-like-likers-${momentId}`);
+        const heart = button?.querySelector('.ml-heart');
+        const count = countByMoment[momentId] || 0;
+        const liked = Boolean(likedByCurrentUser[momentId]);
+
+        button?.classList.toggle('liked', liked);
+        button?.setAttribute('aria-pressed', String(liked));
+        if (heart) heart.textContent = liked ? '❤️' : '🤍';
+        if (countElement) countElement.textContent = count ? String(count) : '喜欢';
+        if (namesElement) {
+            const names = [...new Set(namesByMoment[momentId] || [])];
+            namesElement.textContent = names.length ? `${names.join('、')} 觉得很赞 ❤` : '';
+        }
+    });
 }
 
 async function toggleMomentLike(momentId) {
-    if (!currentAuthor) {
+    if (!isAuthenticated()) {
         openLoginModal();
         return;
     }
-    const btn = document.getElementById(`moment-like-btn-${momentId}`);
-    const isLiked = btn && btn.classList.contains('liked');
+    if (!momentId || pendingMomentLikes.has(momentId)) return;
+
+    const button = document.getElementById(`moment-like-btn-${momentId}`);
+    const currentlyLiked = button?.classList.contains('liked') || false;
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+    pendingMomentLikes.add(momentId);
+    if (button) button.disabled = true;
+
     try {
-        let res;
-        if (isLiked) {
-            res = await supabaseClient.from('moment_likes')
+        const result = currentlyLiked
+            ? await supabaseClient
+                .from('moment_likes')
                 .delete()
                 .eq('moment_id', momentId)
-                .eq('author', currentAuthor);
-        } else {
-            res = await supabaseClient.from('moment_likes')
-                .insert([{ moment_id: momentId, author: currentAuthor }]);
-            // 点赞时播放爱心动画
-            if (btn && !isLiked) {
-                const rect = btn.getBoundingClientRect();
-                spawnHearts(rect.left + rect.width / 2, rect.top);
-            }
+                .eq('user_id', userId)
+            : await supabaseClient
+                .from('moment_likes')
+                .insert([{ moment_id: momentId }]);
+
+        if (result.error) throw result.error;
+        if (!isCurrentAuthSnapshot(epoch, userId)) return;
+
+        if (!currentlyLiked && button && typeof spawnHearts === 'function') {
+            const rect = button.getBoundingClientRect();
+            spawnHearts(rect.left + rect.width / 2, rect.top);
         }
-        if (res.error) {
-            alert('点赞失败，请确保在 Supabase 创建了 moment_likes 表！\n错误信息：' + res.error.message);
-            return;
-        }
-        // 刷新当前动态点赞显示
-        loadMomentLikes([momentId]);
-    } catch(e) {
-        console.error('点赞异常:', e);
+        await loadMomentLikes([momentId]);
+    } catch (error) {
+        console.error('更新动态点赞失败:', error);
+        if (typeof showToast === 'function') showToast('点赞失败，请稍后重试');
+    } finally {
+        pendingMomentLikes.delete(momentId);
+        if (button) button.disabled = false;
     }
 }

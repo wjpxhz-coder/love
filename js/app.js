@@ -2,13 +2,11 @@ window.onload = async function() {
     initTheme();
     createStarField();
     renderAnniversaries(); 
-    initPresence();
+    initAccessibleUiState();
     setTimeout(initCardGlow, 600);
 
-    // 如果未登录，初始化展示锁定占位卡片
-    if (!localStorage.getItem('lover_identity') && typeof showLockedUI === 'function') {
-        showLockedUI();
-    }
+    // 默认保持私密内容锁定，真实 Auth 会话恢复后再解锁。
+    if (typeof showLockedUI === 'function') showLockedUI();
 
     await initAuth();
 };
@@ -16,9 +14,82 @@ window.onload = async function() {
 // 注册 Service Worker (PWA)
 // ==========================================
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log('SW registered'))
-        .catch(err => console.log('SW registration failed:', err));
+    window.addEventListener('load', async () => {
+        try {
+            const registration = await navigator.serviceWorker.register('./sw.js', {
+                updateViaCache: 'none'
+            });
+
+            const announceUpdate = worker => {
+                if (!worker || !navigator.serviceWorker.controller) return;
+                showToast('发现新版本，将在下次打开时自动启用。');
+            };
+
+            if (registration.waiting) announceUpdate(registration.waiting);
+            registration.addEventListener('updatefound', () => {
+                const worker = registration.installing;
+                if (!worker) return;
+                worker.addEventListener('statechange', () => {
+                    if (worker.state === 'installed') announceUpdate(worker);
+                });
+            });
+
+            // Check the worker script without cache-busting query strings.
+            await registration.update();
+        } catch (error) {
+            console.warn('Service Worker registration failed:', error);
+        }
+    }, { once: true });
+}
+
+function initAccessibleUiState() {
+    const classBindings = [
+        { target: 'user-dropdown', control: 'user-avatar-btn', activeClass: 'show' },
+        { target: 'notification-panel', control: 'notification-bell', activeClass: 'show' },
+        { target: 'fab-menu', control: 'fab-main', activeClass: 'show' },
+        { target: 'profile-page', activeClass: 'show' },
+        { target: 'edit-profile-page', activeClass: 'show' },
+        { target: 'lightbox', activeClass: 'show' }
+    ];
+
+    classBindings.forEach(({ target, control, activeClass }) => {
+        const targetElement = document.getElementById(target);
+        const controlElement = control ? document.getElementById(control) : null;
+        if (!targetElement) return;
+
+        const syncState = () => {
+            const isActive = targetElement.classList.contains(activeClass);
+            targetElement.setAttribute('aria-hidden', String(!isActive));
+            if (controlElement) controlElement.setAttribute('aria-expanded', String(isActive));
+        };
+        syncState();
+        new MutationObserver(syncState).observe(targetElement, { attributes: true, attributeFilter: ['class'] });
+    });
+
+    const syncSelectedState = selector => {
+        document.querySelectorAll(selector).forEach(element => {
+            const syncState = () => {
+                const isSelected = element.classList.contains('active') || element.classList.contains('selected');
+                element.setAttribute(element.getAttribute('role') === 'tab' ? 'aria-selected' : 'aria-pressed', String(isSelected));
+            };
+            syncState();
+            new MutationObserver(syncState).observe(element, { attributes: true, attributeFilter: ['class'] });
+        });
+    };
+
+    syncSelectedState('.ai-tab, .milestone-tab, .mood-emoji-btn, .theme-opt-btn');
+
+    const passwordToggle = document.getElementById('login-pw-eye');
+    const passwordInput = document.getElementById('login-password');
+    if (passwordToggle && passwordInput) {
+        const syncPasswordToggle = () => {
+            const isVisible = passwordInput.type === 'text';
+            passwordToggle.setAttribute('aria-pressed', String(isVisible));
+            passwordToggle.setAttribute('aria-label', isVisible ? '隐藏密码' : '显示密码');
+        };
+        syncPasswordToggle();
+        new MutationObserver(syncPasswordToggle).observe(passwordInput, { attributes: true, attributeFilter: ['type'] });
+    }
 }
 
 let tempTargetVersionToSave = '';
@@ -42,7 +113,7 @@ function showVersionModal(versionName, useConfigLog = true) {
 
     if (verNumEl) verNumEl.textContent = displayVersion || (typeof UPDATE_LOG !== 'undefined' ? UPDATE_LOG.version : 'latest');
     
-    list.innerHTML = '';
+    list.replaceChildren();
 
     if (useConfigLog && typeof UPDATE_LOG !== 'undefined') {
         if (verDateEl) verDateEl.textContent = `更新时间：${UPDATE_LOG.date}`;

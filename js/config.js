@@ -13,10 +13,6 @@ window.addEventListener('scroll', () => {
 
 const startDate = new Date(2026, 4, 23, 1, 0, 0);
 
-// ── 账号系统 ──
-// 合法用户名列表（密码验证已迁移到服务端）
-const VALID_USERS = ["小蛇", "小奚"];
-
 // 当前登录用户的 profile
 let currentUserProfile = null;
 
@@ -34,22 +30,125 @@ const ANNIVERSARIES = [
 
 const SUPABASE_URL = 'https://tveiegolbotlqpjpwpes.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_AhdN1U9vSR1efN_5zDYMLQ_D_fyt3gN';
+const TRUSTED_MEDIA_HOSTS = new Set([
+    window.location.hostname,
+    new URL(SUPABASE_URL).hostname
+]);
+const STORAGE_REFERENCE_PREFIX = 'storage://photos/';
+const signedMediaUrlCache = new Map();
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    global: { fetch: (...args) => fetch(...args) }
-});
+/**
+ * 将数据库中的媒体地址收敛到受信任来源。
+ * 生产媒体只允许 HTTPS 的当前站点或本项目 Supabase 域；本地预览可显式允许 blob:。
+ */
+function sanitizeMediaUrl(value, { allowBlob = false } = {}) {
+    if (typeof value !== 'string' || !value.trim()) return '';
+    try {
+        const url = new URL(value, window.location.href);
+        if (allowBlob && url.protocol === 'blob:') return url.href;
+
+        const isLocalDevelopment = url.hostname === window.location.hostname
+            && (url.protocol === 'http:' || url.protocol === 'https:');
+        const isTrustedHttps = url.protocol === 'https:' && TRUSTED_MEDIA_HOSTS.has(url.hostname);
+        return isLocalDevelopment || isTrustedHttps ? url.href : '';
+    } catch (_error) {
+        return '';
+    }
+}
+
+function createStorageReference(objectPath) {
+    if (typeof objectPath !== 'string') return '';
+    const normalizedPath = objectPath.replace(/^\/+/, '');
+    if (!normalizedPath || normalizedPath.includes('..') || normalizedPath.includes('\\')) return '';
+    return `${STORAGE_REFERENCE_PREFIX}${normalizedPath}`;
+}
+
+function getStorageObjectPath(value) {
+    if (typeof value !== 'string' || !value.startsWith(STORAGE_REFERENCE_PREFIX)) return '';
+    const objectPath = value.slice(STORAGE_REFERENCE_PREFIX.length);
+    if (!objectPath || objectPath.includes('..') || objectPath.includes('\\')) return '';
+    return objectPath;
+}
+
+async function resolveMediaUrl(value) {
+    const directUrl = sanitizeMediaUrl(value);
+    if (directUrl) return directUrl;
+
+    const objectPath = getStorageObjectPath(value);
+    if (!objectPath || !currentAuthUser) return '';
+    const requestUserId = currentAuthUser.id;
+    const requestAuthEpoch = typeof authEpoch === 'number' ? authEpoch : null;
+    const cached = signedMediaUrlCache.get(objectPath);
+    if (cached && cached.expiresAt > Date.now()) return cached.url;
+
+    const { data, error } = await supabaseClient.storage
+        .from('photos')
+        .createSignedUrl(objectPath, 60 * 60);
+    if (!currentAuthUser || currentAuthUser.id !== requestUserId
+        || (requestAuthEpoch !== null && authEpoch !== requestAuthEpoch)) {
+        return '';
+    }
+    if (error || !data?.signedUrl) {
+        console.error('创建媒体签名地址失败:', error);
+        return '';
+    }
+
+    const signedUrl = sanitizeMediaUrl(data.signedUrl);
+    if (signedUrl) {
+        signedMediaUrlCache.set(objectPath, {
+            url: signedUrl,
+            expiresAt: Date.now() + 50 * 60 * 1000
+        });
+    }
+    return signedUrl;
+}
+
+async function hydrateStructuredMediaContent(rawContent) {
+    try {
+        const parsed = JSON.parse(rawContent);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return rawContent;
+        if (Array.isArray(parsed.images)) {
+            parsed.images = (await Promise.all(parsed.images.map(resolveMediaUrl))).filter(Boolean);
+        }
+        if (parsed.audio) parsed.audio = await resolveMediaUrl(parsed.audio);
+        return JSON.stringify(parsed);
+    } catch (_error) {
+        return rawContent;
+    }
+}
+
+async function hydrateMomentMediaRecord(record) {
+    if (!record || typeof record !== 'object') return record;
+    const hydrated = { ...record };
+    if (hydrated.type === 'photo' || hydrated.type === 'audio') {
+        hydrated.content = await resolveMediaUrl(hydrated.content);
+    } else if (hydrated.type === 'moment') {
+        hydrated.content = await hydrateStructuredMediaContent(hydrated.content);
+    }
+    return hydrated;
+}
+
+function clearSignedMediaCache() {
+    signedMediaUrlCache.clear();
+}
+
+const supabaseClient = window.supabase?.createClient
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+        global: { fetch: (...args) => fetch(...args) }
+    })
+    : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.4.0';
+const APP_VERSION = 'v3.5.0';
 const UPDATE_LOG = {
-    version: 'v3.4.0',
-    date: '2026-07-12',
-    title: '空间隐私甜蜜升级 🔒💖',
+    version: 'v3.5.0',
+    date: '2026-07-13',
+    title: '空间安全与稳定性升级 🔒✨',
     features: [
-        '新增「未登录内容保密」：未登录时隐藏全部动态时光足迹和心情热力图，并显示精美的爱心锁卡片引导输入密码，全方位保护两人私密日记 🔒',
-        '新增「重大事件记录板 (大事记)」：收藏回忆、回顾我们的里程碑，还有浪漫拍立得照片墙与已过天数计时 🏆',
-        '新增「系统设置」：个人主页右上角可快速切换浅深色主题、清理缓存并重载 ⚙️',
-        '优化「页面性能与体验」：修复了部分设备上按钮遮挡与排版问题 ✨'
+        '登录升级为 Supabase Auth 会话，私密数据授权不再依赖本地身份标记 🔐',
+        '修复录音、筛选、大事记灯箱、资料保存和心情日期等稳定性问题 🛠️',
+        '收紧动态内容渲染和媒体来源，降低恶意内容注入风险 🛡️',
+        '改进离线缓存、深浅主题、键盘操作和减少动效体验 ✨'
     ]
 };
 

@@ -30,13 +30,10 @@
         }
         .resonance-text {
             font-size: 0.9em;
-            color: #d46b7a;
+            color: var(--primary);
             font-weight: 600;
             letter-spacing: 1px;
             white-space: nowrap;
-            background: linear-gradient(90deg, #d46b7a, #c9a970);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
         }
 
         @media (max-width: 480px) {
@@ -80,6 +77,10 @@
             background: var(--primary-light);
             border-radius: 4px;
         }
+        .blind-box-status {
+            color: var(--text-muted);
+            font-size: 0.9em;
+        }
         .blind-box-img {
             max-width: 100%;
             border-radius: 12px;
@@ -102,11 +103,35 @@
             margin-bottom: 8px;
         }
         .blind-box-prompt {
-            color: #d46b7a;
+            color: var(--primary);
             font-weight: 600;
             font-size: 1.05em;
             letter-spacing: 1px;
             margin-top: 10px;
+        }
+        .blind-box-locate {
+            margin-top: 15px;
+            padding: 6px 16px;
+            font-size: 0.85em;
+        }
+        .blind-box-back {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .blind-box-back button {
+            display: inline-flex;
+            padding: 8px 16px;
+            border: 1px dashed var(--primary-light);
+            background: rgba(164, 95, 107, 0.1);
+            color: var(--primary);
+            box-shadow: none;
+            font-size: 0.9em;
+        }
+        .blind-box-target {
+            box-shadow: 0 0 20px rgba(143, 70, 84, 0.6) !important;
+            transition: box-shadow 0.25s ease;
         }
         /* ── 动态渐变背景动画 ── */
         @keyframes gradientShift {
@@ -173,7 +198,9 @@
         .comment-cancel-btn::after, .btn-cancel::after, .mood-emoji-btn::after,
         .ai-tab::after, .theme-toggle::after, .ai-refresh-btn::after,
         .ai-chat-close-btn::after, .ai-chat-send-btn::after,
-        .moment-like-btn::after, .comment-img-upload-btn::after { display: none; }
+        .moment-like-btn::after, .comment-img-upload-btn::after,
+        .notification-read-all::after, .user-dropdown-item::after,
+        .moment-image-add-btn::after, .edit-avatar-circle::after { display: none; }
 
         /* ── 计时器翻页动画 ── */
         .timer-card .num.flip {
@@ -263,4 +290,3 @@
         .toggle-text-btn:hover {
             color: var(--primary-light);
         }
-    </style>

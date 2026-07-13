@@ -1,2 +1,9 @@
 check_profiles.py
 .DS_Store
+
+# Local secrets and Supabase CLI state
+.env
+.env.*
+!.env.example
+.supabase/
+supabase/.temp/

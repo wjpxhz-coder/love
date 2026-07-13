@@ -79,6 +79,15 @@
             cursor: pointer;
             font-weight: 400;
             transition: color 0.2s;
+            min-height: 44px;
+            margin: -10px -8px -10px 0;
+            padding: 10px 8px;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            box-shadow: none;
+            font-family: inherit;
+            letter-spacing: normal;
         }
         .notification-read-all:hover {
             color: var(--primary);
@@ -110,6 +119,19 @@
             font-size: 0.75em;
             color: var(--text-muted);
             margin-top: 4px;
+        }
+        .notification-preview {
+            margin-top: 4px;
+            color: var(--text-muted);
+            font-size: 0.84em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .notification-target {
+            background: rgba(164, 95, 107, 0.18) !important;
+            box-shadow: 0 0 0 3px rgba(164, 95, 107, 0.2);
+            transition: background-color 0.25s ease, box-shadow 0.25s ease;
         }
         .notification-empty {
             padding: 24px;

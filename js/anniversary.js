@@ -3,19 +3,46 @@
 // ==========================================
 function renderAnniversaries() {
     const grid = document.getElementById('anniv-grid');
+    if (!grid) return;
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const appDate = typeof getAppDateKey === 'function'
+        ? getAppDateKey(now).split('-').map(Number)
+        : [now.getFullYear(), now.getMonth() + 1, now.getDate()];
+    const [currentYear, currentMonth, currentDay] = appDate;
+    const todayOrdinal = Date.UTC(currentYear, currentMonth - 1, currentDay);
+    const fragment = document.createDocumentFragment();
 
-    grid.innerHTML = ANNIVERSARIES.map(a => {
-        let next = new Date(now.getFullYear(), a.month - 1, a.day);
-        if (next < today) next.setFullYear(next.getFullYear() + 1);
-        const diff = Math.round((next - today) / 86400000);
+    ANNIVERSARIES.forEach(anniversary => {
+        let year = currentYear;
+        let nextOrdinal = Date.UTC(year, anniversary.month - 1, anniversary.day);
+        if (nextOrdinal < todayOrdinal) {
+            year += 1;
+            nextOrdinal = Date.UTC(year, anniversary.month - 1, anniversary.day);
+        }
+        const diff = Math.round((nextOrdinal - todayOrdinal) / 86400000);
         const isToday = diff === 0;
-        return `<div class="anniv-card ${isToday ? 'today' : ''}">
-            <span class="anniv-icon">${a.icon}</span>
-            <div class="anniv-name">${a.name}</div>
-            <div class="anniv-days">${isToday ? '🎉今天！' : diff}</div>
-            ${!isToday ? '<div class="anniv-unit">天后</div>' : ''}
-        </div>`;
-    }).join('');
+
+        const card = document.createElement('div');
+        card.className = `anniv-card${isToday ? ' today' : ''}`;
+        const icon = document.createElement('span');
+        icon.className = 'anniv-icon';
+        icon.textContent = anniversary.icon;
+        icon.setAttribute('aria-hidden', 'true');
+        const name = document.createElement('div');
+        name.className = 'anniv-name';
+        name.textContent = anniversary.name;
+        const days = document.createElement('div');
+        days.className = 'anniv-days';
+        days.textContent = isToday ? '🎉今天！' : String(diff);
+        card.append(icon, name, days);
+        if (!isToday) {
+            const unit = document.createElement('div');
+            unit.className = 'anniv-unit';
+            unit.textContent = '天后';
+            card.appendChild(unit);
+        }
+        fragment.appendChild(card);
+    });
+
+    grid.replaceChildren(fragment);
 }

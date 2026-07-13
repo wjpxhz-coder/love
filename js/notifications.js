@@ -1,208 +1,269 @@
 // ==========================================
-// 通知功能逻辑
+// 通知功能
 // ==========================================
+const NOTIFICATION_ACTIONS = {
+    moment: '发布了新动态',
+    comment: '发表了评论',
+    like: '点赞了评论',
+    miss: '给你发来了心电感应',
+    recalled: '撤回了该互动'
+};
 let processedMissIds = new Set();
+let missEffectTimer = null;
+
+function resetNotificationState() {
+    processedMissIds.clear();
+    if (missEffectTimer) {
+        clearTimeout(missEffectTimer);
+        missEffectTimer = null;
+    }
+}
+
+function isNotificationRead(notification) {
+    return Array.isArray(notification.read_by) && notification.read_by.includes(currentAuthor);
+}
+
+function notificationPreview(content) {
+    if (typeof content !== 'string') return '';
+    const trimmed = content.trim();
+    if (!trimmed.startsWith('{')) return trimmed.slice(0, 160);
+    try {
+        const parsed = JSON.parse(trimmed);
+        const text = typeof parsed.text === 'string' ? parsed.text.trim() : '';
+        const mediaHint = Array.isArray(parsed.images) && parsed.images.length ? ' [🖼️图片]' : '';
+        return `${text}${mediaHint}`.slice(0, 160);
+    } catch (_error) {
+        return trimmed.slice(0, 160);
+    }
+}
+
+function formatNotificationTime(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('zh-CN', {
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).format(date);
+}
+
+function createNotificationItem(notification) {
+    const isRead = isNotificationRead(notification);
+    const item = document.createElement('li');
+    item.className = `notification-item${isRead ? '' : ' unread'}`;
+    item.tabIndex = 0;
+    item.setAttribute('role', 'button');
+
+    const headline = document.createElement('div');
+    const actor = document.createElement('strong');
+    actor.textContent = notification.actor || '成员';
+    headline.append(actor, document.createTextNode(` ${NOTIFICATION_ACTIONS[notification.type] || '发来了一条通知'}`));
+    item.appendChild(headline);
+
+    const preview = notificationPreview(notification.content);
+    if (preview) {
+        const previewElement = document.createElement('div');
+        previewElement.className = 'notification-preview';
+        previewElement.textContent = preview;
+        item.appendChild(previewElement);
+    }
+
+    const time = document.createElement('div');
+    time.className = 'notification-time';
+    time.textContent = formatNotificationTime(notification.created_at);
+    item.appendChild(time);
+
+    const activate = () => handleNotificationClick(notification.id, notification.type, notification.related_id);
+    item.addEventListener('click', activate);
+    item.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            activate();
+        }
+    });
+    return item;
+}
+
+async function markSingleNotificationRead(notificationId) {
+    if (!isAuthenticated() || !notificationId) return;
+    const { error } = await supabaseClient.rpc('mark_notification_read', {
+        p_notification_id: notificationId
+    });
+    if (error) console.error('标记通知已读失败:', error);
+}
+
+function scheduleMissEffects(notifications, epoch, userId) {
+    if (!notifications.length) return;
+    notifications.forEach(notification => processedMissIds.add(notification.id));
+    if (missEffectTimer) clearTimeout(missEffectTimer);
+
+    missEffectTimer = setTimeout(async () => {
+        missEffectTimer = null;
+        if (!isCurrentAuthSnapshot(epoch, userId)) return;
+
+        if (typeof createHeartRain === 'function') createHeartRain();
+        notifications.forEach(notification => {
+            if (typeof showToast === 'function') {
+                showToast(`💓 ${notification.actor || 'TA'} 在离线期间发来了心电感应！`);
+            }
+        });
+
+        await Promise.allSettled(notifications.map(notification => markSingleNotificationRead(notification.id)));
+        if (isCurrentAuthSnapshot(epoch, userId)) loadNotifications();
+    }, 1500);
+}
 
 async function loadNotifications() {
-    if (!currentAuthor) return;
+    if (!isAuthenticated()) return;
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+
     const { data, error } = await supabaseClient
         .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false }).limit(50);
-    
+        .select('id, actor_id, recipient_id, actor, type, content, related_id, read_by, created_at')
+        .eq('recipient_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+    if (!isCurrentAuthSnapshot(epoch, userId)) return;
     if (error) {
         console.error('加载通知失败:', error);
         return;
     }
 
-    const listEl = document.getElementById('notification-list');
-    const badgeEl = document.getElementById('notification-badge');
-    listEl.innerHTML = '';
-    
-    // 过滤出除了自己产生的之外的通知
-    const validNotifications = data.filter(n => n.actor !== currentAuthor);
-    
-    // 检测是否有未读的他人发送的 'miss' 想念通知（且本地尚未处理过）
-    const unreadMissNotifications = validNotifications.filter(n => {
-        const isRead = n.read_by && n.read_by.includes(currentAuthor);
-        return n.type === 'miss' && !isRead && !processedMissIds.has(n.id);
-    });
+    const list = document.getElementById('notification-list');
+    const badge = document.getElementById('notification-badge');
+    if (!list || !badge) return;
 
-    if (unreadMissNotifications.length > 0) {
-        // 立刻加入已处理缓存，防止异步请求在 1.5 秒延时内多次调用导致特效重叠播放
-        unreadMissNotifications.forEach(n => processedMissIds.add(n.id));
-        
-        // 延时 1.5 秒触发，避免同登录界面的爱心粒子特效冲突
-        setTimeout(async () => {
-            if (typeof createHeartRain === 'function') {
-                createHeartRain();
-            }
-            unreadMissNotifications.forEach(n => {
-                if (typeof showToast === 'function') {
-                    showToast(`💓 ${n.actor} 在离线期间给你发来了心电感应，正在疯狂想你！`);
-                }
-            });
+    const notifications = data || [];
+    const unreadMisses = notifications.filter(notification => (
+        notification.type === 'miss'
+        && !isNotificationRead(notification)
+        && !processedMissIds.has(notification.id)
+    ));
+    scheduleMissEffects(unreadMisses, epoch, userId);
 
-            // 自动在 Supabase 中标记为已读，避免下一次登录刷新时再次触发
-            try {
-                await Promise.all(unreadMissNotifications.map(async (n) => {
-                    const newReadBy = n.read_by ? [...n.read_by, currentAuthor] : [currentAuthor];
-                    return supabaseClient.from('notifications').update({ read_by: newReadBy }).eq('id', n.id);
-                }));
-                // 重载通知刷新 UI 未读红点
-                loadNotifications();
-            } catch (dbErr) {
-                console.error('标记想念通知为已读失败:', dbErr);
-            }
-        }, 1500);
-    }
-    
-    let hasUnread = false;
-    
-    if (validNotifications.length === 0) {
-        listEl.innerHTML = '<li class="notification-empty">暂无通知</li>';
-        badgeEl.classList.remove('show');
+    list.replaceChildren();
+    if (!notifications.length) {
+        const empty = document.createElement('li');
+        empty.className = 'notification-empty';
+        empty.textContent = '暂无通知';
+        list.appendChild(empty);
+        badge.classList.remove('show');
+        badge.setAttribute('aria-hidden', 'true');
         return;
     }
-    
-    validNotifications.forEach(n => {
-        const isRead = n.read_by && n.read_by.includes(currentAuthor);
-        if (!isRead) hasUnread = true;
-        
-        const li = document.createElement('li');
-        li.className = `notification-item ${isRead ? '' : 'unread'}`;
-        li.setAttribute('onclick', `handleNotificationClick('${n.id}', '${n.type}', '${n.related_id}')`);
-        li.style.cursor = 'pointer';
-        
-        let actionText = '';
-        if (n.type === 'moment') actionText = '发布了新动态';
-        else if (n.type === 'comment') actionText = '发表了评论';
-        else if (n.type === 'like') actionText = '点赞了评论';
-        else if (n.type === 'miss') actionText = '给你发来了心电感应';
-        else if (n.type === 'recalled') actionText = '撤回了该互动';
-        
-        let displayContent = n.content || '';
-        if (displayContent.startsWith('{') && displayContent.endsWith('}')) {
-            try {
-                const parsed = JSON.parse(displayContent);
-                displayContent = parsed.text || '';
-                if (parsed.images && parsed.images.length > 0) {
-                    displayContent += ' [🖼️图片]';
-                }
-            } catch (e) {}
-        }
-        
-        const contentText = displayContent ? `<div style="color: var(--text-muted); font-size: 0.85em; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${displayContent}</div>` : '';
-        
-        const d = new Date(n.created_at);
-        const timeStr = `${d.getMonth()+1}-${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-        
-        li.innerHTML = `
-            <div><strong>${n.actor}</strong> ${actionText}</div>
-            ${contentText}
-            <div class="notification-time">${timeStr}</div>
-        `;
-        listEl.appendChild(li);
-    });
-    
-    if (hasUnread) {
-        badgeEl.classList.add('show');
-    } else {
-        badgeEl.classList.remove('show');
-    }
+
+    const fragment = document.createDocumentFragment();
+    notifications.forEach(notification => fragment.appendChild(createNotificationItem(notification)));
+    list.appendChild(fragment);
+
+    const hasUnread = notifications.some(notification => !isNotificationRead(notification));
+    badge.classList.toggle('show', hasUnread);
+    badge.setAttribute('aria-hidden', String(!hasUnread));
 }
 
 function toggleNotificationPanel() {
-    if (!currentAuthor) {
+    if (!isAuthenticated()) {
         openLoginModal();
         return;
     }
     const panel = document.getElementById('notification-panel');
-    panel.classList.toggle('show');
-    if (panel.classList.contains('show')) {
-        loadNotifications();
-    }
+    const bell = document.getElementById('notification-bell');
+    if (!panel) return;
+
+    const open = !panel.classList.contains('show');
+    panel.classList.toggle('show', open);
+    panel.setAttribute('aria-hidden', String(!open));
+    bell?.setAttribute('aria-expanded', String(open));
+    if (open) loadNotifications();
 }
 
 async function markAllNotificationsRead() {
-    if (!currentAuthor) return;
-    const { data, error } = await supabaseClient
-        .from('notifications')
-        .select('id, read_by');
-        
-    if (error) return;
-    
-    const unreadItems = data.filter(n => !(n.read_by && n.read_by.includes(currentAuthor)));
-    if (unreadItems.length === 0) {
-        loadNotifications();
+    if (!isAuthenticated()) return;
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+    const { error } = await supabaseClient.rpc('mark_all_notifications_read');
+    if (error) {
+        console.error('全部标为已读失败:', error);
         return;
     }
-    
-    await Promise.all(unreadItems.map(item => {
-        const newReadBy = item.read_by ? [...item.read_by, currentAuthor] : [currentAuthor];
-        return supabaseClient.from('notifications').update({ read_by: newReadBy }).eq('id', item.id);
-    }));
-    
-    loadNotifications();
+    if (isCurrentAuthSnapshot(epoch, userId)) loadNotifications();
 }
 
 async function handleNotificationClick(notificationId, type, relatedId) {
-    document.getElementById('notification-panel').classList.remove('show');
+    if (!isAuthenticated()) return;
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+    const panel = document.getElementById('notification-panel');
+    panel?.classList.remove('show');
+    panel?.setAttribute('aria-hidden', 'true');
+    document.getElementById('notification-bell')?.setAttribute('aria-expanded', 'false');
     await markSingleNotificationRead(notificationId);
-    
-    if (type === 'miss' || type === 'recalled') {
+    if (!isCurrentAuthSnapshot(epoch, userId)) return;
+
+    if (type === 'miss' || type === 'recalled' || !relatedId) {
+        loadNotifications();
         return;
     }
-    
+
     try {
         let targetMomentId = relatedId;
         let targetCommentId = null;
-        
         if (type === 'comment' || type === 'like') {
             targetCommentId = relatedId;
-            const { data, error } = await supabaseClient.from('comments').select('moment_id').eq('id', relatedId).single();
-            if (data) {
-                targetMomentId = data.moment_id;
+            const { data, error } = await supabaseClient
+                .from('comments')
+                .select('moment_id')
+                .eq('id', relatedId)
+                .maybeSingle();
+            if (error) throw error;
+            if (!isCurrentAuthSnapshot(epoch, userId)) return;
+            if (!data) {
+                if (typeof showToast === 'function') showToast('该互动已撤回或已不存在。');
+                return;
             }
+            targetMomentId = data.moment_id;
         }
-        
-        const card = document.getElementById(`card-${targetMomentId}`);
-        if (card) {
-            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            
-            if (targetCommentId) {
-                const commentsSection = document.getElementById(`comments-${targetMomentId}`);
-                if (commentsSection && commentsSection.style.display === 'none') {
-                    commentsSection.style.display = 'block';
-                    await loadComments(targetMomentId);
-                }
-                
-                setTimeout(() => {
-                    const commentEl = document.getElementById(`comment-${targetCommentId}`);
-                    if (commentEl) {
-                        commentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        commentEl.style.transition = 'background-color 0.5s';
-                        commentEl.style.backgroundColor = 'rgba(212, 160, 168, 0.4)';
-                        setTimeout(() => { commentEl.style.backgroundColor = ''; }, 2000);
-                    }
-                }, 200);
-            }
-        } else {
-            alert('该动态不在当前视图中，请先向下滑动加载更多回忆~');
-        }
-    } catch (e) {
-        console.error(e);
-    }
-}
 
-async function markSingleNotificationRead(notificationId) {
-    if (!currentAuthor) return;
-    const { data } = await supabaseClient.from('notifications').select('read_by').eq('id', notificationId).single();
-    if (data && !(data.read_by && data.read_by.includes(currentAuthor))) {
-        const newReadBy = data.read_by ? [...data.read_by, currentAuthor] : [currentAuthor];
-        await supabaseClient.from('notifications').update({ read_by: newReadBy }).eq('id', notificationId);
-        loadNotifications();
+        const card = document.getElementById(`card-${targetMomentId}`);
+        if (!card) {
+            const { data: targetMoment, error: targetError } = await supabaseClient
+                .from('moments')
+                .select('id')
+                .eq('id', targetMomentId)
+                .maybeSingle();
+            if (targetError) throw targetError;
+            if (!isCurrentAuthSnapshot(epoch, userId)) return;
+            if (typeof showToast === 'function') {
+                showToast(targetMoment
+                    ? '该动态不在当前视图中，请清除筛选或继续加载回忆。'
+                    : '该互动已撤回或已不存在。');
+            }
+            return;
+        }
+
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (targetCommentId) {
+            const commentsSection = document.getElementById(`comments-${targetMomentId}`);
+            if (commentsSection && getComputedStyle(commentsSection).display === 'none') {
+                commentsSection.style.display = 'block';
+                commentsSection.setAttribute('aria-hidden', 'false');
+                document.getElementById(`comment-toggle-${targetMomentId}`)?.setAttribute('aria-expanded', 'true');
+                await loadComments(targetMomentId);
+            }
+            const comment = document.getElementById(`comment-${targetCommentId}`);
+            if (comment) {
+                comment.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                comment.classList.add('notification-target');
+                setTimeout(() => comment.classList.remove('notification-target'), 2000);
+            }
+        }
+    } catch (error) {
+        console.error('定位通知目标失败:', error);
+    } finally {
+        if (isCurrentAuthSnapshot(epoch, userId)) loadNotifications();
     }
 }
-// 初始化时尝试加载通知
-setTimeout(loadNotifications, 1000);

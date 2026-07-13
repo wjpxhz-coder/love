@@ -3,21 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小蛇 ♡ 小奚 甜蜜记</title>
-    <meta name="description" content="小蛇和小奚的甜蜜纪念空间">
-    <meta name="theme-color" content="#b5737a">
+    <title>甜蜜记</title>
+    <meta name="description" content="私人纪念空间">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <meta name="theme-color" content="#8f4654">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Nunito:wght@400;500;600&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"
+            integrity="sha384-nWa0WrJ8Dl90YqhjSU0vNB8IxSO54t6AmEmV83LMTb/Img+Af2MfK7XJE54mwpSR"
+            crossorigin="anonymous"></script>
     <script>
         (function() {
             var saved = localStorage.getItem('theme_preference');
-            var theme = saved || 'light';
+            var theme = saved === 'dark' ? 'dark' : 'light';
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
@@ -39,52 +45,56 @@
     <link rel="stylesheet" href="css/responsive.css">
 </head>
 <body>
-<div id="bg-layer"></div>
+<a class="skip-link" href="#main-content">跳到主要内容</a>
+<div id="bg-layer" aria-hidden="true"></div>
 
 <!-- 同频共振 UI -->
-<div class="resonance-ui" id="resonance-ui">
+<div class="resonance-ui" id="resonance-ui" role="status" aria-live="polite" aria-atomic="true">
     <div class="resonance-hearts">💖💖</div>
     <div class="resonance-text">此刻，TA 也在陪你看回忆 ✨</div>
 </div>
 
 <!-- 登录触发按钮（未登录时显示） -->
-<button id="login-trigger-btn" class="login-trigger-btn" onclick="openLoginModal()" title="登录">👤</button>
+<button id="login-trigger-btn" class="login-trigger-btn" type="button" onclick="openLoginModal()" aria-label="登录">👤</button>
 
 <!-- 登录后头像按钮 -->
-<button id="user-avatar-btn" class="user-avatar-btn" onclick="toggleUserDropdown()" title="我的">
-    <div class="avatar-placeholder">🌸</div>
+<button id="user-avatar-btn" class="user-avatar-btn" type="button" onclick="toggleUserDropdown()"
+        aria-label="打开用户菜单" aria-controls="user-dropdown" aria-expanded="false">
+    <span class="avatar-placeholder" aria-hidden="true">🌸</span>
 </button>
 
 <!-- 用户下拉菜单 -->
-<div id="user-dropdown" class="user-dropdown">
+<div id="user-dropdown" class="user-dropdown" aria-hidden="true">
     <div id="user-name-label" class="user-name-label">已登录</div>
-    <div class="user-dropdown-item" onclick="openProfilePage(); hideUserDropdown();">🌸 个人主页</div>
-    <div class="user-dropdown-item logout" onclick="doLogout()">🚪 退出登录</div>
+    <button type="button" class="user-dropdown-item" onclick="openProfilePage(); hideUserDropdown();">🌸 个人主页</button>
+    <button type="button" class="user-dropdown-item logout" onclick="doLogout()">🚪 退出登录</button>
 </div>
 
 <!-- 通知铃铛及面板 -->
-<button id="notification-bell" class="notification-bell" onclick="toggleNotificationPanel()">
+<button id="notification-bell" class="notification-bell" type="button" onclick="toggleNotificationPanel()"
+        aria-label="消息通知" aria-controls="notification-panel" aria-expanded="false">
     🔔
-    <span id="notification-badge" class="notification-badge"></span>
+    <span id="notification-badge" class="notification-badge" aria-hidden="true"></span>
 </button>
-<div id="notification-panel" class="notification-panel">
+<aside id="notification-panel" class="notification-panel" aria-labelledby="notification-title" aria-hidden="true">
     <div class="notification-header">
-        <span>消息通知</span>
-        <span class="notification-read-all" onclick="markAllNotificationsRead()">全部标为已读</span>
+        <span id="notification-title">消息通知</span>
+        <button type="button" class="notification-read-all" onclick="markAllNotificationsRead()">全部标为已读</button>
     </div>
     <ul id="notification-list" class="notification-list">
         <li class="notification-empty">暂无通知</li>
     </ul>
-</div>
+</aside>
 
-<button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+<button id="theme-toggle" class="theme-toggle" type="button" onclick="toggleTheme()"
+        aria-label="切换到深色主题" aria-pressed="false">🌙</button>
 
-<div id="star-field"></div>
+<div id="star-field" aria-hidden="true"></div>
 
-<canvas id="sakura-canvas"></canvas>
-<canvas id="sakura-canvas-foreground"></canvas>
+<canvas id="sakura-canvas" aria-hidden="true"></canvas>
+<canvas id="sakura-canvas-foreground" aria-hidden="true"></canvas>
 
-<div class="container">
+<main class="container" id="main-content">
 
     <header class="site-header">
         <h1>小蛇 ♡ 小奚</h1>
@@ -95,7 +105,7 @@
     </header>
 
     <section class="timer-section">
-        <p class="timer-label">我们已经相伴走过</p>
+        <h2 class="timer-label">我们已经相伴走过</h2>
         <div class="timer-grid">
             <div class="timer-card"><span class="num" id="t-days">0</span><span class="unit">天</span></div>
             <div class="timer-card"><span class="num" id="t-hours">0</span><span class="unit">小时</span></div>
@@ -106,12 +116,12 @@
 
 
     <section class="anniv-section">
-        <p class="section-label">✨ 重要纪念日</p>
+        <h2 class="section-label">✨ 重要纪念日</h2>
         <div class="anniv-grid" id="anniv-grid"></div>
     </section>
 
     <section class="mood-section">
-        <div class="mood-section-title">🌈 心情日历</div>
+        <h2 class="mood-section-title">🌈 心情日历</h2>
         <div id="mood-unlocked-content">
             <div class="mood-heatmap" id="mood-heatmap"></div>
             <div class="mood-checkin-row">
@@ -121,7 +131,7 @@
         </div>
         <div class="locked-card" id="mood-locked-card" style="display: none;">
             <div class="locked-icon">🔒</div>
-            <div class="locked-text">输入我们的专属暗号，即可开启心情日历 🌈</div>
+            <div class="locked-text">登录情侣空间，即可开启心情日历 🌈</div>
             <button class="btn-locked-login" onclick="openLoginModal()">✨ 立即进入</button>
         </div>
     </section>
@@ -132,9 +142,9 @@
     </div>
 
     <section class="timeline-section">
-        <h3 class="timeline-title">⏳ 时光足迹</h3>
+        <h2 class="timeline-title">⏳ 时光足迹</h2>
         <div id="timeline-unlocked-content">
-            <div id="filter-indicator" class="filter-active-indicator" style="cursor: pointer;" onclick="openFilterModal()">当前已开启筛选 (点击修改)</div>
+            <button id="filter-indicator" class="filter-active-indicator" type="button" onclick="openFilterModal()">当前已开启筛选 (点击修改)</button>
             <div class="timeline-track" id="timeline-content">
                 <div class="empty-state">正在加载甜蜜回忆…</div>
             </div>
@@ -146,42 +156,30 @@
         </div>
     </section>
 
-</div>
-
-<!-- 密码弹窗 -->
-<dialog class="native-dialog" id="customModal">
-    <div class="modal-box">
-        <h3 class="modal-title">请输入专属暗号 💖</h3>
-        <input type="password" class="modal-input" id="modalInput" placeholder="请输入暗号…">
-        <div class="modal-msg" id="modalMsg"></div>
-        <div class="modal-btns">
-            <button class="btn-cancel" onclick="closeModal()">取消</button>
-            <button onclick="verifyCode()">确认</button>
-        </div>
-    </div>
-</dialog>
+</main>
 
 <!-- 图文动态发布弹窗 -->
-<dialog class="native-dialog" id="momentModal">
+<dialog class="native-dialog" id="momentModal" aria-labelledby="moment-modal-title">
     <div class="modal-box" style="max-width: 400px; padding: 24px;">
-        <h3 class="modal-title" style="margin-bottom: 16px;">✨ 发布动态</h3>
-        <textarea class="modal-input" id="momentTextInput" placeholder="这一刻的想法..." rows="4" style="resize:vertical;text-align:left;margin-top:0; border: none; background: rgba(255,255,255,0.5); font-size: 1.05em;"></textarea>
+        <h2 class="modal-title" id="moment-modal-title" style="margin-bottom: 16px;">✨ 发布动态</h2>
+        <label class="visually-hidden" for="momentTextInput">动态内容</label>
+        <textarea class="modal-input" id="momentTextInput" maxlength="2000" placeholder="这一刻的想法..." rows="4" style="resize:vertical;text-align:left;margin-top:0; border: none; background: rgba(255,255,255,0.5); font-size: 1.05em;"></textarea>
         
         <div id="momentImagePreviewContainer" class="moment-image-preview-container">
-            <div class="moment-image-add-btn" onclick="document.getElementById('momentPhotoInput').click()">
-                <div style="font-size: 2em; color: var(--text-muted); font-weight: 300;">+</div>
-            </div>
+            <button class="moment-image-add-btn" type="button" onclick="document.getElementById('momentPhotoInput').click()" aria-label="添加照片或视频">
+                <span style="font-size: 2em; color: var(--text-muted); font-weight: 300;" aria-hidden="true">+</span>
+            </button>
         </div>
-        <input type="file" id="momentPhotoInput" accept="image/*,video/*" multiple style="display:none;" onchange="handleMomentPhotoSelect(event)">
+        <input type="file" id="momentPhotoInput" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" multiple style="display:none;" onchange="handleMomentPhotoSelect(event)">
         
         <!-- 新增的录音控件 -->
         <div class="moment-audio-section" style="margin: 12px 0; display: flex; align-items: center; gap: 8px;">
-            <button id="btn-moment-audio" type="button" onclick="toggleMomentRecording()" style="background: rgba(160, 212, 198, 0.15); border: 1px solid rgba(160, 212, 198, 0.3); color: #5aa190; padding: 8px 16px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.9em; transition: all 0.2s; outline: none; font-family: inherit; user-select: none; -webkit-user-select: none;">
+            <button id="btn-moment-audio" type="button" onclick="toggleMomentRecording()" aria-pressed="false" style="background: rgba(160, 212, 198, 0.15); border: 1px solid rgba(160, 212, 198, 0.3); color: #437f72; padding: 8px 16px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.9em; transition: all 0.2s; outline: none; font-family: inherit; user-select: none; -webkit-user-select: none;">
                 <span class="audio-icon">🎙️</span> <span class="audio-text">录制声音</span>
             </button>
             <div id="momentAudioPreview" style="display: none; align-items: center; gap: 8px; flex: 1;">
                 <audio id="momentAudioPlayer" controls style="height: 36px; flex: 1; border-radius: 18px; outline: none;"></audio>
-                <button id="btn-delete-audio" type="button" onclick="deleteRecordedAudio()" style="background: none; border: none; color: #ff5e7e; font-size: 1.4em; cursor: pointer; padding: 0 6px; display: flex; align-items: center; justify-content: center;">×</button>
+                <button id="btn-delete-audio" type="button" onclick="deleteRecordedAudio()" aria-label="删除录音" style="background: none; border: none; color: #ff5e7e; font-size: 1.4em; cursor: pointer; padding: 0 6px; display: flex; align-items: center; justify-content: center;">×</button>
             </div>
         </div>
         
@@ -190,7 +188,7 @@
             <input type="checkbox" id="momentIsMilestone" style="accent-color: var(--primary); width: 16px; height: 16px; cursor: pointer;"> 🏆 设为重大事件 (大事记)
         </label>
         
-        <div class="modal-msg" id="momentModalMsg"></div>
+        <div class="modal-msg" id="momentModalMsg" role="status" aria-live="polite"></div>
         <div class="modal-btns" style="margin-top: 16px;">
             <button class="btn-cancel" onclick="closeMomentModal()">取消</button>
             <button id="btn-submit-moment" onclick="submitMomentPost()">发布</button>
@@ -200,18 +198,19 @@
 
 
 <!-- 心情打卡弹窗 -->
-<dialog class="native-dialog" id="moodModal">
+<dialog class="native-dialog" id="moodModal" aria-labelledby="mood-modal-title">
     <div class="modal-box">
-        <h3 class="modal-title">今日心情打卡 🌈</h3>
+        <h2 class="modal-title" id="mood-modal-title">今日心情打卡 🌈</h2>
         <div class="mood-emoji-row" id="moodEmojiRow">
-            <button class="mood-emoji-btn" data-score="1" onclick="selectMood(1)">😢</button>
-            <button class="mood-emoji-btn" data-score="2" onclick="selectMood(2)">😕</button>
-            <button class="mood-emoji-btn" data-score="3" onclick="selectMood(3)">😊</button>
-            <button class="mood-emoji-btn" data-score="4" onclick="selectMood(4)">😄</button>
-            <button class="mood-emoji-btn" data-score="5" onclick="selectMood(5)">🥰</button>
+            <button class="mood-emoji-btn" type="button" data-score="1" onclick="selectMood(1)" aria-label="心情很难过" aria-pressed="false">😢</button>
+            <button class="mood-emoji-btn" type="button" data-score="2" onclick="selectMood(2)" aria-label="心情有点低落" aria-pressed="false">😕</button>
+            <button class="mood-emoji-btn" type="button" data-score="3" onclick="selectMood(3)" aria-label="心情不错" aria-pressed="false">😊</button>
+            <button class="mood-emoji-btn" type="button" data-score="4" onclick="selectMood(4)" aria-label="心情很好" aria-pressed="false">😄</button>
+            <button class="mood-emoji-btn" type="button" data-score="5" onclick="selectMood(5)" aria-label="心情特别幸福" aria-pressed="false">🥰</button>
         </div>
-        <textarea class="modal-input" id="moodNote" placeholder="说说今天发生了什么…（可选）" rows="3" style="resize:none;text-align:left;margin-top:4px;"></textarea>
-        <div class="modal-msg" id="moodModalMsg"></div>
+        <label class="visually-hidden" for="moodNote">今天发生的事情</label>
+        <textarea class="modal-input" id="moodNote" maxlength="300" placeholder="说说今天发生了什么…（可选）" rows="3" style="resize:none;text-align:left;margin-top:4px;"></textarea>
+        <div class="modal-msg" id="moodModalMsg" role="status" aria-live="polite"></div>
         <div class="modal-btns">
             <button class="btn-cancel" onclick="closeMoodModal()">取消</button>
             <button onclick="submitMood()">记录</button>
@@ -220,20 +219,17 @@
 </dialog>
 
 <!-- 检索筛选弹窗 -->
-<dialog class="native-dialog" id="filterModal">
+<dialog class="native-dialog" id="filterModal" aria-labelledby="filter-modal-title">
     <div class="modal-box" style="width: 92%; max-width: 380px;">
-        <h3 class="modal-title">检索回忆 📂</h3>
+        <h2 class="modal-title" id="filter-modal-title">检索回忆 📂</h2>
         
         <div class="filter-section" style="margin-top: 16px;">
             <div class="filter-section-title">📅 按时间</div>
             <div class="filter-row">
-                <select id="filterYear" class="filter-select">
+                <select id="filterYear" class="filter-select" aria-label="筛选年份">
                     <option value="">所有年份</option>
-                    <option value="2026">2026年</option>
-                    <option value="2027">2027年</option>
-                    <option value="2028">2028年</option>
                 </select>
-                <select id="filterMonth" class="filter-select">
+                <select id="filterMonth" class="filter-select" aria-label="筛选月份">
                     <option value="">所有月份</option>
                     <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4">4月</option>
                     <option value="5">5月</option><option value="6">6月</option><option value="7">7月</option><option value="8">8月</option>
@@ -262,7 +258,8 @@
 
         <div class="filter-section">
             <div class="filter-section-title">🔍 按关键词 / 标签</div>
-            <input type="text" id="filterKeyword" class="filter-keyword" placeholder="例如：约会 或 #旅游">
+            <label class="visually-hidden" for="filterKeyword">关键词或标签</label>
+            <input type="search" id="filterKeyword" class="filter-keyword" maxlength="100" placeholder="例如：约会 或 #旅游">
         </div>
 
         <div class="modal-btns" style="margin-top: 24px;">
@@ -274,9 +271,9 @@
 </dialog>
 
 <!-- 回忆盲盒弹窗 -->
-<dialog class="native-dialog" id="blindBoxModal">
+<dialog class="native-dialog" id="blindBoxModal" aria-labelledby="blind-box-title">
     <div class="modal-box" style="width: 92%; max-width: 400px;">
-        <h3 class="modal-title">🎲 开启回忆盲盒...</h3>
+        <h2 class="modal-title" id="blind-box-title">🎲 开启回忆盲盒...</h2>
         <div class="blind-box-content" id="blindBoxContent">
             <div style="color:var(--text-muted); font-size: 0.9em;">闭上眼睛，正在穿越时空... ✨</div>
         </div>
@@ -288,46 +285,47 @@
 </dialog>
 
 <div class="fab-container" id="fab-container">
-    <div class="fab-menu" id="fab-menu">
+    <div class="fab-menu" id="fab-menu" aria-hidden="true">
         <div class="fab-item-wrapper">
             <span class="fab-label">一键想你</span>
-            <button class="fab-item fab-item-miss" onclick="sendMissYou(); toggleFabMenu();" title="一键想你">💓</button>
+            <button class="fab-item fab-item-miss" type="button" onclick="sendMissYou(); toggleFabMenu();" aria-label="一键想你">💓</button>
         </div>
         <div class="fab-item-wrapper">
             <span class="fab-label">AI 聊天</span>
-            <button class="fab-item fab-item-chat" onclick="openAIChatModal(); toggleFabMenu();" title="AI 聊天">💬</button>
+            <button class="fab-item fab-item-chat" type="button" onclick="openAIChatModal(); toggleFabMenu();" aria-label="AI 聊天">💬</button>
         </div>
         <div class="fab-item-wrapper">
             <span class="fab-label">情感助理</span>
-            <button class="fab-item fab-item-ai" onclick="openAIModal(); toggleFabMenu();" title="情感助理">🤖</button>
+            <button class="fab-item fab-item-ai" type="button" onclick="openAIModal(); toggleFabMenu();" aria-label="情感助理">🤖</button>
         </div>
         <div class="fab-item-wrapper">
             <span class="fab-label">检索回忆</span>
-            <button class="fab-item fab-item-filter" onclick="openFilterModal(); toggleFabMenu();" title="检索回忆">🔍</button>
+            <button class="fab-item fab-item-filter" type="button" onclick="openFilterModal(); toggleFabMenu();" aria-label="检索回忆">🔍</button>
         </div>
         <div class="fab-item-wrapper">
             <span class="fab-label">大事记</span>
-            <button class="fab-item fab-item-milestones" onclick="openMilestonesModal(); toggleFabMenu();" title="重大事件">🏆</button>
+            <button class="fab-item fab-item-milestones" type="button" onclick="openMilestonesModal(); toggleFabMenu();" aria-label="重大事件">🏆</button>
         </div>
     </div>
-    <button class="fab-main" onclick="toggleFabMenu()" title="功能菜单">✨</button>
+    <button class="fab-main" id="fab-main" type="button" onclick="toggleFabMenu()" aria-label="功能菜单"
+            aria-controls="fab-menu" aria-expanded="false">✨</button>
 </div>
 
 <!-- AI面板 -->
-<dialog class="native-dialog" id="aiModal">
+<dialog class="native-dialog" id="aiModal" aria-labelledby="ai-modal-title">
     <div class="modal-box ai-modal-box">
         <div class="ai-header-row">
-            <h3 class="modal-title" style="margin-bottom:0;">🤖 专属情感助理</h3>
+            <h2 class="modal-title" id="ai-modal-title" style="margin-bottom:0;">🤖 专属情感助理</h2>
             <div class="ai-action-btns">
-                <button class="ai-refresh-btn" id="aiRefreshBtn" onclick="refreshAIContent()" title="刷新内容">🔄</button>
+                <button class="ai-refresh-btn" id="aiRefreshBtn" type="button" onclick="refreshAIContent()" aria-label="刷新内容">🔄</button>
             </div>
         </div>
-        <div class="ai-tabs">
-            <button class="ai-tab active" onclick="switchAITab('topic')">今日话题</button>
-            <button class="ai-tab" onclick="switchAITab('anniversary')">纪念日</button>
-            <button class="ai-tab" onclick="switchAITab('summary')">回忆总结</button>
+        <div class="ai-tabs" role="tablist" aria-label="情感助理内容">
+            <button class="ai-tab active" id="ai-tab-topic" type="button" role="tab" aria-selected="true" aria-controls="aiContentArea" onclick="switchAITab('topic')">今日话题</button>
+            <button class="ai-tab" id="ai-tab-anniversary" type="button" role="tab" aria-selected="false" aria-controls="aiContentArea" onclick="switchAITab('anniversary')">纪念日</button>
+            <button class="ai-tab" id="ai-tab-summary" type="button" role="tab" aria-selected="false" aria-controls="aiContentArea" onclick="switchAITab('summary')">回忆总结</button>
         </div>
-        <div class="ai-content-area" id="aiContentArea">
+        <div class="ai-content-area" id="aiContentArea" role="tabpanel" aria-live="polite">
             <div class="ai-loading">思考中，请稍候... ✨</div>
         </div>
         <div class="modal-btns">
@@ -337,13 +335,13 @@
 </dialog>
 
 <!-- AI 对话框 -->
-<dialog class="native-dialog ai-chat-dialog" id="aiChatOverlay">
+<dialog class="native-dialog ai-chat-dialog" id="aiChatOverlay" aria-labelledby="ai-chat-title">
     <div class="ai-chat-box">
         <div class="ai-chat-header">
-            <h3>💬 和小助理聊聊</h3>
-            <button class="ai-chat-close-btn" onclick="closeAIChatModal()">&#10005;</button>
+            <h2 id="ai-chat-title">💬 和小助理聊聊</h2>
+            <button class="ai-chat-close-btn" type="button" onclick="closeAIChatModal()" aria-label="关闭 AI 聊天">&#10005;</button>
         </div>
-        <div class="ai-chat-messages" id="aiChatMessages">
+        <div class="ai-chat-messages" id="aiChatMessages" role="log" aria-live="polite" aria-relevant="additions text">
             <div class="ai-chat-welcome">
                 🌸 嗨~ 我是你们的专属情感小助理！<br>
                 有什么想聊的都可以跟我说哦~<br>
@@ -352,52 +350,55 @@
             </div>
         </div>
         <div class="ai-chat-input-row">
-            <textarea class="ai-chat-input" id="aiChatInput" placeholder="说点什么吧..." rows="1" onkeydown="handleChatKeyDown(event)"></textarea>
-            <button class="ai-chat-send-btn" id="aiChatSendBtn" onclick="sendChatMessage()">💌</button>
+            <label class="visually-hidden" for="aiChatInput">发送给小助理的消息</label>
+            <textarea class="ai-chat-input" id="aiChatInput" maxlength="500" placeholder="说点什么吧..." rows="1" onkeydown="handleChatKeyDown(event)"></textarea>
+            <button class="ai-chat-send-btn" id="aiChatSendBtn" type="button" onclick="sendChatMessage()" aria-label="发送消息">💌</button>
         </div>
     </div>
 </dialog>
 
 <!-- 灯箱 -->
-<div id="lightbox" onclick="closeLightbox(event)">
+<div id="lightbox" role="dialog" aria-modal="true" aria-label="媒体预览" aria-hidden="true" tabindex="-1" onclick="closeLightbox(event)">
     <img id="lightbox-img" src="" alt="回忆放大" style="display:none;">
     <video id="lightbox-video" src="" controls style="display:none; max-width:90%; max-height:90%; border-radius:12px; margin: auto; position: absolute; top: 0; bottom: 0; left: 0; right: 0;"></video>
 </div>
 
 <!-- 浪漫登录弹窗 -->
-<dialog class="native-dialog login-dialog" id="login-overlay">
-    <div class="login-bg"></div>
-    <canvas id="login-canvas" class="login-canvas"></canvas>
+<dialog class="native-dialog login-dialog" id="login-overlay" aria-labelledby="login-title">
+    <div class="login-bg" aria-hidden="true"></div>
+    <canvas id="login-canvas" class="login-canvas" aria-hidden="true"></canvas>
     <div class="login-box">
-        <div class="login-halo"></div>
-        <button class="login-close-btn" onclick="closeLoginModal()">✕</button>
-        <span class="login-heart-icon">💖</span>
-        <div class="login-title">小蛇 ♡ 小奚</div>
-        <div class="login-subtitle">专属空间 · 爱的密码</div>
-        <div class="login-field">
-            <label>🌸 账号</label>
-            <input type="text" id="login-username" class="login-input" placeholder="小蛇 / 小奚" autocomplete="off">
-        </div>
-        <div class="login-field">
-            <label>🔐 密码</label>
-            <div class="login-pw-wrap">
-                <input type="password" id="login-password" class="login-input" placeholder="输入你的爱意密码…">
-                <button class="login-pw-eye" id="login-pw-eye" onclick="toggleLoginPwEye()">👁</button>
+        <div class="login-halo" aria-hidden="true"></div>
+        <button class="login-close-btn" type="button" onclick="closeLoginModal()" aria-label="关闭登录窗口">✕</button>
+        <span class="login-heart-icon" aria-hidden="true">💖</span>
+        <h2 class="login-title" id="login-title">小蛇 ♡ 小奚</h2>
+        <div class="login-subtitle">专属空间 · 账户登录</div>
+        <form class="login-form" onsubmit="event.preventDefault(); doLogin();">
+            <div class="login-field">
+                <label for="login-username">🌸 邮箱</label>
+                <input type="email" id="login-username" class="login-input" placeholder="请输入邮箱" autocomplete="username" inputmode="email" required>
             </div>
-        </div>
-        <div class="login-error" id="login-error"></div>
-        <button class="login-btn" id="login-btn" onclick="doLogin()">✨ 进入我们的世界</button>
+            <div class="login-field">
+                <label for="login-password">🔐 密码</label>
+                <div class="login-pw-wrap">
+                    <input type="password" id="login-password" class="login-input" placeholder="请输入密码" autocomplete="current-password" required>
+                    <button class="login-pw-eye" id="login-pw-eye" type="button" onclick="toggleLoginPwEye()" aria-label="显示密码" aria-pressed="false">👁</button>
+                </div>
+            </div>
+            <div class="login-error" id="login-error" role="alert" aria-live="assertive"></div>
+            <button class="login-btn" id="login-btn" type="submit">✨ 进入我们的世界</button>
+        </form>
     </div>
 </dialog>
 
 <!-- 个人主页全屏页 -->
-<div id="profile-page" class="profile-page">
-    <canvas id="profile-particles-canvas" class="profile-particles-canvas"></canvas>
+<section id="profile-page" class="profile-page" aria-labelledby="profile-topbar-title" aria-hidden="true">
+    <canvas id="profile-particles-canvas" class="profile-particles-canvas" aria-hidden="true"></canvas>
     <div class="profile-topbar">
         <button class="profile-back-btn" onclick="closeProfilePage()">← 返回</button>
         <div class="profile-topbar-title" id="profile-topbar-title">我的主页</div>
         <div class="profile-topbar-right">
-            <button class="profile-settings-btn" id="profile-settings-btn" onclick="openSettingsModal()" title="设置">⚙️</button>
+            <button class="profile-settings-btn" id="profile-settings-btn" type="button" onclick="openSettingsModal()" aria-label="设置">⚙️</button>
             <button class="profile-edit-btn" id="profile-edit-btn-top" onclick="openEditProfilePage()">✏️ 编辑资料</button>
         </div>
     </div>
@@ -420,41 +421,41 @@
         </div>
         <button class="profile-action-btn" id="profile-edit-btn-bottom" onclick="openEditProfilePage()">✨ 修改个人资料</button>
     </div>
-</div>
+</section>
 
 <!-- 编辑资料全屏页 -->
-<div id="edit-profile-page" class="edit-profile-page">
+<section id="edit-profile-page" class="edit-profile-page" aria-labelledby="edit-profile-title" aria-hidden="true">
     <div class="edit-topbar">
         <button class="edit-cancel-btn" onclick="closeEditProfilePage()">取消</button>
-        <div style="font-family:'ZCOOL KuaiLe',cursive; color:var(--primary); font-size:1.1em; letter-spacing:2px;">编辑资料</div>
+        <h2 id="edit-profile-title" style="font-family:'ZCOOL KuaiLe',cursive; color:var(--primary); font-size:1.1em; letter-spacing:2px;">编辑资料</h2>
         <button class="edit-save-btn" id="edit-save-btn" onclick="saveProfile()">保存</button>
     </div>
     <div class="edit-body">
         <div class="edit-avatar-area">
-            <div class="edit-avatar-circle" onclick="document.getElementById('avatar-file-input').click()" id="edit-avatar-circle">
-                <div class="avatar-ph">🌸</div>
-            </div>
+            <button class="edit-avatar-circle" type="button" onclick="document.getElementById('avatar-file-input').click()" id="edit-avatar-circle" aria-label="更换头像">
+                <span class="avatar-ph" aria-hidden="true">🌸</span>
+            </button>
             <div class="edit-avatar-label">点击更换头像</div>
-            <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="handleAvatarSelect(event)">
+            <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" onchange="handleAvatarSelect(event)">
         </div>
         <div class="edit-field">
-            <label>昵称</label>
-            <input type="text" id="edit-nickname" class="edit-input" placeholder="你的昵称" maxlength="20">
+            <label for="edit-nickname">昵称</label>
+            <input type="text" id="edit-nickname" class="edit-input" placeholder="你的昵称" maxlength="40">
         </div>
         <div class="edit-field">
-            <label>一句话签名</label>
-            <input type="text" id="edit-bio" class="edit-input" placeholder="写下你的签名…" maxlength="60">
+            <label for="edit-bio">一句话签名</label>
+            <input type="text" id="edit-bio" class="edit-input" placeholder="写下你的签名…" maxlength="300">
         </div>
-        <div class="edit-msg" id="edit-msg"></div>
+        <div class="edit-msg" id="edit-msg" role="status" aria-live="polite"></div>
     </div>
-</div>
+</section>
 
 <!-- 版本更新弹窗 -->
-<dialog class="native-dialog version-dialog" id="versionModal">
+<dialog class="native-dialog version-dialog" id="versionModal" aria-labelledby="versionTitle">
     <div class="modal-box version-modal-box">
         <div class="version-decor-heart">💝</div>
-        <h3 class="modal-title" id="versionTitle">空间甜蜜升级 💖</h3>
-        <div class="version-tag" id="versionNumber">v3.1.0</div>
+        <h2 class="modal-title" id="versionTitle">空间甜蜜升级 💖</h2>
+        <div class="version-tag" id="versionNumber">v3.5.0</div>
         <div class="version-body">
             <div class="version-date" id="versionDate">更新时间：2026-07-11</div>
             <ul class="version-changelog" id="versionChangelogList">
@@ -468,16 +469,25 @@
 </dialog>
 
 <!-- 系统设置弹窗 -->
-<dialog class="native-dialog settings-dialog" id="settingsModal">
+<dialog class="native-dialog settings-dialog" id="settingsModal" aria-labelledby="settings-modal-title">
     <div class="modal-box settings-modal-box">
-        <h3 class="modal-title">⚙️ 系统设置</h3>
+        <h2 class="modal-title" id="settings-modal-title">⚙️ 系统设置</h2>
         
         <div class="settings-group">
             <div class="settings-label">🎨 空间主题</div>
             <div class="theme-options">
-                <button class="theme-opt-btn" id="theme-btn-light" onclick="setThemeDirect('light')">☀️ 浅色</button>
-                <button class="theme-opt-btn" id="theme-btn-dark" onclick="setThemeDirect('dark')">🌙 深色</button>
+                <button class="theme-opt-btn" id="theme-btn-light" type="button" onclick="setThemeDirect('light')" aria-pressed="true">☀️ 浅色</button>
+                <button class="theme-opt-btn" id="theme-btn-dark" type="button" onclick="setThemeDirect('dark')" aria-pressed="false">🌙 深色</button>
             </div>
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-label">🤖 AI 隐私</div>
+            <label class="ai-privacy-toggle" for="ai-service-consent">
+                <input type="checkbox" id="ai-service-consent" onchange="setAIServiceConsent(this.checked)" aria-describedby="ai-privacy-tip">
+                <span>允许使用 DeepSeek AI 服务</span>
+            </label>
+            <div class="settings-tip" id="ai-privacy-tip">默认关闭。开启后，您主动发送的对话会传给 DeepSeek；生成“回忆总结”时，还会发送由当前账号发布的最多 20 条文字日记（总计不超过 4,000 字），不会发送伴侣发布的日记。可随时关闭。</div>
         </div>
         
         <div class="settings-group">
@@ -492,7 +502,7 @@
         </div>
         
         <div class="settings-footer">
-            <span id="settingsVersion">当前版本：v3.1.0</span>
+            <span id="settingsVersion">当前版本：v3.5.0</span>
         </div>
         
         <div class="modal-btns" style="margin-top: 24px;">
@@ -502,17 +512,17 @@
 </dialog>
 
 <!-- 大事记/重大事件记录板弹窗 -->
-<dialog class="native-dialog milestones-dialog" id="milestonesModal">
+<dialog class="native-dialog milestones-dialog" id="milestonesModal" aria-labelledby="milestones-modal-title">
     <div class="modal-box milestones-modal-box">
         <div class="milestones-header">
-            <h3 class="modal-title" style="margin-bottom: 12px;">🏆 大事记记录板</h3>
-            <div class="milestones-tabs">
-                <button class="milestone-tab active" id="tab-milestone-list" onclick="switchMilestoneTab('list')">⌛ 事件时间轴</button>
-                <button class="milestone-tab" id="tab-milestone-gallery" onclick="switchMilestoneTab('gallery')">📸 拍立得墙</button>
+            <h2 class="modal-title" id="milestones-modal-title" style="margin-bottom: 12px;">🏆 大事记记录板</h2>
+            <div class="milestones-tabs" role="tablist" aria-label="大事记视图">
+                <button class="milestone-tab active" id="tab-milestone-list" type="button" role="tab" aria-selected="true" aria-controls="milestonesContent" onclick="switchMilestoneTab('list')">⌛ 事件时间轴</button>
+                <button class="milestone-tab" id="tab-milestone-gallery" type="button" role="tab" aria-selected="false" aria-controls="milestonesContent" onclick="switchMilestoneTab('gallery')">📸 拍立得墙</button>
             </div>
         </div>
         
-        <div class="milestones-content" id="milestonesContent">
+        <div class="milestones-content" id="milestonesContent" role="tabpanel">
             <!-- 动态渲染大事记列表或照片墙 -->
         </div>
 

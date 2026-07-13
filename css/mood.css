@@ -107,4 +107,6 @@
             .anniv-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
             .anniv-card { padding: 12px 6px; }
             .anniv-card .anniv-days { font-size: 1.3em; }
+            .mood-emoji-row { gap: 5px; }
+            .mood-emoji-btn { width: 44px; height: 44px; font-size: 1.35em; }
         }

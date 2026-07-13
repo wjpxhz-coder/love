@@ -1,269 +1,376 @@
 // ==========================================
-// 6. DeepSeek AI 专属助手逻辑
+// AI 专属助手
 // ==========================================
-
-async function callDeepSeek(systemPrompt, userPrompt) {
-    const { data, error } = await supabaseClient.functions.invoke('ai-chat', {
-        body: {
-            messages: [
-                {"role": "system", "content": systemPrompt},
-                {"role": "user", "content": userPrompt}
-            ],
-            temperature: 0.7,
-            max_tokens: 800
-        }
-    });
-    
-    if (error) {
-        throw new Error(`API request failed: ${error.message}`);
-    }
-    if (data && data.choices && data.choices.length > 0) {
-        return data.choices[0].message.content;
-    } else {
-        throw new Error(data?.error?.message || "AI returned empty data");
-    }
-}
-
-async function callDeepSeekChat(messages) {
-    const { data, error } = await supabaseClient.functions.invoke('ai-chat', {
-        body: {
-            messages: messages,
-            temperature: 0.8,
-            max_tokens: 600
-        }
-    });
-    
-    if (error) {
-        throw new Error(`API request failed: ${error.message}`);
-    }
-    if (data && data.choices && data.choices.length > 0) {
-        return data.choices[0].message.content;
-    } else {
-        throw new Error(data?.error?.message || "AI returned empty data");
-    }
-}
-
+const AI_TABS = new Set(['topic', 'anniversary', 'summary']);
+const CHAT_SYSTEM_PROMPT = '你是小蛇和小奚的专属情感小助理，语气温暖、俏皮、可爱。帮助他们聊天解闷、提供恋爱建议、推荐约会点子或化解小矛盾。回答简洁温馨，每次不超过200字。';
+const AI_SERVICE_CONSENT_PREFIX = 'ai_service_consent_';
 let currentAITab = 'topic';
+let chatHistory = [];
+let isChatSending = false;
+
+function getAIServiceConsentKey() {
+    return currentAuthUser?.id ? `${AI_SERVICE_CONSENT_PREFIX}${currentAuthUser.id}` : '';
+}
+
+function hasAIServiceConsent() {
+    const key = getAIServiceConsentKey();
+    return Boolean(key && localStorage.getItem(key) === 'granted');
+}
+
+function syncAIPrivacySetting() {
+    const checkbox = document.getElementById('ai-service-consent');
+    if (checkbox) checkbox.checked = hasAIServiceConsent();
+}
+
+function setAIServiceConsent(enabled) {
+    const key = getAIServiceConsentKey();
+    if (!key) return;
+
+    if (enabled) localStorage.setItem(key, 'granted');
+    else {
+        localStorage.removeItem(key);
+        chatHistory = [];
+    }
+    syncAIPrivacySetting();
+    if (typeof showToast === 'function') {
+        showToast(enabled ? 'AI 服务已开启，可随时在设置中关闭。' : 'AI 服务已关闭，不会再向 DeepSeek 发送内容。');
+    }
+}
+
+function assertAIConsent() {
+    if (hasAIServiceConsent()) return;
+    throw new Error('AI_CONSENT_REQUIRED');
+}
+
+function assertAIAuthenticated() {
+    if (isAuthenticated()) return;
+    throw new Error('AUTH_REQUIRED');
+}
+
+function readAIResponse(data) {
+    const content = data?.choices?.[0]?.message?.content;
+    if (typeof content !== 'string' || !content.trim()) {
+        throw new Error('AI_EMPTY_RESPONSE');
+    }
+    return content.trim();
+}
+
+async function invokeAI(messages) {
+    assertAIAuthenticated();
+    assertAIConsent();
+    const { data, error } = await supabaseClient.functions.invoke('ai-chat', {
+        body: { messages }
+    });
+    if (error) throw new Error('AI_REQUEST_FAILED');
+    return readAIResponse(data);
+}
+
+function callDeepSeek(systemPrompt, userPrompt) {
+    return invokeAI([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+    ]);
+}
+
+function callDeepSeekChat(messages) {
+    return invokeAI(messages);
+}
+
+function setAIContent(message, state = '') {
+    const contentArea = document.getElementById('aiContentArea');
+    if (!contentArea) return;
+    contentArea.replaceChildren();
+
+    const content = document.createElement('div');
+    content.className = state === 'loading' ? 'ai-loading' : `ai-result${state ? ` ${state}` : ''}`;
+    content.textContent = message;
+    contentArea.appendChild(content);
+}
 
 function openAIModal() {
-    document.getElementById('aiModal').showModal();
+    if (!isAuthenticated()) {
+        openLoginModal();
+        return;
+    }
+    document.getElementById('aiModal')?.showModal();
     switchAITab('topic');
 }
 
 function closeAIModal() {
-    document.getElementById('aiModal').close();
+    const modal = document.getElementById('aiModal');
+    if (modal?.open) modal.close();
 }
 
 function toggleFabMenu() {
-    const menu = document.getElementById('fab-menu');
-    if (menu.classList.contains('show')) {
-        menu.classList.remove('show');
-    } else {
-        menu.classList.add('show');
+    if (!isAuthenticated()) {
+        openLoginModal();
+        return;
     }
+    const menu = document.getElementById('fab-menu');
+    const button = document.getElementById('fab-main');
+    if (!menu) return;
+    const expanded = !menu.classList.contains('show');
+    menu.classList.toggle('show', expanded);
+    button?.setAttribute('aria-expanded', String(expanded));
 }
 
 async function refreshAIContent() {
-    const refreshBtn = document.getElementById('aiRefreshBtn');
-    if (refreshBtn.classList.contains('spinning')) return;
-    refreshBtn.classList.add('spinning');
+    if (!isAuthenticated()) return;
+    const refreshButton = document.getElementById('aiRefreshBtn');
+    if (!refreshButton || refreshButton.classList.contains('spinning')) return;
+    refreshButton.classList.add('spinning');
+    refreshButton.disabled = true;
     try {
         await switchAITab(currentAITab, true);
     } finally {
-        refreshBtn.classList.remove('spinning');
+        refreshButton.classList.remove('spinning');
+        refreshButton.disabled = false;
     }
+}
+
+function updateAITabState(tabName) {
+    document.querySelectorAll('.ai-tab').forEach(button => {
+        const active = button.id === `ai-tab-${tabName}`;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+        button.tabIndex = active ? 0 : -1;
+    });
+}
+
+function extractStoryText(moment) {
+    if (moment.type === 'text') return String(moment.content || '').trim();
+    if (moment.type !== 'moment') return '';
+    try {
+        const parsed = JSON.parse(moment.content);
+        return typeof parsed.text === 'string' ? parsed.text.trim() : '';
+    } catch (_error) {
+        return '';
+    }
+}
+
+async function loadRecentStoryLog() {
+    const { data, error } = await supabaseClient
+        .from('moments')
+        .select('author, user_id, type, content, created_at')
+        .eq('user_id', currentAuthUser.id)
+        .in('type', ['text', 'moment'])
+        .order('created_at', { ascending: false })
+        .limit(20);
+    if (error) throw error;
+
+    return (data || [])
+        .map(moment => ({ ...moment, storyText: extractStoryText(moment) }))
+        .filter(moment => moment.storyText)
+        .reverse()
+        .map(moment => {
+            const shortText = moment.storyText.length > 160
+                ? `${moment.storyText.slice(0, 160)}…`
+                : moment.storyText;
+            return `${moment.author || '成员'}：${shortText}`;
+        })
+        .join('\n')
+        .slice(0, 4000);
+}
+
+async function getCachedAIContent(tabName) {
+    const validSince = new Date();
+    if (tabName === 'summary') validSince.setDate(validSince.getDate() - 7);
+    else validSince.setHours(0, 0, 0, 0);
+
+    let query = supabaseClient
+        .from('ai_content')
+        .select('content, created_at')
+        .eq('type', tabName)
+        .gte('created_at', validSince.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1);
+    if (tabName === 'summary') query = query.eq('created_by', currentAuthUser.id);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data?.[0]?.content || '';
+}
+
+async function cacheAIContent(tabName, content) {
+    const { error } = await supabaseClient
+        .from('ai_content')
+        .insert([{ type: tabName, content }]);
+    if (error) console.error('缓存 AI 内容失败:', error);
 }
 
 async function switchAITab(tabName, forceRefresh = false) {
-    currentAITab = tabName;
-    // Update tab style
-    document.querySelectorAll('.ai-tab').forEach(btn => btn.classList.remove('active'));
-    const tabBtn = Array.from(document.querySelectorAll('.ai-tab')).find(b => b.getAttribute('onclick').includes(tabName));
-    if (tabBtn) tabBtn.classList.add('active');
+    if (!AI_TABS.has(tabName)) return;
+    if (!isAuthenticated()) {
+        openLoginModal();
+        return;
+    }
 
-    const contentArea = document.getElementById('aiContentArea');
-    contentArea.innerHTML = '<div class="ai-loading">思考中，请稍候... ✨</div>';
+    currentAITab = tabName;
+    updateAITabState(tabName);
+    setAIContent('思考中，请稍候... ✨', 'loading');
+
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+    const stillCurrent = () => isCurrentAuthSnapshot(epoch, userId) && currentAITab === tabName;
 
     try {
-        // Only check cache if not force refreshing
         if (!forceRefresh) {
-            let validTimeStr = new Date();
-            if (tabName === 'summary') {
-                validTimeStr.setDate(validTimeStr.getDate() - 7); 
-            } else {
-                validTimeStr.setHours(0,0,0,0); 
-            }
-            
-            const { data: existingData, error: qErr } = await supabaseClient
-                .from('ai_content')
-                .select('*')
-                .eq('type', tabName)
-                .gte('created_at', validTimeStr.toISOString())
-                .order('created_at', { ascending: false })
-                .limit(1);
-
-            if (!qErr && existingData && existingData.length > 0) {
-                contentArea.innerHTML = escapeHtml(existingData[0].content);
+            const cached = await getCachedAIContent(tabName);
+            if (!stillCurrent()) return;
+            if (cached) {
+                setAIContent(cached);
                 return;
             }
         }
 
-        let systemPrompt = "";
-        let userPrompt = "";
-        let generatedText = "";
+        if (!hasAIServiceConsent()) {
+            setAIContent('AI 服务默认关闭。请先在“头像 → 设置 → AI 隐私”中阅读说明并主动开启。');
+            return;
+        }
 
+        let generatedText = '';
         if (tabName === 'topic') {
-            systemPrompt = "你是一个温暖、可爱的情感小助手。你的任务是给一对情侣（小蛇和小奚）提供每天的专属互动话题。话题要有趣、能增进感情、或者带来回忆。";
-            userPrompt = "请生成今天的每日话题，直接输出话题本身，语言要亲切、带点俏皮，200字以内。";
-            generatedText = await callDeepSeek(systemPrompt, userPrompt);
-        } 
-        else if (tabName === 'anniversary') {
+            generatedText = await callDeepSeek(
+                '你是一个温暖、可爱的情感小助手，为一对情侣提供能增进感情、唤起回忆的互动话题。',
+                '请生成今天的一个互动话题。直接输出话题，亲切俏皮，200字以内。'
+            );
+        } else if (tabName === 'anniversary') {
             const now = new Date();
-            const currentYear = now.getFullYear();
-            let annivDate = new Date(currentYear, 4, 23);
-            if (now > annivDate) {
-                annivDate = new Date(currentYear + 1, 4, 23);
-            }
-            const diffDays = Math.ceil((annivDate - now) / (1000 * 60 * 60 * 24));
-            
-            if (diffDays <= 7) {
-                systemPrompt = "你是一个深情的爱情文案专家。这对情侣（小蛇和小奚）即将在" + diffDays + "天后迎来他们的相爱纪念日。";
-                userPrompt = "请为他们写一段充满期待和爱意的纪念日倒计时文案。要求：感情真挚，提到还有几天就是纪念日了，300字以内。";
-                generatedText = await callDeepSeek(systemPrompt, userPrompt);
-            } else {
-                contentArea.innerHTML = `距离下一个纪念日（5月23日）还有 ${diffDays} 天，等到只剩7天的时候，我再来给你们写专属情话吧~ 💖`;
-                return; 
-            }
-        } 
-        else if (tabName === 'summary') {
-            const { data: textData } = await supabaseClient
-                .from('moments')
-                .select('author, content, created_at')
-                .eq('type', 'text')
-                .order('created_at', { ascending: false })
-                .limit(10);
-            
-            if (!textData || textData.length === 0) {
-                contentArea.innerHTML = "目前还没有太多文字记录呢，多写点日记，下周我来帮你们做故事总结！";
+            let anniversary = new Date(now.getFullYear(), 4, 23);
+            if (now > anniversary) anniversary = new Date(now.getFullYear() + 1, 4, 23);
+            const days = Math.ceil((anniversary - now) / 86400000);
+            if (days > 7) {
+                if (stillCurrent()) setAIContent(`距离下一个纪念日（5月23日）还有 ${days} 天。剩下 7 天时再来领取专属倒计时情话吧~ 💖`);
                 return;
             }
-            
-            let storyLog = textData.reverse().map(m => {
-                const shortText = m.content.length > 100 ? m.content.substring(0, 100) + '...' : m.content;
-                return `${m.author} 说：${shortText}`;
-            }).join('\n');
-            systemPrompt = "你是一个感情故事的记录员。请根据情侣（小蛇和小奚）最近的文字日记，以第一人称（作为他们回忆的守护者）总结他们近期的感情状态和生活片段。";
-            userPrompt = "日记如下：\n" + storyLog + "\n\n请写一篇优美、温情的“我们的近期故事总结”（400字以内）。";
-            generatedText = await callDeepSeek(systemPrompt, userPrompt);
+            generatedText = await callDeepSeek(
+                `你是爱情文案助手。这对情侣将在 ${days} 天后迎来相爱纪念日。`,
+                '写一段真挚、克制的纪念日倒计时文案，300字以内。'
+            );
+        } else {
+            const storyLog = await loadRecentStoryLog();
+            if (!stillCurrent()) return;
+            if (!storyLog) {
+                setAIContent('目前还没有足够的文字记录。多写一些日记，下周再来生成故事总结吧！');
+                return;
+            }
+            generatedText = await callDeepSeek(
+                '你是情侣回忆的记录员。根据提供的近期日记，以回忆守护者的第一人称总结生活片段；不虚构未提供的事实。',
+                `近期日记：\n${storyLog}\n\n请写一篇温情的近期故事总结，400字以内。`
+            );
         }
 
-        contentArea.innerHTML = escapeHtml(generatedText);
-
-        // Only cache successful results
-        if (generatedText) {
-            await supabaseClient.from('ai_content').insert([{ type: tabName, content: generatedText }]);
-            
-            const retainDate = new Date();
-            retainDate.setDate(retainDate.getDate() - 7);
-            await supabaseClient
-                .from('ai_content')
-                .delete()
-                .neq('type', 'summary')
-                .lt('created_at', retainDate.toISOString());
-            
-            const retainSummaryDate = new Date();
-            retainSummaryDate.setDate(retainSummaryDate.getDate() - 30);
-            await supabaseClient
-                .from('ai_content')
-                .delete()
-                .eq('type', 'summary')
-                .lt('created_at', retainSummaryDate.toISOString());
+        if (!stillCurrent()) return;
+        setAIContent(generatedText);
+        await cacheAIContent(tabName, generatedText);
+    } catch (error) {
+        if (error.message === 'AUTH_REQUIRED' || !stillCurrent()) return;
+        if (error.message === 'AI_CONSENT_REQUIRED') {
+            setAIContent('AI 服务默认关闭。请先在“头像 → 设置 → AI 隐私”中阅读说明并主动开启。');
+            return;
         }
-
-    } catch (err) {
-        console.error("AI 模块出错:", err);
-        contentArea.innerHTML = '<div style="text-align:center;">' +
-            '<div style="margin-bottom:12px;">糟糕，脑电波连接失败啦 🥺</div>' +
-            '<div style="font-size:0.82em; color:var(--text-muted); margin-bottom:16px;">点击上方 🔄 按钮重新尝试</div>' +
-            '</div>';
+        console.error('AI 模块出错:', error);
+        setAIContent('脑电波连接失败啦 🥺 请稍后点击刷新重试。', 'error');
     }
 }
 
 // ==========================================
-// AI Chat Dialog (no persistent storage)
+// AI 对话（仅保存在当前页面内）
 // ==========================================
-let chatHistory = [];
-let isChatSending = false;
-const CHAT_SYSTEM_PROMPT = "你是小蛇和小奚的专属情感小助理，语气温暖、俏皮、可爱。你的任务是帮助这对情侣聊天解闷、提供恋爱建议、推荐约会点子、帮忙化解小矛盾，或者只是陪他们聊聊天。回答要简洁温馨，每次不超过200字。可以适当使用emoji。";
-
 function openAIChatModal() {
-    document.getElementById('aiChatOverlay').showModal();
-    document.getElementById('aiChatInput').focus();
+    if (!isAuthenticated()) {
+        openLoginModal();
+        return;
+    }
+    document.getElementById('aiChatOverlay')?.showModal();
+    document.getElementById('aiChatInput')?.focus();
 }
 
 function closeAIChatModal() {
-    document.getElementById('aiChatOverlay').close();
+    const modal = document.getElementById('aiChatOverlay');
+    if (modal?.open) modal.close();
 }
 
-function handleChatKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
+function handleChatKeyDown(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
         sendChatMessage();
     }
 }
 
-function appendChatMessage(role, text) {
+function appendChatMessage(role, message) {
     const container = document.getElementById('aiChatMessages');
-    const welcome = container.querySelector('.ai-chat-welcome');
-    if (welcome) welcome.remove();
+    if (!container) return null;
+    container.querySelector('.ai-chat-welcome')?.remove();
 
-    const msgDiv = document.createElement('div');
-    msgDiv.className = 'chat-msg ' + (role === 'user' ? 'user' : 'ai');
-    msgDiv.textContent = text;
-    container.appendChild(msgDiv);
+    const messageElement = document.createElement('div');
+    messageElement.className = `chat-msg ${role === 'user' ? 'user' : 'ai'}`;
+    messageElement.textContent = message;
+    container.appendChild(messageElement);
     container.scrollTop = container.scrollHeight;
-    return msgDiv;
+    return messageElement;
 }
 
 async function sendChatMessage() {
-    if (isChatSending) return;
+    if (isChatSending || !isAuthenticated()) return;
     const input = document.getElementById('aiChatInput');
-    const text = input.value.trim();
-    if (!text) return;
+    const sendButton = document.getElementById('aiChatSendBtn');
+    const message = input?.value.trim() || '';
+    if (!message) return;
+    if (message.length > 500) {
+        if (typeof showToast === 'function') showToast('单条消息不能超过 500 个字符');
+        return;
+    }
+    if (!hasAIServiceConsent()) {
+        if (typeof showToast === 'function') {
+            showToast('请先在“头像 → 设置 → AI 隐私”中阅读说明并开启 AI。', 5000);
+        }
+        return;
+    }
 
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
     input.value = '';
     input.style.height = 'auto';
     isChatSending = true;
-    document.getElementById('aiChatSendBtn').disabled = true;
+    if (sendButton) sendButton.disabled = true;
 
-    appendChatMessage('user', text);
-    chatHistory.push({ role: 'user', content: text });
-
-    // Keep only last 6 messages (3 turns) to avoid token overflow
-    const recentHistory = chatHistory.slice(-6);
-
-    const typingMsg = appendChatMessage('ai', '思考中...');
-    typingMsg.classList.add('typing');
+    appendChatMessage('user', message);
+    chatHistory.push({ role: 'user', content: message });
+    chatHistory = chatHistory.slice(-6);
+    const typingMessage = appendChatMessage('ai', '思考中...');
+    typingMessage?.classList.add('typing');
 
     try {
-        const messages = [
+        const reply = await callDeepSeekChat([
             { role: 'system', content: CHAT_SYSTEM_PROMPT },
-            ...recentHistory
-        ];
-        const reply = await callDeepSeekChat(messages);
-
-        typingMsg.textContent = reply;
-        typingMsg.classList.remove('typing');
-
+            ...chatHistory
+        ]);
+        if (!isCurrentAuthSnapshot(epoch, userId) || !typingMessage) return;
+        typingMessage.textContent = reply;
+        typingMessage.classList.remove('typing');
         chatHistory.push({ role: 'assistant', content: reply });
-    } catch (err) {
-        console.error('Chat AI error:', err);
-        typingMsg.textContent = '哎呀，我走神了...再说一次吧~ 🥺';
-        typingMsg.classList.remove('typing');
+        chatHistory = chatHistory.slice(-6);
+    } catch (error) {
+        if (isCurrentAuthSnapshot(epoch, userId) && typingMessage) {
+            typingMessage.textContent = '哎呀，我走神了…稍后再试一次吧~ 🥺';
+            typingMessage.classList.remove('typing');
+        }
+        console.error('AI 对话失败:', error);
     } finally {
         isChatSending = false;
-        document.getElementById('aiChatSendBtn').disabled = false;
-        const container = document.getElementById('aiChatMessages');
-        container.scrollTop = container.scrollHeight;
+        if (sendButton) sendButton.disabled = false;
     }
+}
+
+function clearPrivateFeatureState() {
+    currentAITab = 'topic';
+    chatHistory = [];
+    isChatSending = false;
+    const chatMessages = document.getElementById('aiChatMessages');
+    if (chatMessages) chatMessages.replaceChildren();
+    const aiContent = document.getElementById('aiContentArea');
+    if (aiContent) aiContent.replaceChildren();
+    if (typeof cleanupBlindBox === 'function') cleanupBlindBox();
+    window.currentBlindBoxMoment = null;
 }
