@@ -84,13 +84,15 @@
 
 
         .modal-title {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-family: 'ZCOOL KuaiLe', cursive;
             color: var(--primary);
             margin-bottom: 6px;
             font-size: 1.3em;
             letter-spacing: 2px;
-        
-            text-wrap: balance;}
+        }
 
         .modal-input {
             width: 100%;

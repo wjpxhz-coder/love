@@ -1,10 +1,19 @@
 // ==========================================
-// 心情打卡
+// 心情打卡与月历
 // ==========================================
 const MOOD_EMOJIS = ['', '😢', '😕', '😊', '😄', '🥰'];
-const MOOD_COLORS = ['', '#e8c0c0', '#d4b8d4', '#b8d4c0', '#b8cce8', '#e8b8d0'];
 const MOOD_TIME_ZONE = 'Asia/Shanghai';
+const MOOD_ENTRY_FIELDS = 'id, user_id, date, score, author, note, created_at, updated_at';
+
 let selectedMoodScore = 0;
+let editingMoodId = null;
+let isMoodSaving = false;
+let currentMoodMonthKey = '';
+let moodEntriesByDate = {};
+let moodLoadRequestId = 0;
+let activeMoodDetailDate = '';
+let moodDetailReturnDate = '';
+let todayOwnMoodCount = 0;
 
 function getAppDateKey(date = new Date()) {
     const parts = new Intl.DateTimeFormat('en-US', {
@@ -17,31 +26,102 @@ function getAppDateKey(date = new Date()) {
     return `${values.year}-${values.month}-${values.day}`;
 }
 
-function shiftDateKey(dateKey, days) {
-    const [year, month, day] = dateKey.split('-').map(Number);
-    const shifted = new Date(Date.UTC(year, month - 1, day + days));
-    return shifted.toISOString().slice(0, 10);
+function getCurrentMoodMonthKey() {
+    return getAppDateKey().slice(0, 7);
 }
 
-function openMoodModal() {
+function normalizeMoodMonthKey(monthKey) {
+    return /^\d{4}-\d{2}$/.test(monthKey || '') ? monthKey : getCurrentMoodMonthKey();
+}
+
+function shiftMoodMonth(monthKey, offset) {
+    const [year, month] = normalizeMoodMonthKey(monthKey).split('-').map(Number);
+    const shifted = new Date(Date.UTC(year, month - 1 + offset, 1));
+    return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function getMoodMonthBounds(monthKey) {
+    const normalized = normalizeMoodMonthKey(monthKey);
+    const [year, month] = normalized.split('-').map(Number);
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    return {
+        year,
+        month,
+        daysInMonth,
+        firstDate: `${normalized}-01`,
+        lastDate: `${normalized}-${String(daysInMonth).padStart(2, '0')}`,
+        mondayOffset: (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7
+    };
+}
+
+function formatMoodMonthTitle(monthKey) {
+    const [year, month] = normalizeMoodMonthKey(monthKey).split('-');
+    return `${year} 年 ${Number(month)} 月`;
+}
+
+function formatMoodDateTitle(dateKey) {
+    const [year, month, day] = dateKey.split('-').map(Number);
+    return `${year} 年 ${month} 月 ${day} 日`;
+}
+
+function moodEntryTimestamp(entry) {
+    const value = new Date(entry.created_at || 0).getTime();
+    return Number.isFinite(value) ? value : 0;
+}
+
+function compareMoodEntries(left, right) {
+    const timeDifference = moodEntryTimestamp(left) - moodEntryTimestamp(right);
+    if (timeDifference) return timeDifference;
+    return String(left.id).localeCompare(String(right.id), undefined, { numeric: true });
+}
+
+function getMoodEntryById(entryId) {
+    const targetId = String(entryId);
+    for (const entries of Object.values(moodEntriesByDate)) {
+        const match = entries.find(entry => String(entry.id) === targetId);
+        if (match) return match;
+    }
+    return null;
+}
+
+function resetMoodComposer(entry = null) {
+    selectedMoodScore = entry ? Number(entry.score) : 0;
+    document.querySelectorAll('.mood-emoji-btn').forEach(button => {
+        const selected = Number(button.dataset.score) === selectedMoodScore;
+        button.classList.toggle('selected', selected);
+        button.setAttribute('aria-pressed', String(selected));
+    });
+    document.getElementById('moodNote').value = entry?.note || '';
+    document.getElementById('moodModalMsg').textContent = '';
+}
+
+function openMoodModal(entryId = null) {
     if (!isAuthenticated()) {
         openLoginModal();
         return;
     }
 
-    selectedMoodScore = 0;
-    document.querySelectorAll('.mood-emoji-btn').forEach(button => {
-        button.classList.remove('selected');
-        button.setAttribute('aria-pressed', 'false');
-    });
-    document.getElementById('moodNote').value = '';
-    document.getElementById('moodModalMsg').textContent = '';
+    const entry = entryId === null ? null : getMoodEntryById(entryId);
+    if (entryId !== null && (!entry || entry.user_id !== currentAuthUser.id)) {
+        if (typeof showToast === 'function') showToast('只能编辑自己的心情记录。');
+        return;
+    }
+
+    editingMoodId = entry ? entry.id : null;
+    const title = document.getElementById('mood-modal-title');
+    const submitButton = document.getElementById('mood-submit-button');
+    if (title) title.textContent = entry ? `编辑 ${formatMoodDateTitle(entry.date)} 的心情` : '今日心情打卡 🌈';
+    if (submitButton) submitButton.textContent = entry ? '保存修改' : '记录';
+    resetMoodComposer(entry);
     document.getElementById('moodModal').showModal();
 }
 
 function closeMoodModal() {
+    if (isMoodSaving) return;
     const modal = document.getElementById('moodModal');
     if (modal?.open) modal.close();
+    editingMoodId = null;
+    moodDetailReturnDate = '';
 }
 
 function selectMood(score) {
@@ -63,6 +143,7 @@ async function submitMood() {
         openLoginModal();
         return;
     }
+    if (isMoodSaving) return;
     if (!selectedMoodScore) {
         messageElement.textContent = '请先选择今天的心情哦！';
         return;
@@ -74,93 +155,177 @@ async function submitMood() {
         return;
     }
 
-    const submitButton = document.querySelector('#moodModal .modal-btns button:last-child');
-    const originalText = submitButton?.textContent || '记录';
+    const submitButton = document.getElementById('mood-submit-button');
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
+    const entryBeingEdited = editingMoodId === null ? null : getMoodEntryById(editingMoodId);
+    const returnDate = entryBeingEdited?.date || '';
+    isMoodSaving = true;
     if (submitButton) {
         submitButton.disabled = true;
-        submitButton.textContent = '记录中…';
+        submitButton.textContent = entryBeingEdited ? '保存中…' : '记录中…';
     }
 
     try {
-        const { error } = await supabaseClient.from('moods').upsert([{
-            date: getAppDateKey(),
-            score: selectedMoodScore,
-            note: note || null
-        }], { onConflict: 'user_id,date' });
-        if (error) throw error;
+        let result;
+        if (entryBeingEdited) {
+            result = await supabaseClient
+                .from('moods')
+                .update({ score: selectedMoodScore, note: note || null })
+                .eq('id', entryBeingEdited.id)
+                .eq('user_id', userId)
+                .select(MOOD_ENTRY_FIELDS)
+                .single();
+        } else {
+            result = await supabaseClient
+                .from('moods')
+                .insert([{
+                    date: getAppDateKey(),
+                    score: selectedMoodScore,
+                    note: note || null
+                }])
+                .select(MOOD_ENTRY_FIELDS)
+                .single();
+        }
+        if (result.error) throw result.error;
         if (!isCurrentAuthSnapshot(epoch, userId)) return;
 
-        closeMoodModal();
-        await loadMoods();
+        if (!entryBeingEdited) todayOwnMoodCount += 1;
+
+        document.getElementById('moodModal')?.close();
+        editingMoodId = null;
+        await loadMoods(currentMoodMonthKey || getCurrentMoodMonthKey());
+        if (!isCurrentAuthSnapshot(epoch, userId)) return;
+        if (returnDate) openMoodDayModal(returnDate);
+        if (typeof refreshMoodReminderState === 'function') await refreshMoodReminderState();
     } catch (error) {
         console.error('保存心情失败:', error);
-        messageElement.textContent = '保存失败，请稍后重试。';
+        messageElement.textContent = error?.code === '23505'
+            ? '数据库仍限制每天一条记录，请先执行最新迁移。'
+            : '保存失败，请稍后重试。';
     } finally {
+        isMoodSaving = false;
         if (submitButton) {
             submitButton.disabled = false;
-            submitButton.textContent = originalText;
+            submitButton.textContent = editingMoodId === null ? '记录' : '保存修改';
         }
     }
 }
 
-function renderMoodHeatmap(heatmap, dates, entriesByDate) {
-    const fragment = document.createDocumentFragment();
-    dates.forEach(date => {
-        const entries = entriesByDate[date] || [];
-        const dot = document.createElement('div');
-        if (!entries.length) {
-            dot.className = 'mood-empty-dot';
-            dot.title = date;
-            dot.setAttribute('aria-label', `${date} 没有心情记录`);
-            fragment.appendChild(dot);
-            return;
+function createMoodCalendarCell(dateKey, dayNumber, entries) {
+    const today = getAppDateKey();
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'mood-calendar-day';
+    cell.setAttribute('role', 'gridcell');
+    if (dateKey === today) cell.classList.add('today');
+    if (entries.length) cell.classList.add('has-entries');
+
+    const day = document.createElement('span');
+    day.className = 'mood-calendar-day-number';
+    day.textContent = String(dayNumber);
+    cell.appendChild(day);
+
+    if (entries.length) {
+        const latestByMember = new Map();
+        entries.forEach(entry => latestByMember.set(entry.user_id || entry.author, entry));
+        const previews = document.createElement('span');
+        previews.className = 'mood-calendar-previews';
+        latestByMember.forEach(entry => {
+            const preview = document.createElement('span');
+            preview.className = 'mood-calendar-preview';
+            preview.textContent = MOOD_EMOJIS[Number(entry.score)] || '•';
+            preview.title = `${entry.author || '成员'}：${MOOD_EMOJIS[Number(entry.score)] || ''}`;
+            previews.appendChild(preview);
+        });
+        cell.appendChild(previews);
+
+        if (entries.length > 1) {
+            const count = document.createElement('span');
+            count.className = 'mood-entry-count';
+            count.textContent = `${entries.length} 条`;
+            cell.appendChild(count);
         }
-
-        const total = entries.reduce((sum, entry) => sum + Number(entry.score || 0), 0);
-        const average = Math.max(1, Math.min(5, Math.round(total / entries.length)));
-        const labels = entries.map(entry => {
-            const author = entry.author || '成员';
-            const emoji = MOOD_EMOJIS[Number(entry.score)] || '';
-            return `${author}${emoji}${entry.note ? ` ${entry.note}` : ''}`;
-        }).join(' / ');
-
-        dot.className = 'mood-dot';
-        dot.style.backgroundColor = MOOD_COLORS[average];
-        dot.textContent = MOOD_EMOJIS[average];
-        dot.title = `${date} ${labels}`;
-        dot.setAttribute('aria-label', `${date}：${labels}`);
-        fragment.appendChild(dot);
-    });
-
-    heatmap.replaceChildren(fragment);
+        const labels = entries.map(entry => `${entry.author || '成员'}${MOOD_EMOJIS[Number(entry.score)] || ''}`).join('、');
+        cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}，${entries.length} 条心情记录：${labels}`);
+        cell.addEventListener('click', () => openMoodDayModal(dateKey));
+    } else if (dateKey === today) {
+        cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}，尚未打卡，点击记录`);
+        cell.addEventListener('click', () => openMoodModal());
+    } else {
+        cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}，没有心情记录`);
+        cell.disabled = true;
+    }
+    return cell;
 }
 
-async function loadMoods() {
+function renderMoodCalendar(monthKey, entriesByDate) {
     const heatmap = document.getElementById('mood-heatmap');
+    const monthTitle = document.getElementById('mood-calendar-month');
+    const nextButton = document.getElementById('mood-calendar-next');
+    if (!heatmap || !monthTitle) return;
+
+    const bounds = getMoodMonthBounds(monthKey);
+    monthTitle.textContent = formatMoodMonthTitle(monthKey);
+    if (nextButton) nextButton.disabled = monthKey >= getCurrentMoodMonthKey();
+
+    const fragment = document.createDocumentFragment();
+    for (let index = 0; index < bounds.mondayOffset; index += 1) {
+        const spacer = document.createElement('span');
+        spacer.className = 'mood-calendar-spacer';
+        spacer.setAttribute('aria-hidden', 'true');
+        fragment.appendChild(spacer);
+    }
+
+    for (let day = 1; day <= bounds.daysInMonth; day += 1) {
+        const dateKey = `${monthKey}-${String(day).padStart(2, '0')}`;
+        fragment.appendChild(createMoodCalendarCell(dateKey, day, entriesByDate[dateKey] || []));
+    }
+    heatmap.replaceChildren(fragment);
+    updateMoodCheckinPrompt();
+}
+
+function updateMoodCheckinPrompt() {
+    const label = document.getElementById('mood-checkin-label');
+    const button = document.getElementById('mood-checkin-button');
+    if (label) label.textContent = todayOwnMoodCount ? `今天已记录 ${todayOwnMoodCount} 次` : '今天心情怎么样？';
+    if (button) button.textContent = todayOwnMoodCount ? '✨ 再记一条' : '✨ 打卡心情';
+}
+
+async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKey()) {
+    const heatmap = document.getElementById('mood-heatmap');
+    const status = document.getElementById('mood-calendar-status');
     if (!heatmap) return;
     if (!isAuthenticated()) {
         heatmap.replaceChildren();
         return;
     }
 
+    const requestedMonth = normalizeMoodMonthKey(monthKey);
+    const currentMonth = getCurrentMoodMonthKey();
+    currentMoodMonthKey = requestedMonth > currentMonth ? currentMonth : requestedMonth;
+    const bounds = getMoodMonthBounds(currentMoodMonthKey);
+    const requestId = ++moodLoadRequestId;
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
-    const today = getAppDateKey();
-    const dates = Array.from({ length: 28 }, (_, index) => shiftDateKey(today, index - 27));
+    if (status) status.textContent = '正在加载本月心情…';
 
-    const { data, error } = await supabaseClient
+    let query = supabaseClient
         .from('moods')
-        .select('date, score, author, note')
-        .gte('date', dates[0])
-        .lte('date', dates[dates.length - 1])
-        .order('date', { ascending: true });
+        .select(MOOD_ENTRY_FIELDS)
+        .gte('date', bounds.firstDate)
+        .lte('date', bounds.lastDate)
+        .order('date', { ascending: true })
+        .order('created_at', { ascending: true });
+    if (currentUserProfile?.space_id) query = query.eq('space_id', currentUserProfile.space_id);
+    const { data, error } = await query;
 
-    if (!isCurrentAuthSnapshot(epoch, userId)) return;
+    if (requestId !== moodLoadRequestId || !isCurrentAuthSnapshot(epoch, userId)) return;
     if (error) {
-        console.error('加载心情日历失败:', error);
-        heatmap.replaceChildren();
+        console.error('加载心情月历失败:', error);
+        moodEntriesByDate = {};
+        renderMoodCalendar(currentMoodMonthKey, moodEntriesByDate);
+        if (status) status.textContent = '本月心情加载失败，请稍后重试。';
         return;
     }
 
@@ -169,5 +334,137 @@ async function loadMoods() {
         if (!entriesByDate[entry.date]) entriesByDate[entry.date] = [];
         entriesByDate[entry.date].push(entry);
     });
-    renderMoodHeatmap(heatmap, dates, entriesByDate);
+    Object.values(entriesByDate).forEach(entries => entries.sort(compareMoodEntries));
+    moodEntriesByDate = entriesByDate;
+    if (currentMoodMonthKey === getCurrentMoodMonthKey()) {
+        todayOwnMoodCount = (entriesByDate[getAppDateKey()] || [])
+            .filter(entry => entry.user_id === userId).length;
+    }
+    renderMoodCalendar(currentMoodMonthKey, moodEntriesByDate);
+    if (status) status.textContent = data?.length ? '' : '这个月还没有心情记录。';
+}
+
+function changeMoodMonth(offset) {
+    const nextMonth = shiftMoodMonth(currentMoodMonthKey || getCurrentMoodMonthKey(), Number(offset) || 0);
+    if (nextMonth > getCurrentMoodMonthKey()) return;
+    loadMoods(nextMonth);
+}
+
+function goToCurrentMoodMonth() {
+    loadMoods(getCurrentMoodMonthKey());
+}
+
+function formatMoodEntryTime(entry) {
+    const date = new Date(entry.created_at);
+    if (Number.isNaN(date.getTime())) return '时间未知';
+    return new Intl.DateTimeFormat('zh-CN', {
+        timeZone: MOOD_TIME_ZONE,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).format(date);
+}
+
+function createMoodDayEntry(entry) {
+    const card = document.createElement('article');
+    card.className = `mood-day-entry${entry.user_id === currentAuthUser?.id ? ' own' : ''}`;
+
+    const header = document.createElement('div');
+    header.className = 'mood-day-entry-header';
+    const identity = document.createElement('strong');
+    identity.textContent = `${entry.author || '成员'} ${MOOD_EMOJIS[Number(entry.score)] || ''}`;
+    const time = document.createElement('time');
+    time.dateTime = entry.created_at || '';
+    time.textContent = formatMoodEntryTime(entry);
+    header.append(identity, time);
+    card.appendChild(header);
+
+    const note = document.createElement('p');
+    note.className = `mood-day-entry-note${entry.note ? '' : ' empty'}`;
+    note.textContent = entry.note || '没有留下文字';
+    card.appendChild(note);
+
+    if (entry.user_id === currentAuthUser?.id) {
+        const actions = document.createElement('div');
+        actions.className = 'mood-day-entry-actions';
+        const editButton = document.createElement('button');
+        editButton.type = 'button';
+        editButton.textContent = '编辑';
+        editButton.addEventListener('click', () => editMoodEntry(entry.id));
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'danger';
+        deleteButton.textContent = '删除';
+        deleteButton.addEventListener('click', () => deleteMoodEntry(entry.id));
+        actions.append(editButton, deleteButton);
+        card.appendChild(actions);
+    }
+    return card;
+}
+
+function openMoodDayModal(dateKey) {
+    const entries = moodEntriesByDate[dateKey] || [];
+    if (!entries.length) return;
+    activeMoodDetailDate = dateKey;
+    const title = document.getElementById('mood-day-modal-title');
+    const list = document.getElementById('mood-day-list');
+    if (!title || !list) return;
+    title.textContent = `${formatMoodDateTitle(dateKey)} · ${entries.length} 条`;
+    const fragment = document.createDocumentFragment();
+    entries.forEach(entry => fragment.appendChild(createMoodDayEntry(entry)));
+    list.replaceChildren(fragment);
+    const modal = document.getElementById('moodDayModal');
+    if (modal && !modal.open) modal.showModal();
+}
+
+function closeMoodDayModal() {
+    const modal = document.getElementById('moodDayModal');
+    if (modal?.open) modal.close();
+    activeMoodDetailDate = '';
+}
+
+function editMoodEntry(entryId) {
+    const entry = getMoodEntryById(entryId);
+    if (!entry || entry.user_id !== currentAuthUser?.id) return;
+    moodDetailReturnDate = entry.date;
+    closeMoodDayModal();
+    openMoodModal(entry.id);
+}
+
+async function deleteMoodEntry(entryId) {
+    const entry = getMoodEntryById(entryId);
+    if (!entry || entry.user_id !== currentAuthUser?.id || !isAuthenticated()) return;
+    if (!window.confirm('确定删除这条心情记录吗？删除后无法恢复。')) return;
+
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+    const dateKey = entry.date;
+    const { error } = await supabaseClient
+        .from('moods')
+        .delete()
+        .eq('id', entry.id)
+        .eq('user_id', userId);
+
+    if (!isCurrentAuthSnapshot(epoch, userId)) return;
+    if (error) {
+        console.error('删除心情失败:', error);
+        if (typeof showToast === 'function') showToast('删除失败，请稍后重试。');
+        return;
+    }
+
+    if (dateKey === getAppDateKey()) todayOwnMoodCount = Math.max(0, todayOwnMoodCount - 1);
+    closeMoodDayModal();
+    await loadMoods(currentMoodMonthKey);
+    if ((moodEntriesByDate[dateKey] || []).length) openMoodDayModal(dateKey);
+    if (typeof refreshMoodReminderState === 'function') await refreshMoodReminderState();
+}
+
+function resetMoodState() {
+    moodLoadRequestId += 1;
+    currentMoodMonthKey = '';
+    moodEntriesByDate = {};
+    activeMoodDetailDate = '';
+    editingMoodId = null;
+    isMoodSaving = false;
+    todayOwnMoodCount = 0;
 }

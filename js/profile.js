@@ -376,6 +376,12 @@ function openSettingsModal() {
     const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
     updateSettingsThemeButtons(currentTheme);
     if (typeof syncAIPrivacySetting === 'function') syncAIPrivacySetting();
+    const reminderMessage = document.getElementById('mood-reminder-message');
+    if (reminderMessage) reminderMessage.textContent = '';
+    if (typeof loadMoodReminderSettings === 'function') {
+        applyMoodReminderSettingsToForm();
+        loadMoodReminderSettings({ syncForm: true });
+    }
     modal.showModal();
 }
 
