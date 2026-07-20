@@ -121,12 +121,24 @@
     </section>
 
     <section class="mood-section">
-        <h2 class="mood-section-title">🌈 心情日历</h2>
+        <div class="mood-calendar-heading">
+            <h2 class="mood-section-title">🌈 心情日历</h2>
+            <button class="mood-today-btn" id="mood-calendar-today" type="button" onclick="goToCurrentMoodMonth()">回到今天</button>
+        </div>
         <div id="mood-unlocked-content">
-            <div class="mood-heatmap" id="mood-heatmap"></div>
+            <div class="mood-calendar-toolbar" aria-label="心情日历月份导航">
+                <button class="mood-month-nav" type="button" onclick="changeMoodMonth(-1)" aria-label="查看上个月">‹</button>
+                <div class="mood-calendar-month" id="mood-calendar-month" aria-live="polite"></div>
+                <button class="mood-month-nav" id="mood-calendar-next" type="button" onclick="changeMoodMonth(1)" aria-label="查看下个月">›</button>
+            </div>
+            <div class="mood-weekdays" aria-hidden="true">
+                <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+            </div>
+            <div class="mood-calendar-grid" id="mood-heatmap" role="grid" aria-label="心情打卡月历"></div>
+            <div class="mood-calendar-status" id="mood-calendar-status" role="status" aria-live="polite"></div>
             <div class="mood-checkin-row">
-                <span class="mood-checkin-label">今天心情怎么样？</span>
-                <button class="btn-mood" onclick="checkPassword('mood')">✨ 打卡心情</button>
+                <span class="mood-checkin-label" id="mood-checkin-label">今天心情怎么样？</span>
+                <button class="btn-mood" id="mood-checkin-button" onclick="checkPassword('mood')">✨ 打卡心情</button>
             </div>
         </div>
         <div class="locked-card" id="mood-locked-card" style="display: none;">
@@ -170,7 +182,7 @@
                 <span style="font-size: 2em; color: var(--text-muted); font-weight: 300;" aria-hidden="true">+</span>
             </button>
         </div>
-        <input type="file" id="momentPhotoInput" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" multiple style="display:none;" onchange="handleMomentPhotoSelect(event)">
+        <input type="file" id="momentPhotoInput" accept="image/*,video/*" multiple style="display:none;" onchange="handleMomentPhotoSelect(event)">
         
         <!-- 新增的录音控件 -->
         <div class="moment-audio-section" style="margin: 12px 0; display: flex; align-items: center; gap: 8px;">
@@ -213,7 +225,18 @@
         <div class="modal-msg" id="moodModalMsg" role="status" aria-live="polite"></div>
         <div class="modal-btns">
             <button class="btn-cancel" onclick="closeMoodModal()">取消</button>
-            <button onclick="submitMood()">记录</button>
+            <button id="mood-submit-button" onclick="submitMood()">记录</button>
+        </div>
+    </div>
+</dialog>
+
+<!-- 单日心情详情弹窗 -->
+<dialog class="native-dialog mood-day-dialog" id="moodDayModal" aria-labelledby="mood-day-modal-title">
+    <div class="modal-box mood-day-modal-box">
+        <h2 class="modal-title" id="mood-day-modal-title">心情记录</h2>
+        <div class="mood-day-list" id="mood-day-list"></div>
+        <div class="modal-btns">
+            <button class="btn-cancel" type="button" onclick="closeMoodDayModal()">关闭</button>
         </div>
     </div>
 </dialog>
@@ -488,6 +511,21 @@
                 <span>允许使用 DeepSeek AI 服务</span>
             </label>
             <div class="settings-tip" id="ai-privacy-tip">默认关闭。开启后，您主动发送的对话会传给 DeepSeek；生成“回忆总结”时，还会发送由当前账号发布的最多 20 条文字日记（总计不超过 4,000 字），不会发送伴侣发布的日记。可随时关闭。</div>
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-label">🌈 每日打卡提醒</div>
+            <label class="mood-reminder-toggle" for="mood-reminder-enabled">
+                <input type="checkbox" id="mood-reminder-enabled" onchange="handleMoodReminderEnabledChange()" aria-describedby="mood-reminder-tip">
+                <span>开启站内提醒</span>
+            </label>
+            <label class="mood-reminder-time-row" for="mood-reminder-time">
+                <span>提醒时间</span>
+                <input type="time" id="mood-reminder-time" value="21:00" step="60">
+            </label>
+            <button class="btn-settings-action mood-reminder-save" id="mood-reminder-save" type="button" onclick="saveMoodReminderSettings()">保存提醒设置</button>
+            <div class="settings-tip" id="mood-reminder-tip">默认每天 21:00 提醒。仅在网站打开时显示站内消息，完成当天打卡后自动清除。</div>
+            <div class="settings-tip mood-reminder-message" id="mood-reminder-message" role="status" aria-live="polite"></div>
         </div>
         
         <div class="settings-group">

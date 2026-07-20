@@ -115,6 +115,9 @@
         .notification-item.unread {
             background: rgba(212, 160, 168, 0.1);
         }
+        .mood-reminder-notification {
+            border-left: 3px solid var(--primary);
+        }
         .notification-time {
             font-size: 0.75em;
             color: var(--text-muted);

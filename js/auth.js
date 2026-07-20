@@ -336,7 +336,8 @@ function scrubPrivateDom() {
         'stat-photos': '0',
         'edit-msg': '',
         'momentModalMsg': '',
-        'moodModalMsg': ''
+        'moodModalMsg': '',
+        'mood-reminder-message': ''
     };
     Object.entries(textDefaults).forEach(([id, value]) => {
         const element = document.getElementById(id);
@@ -355,6 +356,13 @@ function scrubPrivateDom() {
     if (milestoneCheckbox) milestoneCheckbox.checked = false;
     const aiConsent = document.getElementById('ai-service-consent');
     if (aiConsent) aiConsent.checked = false;
+    const moodReminderEnabled = document.getElementById('mood-reminder-enabled');
+    if (moodReminderEnabled) moodReminderEnabled.checked = true;
+    const moodReminderTime = document.getElementById('mood-reminder-time');
+    if (moodReminderTime) {
+        moodReminderTime.value = '21:00';
+        moodReminderTime.disabled = false;
+    }
 
     const momentTitle = document.getElementById('moment-modal-title');
     if (momentTitle) momentTitle.textContent = '✨ 发布动态';
@@ -364,7 +372,7 @@ function scrubPrivateDom() {
         button.setAttribute('aria-pressed', 'false');
     });
 
-    ['milestonesContent', 'blindBoxContent', 'aiContentArea', 'aiChatMessages'].forEach(id => {
+    ['milestonesContent', 'blindBoxContent', 'aiContentArea', 'aiChatMessages', 'mood-day-list'].forEach(id => {
         document.getElementById(id)?.replaceChildren();
     });
 }
@@ -390,6 +398,7 @@ async function resetAuthenticatedUI() {
     if (typeof clearSignedMediaCache === 'function') clearSignedMediaCache();
     if (typeof resetNotificationState === 'function') resetNotificationState();
     else if (typeof processedMissIds !== 'undefined') processedMissIds.clear();
+    if (typeof resetMoodState === 'function') resetMoodState();
     const presenceCleanup = typeof cleanupPresence === 'function'
         ? cleanupPresence()
         : Promise.resolve();
@@ -426,6 +435,8 @@ async function resetAuthenticatedUI() {
         timeline.appendChild(empty);
     }
     document.getElementById('mood-heatmap')?.replaceChildren();
+    const moodStatus = document.getElementById('mood-calendar-status');
+    if (moodStatus) moodStatus.textContent = '';
 
     const notificationList = document.getElementById('notification-list');
     if (notificationList) {

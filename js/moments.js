@@ -13,11 +13,12 @@ const momentPhotoPreviewUrls = new Set();
 let isMomentSubmitting = false;
 const MAX_MOMENT_TEXT_LENGTH = 2000;
 const MAX_MOMENT_MEDIA_COUNT = 9;
-const MAX_MOMENT_MEDIA_BYTES = 20 * 1024 * 1024;
-const ALLOWED_MOMENT_MEDIA_TYPES = new Set([
-    'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-    'video/mp4', 'video/webm', 'video/quicktime'
-]);
+const MAX_MOMENT_MEDIA_BYTES = 100 * 1024 * 1024;
+function isAllowedMomentMedia(file) {
+    if (file.type.startsWith('image/') || file.type.startsWith('video/')) return true;
+    const ext = String(file.name).split('.').pop().toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4', 'webm', 'mov', 'm4v'].includes(ext);
+}
 
 function hasMomentAuthContext() {
     return typeof currentAuthUser !== 'undefined' && Boolean(currentAuthUser) && Boolean(currentAuthor);
@@ -161,7 +162,7 @@ function openMomentModal() {
     resetMomentComposer();
 
     const titleEl = modal.querySelector('.modal-title');
-    
+
     const p = allProfilesCache[currentAuthor] || {};
     if (titleEl) {
         titleEl.replaceChildren();
@@ -197,7 +198,7 @@ function openMomentModal() {
         btnAudio.disabled = false;
     }
     if (previewAudio) previewAudio.style.display = 'none';
-    
+
     modal.showModal();
     setTimeout(() => input.focus(), 100);
 }
@@ -221,11 +222,11 @@ function handleMomentPhotoSelect(event) {
     if (!previewContainer) return;
     const addBtn = previewContainer.querySelector('.moment-image-add-btn');
     const availableSlots = Math.max(0, MAX_MOMENT_MEDIA_COUNT - momentSelectedFiles.length - (momentAudioBlob ? 1 : 0));
-    const validFiles = files.filter(file => ALLOWED_MOMENT_MEDIA_TYPES.has(file.type) && file.size <= MAX_MOMENT_MEDIA_BYTES);
+    const validFiles = files.filter(file => isAllowedMomentMedia(file) && file.size <= MAX_MOMENT_MEDIA_BYTES);
     const acceptedFiles = validFiles.slice(0, availableSlots);
     if (acceptedFiles.length !== files.length) {
         const msgEl = document.getElementById('momentModalMsg');
-        if (msgEl) msgEl.textContent = '最多添加 9 个媒体；单个文件不超过 20MB，仅支持常见 JPG/PNG/WebP/GIF、MP4/WebM/MOV。';
+        if (msgEl) msgEl.textContent = '最多添加 9 个媒体；单个文件不超过 100MB，仅支持常见图文或视频。';
     }
     acceptedFiles.forEach(file => {
         momentSelectedFiles.push(file);
@@ -266,6 +267,86 @@ function handleMomentPhotoSelect(event) {
     document.getElementById('momentPhotoInput').value = '';
 }
 
+// --- 视频压缩功能 ---
+let ffmpegInstance = null;
+
+async function getFFmpeg() {
+    if (ffmpegInstance) return ffmpegInstance;
+
+    await new Promise((resolve, reject) => {
+        if (window.FFmpegWASM) return resolve();
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+
+    await new Promise((resolve, reject) => {
+        if (window.FFmpegUtil) return resolve();
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+
+    const { FFmpeg } = window.FFmpegWASM;
+    const ffmpeg = new FFmpeg();
+    await ffmpeg.load({
+        coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+        wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm'
+    });
+    ffmpegInstance = ffmpeg;
+    return ffmpeg;
+}
+
+function isMomentVideoFile(file) {
+    if (file.type.startsWith('video/')) return true;
+    const ext = String(file.name).split('.').pop().toLowerCase();
+    return ['mp4', 'webm', 'mov', 'm4v', 'quicktime'].includes(ext);
+}
+
+async function compressVideoFile(file, onProgress) {
+    try {
+        const ffmpeg = await getFFmpeg();
+        const { fetchFile } = window.FFmpegUtil;
+
+        ffmpeg.on('progress', ({ progress }) => {
+            if (onProgress) onProgress(Math.round(progress * 100));
+        });
+
+        const inputExt = getMomentFileExtension(file) || 'mp4';
+        const inputName = 'input.' + (inputExt === 'bin' ? 'mp4' : inputExt);
+        const outputName = 'output.mp4';
+
+        await ffmpeg.writeFile(inputName, await fetchFile(file));
+
+        await ffmpeg.exec([
+            '-i', inputName,
+            '-vcodec', 'libx264',
+            '-crf', '28',
+            '-preset', 'ultrafast',
+            outputName
+        ]);
+
+        const data = await ffmpeg.readFile(outputName);
+        const newBlob = new Blob([data.buffer], { type: 'video/mp4' });
+
+        await ffmpeg.deleteFile(inputName);
+        await ffmpeg.deleteFile(outputName);
+        ffmpeg.off('progress');
+
+        return new File([newBlob], file.name.replace(/\.[^/.]+$/, "") + "_compressed.mp4", {
+            type: 'video/mp4'
+        });
+    } catch (e) {
+        console.error("Video compression failed", e);
+        if (ffmpegInstance) ffmpegInstance.off('progress');
+        return file;
+    }
+}
+
 async function submitMomentPost() {
     if (!hasMomentAuthContext() || isMomentSubmitting) return;
     const requestAuthEpoch = getMomentAuthEpoch();
@@ -281,7 +362,7 @@ async function submitMomentPost() {
         return;
     }
     if (momentSelectedFiles.length + (momentAudioBlob ? 1 : 0) > MAX_MOMENT_MEDIA_COUNT
-        || momentSelectedFiles.some(file => !ALLOWED_MOMENT_MEDIA_TYPES.has(file.type) || file.size > MAX_MOMENT_MEDIA_BYTES)
+        || momentSelectedFiles.some(file => !isAllowedMomentMedia(file) || file.size > MAX_MOMENT_MEDIA_BYTES)
         || (momentAudioBlob && momentAudioBlob.size > MAX_MOMENT_MEDIA_BYTES)) {
         msgEl.textContent = '媒体数量、格式或大小不符合要求，请重新选择。';
         return;
@@ -304,10 +385,19 @@ async function submitMomentPost() {
     try {
         let uploadedUrls = [];
         if (momentSelectedFiles.length > 0) {
-            for (const file of momentSelectedFiles) {
+            for (let i = 0; i < momentSelectedFiles.length; i++) {
+                let file = momentSelectedFiles[i];
+                if (isMomentVideoFile(file) && file.size > 20 * 1024 * 1024) {
+                    btn.textContent = '⏳ 准备压缩...';
+                    file = await compressVideoFile(file, (progress) => {
+                        btn.textContent = `⏳ 压缩视频 ${progress}%...`;
+                    });
+                    btn.textContent = '⏳ 发布中…';
+                    momentSelectedFiles[i] = file;
+                }
                 const fileExt = getMomentFileExtension(file);
                 const fileName = `${storageDirectory}/${Date.now()}_${Math.random().toString(36).substring(2,9)}.${fileExt}`;
-                const { error } = await supabaseClient.storage.from('photos').upload(fileName, file, { contentType: file.type, upsert: false });
+                const { error } = await supabaseClient.storage.from('photos').upload(fileName, file, { contentType: file.type || 'application/octet-stream', upsert: false });
                 if (error) throw error;
                 uploadedObjectPaths.push(fileName);
                 uploadedUrls.push(createStorageReference(fileName));
