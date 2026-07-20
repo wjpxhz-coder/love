@@ -11,7 +11,6 @@ let isMomentRecording = false;
 let momentAudioPreviewUrl = null;
 const momentPhotoPreviewUrls = new Set();
 let isMomentSubmitting = false;
-const MAX_MOMENT_TEXT_LENGTH = 2000;
 const MAX_MOMENT_MEDIA_COUNT = 9;
 const MAX_MOMENT_MEDIA_BYTES = 100 * 1024 * 1024;
 function isAllowedMomentMedia(file) {
@@ -357,10 +356,7 @@ async function submitMomentPost() {
         msgEl.innerText = '写点什么、发张照片或录段声音吧！';
         return;
     }
-    if (text.length > MAX_MOMENT_TEXT_LENGTH) {
-        msgEl.textContent = '正文最多 2000 个字符。';
-        return;
-    }
+
     if (momentSelectedFiles.length + (momentAudioBlob ? 1 : 0) > MAX_MOMENT_MEDIA_COUNT
         || momentSelectedFiles.some(file => !isAllowedMomentMedia(file) || file.size > MAX_MOMENT_MEDIA_BYTES)
         || (momentAudioBlob && momentAudioBlob.size > MAX_MOMENT_MEDIA_BYTES)) {
