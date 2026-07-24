@@ -128,10 +128,17 @@
         <div id="mood-unlocked-content">
             <div class="mood-calendar-toolbar" aria-label="心情日历月份导航">
                 <button class="mood-month-nav" type="button" onclick="changeMoodMonth(-1)" aria-label="查看上个月">‹</button>
-                <label class="mood-month-picker" for="mood-calendar-month">
-                    <span class="visually-hidden">选择心情日历年月</span>
-                    <input id="mood-calendar-month" type="month" onchange="selectMoodMonth(this.value)" aria-describedby="mood-calendar-status">
-                </label>
+                <div class="mood-month-picker" role="group" aria-label="选择心情日历年月">
+                    <label class="visually-hidden" for="mood-calendar-year">年份</label>
+                    <select id="mood-calendar-year" onchange="selectMoodMonthFromPicker()" aria-describedby="mood-calendar-status"></select>
+                    <label class="visually-hidden" for="mood-calendar-month">月份</label>
+                    <select id="mood-calendar-month" onchange="selectMoodMonthFromPicker()" aria-describedby="mood-calendar-status">
+                        <option value="01">1 月</option><option value="02">2 月</option><option value="03">3 月</option>
+                        <option value="04">4 月</option><option value="05">5 月</option><option value="06">6 月</option>
+                        <option value="07">7 月</option><option value="08">8 月</option><option value="09">9 月</option>
+                        <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
+                    </select>
+                </div>
                 <button class="mood-month-nav" id="mood-calendar-next" type="button" onclick="changeMoodMonth(1)" aria-label="查看下个月">›</button>
             </div>
             <div class="mood-weekdays" aria-hidden="true">
