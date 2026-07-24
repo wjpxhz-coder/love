@@ -59,6 +59,29 @@ function formatMoodMonthTitle(monthKey) {
     return `${year} 年 ${Number(month)} 月`;
 }
 
+function updateMoodMonthPicker(monthKey) {
+    const yearPicker = document.getElementById('mood-calendar-year');
+    const monthPicker = document.getElementById('mood-calendar-month');
+    if (!yearPicker || !monthPicker) return false;
+
+    const [selectedYear, selectedMonth] = normalizeMoodMonthKey(monthKey).split('-');
+    const currentYear = Number(getCurrentMoodMonthKey().slice(0, 4));
+    const firstYear = 2000;
+    if (yearPicker.options.length !== currentYear - firstYear + 1) {
+        const options = document.createDocumentFragment();
+        for (let year = currentYear; year >= firstYear; year -= 1) {
+            const option = document.createElement('option');
+            option.value = String(year);
+            option.textContent = `${year} 年`;
+            options.appendChild(option);
+        }
+        yearPicker.replaceChildren(options);
+    }
+    yearPicker.value = selectedYear;
+    monthPicker.value = selectedMonth;
+    return true;
+}
+
 function formatMoodDateTitle(dateKey) {
     const [year, month, day] = dateKey.split('-').map(Number);
     return `${year} 年 ${month} 月 ${day} 日`;
@@ -261,14 +284,11 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
 
 function renderMoodCalendar(monthKey, entriesByDate) {
     const heatmap = document.getElementById('mood-heatmap');
-    const monthPicker = document.getElementById('mood-calendar-month');
     const nextButton = document.getElementById('mood-calendar-next');
-    if (!heatmap || !monthPicker) return;
+    if (!heatmap || !updateMoodMonthPicker(monthKey)) return;
 
     const bounds = getMoodMonthBounds(monthKey);
     const currentMonth = getCurrentMoodMonthKey();
-    monthPicker.value = monthKey;
-    monthPicker.max = currentMonth;
     if (nextButton) nextButton.disabled = monthKey >= currentMonth;
 
     const fragment = document.createDocumentFragment();
@@ -359,6 +379,12 @@ function selectMoodMonth(monthKey) {
         return;
     }
     loadMoods(selectedMonth);
+}
+
+function selectMoodMonthFromPicker() {
+    const year = document.getElementById('mood-calendar-year')?.value;
+    const month = document.getElementById('mood-calendar-month')?.value;
+    selectMoodMonth(`${year}-${month}`);
 }
 
 function goToCurrentMoodMonth() {

@@ -56,21 +56,26 @@
 }
 
 .mood-month-picker {
-    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 5px;
 }
 
-.mood-month-picker input {
+.mood-month-picker select {
     min-height: 34px;
     border: 1px solid var(--glass-border);
-    border-radius: 18px;
-    padding: 5px 10px;
+    border-radius: 10px;
+    padding: 5px 7px;
     background: rgba(255,255,255,0.42);
     color: var(--text);
     font: inherit;
     font-weight: 700;
-    letter-spacing: 0.4px;
+    letter-spacing: 0;
     cursor: pointer;
 }
+
+#mood-calendar-year { width: 78px; }
+#mood-calendar-month { width: 67px; }
 
 .mood-month-nav {
     width: 34px;
