@@ -55,10 +55,21 @@
     font-size: 0.76em;
 }
 
-.mood-calendar-month {
+.mood-month-picker {
+    position: relative;
+}
+
+.mood-month-picker input {
+    min-height: 34px;
+    border: 1px solid var(--glass-border);
+    border-radius: 18px;
+    padding: 5px 10px;
+    background: rgba(255,255,255,0.42);
     color: var(--text);
+    font: inherit;
     font-weight: 700;
-    letter-spacing: 1px;
+    letter-spacing: 0.4px;
+    cursor: pointer;
 }
 
 .mood-month-nav {
