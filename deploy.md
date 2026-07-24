@@ -4,6 +4,14 @@
 
 ## 1. 本地校验
 在本地完成代码修改后，先验证：
+```bash
+npm run typecheck && npm test -- --run && npm run build
+```
+或者分步运行：
+1. **类型检查**：`npm run typecheck`
+2. **运行测试**：`npm test -- --run`
+3. **本地构建**：`npm run build`
+
 > **提示**：如果是纯静态页面（如本项目没有 `package.json`），可跳过此步，但仍需手动确认页面语法无错。
 
 ## 2. 敏感信息检查

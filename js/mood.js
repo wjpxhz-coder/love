@@ -261,13 +261,15 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
 
 function renderMoodCalendar(monthKey, entriesByDate) {
     const heatmap = document.getElementById('mood-heatmap');
-    const monthTitle = document.getElementById('mood-calendar-month');
+    const monthPicker = document.getElementById('mood-calendar-month');
     const nextButton = document.getElementById('mood-calendar-next');
-    if (!heatmap || !monthTitle) return;
+    if (!heatmap || !monthPicker) return;
 
     const bounds = getMoodMonthBounds(monthKey);
-    monthTitle.textContent = formatMoodMonthTitle(monthKey);
-    if (nextButton) nextButton.disabled = monthKey >= getCurrentMoodMonthKey();
+    const currentMonth = getCurrentMoodMonthKey();
+    monthPicker.value = monthKey;
+    monthPicker.max = currentMonth;
+    if (nextButton) nextButton.disabled = monthKey >= currentMonth;
 
     const fragment = document.createDocumentFragment();
     for (let index = 0; index < bounds.mondayOffset; index += 1) {
@@ -348,6 +350,15 @@ function changeMoodMonth(offset) {
     const nextMonth = shiftMoodMonth(currentMoodMonthKey || getCurrentMoodMonthKey(), Number(offset) || 0);
     if (nextMonth > getCurrentMoodMonthKey()) return;
     loadMoods(nextMonth);
+}
+
+function selectMoodMonth(monthKey) {
+    const selectedMonth = normalizeMoodMonthKey(monthKey);
+    if (selectedMonth > getCurrentMoodMonthKey()) {
+        goToCurrentMoodMonth();
+        return;
+    }
+    loadMoods(selectedMonth);
 }
 
 function goToCurrentMoodMonth() {

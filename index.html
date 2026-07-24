@@ -128,7 +128,10 @@
         <div id="mood-unlocked-content">
             <div class="mood-calendar-toolbar" aria-label="心情日历月份导航">
                 <button class="mood-month-nav" type="button" onclick="changeMoodMonth(-1)" aria-label="查看上个月">‹</button>
-                <div class="mood-calendar-month" id="mood-calendar-month" aria-live="polite"></div>
+                <label class="mood-month-picker" for="mood-calendar-month">
+                    <span class="visually-hidden">选择心情日历年月</span>
+                    <input id="mood-calendar-month" type="month" onchange="selectMoodMonth(this.value)" aria-describedby="mood-calendar-status">
+                </label>
                 <button class="mood-month-nav" id="mood-calendar-next" type="button" onclick="changeMoodMonth(1)" aria-label="查看下个月">›</button>
             </div>
             <div class="mood-weekdays" aria-hidden="true">
