@@ -1,74 +1,157 @@
-# `ai-chat` Edge Function release requirements
+# `ai-chat` Agnes 2.0 release requirements
 
-`index.ts` implements this trust boundary. Deployment remains blocked until the
-implementation and every item below pass staging tests; a permissive fallback
-would turn the project into an unauthenticated paid-model proxy.
+`index.ts` is the only supported production AI gateway. It fixes the Agnes
+endpoint, model, sampling and output ceiling server-side and never accepts
+provider configuration or image URLs from a browser.
 
-## Gateway and identity
+## Emergency maintenance deployment
 
-- Deploy with JWT verification enabled. Never use `--no-verify-jwt`.
-- Require one `Authorization: Bearer <access token>` header. Reject missing,
-  malformed, expired and refresh tokens.
-- Resolve the user from the verified token; never accept `user_id`, `username`,
-  `space_id`, role or membership from JSON input.
-- Query the caller's `profiles.user_id = auth user id` row with the caller's JWT
-  (or a narrowly scoped server client), then verify the corresponding
-  `(space_id,user_id)` membership. Reject an unmapped user before any AI call.
-- Never return a service-role key, provider key or raw upstream error body.
+`maintenance.ts` is a provider-free, origin-restricted fallback. It still
+requires a valid Auth user, mapped profile and current space membership before
+returning `503 SERVICE_MAINTENANCE`.
 
-## CORS and HTTP surface
+To deploy it, temporarily add the following line to the existing function block
+in `supabase/config.toml` (the path is relative to `supabase/config.toml`):
 
-- Maintain an exact HTTPS origin allowlist in a deployed environment variable.
-  Do not reflect arbitrary `Origin` and do not use `*` with Authorization.
-- Answer `OPTIONS` only for allowlisted origins and only advertise `POST`,
-  `authorization`, `content-type` and the required Supabase client headers.
-- Reject non-`POST` requests with `405` and set `Vary: Origin`.
-- Require `application/json` and enforce a small request-body byte limit before
-  parsing. Reject duplicate/unknown top-level fields if practical.
+```toml
+[functions.ai-chat]
+verify_jwt = true
+entrypoint = "./functions/ai-chat/maintenance.ts"
+```
 
-## Message validation
+Then deploy normally:
 
-- Accept one `messages` array only.
-- Limit the array to at most 20 items and total content to at most 12,000 UTF-8
-  characters (or a stricter token-aware limit).
-- Every item must contain only a role in `system`, `user`, `assistant` and a
-  string `content`; limit each content value to 4,000 characters.
-- Reject empty content, nested objects, tool/function messages, URLs supplied as
-  provider endpoints, and client-provided model/sampling/billing controls.
-- Prepend the audited server system prompt. Client `system` content is context,
-  not authority, and cannot override privacy/safety/format limits.
+```powershell
+supabase functions deploy ai-chat --project-ref YOUR_PROJECT_REF
+```
 
-## Provider and cost controls
+Never pass `--no-verify-jwt`. Verify a missing token is rejected, a disallowed
+Origin is rejected, an unmapped user is rejected, and a valid member receives
+`503 SERVICE_MAINTENANCE`. To restore Agnes, remove only the `entrypoint` line,
+leave `verify_jwt = true`, deploy again, and repeat the authorization tests.
+Never roll back to an older function version that had JWT verification disabled.
 
-- Read `DEEPSEEK_API_KEY` only from Supabase Edge Function secrets.
-- Fix the provider HTTPS endpoint and model server-side. The current audited
-  model is `deepseek-v4-flash`. Do not accept `model`,
-  `base_url`, `max_tokens`, `temperature`, streaming targets or API keys from
-  the client.
-- Enforce a server maximum output (recommended no more than 800 tokens), request
-  timeout, response-size ceiling and safe fixed sampling settings.
-- Add a distributed per-user/per-space rate limit and daily token/cost quota.
-  In-memory counters are insufficient because Edge instances are ephemeral.
-- Abort upstream work when the client disconnects where supported.
+## Secrets and fixed provider configuration
 
-## Data handling and observability
+- Delete/reset every Agnes key ever pasted into chat, source, screenshots or
+  logs before deployment.
+- Configure the replacement only as the Edge Function secret `AGNES_API_KEY`.
+- Remove the obsolete `DEEPSEEK_API_KEY` secret after the maintenance version is
+  live.
+- Set `AI_CHAT_ALLOWED_ORIGINS` to exactly `https://wjpxhz-coder.github.io`.
+- The production code calls only
+  `https://apihub.agnes-ai.com/v1/chat/completions` with `agnes-2.0-flash`,
+  `stream=false`, `max_tokens=800`, `temperature=0.7`, and a 60-second timeout.
 
-- Obtain explicit in-product consent before sending diary content to DeepSeek.
-- Send only the minimum selected diary excerpts; never query an entire space by
-  default and never accept another space id from the client.
-- Log request id, caller UUID, status, latency and coarse token counts. Do not
-  log messages, diary text, Authorization headers, signed URLs or provider keys.
-- Return stable, non-sensitive error codes to the browser. Keep raw provider
-  diagnostics in access-controlled server telemetry only.
-- Document retention/deletion behavior and provide a user-visible way to disable
-  AI processing.
+## Browser request contract
 
-## Required tests before deployment
+Every Agnes request must include `X-Agnes-Consent-Version: agnes-2.0-v1`. This
+is checked after Auth/membership and before quota/provider access, so a cached
+pre-Agnes client cannot reuse its old provider consent. Missing or different
+markers return `428 AGNES_CONSENT_VERSION_REQUIRED`.
 
-- no token, expired token, anon key and refresh token are rejected;
-- a valid but unmapped Auth user is rejected;
-- both mapped members succeed, while a forged space/user field has no effect;
-- disallowed origin/preflight, oversized body, 21 messages, 4,001-character
-  content, unknown role and client model/token settings are rejected;
-- quota exhaustion does not call the provider;
-- provider timeout/error does not leak secrets or raw response bodies.
+The JSON object may contain only `messages` and optional `attachments`:
+
+```ts
+type AIRequest = {
+  messages: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }>;
+  attachments?: Array<
+    | { source: "temporary"; path: string }
+    | { source: "moment"; moment_id: string; image_index: number }
+  >;
+};
+```
+
+- `moment_id` is a positive decimal string, preserving PostgreSQL `bigint`
+  precision. JavaScript numbers are rejected.
+- A legacy `moments.type = 'photo'` row has only `image_index = 0`.
+- A structured `moments.type = 'moment'` row uses the original zero-based
+  `images[]` array index.
+- Temporary paths must be
+  `<current space UUID>/<current Auth user UUID>/<non-empty remainder>`.
+- A caller may select at most nine images. Only JPEG, PNG and WebP are allowed,
+  each object is at most 10 MiB, and the combined size is at most 40 MiB.
+  Storage MIME metadata is not trusted by itself: the function fetches a bounded
+  prefix through the signed URL and verifies the matching JPEG, PNG or WebP file
+  signature before Agnes is called.
+- The server accepts diary references only after querying the moment through the
+  caller's JWT/RLS. It resolves only `storage://photos/...` references or exact
+  HTTPS public-object URLs on this project's Supabase origin.
+- The browser cannot submit a model, base URL, API key, signed URL or arbitrary
+  image URL. Unknown top-level and attachment fields are rejected.
+
+The server validates Storage metadata, creates 300-second signed URLs, and adds
+the images to the final user message as Agnes `image_url` content blocks.
+Temporary `ai-inputs` objects are deleted in one `finally` path after success,
+validation failure, quota failure, provider error or timeout. The browser also
+drains active uploads before an explicit logout and removes caller-owned stale
+objects on the next login. Diary originals in `photos` are never deleted. Image
+references are not persisted by the function.
+
+## Identity, quotas and observability
+
+- The gateway and function both require `Authorization: Bearer <access token>`.
+- CORS permits the fixed Agnes consent header only from the pinned production
+  Pages origin.
+- The function resolves the user with `auth.getUser(token)`, then checks
+  `profiles` and `space_members` through the same caller-scoped client.
+- `claim_ai_chat_quota()` remains the distributed limit: eight requests per ten
+  minutes and sixty per database day for each member.
+- Logs contain only request ID, caller UUID, coarse status and latency. They
+  never contain messages, object paths, signed URLs, provider bodies or keys.
+- Successful responses retain `choices[0].message.content`; failures return a
+  stable `code` and `request_id`.
+
+Stable attachment codes are:
+
+```text
+INVALID_ATTACHMENT
+TOO_MANY_ATTACHMENTS
+ATTACHMENTS_REQUIRE_USER_MESSAGE
+INVALID_TEMPORARY_PATH
+TEMPORARY_PATH_FORBIDDEN
+INVALID_MOMENT_ID
+INVALID_IMAGE_INDEX
+ATTACHMENT_FORBIDDEN
+ATTACHMENT_LOOKUP_FAILED
+IMAGE_UNAVAILABLE
+UNSUPPORTED_IMAGE_TYPE
+IMAGE_CONTENT_MISMATCH
+IMAGE_TOO_LARGE
+IMAGES_TOO_LARGE
+```
+
+Provider codes include `PROVIDER_TIMEOUT`, `PROVIDER_AUTH_FAILED`,
+`PROVIDER_BILLING_REQUIRED`, `PROVIDER_RATE_LIMITED`,
+`PROVIDER_REQUEST_REJECTED`, `PROVIDER_UNAVAILABLE`,
+`INVALID_PROVIDER_RESPONSE`, and `EMPTY_PROVIDER_RESPONSE`. The browser never
+receives the upstream response body.
+
+## Required checks before enabling the frontend
+
+Run:
+
+```powershell
+deno fmt --check supabase/functions/ai-chat
+deno check --config supabase/functions/ai-chat/deno.json supabase/functions/ai-chat/index.ts supabase/functions/ai-chat/maintenance.ts
+deno test --allow-env --config supabase/functions/ai-chat/deno.json supabase/functions/ai-chat/*_test.ts
+```
+
+In staging, verify:
+
+- missing/expired token, anon key, refresh token and unmapped Auth users fail;
+- wrong Origin and forged user/space/model/URL fields fail before Agnes;
+- pure text, one image, mixed sources and nine images work;
+- ten images, GIF/video, oversized metadata, forged moment IDs, another space's
+  moment and arbitrary URLs fail with the documented codes;
+- quota exhaustion never calls Agnes;
+- temporary objects are deleted after success, upstream failure and timeout;
+- logs and browser errors contain no request content, object paths, signed URLs
+  or secrets.
+
+A real nine-image Agnes request is a release gate. If Agnes rejects it, measure
+the highest stable provider-supported count and lower the backend, frontend,
+tests and documentation together before release.

@@ -256,6 +256,9 @@ async function onLoginSuccess(username, isNewLogin) {
     if (typeof fetchMoments === 'function') loaders.push(fetchMoments());
     if (typeof loadMoods === 'function') loaders.push(loadMoods());
     if (typeof loadNotifications === 'function') loaders.push(loadNotifications());
+    if (typeof cleanupStaleAIInputsForCurrentUser === 'function') {
+        loaders.push(cleanupStaleAIInputsForCurrentUser());
+    }
     await Promise.allSettled(loaders);
 
     if (isNewLogin && typeof spawnHearts === 'function') {
@@ -472,6 +475,9 @@ async function resetAuthenticatedUI() {
 
 async function doLogout() {
     try {
+        if (typeof cleanupActiveAIUploadsBeforeLogout === 'function') {
+            await cleanupActiveAIUploadsBeforeLogout();
+        }
         await supabaseClient.auth.signOut({ scope: 'local' });
     } catch (error) {
         console.error('退出登录失败:', error);
