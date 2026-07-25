@@ -19,8 +19,16 @@ legacy rows or Storage objects.
   Storage state.
 - `manual/04_make_photos_private.sql` is the guarded final switch from a legacy
   public `photos` bucket to a private bucket.
-- `functions/ai-chat/index.ts` is the authenticated, RLS-scoped DeepSeek
-  gateway; `AUTHORIZATION.md` defines its release checklist and trust boundary.
+- `functions/ai-chat/index.ts` is the authenticated, RLS-scoped Agnes 2.0
+  gateway with temporary-image cleanup; `AUTHORIZATION.md` defines its release
+  checklist, rollback path and trust boundary.
+- `migrations/20260724144233_agnes_ai_inputs_and_cache_metadata.sql` isolates
+  the private `ai-inputs` bucket, scopes legacy broad policies back to `photos`,
+  and versions the shared AI cache by provider, model and prompt version.
+- `migrations/20260725004913_fix_ai_inputs_insert_policy_metadata_stage.sql`
+  keeps upload identity/path authorization in INSERT RLS while leaving
+  pre-write MIME/size enforcement to the private bucket; stored metadata and
+  real file signatures are revalidated before Agnes is called.
 - `config.toml` explicitly keeps gateway JWT verification enabled.
 - `DEPLOY.md` is the required production runbook.
 
@@ -101,6 +109,9 @@ RPCs append the current username and write normalized receipts atomically.
 
 The AI gateway accepts only an allowlisted browser origin, independently calls
 Supabase Auth, checks the caller profile and membership through the caller's RLS
-session, validates bounded messages, consumes an atomic database quota, and
-uses fixed provider/model/output settings. Configure `AI_CHAT_ALLOWED_ORIGINS`
-and `DEEPSEEK_API_KEY` as deployed secrets before enabling the UI.
+session, validates bounded messages and Storage-backed attachments, consumes an
+atomic database quota, and uses fixed provider/model/output settings. Configure
+`AI_CHAT_ALLOWED_ORIGINS` and the rotated `AGNES_API_KEY` as deployed secrets
+before enabling the UI. A fixed consent-version request header prevents cached
+pre-Agnes clients from reaching the new provider without re-consent. Never
+place an Agnes key in the browser, chat or Git.

@@ -207,17 +207,28 @@ flag remains public.
 requirement in `functions/ai-chat/AUTHORIZATION.md` have been reviewed and
 tested. In particular:
 
+Apply the focused Agnes migrations in order:
+`20260724144233_agnes_ai_inputs_and_cache_metadata.sql`, then
+`20260725004913_fix_ai_inputs_insert_policy_metadata_stage.sql`. Do not replay
+the drifted July Auth/RLS monolith against an already-migrated production
+database.
+
 - gateway JWT verification must be enabled;
 - the function must independently resolve the Auth user and mapped membership;
 - CORS must use an exact allowlist;
 - request size/message limits and a distributed per-user quota are mandatory;
 - model, endpoint, token limit and sampling settings are server-controlled;
-- `DEEPSEEK_API_KEY` is a deployed secret and never reaches the browser/logs.
+- `AGNES_API_KEY` is a rotated deployed secret and never reaches the
+  browser/logs;
+- Storage-backed image inputs must pass ownership, MIME, file-signature and size
+  validation, and temporary objects must be removed on every exit path.
 
-Set `AI_CHAT_ALLOWED_ORIGINS` to an exact comma-separated list of production
-HTTPS origins (no wildcard) and set `DEEPSEEK_API_KEY` with the Edge Function
-secret manager. The migration's `claim_ai_chat_quota()` allows 8 calls per
-10-minute window and 60 per UTC database day for each member.
+Set `AI_CHAT_ALLOWED_ORIGINS` to exactly
+`https://wjpxhz-coder.github.io` (no wildcard) and set `AGNES_API_KEY` with the
+Edge Function secret manager. Remove the obsolete `DEEPSEEK_API_KEY` only after
+its provider credential has been revoked. The migration's
+`claim_ai_chat_quota()` allows 8 calls per 10-minute window and 60 per UTC
+database day for each member.
 
 Keep `[functions.ai-chat] verify_jwt = true`; never deploy with
 `--no-verify-jwt`. A failed function test is a blocking production failure, not

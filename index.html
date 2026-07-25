@@ -324,8 +324,8 @@
             <button class="fab-item fab-item-miss" type="button" onclick="sendMissYou(); toggleFabMenu();" aria-label="一键想你">💓</button>
         </div>
         <div class="fab-item-wrapper">
-            <span class="fab-label">AI 聊天</span>
-            <button class="fab-item fab-item-chat" type="button" onclick="openAIChatModal(); toggleFabMenu();" aria-label="AI 聊天">💬</button>
+            <span class="fab-label">Agnes 2.0 聊天</span>
+            <button class="fab-item fab-item-chat" type="button" onclick="openAIChatModal(); toggleFabMenu();" aria-label="Agnes 2.0 聊天">💬</button>
         </div>
         <div class="fab-item-wrapper">
             <span class="fab-label">情感助理</span>
@@ -344,11 +344,11 @@
             aria-controls="fab-menu" aria-expanded="false">✨</button>
 </div>
 
-<!-- AI面板 -->
+<!-- Agnes 2.0 面板 -->
 <dialog class="native-dialog" id="aiModal" aria-labelledby="ai-modal-title">
     <div class="modal-box ai-modal-box">
         <div class="ai-header-row">
-            <h2 class="modal-title" id="ai-modal-title" style="margin-bottom:0;">🤖 专属情感助理</h2>
+            <h2 class="modal-title" id="ai-modal-title" style="margin-bottom:0;">🤖 Agnes 2.0 情感助理</h2>
             <div class="ai-action-btns">
                 <button class="ai-refresh-btn" id="aiRefreshBtn" type="button" onclick="refreshAIContent()" aria-label="刷新内容">🔄</button>
             </div>
@@ -367,26 +367,45 @@
     </div>
 </dialog>
 
-<!-- AI 对话框 -->
+<!-- Agnes 2.0 对话框 -->
 <dialog class="native-dialog ai-chat-dialog" id="aiChatOverlay" aria-labelledby="ai-chat-title">
     <div class="ai-chat-box">
         <div class="ai-chat-header">
-            <h2 id="ai-chat-title">💬 和小助理聊聊</h2>
-            <button class="ai-chat-close-btn" type="button" onclick="closeAIChatModal()" aria-label="关闭 AI 聊天">&#10005;</button>
+            <h2 id="ai-chat-title">💬 和 Agnes 2.0 聊聊</h2>
+            <button class="ai-chat-close-btn" type="button" onclick="closeAIChatModal()" aria-label="关闭 Agnes 2.0 聊天">&#10005;</button>
         </div>
         <div class="ai-chat-messages" id="aiChatMessages" role="log" aria-live="polite" aria-relevant="additions text">
             <div class="ai-chat-welcome">
-                🌸 嗨~ 我是你们的专属情感小助理！<br>
-                有什么想聊的都可以跟我说哦~<br>
-                比如恋爱建议、约会点子、小矛盾怎么解决...<br>
+                🌸 嗨~ 我是 Agnes 2.0，你们的专属情感小助理！<br>
+                可以聊日常，也可以选择图片让我帮你分析。<br>
+                图片只用于当前这一轮，继续追问时需要重新选择。<br>
                 💕 随时为你们服务！
             </div>
         </div>
-        <div class="ai-chat-input-row">
-            <label class="visually-hidden" for="aiChatInput">发送给小助理的消息</label>
-            <textarea class="ai-chat-input" id="aiChatInput" maxlength="500" placeholder="说点什么吧..." rows="1" onkeydown="handleChatKeyDown(event)"></textarea>
-            <button class="ai-chat-send-btn" id="aiChatSendBtn" type="button" onclick="sendChatMessage()" aria-label="发送消息">💌</button>
+        <div class="ai-chat-composer">
+            <div class="ai-attachment-preview" id="aiAttachmentPreview" aria-live="polite" hidden></div>
+            <div class="ai-chat-attachment-actions">
+                <button class="ai-attachment-btn" id="aiLocalImageBtn" type="button" onclick="openAILocalImagePicker()">🖼️ 本地图片</button>
+                <input type="file" id="aiLocalImageInput" accept="image/jpeg,image/png,image/webp" multiple hidden onchange="handleAILocalImageSelect(event)">
+                <button class="ai-attachment-btn" id="aiDiaryImageBtn" type="button" onclick="openAIDiaryPicker()">📔 从日记选择</button>
+                <span class="ai-attachment-count" id="aiAttachmentCount">0 / 9</span>
+            </div>
+            <div class="ai-chat-input-row">
+                <label class="visually-hidden" for="aiChatInput">发送给 Agnes 2.0 的消息</label>
+                <textarea class="ai-chat-input" id="aiChatInput" maxlength="500" placeholder="说点什么，或只选择图片..." rows="1" onkeydown="handleChatKeyDown(event)"></textarea>
+                <button class="ai-chat-send-btn" id="aiChatSendBtn" type="button" onclick="sendChatMessage()" aria-label="发送消息">💌</button>
+            </div>
+            <div class="ai-attachment-tip">支持 JPEG、PNG、WebP；最多 9 张，每张不超过 10 MiB，总计不超过 40 MiB，不会压缩。图片不会写入聊天历史。</div>
         </div>
+        <section class="ai-diary-picker" id="aiDiaryPicker" aria-labelledby="ai-diary-picker-title" hidden>
+            <div class="ai-diary-picker-header">
+                <h3 id="ai-diary-picker-title">从共享日记选择图片</h3>
+                <button class="ai-chat-close-btn" type="button" onclick="closeAIDiaryPicker()" aria-label="关闭日记图片选择">&#10005;</button>
+            </div>
+            <div class="ai-diary-picker-status" id="aiDiaryPickerStatus" role="status" aria-live="polite"></div>
+            <div class="ai-diary-picker-grid" id="aiDiaryPickerGrid"></div>
+            <button class="ai-diary-load-more" id="aiDiaryLoadMoreBtn" type="button" onclick="loadMoreAIDiaryImages()" hidden>继续加载</button>
+        </section>
     </div>
 </dialog>
 
@@ -518,9 +537,9 @@
             <div class="settings-label">🤖 AI 隐私</div>
             <label class="ai-privacy-toggle" for="ai-service-consent">
                 <input type="checkbox" id="ai-service-consent" onchange="setAIServiceConsent(this.checked)" aria-describedby="ai-privacy-tip">
-                <span>允许使用 DeepSeek AI 服务</span>
+                <span>允许使用 Agnes 2.0 AI 服务</span>
             </label>
-            <div class="settings-tip" id="ai-privacy-tip">默认关闭。开启后，您主动发送的对话会传给 DeepSeek；生成“回忆总结”时，还会发送由当前账号发布的最多 20 条文字日记（总计不超过 4,000 字），不会发送伴侣发布的日记。可随时关闭。</div>
+            <div class="settings-tip" id="ai-privacy-tip">默认关闭。开启后，您主动发送的文字对话、由当前账号发布的最多 20 条文字日记所生成的本人回忆摘要，以及您主动选择的双方共享空间日记图片会发送给 Agnes AI。选择伴侣发布的图片前，请确认已获得对方同意。临时上传图片只用于本轮分析并在处理完成后删除；图片引用不会写入聊天历史，继续追问图片内容时需重新选择。Agnes 说明付费 Token Plan 或 Enterprise 默认不将输入、图片及输出用于模型训练，实际处理规则以其隐私政策为准。可随时关闭。 <a href="https://agnes-ai.com/en/docs/privacy-policy" target="_blank" rel="noopener noreferrer">查看 Agnes 隐私政策</a></div>
         </div>
 
         <div class="settings-group">
