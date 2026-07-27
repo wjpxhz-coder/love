@@ -119,14 +119,47 @@ function resetMoodComposer(entry = null) {
 }
 
 function openMoodModal(entryId = null) {
-    if (!isAuthenticated()) {
-        openLoginModal();
+    const target = entryId === null
+        ? '/mood/check-in'
+        : `/mood/edit/${encodeURIComponent(String(entryId))}`;
+    if (typeof appNavigate === 'function') {
+        appNavigate(target);
         return;
     }
+    window.location.hash = `#${target}`;
+}
 
-    const entry = entryId === null ? null : getMoodEntryById(entryId);
+async function loadMoodEntryForRoute(entryId) {
+    if (!isAuthenticated()) return null;
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+    let query = supabaseClient
+        .from('moods')
+        .select(MOOD_ENTRY_FIELDS)
+        .eq('id', entryId)
+        .eq('user_id', userId);
+    if (currentUserProfile?.space_id) query = query.eq('space_id', currentUserProfile.space_id);
+    const { data, error } = await query.maybeSingle();
+    if (!isCurrentAuthSnapshot(epoch, userId) || error || !data) return null;
+    const entries = moodEntriesByDate[data.date] || [];
+    if (!entries.some(entry => String(entry.id) === String(data.id))) {
+        moodEntriesByDate[data.date] = [...entries, data].sort(compareMoodEntries);
+    }
+    return data;
+}
+
+async function enterMoodPage(route) {
+    if (!isAuthenticated()) return;
+    const entryId = route?.id === 'mood' && route?.params?.id
+        ? route.params.id
+        : null;
+    let entry = entryId === null ? null : getMoodEntryById(entryId);
+    if (entryId !== null && !entry) entry = await loadMoodEntryForRoute(entryId);
+    const currentMoodRoute = typeof getCurrentAppRoute === 'function' ? getCurrentAppRoute() : null;
+    if (currentMoodRoute && currentMoodRoute.fullPath !== route?.fullPath) return;
     if (entryId !== null && (!entry || entry.user_id !== currentAuthUser.id)) {
         if (typeof showToast === 'function') showToast('只能编辑自己的心情记录。');
+        if (typeof appBack === 'function') appBack('/');
         return;
     }
 
@@ -136,13 +169,18 @@ function openMoodModal(entryId = null) {
     if (title) title.textContent = entry ? `编辑 ${formatMoodDateTitle(entry.date)} 的心情` : '今日心情打卡 🌈';
     if (submitButton) submitButton.textContent = entry ? '保存修改' : '记录';
     resetMoodComposer(entry);
-    document.getElementById('moodModal').showModal();
 }
 
 function closeMoodModal() {
     if (isMoodSaving) return;
-    const modal = document.getElementById('moodModal');
-    if (modal?.open) modal.close();
+    if (typeof appBack === 'function') {
+        appBack('/');
+        return;
+    }
+    window.location.hash = '#/';
+}
+
+function leaveMoodPage() {
     editingMoodId = null;
     moodDetailReturnDate = '';
 }
@@ -215,11 +253,19 @@ async function submitMood() {
 
         if (!entryBeingEdited) todayOwnMoodCount += 1;
 
-        document.getElementById('moodModal')?.close();
         editingMoodId = null;
         await loadMoods(currentMoodMonthKey || getCurrentMoodMonthKey());
         if (!isCurrentAuthSnapshot(epoch, userId)) return;
-        if (returnDate) openMoodDayModal(returnDate);
+        if (typeof appBack === 'function') {
+            const fallback = returnDate
+                ? `/mood/day/${encodeURIComponent(returnDate)}`
+                : '/';
+            appBack(fallback, { force: true });
+        } else {
+            window.location.hash = returnDate
+                ? `#/mood/day/${encodeURIComponent(returnDate)}`
+                : '#/';
+        }
         if (typeof refreshMoodReminderState === 'function') await refreshMoodReminderState();
     } catch (error) {
         console.error('保存心情失败:', error);
@@ -440,8 +486,28 @@ function createMoodDayEntry(entry) {
 }
 
 function openMoodDayModal(dateKey) {
-    const entries = moodEntriesByDate[dateKey] || [];
-    if (!entries.length) return;
+    if (!dateKey) return;
+    const target = `/mood/day/${encodeURIComponent(String(dateKey))}`;
+    if (typeof appNavigate === 'function') {
+        appNavigate(target);
+        return;
+    }
+    window.location.hash = `#${target}`;
+}
+
+async function enterMoodDayPage(route) {
+    const dateKey = String(route?.params?.date || '');
+    let entries = moodEntriesByDate[dateKey] || [];
+    if (!entries.length && /^\d{4}-\d{2}-\d{2}$/.test(dateKey) && isAuthenticated()) {
+        await loadMoods(dateKey.slice(0, 7));
+        const currentMoodDayRoute = typeof getCurrentAppRoute === 'function' ? getCurrentAppRoute() : null;
+        if (currentMoodDayRoute && currentMoodDayRoute.fullPath !== route?.fullPath) return;
+        entries = moodEntriesByDate[dateKey] || [];
+    }
+    if (!entries.length) {
+        if (typeof appBack === 'function') appBack('/');
+        return;
+    }
     activeMoodDetailDate = dateKey;
     const title = document.getElementById('mood-day-modal-title');
     const list = document.getElementById('mood-day-list');
@@ -450,13 +516,17 @@ function openMoodDayModal(dateKey) {
     const fragment = document.createDocumentFragment();
     entries.forEach(entry => fragment.appendChild(createMoodDayEntry(entry)));
     list.replaceChildren(fragment);
-    const modal = document.getElementById('moodDayModal');
-    if (modal && !modal.open) modal.showModal();
 }
 
 function closeMoodDayModal() {
-    const modal = document.getElementById('moodDayModal');
-    if (modal?.open) modal.close();
+    if (typeof appBack === 'function') {
+        appBack('/');
+        return;
+    }
+    window.location.hash = '#/';
+}
+
+function leaveMoodDayPage() {
     activeMoodDetailDate = '';
 }
 
@@ -464,7 +534,6 @@ function editMoodEntry(entryId) {
     const entry = getMoodEntryById(entryId);
     if (!entry || entry.user_id !== currentAuthUser?.id) return;
     moodDetailReturnDate = entry.date;
-    closeMoodDayModal();
     openMoodModal(entry.id);
 }
 
@@ -490,9 +559,18 @@ async function deleteMoodEntry(entryId) {
     }
 
     if (dateKey === getAppDateKey()) todayOwnMoodCount = Math.max(0, todayOwnMoodCount - 1);
-    closeMoodDayModal();
     await loadMoods(currentMoodMonthKey);
-    if ((moodEntriesByDate[dateKey] || []).length) openMoodDayModal(dateKey);
+    const stillViewingDeletedMoodDay = (
+        (typeof isAppRouteActive !== 'function' || isAppRouteActive('mood-day'))
+        && activeMoodDetailDate === dateKey
+    );
+    if (stillViewingDeletedMoodDay) {
+        if ((moodEntriesByDate[dateKey] || []).length) {
+            enterMoodDayPage({ params: { date: dateKey } });
+        } else {
+            closeMoodDayModal();
+        }
+    }
     if (typeof refreshMoodReminderState === 'function') await refreshMoodReminderState();
 }
 

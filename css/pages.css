@@ -1,0 +1,605 @@
+/* ── Hash 路由全屏页面 ─────────────────────────────────────────────── */
+
+body.app-page-active {
+    overflow: hidden;
+}
+
+.app-page {
+    --app-page-content-max: 760px;
+    --app-page-gutter: clamp(16px, 3vw, 32px);
+    --app-page-card-radius: 22px;
+
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1400;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    max-width: none;
+    max-height: none;
+    color: var(--text);
+    background: var(--bg);
+    background: linear-gradient(145deg, var(--bg-1), var(--bg-2), var(--bg-3));
+    overflow: hidden;
+    overscroll-behavior: contain;
+    isolation: isolate;
+}
+
+.app-page.is-active {
+    display: flex;
+    flex-direction: column;
+    animation: app-page-enter 0.22s ease-out both;
+}
+
+dialog.native-dialog.app-page,
+dialog.native-dialog.app-page[open] {
+    margin: 0;
+    padding: 0;
+    transform: none;
+    overflow: hidden;
+}
+
+dialog.native-dialog.app-page::backdrop {
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+@keyframes app-page-enter {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 页面骨架 */
+.app-page-shell {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.app-page-topbar {
+    position: relative;
+    z-index: 20;
+    display: grid;
+    flex: 0 0 auto;
+    grid-template-columns: minmax(44px, 1fr) minmax(0, auto) minmax(44px, 1fr);
+    align-items: center;
+    gap: 12px;
+    min-height: calc(64px + env(safe-area-inset-top));
+    padding:
+        max(10px, env(safe-area-inset-top))
+        max(var(--app-page-gutter), env(safe-area-inset-right))
+        10px
+        max(var(--app-page-gutter), env(safe-area-inset-left));
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-subtle);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+}
+
+.app-page-back {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 44px;
+    min-height: 44px;
+    margin: 0;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text);
+    background: var(--surface-elevated);
+    box-shadow: none;
+    font: 600 0.9rem/1 'Nunito', 'PingFang SC', system-ui, sans-serif;
+    letter-spacing: 0;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.app-page-back:hover {
+    color: var(--primary);
+    border-color: var(--primary-light);
+    background: var(--surface);
+    box-shadow: 0 4px 14px var(--shadow);
+    transform: none;
+}
+
+.app-page-back::after {
+    display: none;
+}
+
+.app-page-topbar-title {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--primary);
+    font-family: 'ZCOOL KuaiLe', cursive;
+    font-size: clamp(1.05rem, 2.4vw, 1.25rem);
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: 2px;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-page-topbar-spacer {
+    justify-self: end;
+    display: block;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.app-page-scroll {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+    padding:
+        clamp(20px, 4vh, 40px)
+        max(var(--app-page-gutter), env(safe-area-inset-right))
+        max(clamp(28px, 5vh, 56px), env(safe-area-inset-bottom))
+        max(var(--app-page-gutter), env(safe-area-inset-left));
+}
+
+.app-page-content {
+    width: 100%;
+    max-width: var(--app-page-content-max);
+    min-width: 0;
+    margin: 0 auto;
+}
+
+.app-page--narrow,
+.app-page-shell--narrow,
+.app-page-content--narrow {
+    --app-page-content-max: 560px;
+}
+
+.app-page--medium,
+.app-page-shell--medium,
+.app-page-content--medium {
+    --app-page-content-max: 760px;
+}
+
+.app-page--wide,
+.app-page-shell--wide,
+.app-page-content--wide {
+    --app-page-content-max: 1040px;
+}
+
+.app-page-card {
+    width: 100%;
+    min-width: 0;
+    padding: clamp(22px, 4vw, 36px);
+    border: 1px solid var(--border);
+    border-radius: var(--app-page-card-radius);
+    color: var(--text);
+    background: var(--surface-elevated);
+    box-shadow: 0 12px 34px var(--shadow);
+}
+
+/* 旧弹窗内容进入页面后，改为内容区内的完整页面卡片。 */
+.app-page .modal-box,
+.app-page #blindBoxModal .modal-box {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: clamp(22px, 4vw, 36px) !important;
+    overflow: visible !important;
+    border: 1px solid var(--border);
+    border-radius: var(--app-page-card-radius);
+    color: var(--text);
+    background: var(--surface-elevated);
+    box-shadow: 0 12px 34px var(--shadow);
+}
+
+.app-page .modal-title {
+    font-size: clamp(1.2rem, 2.8vw, 1.5rem);
+}
+
+.app-page .modal-btns {
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.app-page .modal-btns button {
+    min-height: 44px;
+}
+
+/* Agnes 内容页 */
+#aiModal.app-page .app-page-content {
+    display: flex;
+    min-height: 100%;
+}
+
+#aiModal.app-page .ai-modal-box {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+}
+
+#aiModal.app-page .ai-tabs {
+    flex: 0 0 auto;
+}
+
+#aiModal.app-page .ai-content-area {
+    flex: 1 1 auto;
+    min-height: clamp(300px, 52dvh, 620px);
+    max-height: none;
+    padding: clamp(18px, 3vw, 28px);
+}
+
+#aiModal.app-page .ai-loading {
+    margin-top: clamp(70px, 18vh, 170px);
+}
+
+/* Agnes 对话页 */
+#aiChatOverlay.app-page,
+.app-page.ai-chat-dialog {
+    padding: 0;
+}
+
+#aiChatOverlay.app-page .app-page-scroll {
+    overflow: hidden;
+    padding-top: clamp(14px, 2vh, 24px);
+    padding-bottom: max(clamp(14px, 2vh, 24px), env(safe-area-inset-bottom));
+}
+
+#aiChatOverlay.app-page .app-page-content {
+    display: flex;
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-width: 960px;
+}
+
+#aiChatOverlay.app-page .ai-chat-box,
+#aiChatOverlay.app-page > .ai-chat-box {
+    display: flex;
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    max-width: 960px;
+    max-height: none;
+    margin: 0 auto;
+    border-radius: 22px;
+    transform: none;
+}
+
+#aiChatOverlay.app-page .ai-chat-messages {
+    padding: clamp(14px, 2.5vw, 24px);
+}
+
+#aiChatOverlay.app-page .chat-msg {
+    max-width: min(82%, 700px);
+}
+
+#aiChatOverlay.app-page .ai-chat-input {
+    max-height: 140px;
+}
+
+#aiChatOverlay.app-page .ai-diary-picker {
+    position: absolute;
+    z-index: 12;
+    inset: 0;
+    min-width: 0;
+    min-height: 0;
+    border-radius: inherit;
+    overflow: hidden;
+}
+
+#aiChatOverlay.app-page .ai-diary-picker-grid {
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+}
+
+/* 登录页继续使用原来的浪漫全屏视觉。 */
+#login-overlay.app-page {
+    align-items: center;
+    justify-content: center;
+    padding:
+        max(16px, env(safe-area-inset-top))
+        max(16px, env(safe-area-inset-right))
+        max(16px, env(safe-area-inset-bottom))
+        max(16px, env(safe-area-inset-left));
+    background:
+        radial-gradient(circle at 18% 18%, rgba(255, 225, 235, 0.35), transparent 30%),
+        radial-gradient(circle at 82% 76%, rgba(245, 150, 190, 0.3), transparent 34%),
+        linear-gradient(145deg, #f9b9ca, #d96b91 52%, #8c315f);
+}
+
+#login-overlay.app-page.is-active {
+    display: flex;
+}
+
+#login-overlay.app-page .login-bg,
+#login-overlay.app-page .login-canvas {
+    position: absolute;
+    inset: 0;
+}
+
+#login-overlay.app-page .login-box {
+    width: min(100%, 400px);
+    max-width: 400px;
+    max-height: calc(
+        100dvh
+        - max(32px, env(safe-area-inset-top))
+        - max(32px, env(safe-area-inset-bottom))
+    );
+    margin: auto;
+    transform: none;
+}
+
+/* 让既有个人主页接入统一路由状态，并统一层级和滚动边界。 */
+.profile-page.app-page,
+.edit-profile-page.app-page {
+    display: none;
+    z-index: 1400;
+    overflow: hidden;
+}
+
+.profile-page.app-page {
+    background: linear-gradient(135deg, #fce4ec, #f8bbd0, #ffcdd2, #f48fb1);
+}
+
+.profile-page.app-page.is-active,
+.edit-profile-page.app-page.is-active {
+    display: flex;
+}
+
+.profile-page.app-page .profile-topbar,
+.edit-profile-page.app-page .edit-topbar {
+    flex: 0 0 auto;
+    min-height: calc(64px + env(safe-area-inset-top));
+    padding:
+        max(10px, env(safe-area-inset-top))
+        max(20px, env(safe-area-inset-right))
+        10px
+        max(20px, env(safe-area-inset-left));
+}
+
+.profile-page.app-page .profile-body,
+.edit-profile-page.app-page .edit-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: max(60px, env(safe-area-inset-bottom));
+}
+
+[data-theme='dark'] .profile-page.app-page {
+    background: linear-gradient(145deg, var(--bg-1), var(--bg-2), var(--bg-3));
+}
+
+[data-theme='dark'] .app-page-card,
+[data-theme='dark'] .app-page .modal-box,
+[data-theme='dark'] #aiChatOverlay.app-page .ai-chat-box {
+    color: var(--text);
+    background: var(--surface-elevated);
+    border-color: var(--border);
+    box-shadow: 0 14px 42px rgba(0, 0, 0, 0.34);
+}
+
+/* 平板与手机 */
+@media (max-width: 768px) {
+    .app-page {
+        --app-page-gutter: 16px;
+        --app-page-card-radius: 18px;
+    }
+
+    .app-page-topbar {
+        gap: 8px;
+    }
+
+    .app-page-scroll {
+        scrollbar-gutter: auto;
+        padding-top: 20px;
+        padding-bottom: max(32px, env(safe-area-inset-bottom));
+    }
+
+    .app-page :is(
+        input:not([type='checkbox']):not([type='radio']):not([type='file']),
+        textarea,
+        select
+    ) {
+        font-size: 16px;
+    }
+
+    .app-page :is(button, [role='button'], a.app-page-back) {
+        min-height: 44px;
+    }
+
+    #aiModal.app-page .ai-content-area {
+        min-height: clamp(260px, 46dvh, 500px);
+    }
+
+    #aiChatOverlay.app-page .app-page-scroll {
+        padding: 10px max(10px, env(safe-area-inset-right))
+            max(10px, env(safe-area-inset-bottom))
+            max(10px, env(safe-area-inset-left));
+    }
+
+    #aiChatOverlay.app-page .ai-chat-box,
+    #aiChatOverlay.app-page > .ai-chat-box {
+        border-radius: 18px;
+    }
+
+    #aiChatOverlay.app-page .ai-chat-header {
+        padding-right: max(16px, env(safe-area-inset-right));
+        padding-left: max(16px, env(safe-area-inset-left));
+    }
+
+    #aiChatOverlay.app-page .ai-chat-composer {
+        padding-right: max(10px, env(safe-area-inset-right));
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+        padding-left: max(10px, env(safe-area-inset-left));
+    }
+}
+
+@media (max-width: 480px) {
+    .app-page {
+        --app-page-gutter: 12px;
+        --app-page-card-radius: 16px;
+    }
+
+    .app-page-topbar {
+        min-height: calc(60px + env(safe-area-inset-top));
+        padding-right: max(12px, env(safe-area-inset-right));
+        padding-left: max(12px, env(safe-area-inset-left));
+    }
+
+    .app-page-back {
+        max-width: 112px;
+        padding: 0 11px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .app-page-topbar-title {
+        font-size: 1.05rem;
+        letter-spacing: 1px;
+    }
+
+    .app-page-scroll {
+        padding-top: 14px;
+        padding-right: max(12px, env(safe-area-inset-right));
+        padding-bottom: max(24px, env(safe-area-inset-bottom));
+        padding-left: max(12px, env(safe-area-inset-left));
+    }
+
+    .app-page .modal-box,
+    .app-page .app-page-card {
+        padding: 20px 16px !important;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px var(--shadow);
+    }
+
+    .app-page .modal-btns {
+        flex-wrap: wrap;
+    }
+
+    .app-page .modal-btns button {
+        flex: 1 1 120px;
+    }
+
+    #aiChatOverlay.app-page .app-page-scroll {
+        padding: 0;
+    }
+
+    #aiChatOverlay.app-page .ai-chat-box,
+    #aiChatOverlay.app-page > .ai-chat-box {
+        max-width: none;
+        border-width: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    #aiChatOverlay.app-page .ai-diary-picker {
+        border-radius: 0;
+    }
+
+    #aiChatOverlay.app-page .ai-diary-picker-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #login-overlay.app-page {
+        padding:
+            max(12px, env(safe-area-inset-top))
+            max(12px, env(safe-area-inset-right))
+            max(12px, env(safe-area-inset-bottom))
+            max(12px, env(safe-area-inset-left));
+    }
+
+    #login-overlay.app-page .login-box {
+        width: 100%;
+        padding: 42px 24px 30px;
+        border-radius: 24px;
+    }
+
+    .profile-page.app-page .profile-topbar,
+    .edit-profile-page.app-page .edit-topbar {
+        padding-right: max(12px, env(safe-area-inset-right));
+        padding-left: max(12px, env(safe-area-inset-left));
+    }
+}
+
+@media (min-width: 1200px) {
+    .app-page--wide,
+    .app-page-shell--wide,
+    .app-page-content--wide {
+        --app-page-content-max: 1120px;
+    }
+
+    .app-page-scroll {
+        padding-top: 42px;
+        padding-bottom: max(60px, env(safe-area-inset-bottom));
+    }
+}
+
+@media (max-height: 620px) {
+    .app-page-topbar {
+        min-height: calc(56px + env(safe-area-inset-top));
+        padding-bottom: 6px;
+    }
+
+    .app-page-scroll {
+        padding-top: 12px;
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+
+    #aiModal.app-page .ai-content-area {
+        min-height: 260px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-page.is-active {
+        animation: none;
+    }
+
+    .app-page,
+    .app-page *,
+    .app-page *::before,
+    .app-page *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+
+    #login-overlay.app-page .login-canvas,
+    .profile-page.app-page .profile-particles-canvas {
+        display: none !important;
+    }
+}

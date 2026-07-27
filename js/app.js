@@ -9,6 +9,17 @@ window.onload = async function() {
     if (typeof showLockedUI === 'function') showLockedUI();
 
     await initAuth();
+    if (typeof initAppRouter === 'function') {
+        const route = initAppRouter();
+        if (
+            route?.id === 'login'
+            && typeof isAuthenticated === 'function'
+            && isAuthenticated()
+            && typeof completeLoginNavigation === 'function'
+        ) {
+            completeLoginNavigation();
+        }
+    }
 };
 // ==========================================
 // 注册 Service Worker (PWA)
@@ -47,8 +58,8 @@ function initAccessibleUiState() {
         { target: 'user-dropdown', control: 'user-avatar-btn', activeClass: 'show' },
         { target: 'notification-panel', control: 'notification-bell', activeClass: 'show' },
         { target: 'fab-menu', control: 'fab-main', activeClass: 'show' },
-        { target: 'profile-page', activeClass: 'show' },
-        { target: 'edit-profile-page', activeClass: 'show' },
+        { target: 'profile-page', activeClass: 'is-active' },
+        { target: 'edit-profile-page', activeClass: 'is-active' },
         { target: 'lightbox', activeClass: 'show' }
     ];
 
@@ -90,6 +101,48 @@ function initAccessibleUiState() {
         syncPasswordToggle();
         new MutationObserver(syncPasswordToggle).observe(passwordInput, { attributes: true, attributeFilter: ['type'] });
     }
+}
+
+function onAppRouteEnter(route) {
+    if (!route) return;
+    if (route.id === 'login' && typeof enterLoginPage === 'function') enterLoginPage(route);
+    else if (route.id === 'moment' && typeof enterMomentPage === 'function') enterMomentPage(route);
+    else if (route.id === 'mood' && typeof enterMoodPage === 'function') enterMoodPage(route);
+    else if (route.id === 'mood-day' && typeof enterMoodDayPage === 'function') enterMoodDayPage(route);
+    else if (route.id === 'filter' && typeof enterFilterPage === 'function') enterFilterPage(route);
+    else if (route.id === 'blindbox' && typeof enterBlindBoxPage === 'function') enterBlindBoxPage(route);
+    else if (route.id === 'ai' && typeof enterAIPage === 'function') enterAIPage(route);
+    else if (route.id === 'ai-chat' && typeof enterAIChatPage === 'function') enterAIChatPage(route);
+    else if (route.id === 'settings' && typeof enterSettingsPage === 'function') enterSettingsPage(route);
+    else if (route.id === 'milestones' && typeof enterMilestonesPage === 'function') enterMilestonesPage(route);
+    else if (route.id === 'profile' && typeof enterProfilePage === 'function') enterProfilePage(route);
+    else if (route.id === 'edit-profile' && typeof enterEditProfilePage === 'function') enterEditProfilePage(route);
+}
+
+function onAppRouteLeave(route) {
+    if (!route) return;
+    if (route.id === 'login' && typeof leaveLoginPage === 'function') leaveLoginPage();
+    else if (route.id === 'moment' && typeof leaveMomentPage === 'function') leaveMomentPage();
+    else if (route.id === 'mood' && typeof leaveMoodPage === 'function') leaveMoodPage();
+    else if (route.id === 'mood-day' && typeof leaveMoodDayPage === 'function') leaveMoodDayPage();
+    else if (route.id === 'ai-chat' && typeof leaveAIChatPage === 'function') leaveAIChatPage();
+    else if (route.id === 'profile' && typeof leaveProfilePage === 'function') leaveProfilePage();
+    else if (route.id === 'edit-profile' && typeof leaveEditProfilePage === 'function') leaveEditProfilePage();
+}
+
+function canLeaveAppRoute(route) {
+    if (!route) return true;
+    if (route.id === 'moment' && typeof isMomentSubmitting !== 'undefined' && isMomentSubmitting) {
+        const message = document.getElementById('momentModalMsg');
+        if (message) message.textContent = '正在发布，请稍候…';
+        return false;
+    }
+    if (route.id === 'mood' && typeof isMoodSaving !== 'undefined' && isMoodSaving) return false;
+    if (route.id === 'edit-profile' && typeof isProfileSaving !== 'undefined' && isProfileSaving) {
+        if (typeof showToast === 'function') showToast('资料正在保存，请稍候…');
+        return false;
+    }
+    return true;
 }
 
 let tempTargetVersionToSave = '';

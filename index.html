@@ -43,9 +43,10 @@
     <link rel="stylesheet" href="css/anniversary.css">
     <link rel="stylesheet" href="css/effects.css">
     <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="css/pages.css">
 </head>
 <body>
-<a class="skip-link" href="#main-content">跳到主要内容</a>
+<a class="skip-link" id="skip-link" href="#main-content">跳到主要内容</a>
 <div id="bg-layer" aria-hidden="true"></div>
 
 <!-- 同频共振 UI -->
@@ -180,10 +181,18 @@
 
 </main>
 
-<!-- 图文动态发布弹窗 -->
-<dialog class="native-dialog" id="momentModal" aria-labelledby="moment-modal-title">
-    <div class="modal-box" style="max-width: 400px; padding: 24px;">
-        <h2 class="modal-title" id="moment-modal-title" style="margin-bottom: 16px;">✨ 发布动态</h2>
+<!-- 图文动态发布页面 -->
+<section class="app-page feature-page" id="momentModal" data-page-id="moment" aria-labelledby="moment-modal-title" aria-hidden="true" hidden inert>
+    <div class="app-page-shell">
+        <header class="app-page-topbar">
+            <button class="app-page-back" type="button" onclick="closeMomentModal()">← 返回</button>
+            <div class="app-page-topbar-title">记录此刻</div>
+            <span class="app-page-topbar-spacer" aria-hidden="true"></span>
+        </header>
+        <div class="app-page-scroll">
+            <div class="app-page-content app-page-content--medium">
+    <div class="modal-box app-page-card moment-page-card">
+        <h2 class="modal-title" id="moment-modal-title" data-page-focus tabindex="-1" style="margin-bottom: 16px;">✨ 发布动态</h2>
         <label class="visually-hidden" for="momentTextInput">动态内容</label>
         <textarea class="modal-input" id="momentTextInput" placeholder="这一刻的想法..." rows="4" style="resize:vertical;text-align:left;margin-top:0; border: none; background: rgba(255,255,255,0.5); font-size: 1.05em;"></textarea>
         
@@ -216,13 +225,24 @@
             <button id="btn-submit-moment" onclick="submitMomentPost()">发布</button>
         </div>
     </div>
-</dialog>
+            </div>
+        </div>
+    </div>
+</section>
 
 
-<!-- 心情打卡弹窗 -->
-<dialog class="native-dialog" id="moodModal" aria-labelledby="mood-modal-title">
-    <div class="modal-box">
-        <h2 class="modal-title" id="mood-modal-title">今日心情打卡 🌈</h2>
+<!-- 心情打卡页面 -->
+<section class="app-page feature-page" id="moodModal" data-page-id="mood" aria-labelledby="mood-modal-title" aria-hidden="true" hidden inert>
+    <div class="app-page-shell">
+        <header class="app-page-topbar">
+            <button class="app-page-back" type="button" onclick="closeMoodModal()">← 返回</button>
+            <div class="app-page-topbar-title">心情日记</div>
+            <span class="app-page-topbar-spacer" aria-hidden="true"></span>
+        </header>
+        <div class="app-page-scroll">
+            <div class="app-page-content app-page-content--narrow">
+    <div class="modal-box app-page-card">
+        <h2 class="modal-title" id="mood-modal-title" data-page-focus tabindex="-1">今日心情打卡 🌈</h2>
         <div class="mood-emoji-row" id="moodEmojiRow">
             <button class="mood-emoji-btn" type="button" data-score="1" onclick="selectMood(1)" aria-label="心情很难过" aria-pressed="false">😢</button>
             <button class="mood-emoji-btn" type="button" data-score="2" onclick="selectMood(2)" aria-label="心情有点低落" aria-pressed="false">😕</button>
@@ -238,23 +258,45 @@
             <button id="mood-submit-button" onclick="submitMood()">记录</button>
         </div>
     </div>
-</dialog>
+            </div>
+        </div>
+    </div>
+</section>
 
-<!-- 单日心情详情弹窗 -->
-<dialog class="native-dialog mood-day-dialog" id="moodDayModal" aria-labelledby="mood-day-modal-title">
-    <div class="modal-box mood-day-modal-box">
-        <h2 class="modal-title" id="mood-day-modal-title">心情记录</h2>
+<!-- 单日心情详情页面 -->
+<section class="app-page feature-page mood-day-dialog" id="moodDayModal" data-page-id="mood-day" aria-labelledby="mood-day-modal-title" aria-hidden="true" hidden inert>
+    <div class="app-page-shell">
+        <header class="app-page-topbar">
+            <button class="app-page-back" type="button" onclick="closeMoodDayModal()">← 返回</button>
+            <div class="app-page-topbar-title">心情记录</div>
+            <span class="app-page-topbar-spacer" aria-hidden="true"></span>
+        </header>
+        <div class="app-page-scroll">
+            <div class="app-page-content app-page-content--medium">
+    <div class="modal-box app-page-card mood-day-modal-box">
+        <h2 class="modal-title" id="mood-day-modal-title" data-page-focus tabindex="-1">心情记录</h2>
         <div class="mood-day-list" id="mood-day-list"></div>
         <div class="modal-btns">
             <button class="btn-cancel" type="button" onclick="closeMoodDayModal()">关闭</button>
         </div>
     </div>
-</dialog>
+            </div>
+        </div>
+    </div>
+</section>
 
-<!-- 检索筛选弹窗 -->
-<dialog class="native-dialog" id="filterModal" aria-labelledby="filter-modal-title">
-    <div class="modal-box" style="width: 92%; max-width: 380px;">
-        <h2 class="modal-title" id="filter-modal-title">检索回忆 📂</h2>
+<!-- 检索筛选页面 -->
+<section class="app-page feature-page" id="filterModal" data-page-id="filter" aria-labelledby="filter-modal-title" aria-hidden="true" hidden inert>
+    <div class="app-page-shell">
+        <header class="app-page-topbar">
+            <button class="app-page-back" type="button" onclick="closeFilterModal()">← 返回</button>
+            <div class="app-page-topbar-title">检索回忆</div>
+            <span class="app-page-topbar-spacer" aria-hidden="true"></span>
+        </header>
+        <div class="app-page-scroll">
+            <div class="app-page-content app-page-content--medium">
+    <div class="modal-box app-page-card">
+        <h2 class="modal-title" id="filter-modal-title" data-page-focus tabindex="-1">检索回忆 📂</h2>
         
         <div class="filter-section" style="margin-top: 16px;">
             <div class="filter-section-title">📅 按时间</div>
@@ -301,12 +343,23 @@
             <button onclick="applyFilters()">筛选</button>
         </div>
     </div>
-</dialog>
+            </div>
+        </div>
+    </div>
+</section>
 
-<!-- 回忆盲盒弹窗 -->
-<dialog class="native-dialog" id="blindBoxModal" aria-labelledby="blind-box-title">
-    <div class="modal-box" style="width: 92%; max-width: 400px;">
-        <h2 class="modal-title" id="blind-box-title">🎲 开启回忆盲盒...</h2>
+<!-- 回忆盲盒页面 -->
+<section class="app-page feature-page" id="blindBoxModal" data-page-id="blindbox" aria-labelledby="blind-box-title" aria-hidden="true" hidden inert>
+    <div class="app-page-shell">
+        <header class="app-page-topbar">
+            <button class="app-page-back" type="button" onclick="closeBlindBox()">← 返回</button>
+            <div class="app-page-topbar-title">回忆盲盒</div>
+            <span class="app-page-topbar-spacer" aria-hidden="true"></span>
+        </header>
+        <div class="app-page-scroll">
+            <div class="app-page-content app-page-content--medium">
+    <div class="modal-box app-page-card">
+        <h2 class="modal-title" id="blind-box-title" data-page-focus tabindex="-1">🎲 开启回忆盲盒...</h2>
         <div class="blind-box-content" id="blindBoxContent">
             <div style="color:var(--text-muted); font-size: 0.9em;">闭上眼睛，正在穿越时空... ✨</div>
         </div>
@@ -315,7 +368,10 @@
             <button onclick="triggerBlindBox(false)">再摇一次</button>
         </div>
     </div>
-</dialog>
+            </div>
+        </div>
+    </div>
+</section>
 
 <div class="fab-container" id="fab-container">
     <div class="fab-menu" id="fab-menu" aria-hidden="true">
@@ -344,11 +400,19 @@
             aria-controls="fab-menu" aria-expanded="false">✨</button>
 </div>
 
-<!-- Agnes 2.0 面板 -->
-<dialog class="native-dialog" id="aiModal" aria-labelledby="ai-modal-title">
-    <div class="modal-box ai-modal-box">
+<!-- Agnes 2.0 情感助理页面 -->
+<section class="app-page feature-page" id="aiModal" data-page-id="ai" aria-labelledby="ai-modal-title" aria-hidden="true" hidden inert>
+    <div class="app-page-shell">
+        <header class="app-page-topbar">
+            <button class="app-page-back" type="button" onclick="closeAIModal()">← 返回</button>
+            <div class="app-page-topbar-title">Agnes 2.0</div>
+            <span class="app-page-topbar-spacer" aria-hidden="true"></span>
+        </header>
+        <div class="app-page-scroll">
+            <div class="app-page-content app-page-content--wide">
+    <div class="modal-box app-page-card ai-modal-box">
         <div class="ai-header-row">
-            <h2 class="modal-title" id="ai-modal-title" style="margin-bottom:0;">🤖 Agnes 2.0 情感助理</h2>
+            <h2 class="modal-title" id="ai-modal-title" data-page-focus tabindex="-1" style="margin-bottom:0;">🤖 Agnes 2.0 情感助理</h2>
             <div class="ai-action-btns">
                 <button class="ai-refresh-btn" id="aiRefreshBtn" type="button" onclick="refreshAIContent()" aria-label="刷新内容">🔄</button>
             </div>
@@ -365,14 +429,24 @@
             <button class="btn-cancel" onclick="closeAIModal()">关闭</button>
         </div>
     </div>
-</dialog>
+            </div>
+        </div>
+    </div>
+</section>
 
-<!-- Agnes 2.0 对话框 -->
-<dialog class="native-dialog ai-chat-dialog" id="aiChatOverlay" aria-labelledby="ai-chat-title">
+<!-- Agnes 2.0 聊天页面 -->
+<section class="app-page feature-page ai-chat-dialog" id="aiChatOverlay" data-page-id="ai-chat" aria-labelledby="ai-chat-title" aria-hidden="true" hidden inert>
+    <div class="app-page-shell">
+        <header class="app-page-topbar">
+            <button class="app-page-back" type="button" onclick="closeAIChatModal()">← 返回</button>
+            <div class="app-page-topbar-title">Agnes 2.0 聊天</div>
+            <span class="app-page-topbar-spacer" aria-hidden="true"></span>
+        </header>
+        <div class="app-page-scroll app-page-scroll--chat">
+            <div class="app-page-content app-page-content--wide app-page-content--chat">
     <div class="ai-chat-box">
         <div class="ai-chat-header">
-            <h2 id="ai-chat-title">💬 和 Agnes 2.0 聊聊</h2>
-            <button class="ai-chat-close-btn" type="button" onclick="closeAIChatModal()" aria-label="关闭 Agnes 2.0 聊天">&#10005;</button>
+            <h2 id="ai-chat-title" data-page-focus tabindex="-1">💬 和 Agnes 2.0 聊聊</h2>
         </div>
         <div class="ai-chat-messages" id="aiChatMessages" role="log" aria-live="polite" aria-relevant="additions text">
             <div class="ai-chat-welcome">
@@ -407,7 +481,10 @@
             <button class="ai-diary-load-more" id="aiDiaryLoadMoreBtn" type="button" onclick="loadMoreAIDiaryImages()" hidden>继续加载</button>
         </section>
     </div>
-</dialog>
+            </div>
+        </div>
+    </div>
+</section>
 
 <!-- 灯箱 -->
 <div id="lightbox" role="dialog" aria-modal="true" aria-label="媒体预览" aria-hidden="true" tabindex="-1" onclick="closeLightbox(event)">
@@ -415,15 +492,15 @@
     <video id="lightbox-video" src="" controls style="display:none; max-width:90%; max-height:90%; border-radius:12px; margin: auto; position: absolute; top: 0; bottom: 0; left: 0; right: 0;"></video>
 </div>
 
-<!-- 浪漫登录弹窗 -->
-<dialog class="native-dialog login-dialog" id="login-overlay" aria-labelledby="login-title">
+<!-- 浪漫登录页面 -->
+<section class="app-page login-dialog" id="login-overlay" data-page-id="login" aria-labelledby="login-title" aria-hidden="true" hidden inert>
     <div class="login-bg" aria-hidden="true"></div>
     <canvas id="login-canvas" class="login-canvas" aria-hidden="true"></canvas>
     <div class="login-box">
         <div class="login-halo" aria-hidden="true"></div>
         <button class="login-close-btn" type="button" onclick="closeLoginModal()" aria-label="关闭登录窗口">✕</button>
         <span class="login-heart-icon" aria-hidden="true">💖</span>
-        <h2 class="login-title" id="login-title">小蛇 ♡ 小奚</h2>
+        <h2 class="login-title" id="login-title" data-page-focus tabindex="-1">小蛇 ♡ 小奚</h2>
         <div class="login-subtitle">专属空间 · 账户登录</div>
         <form class="login-form" onsubmit="event.preventDefault(); doLogin();">
             <div class="login-field">
@@ -441,14 +518,14 @@
             <button class="login-btn" id="login-btn" type="submit">✨ 进入我们的世界</button>
         </form>
     </div>
-</dialog>
+</section>
 
 <!-- 个人主页全屏页 -->
-<section id="profile-page" class="profile-page" aria-labelledby="profile-topbar-title" aria-hidden="true">
+<section id="profile-page" class="app-page profile-page" data-page-id="profile" aria-labelledby="profile-topbar-title" aria-hidden="true" hidden inert>
     <canvas id="profile-particles-canvas" class="profile-particles-canvas" aria-hidden="true"></canvas>
     <div class="profile-topbar">
         <button class="profile-back-btn" onclick="closeProfilePage()">← 返回</button>
-        <div class="profile-topbar-title" id="profile-topbar-title">我的主页</div>
+        <div class="profile-topbar-title" id="profile-topbar-title" data-page-focus tabindex="-1">我的主页</div>
         <div class="profile-topbar-right">
             <button class="profile-settings-btn" id="profile-settings-btn" type="button" onclick="openSettingsModal()" aria-label="设置">⚙️</button>
             <button class="profile-edit-btn" id="profile-edit-btn-top" onclick="openEditProfilePage()">✏️ 编辑资料</button>
@@ -476,10 +553,10 @@
 </section>
 
 <!-- 编辑资料全屏页 -->
-<section id="edit-profile-page" class="edit-profile-page" aria-labelledby="edit-profile-title" aria-hidden="true">
+<section id="edit-profile-page" class="app-page edit-profile-page" data-page-id="edit-profile" aria-labelledby="edit-profile-title" aria-hidden="true" hidden inert>
     <div class="edit-topbar">
         <button class="edit-cancel-btn" onclick="closeEditProfilePage()">取消</button>
-        <h2 id="edit-profile-title" style="font-family:'ZCOOL KuaiLe',cursive; color:var(--primary); font-size:1.1em; letter-spacing:2px;">编辑资料</h2>
+        <h2 id="edit-profile-title" data-page-focus tabindex="-1" style="font-family:'ZCOOL KuaiLe',cursive; color:var(--primary); font-size:1.1em; letter-spacing:2px;">编辑资料</h2>
         <button class="edit-save-btn" id="edit-save-btn" onclick="saveProfile()">保存</button>
     </div>
     <div class="edit-body">
@@ -520,10 +597,18 @@
     </div>
 </dialog>
 
-<!-- 系统设置弹窗 -->
-<dialog class="native-dialog settings-dialog" id="settingsModal" aria-labelledby="settings-modal-title">
-    <div class="modal-box settings-modal-box">
-        <h2 class="modal-title" id="settings-modal-title">⚙️ 系统设置</h2>
+<!-- 系统设置页面 -->
+<section class="app-page feature-page settings-dialog" id="settingsModal" data-page-id="settings" aria-labelledby="settings-modal-title" aria-hidden="true" hidden inert>
+    <div class="app-page-shell">
+        <header class="app-page-topbar">
+            <button class="app-page-back" type="button" onclick="closeSettingsModal()">← 返回</button>
+            <div class="app-page-topbar-title">系统设置</div>
+            <span class="app-page-topbar-spacer" aria-hidden="true"></span>
+        </header>
+        <div class="app-page-scroll">
+            <div class="app-page-content app-page-content--medium">
+    <div class="modal-box app-page-card settings-modal-box">
+        <h2 class="modal-title" id="settings-modal-title" data-page-focus tabindex="-1">⚙️ 系统设置</h2>
         
         <div class="settings-group">
             <div class="settings-label">🎨 空间主题</div>
@@ -576,13 +661,24 @@
             <button class="btn-cancel" onclick="closeSettingsModal()">关闭</button>
         </div>
     </div>
-</dialog>
+            </div>
+        </div>
+    </div>
+</section>
 
-<!-- 大事记/重大事件记录板弹窗 -->
-<dialog class="native-dialog milestones-dialog" id="milestonesModal" aria-labelledby="milestones-modal-title">
-    <div class="modal-box milestones-modal-box">
+<!-- 大事记/重大事件记录板页面 -->
+<section class="app-page feature-page milestones-dialog" id="milestonesModal" data-page-id="milestones" aria-labelledby="milestones-modal-title" aria-hidden="true" hidden inert>
+    <div class="app-page-shell">
+        <header class="app-page-topbar">
+            <button class="app-page-back" type="button" onclick="closeMilestonesModal()">← 返回</button>
+            <div class="app-page-topbar-title">大事记</div>
+            <span class="app-page-topbar-spacer" aria-hidden="true"></span>
+        </header>
+        <div class="app-page-scroll">
+            <div class="app-page-content app-page-content--wide">
+    <div class="modal-box app-page-card milestones-modal-box">
         <div class="milestones-header">
-            <h2 class="modal-title" id="milestones-modal-title" style="margin-bottom: 12px;">🏆 大事记记录板</h2>
+            <h2 class="modal-title" id="milestones-modal-title" data-page-focus tabindex="-1" style="margin-bottom: 12px;">🏆 大事记记录板</h2>
             <div class="milestones-tabs" role="tablist" aria-label="大事记视图">
                 <button class="milestone-tab active" id="tab-milestone-list" type="button" role="tab" aria-selected="true" aria-controls="milestonesContent" onclick="switchMilestoneTab('list')">⌛ 事件时间轴</button>
                 <button class="milestone-tab" id="tab-milestone-gallery" type="button" role="tab" aria-selected="false" aria-controls="milestonesContent" onclick="switchMilestoneTab('gallery')">📸 拍立得墙</button>
@@ -598,7 +694,10 @@
             <button class="btn-cancel" onclick="closeMilestonesModal()">关闭</button>
         </div>
     </div>
-</dialog>
+            </div>
+        </div>
+    </div>
+</section>
 
 <script src="js/config.js"></script>
 <script src="js/animations.js"></script>
@@ -618,6 +717,7 @@
 <script src="js/theme.js"></script>
 <script src="js/notifications.js"></script>
 <script src="js/effects.js"></script>
+<script src="js/router.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
