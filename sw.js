@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'love-diary-';
-const CACHE_NAME = 'love-diary-v3.7.0';
+const CACHE_NAME = 'love-diary-v3.8.0';
 
 // Only application-shell files are cached. Private API responses, user media,
 // and third-party resources are deliberately excluded from this allow-list.
@@ -10,11 +10,11 @@ const PRECACHE_ASSETS = [
     './css/variables.css', './css/base.css', './css/header.css', './css/timer.css', './css/timeline.css',
     './css/dialogs.css', './css/comments.css', './css/ai-panel.css', './css/fab.css', './css/auth.css',
     './css/profile.css', './css/notifications.css', './css/mood.css', './css/anniversary.css',
-    './css/effects.css', './css/responsive.css',
+    './css/effects.css', './css/responsive.css', './css/pages.css',
     './js/config.js', './js/animations.js', './js/timer.js', './js/auth.js', './js/profile.js',
     './js/moments.js', './js/milestones.js', './js/comments.js', './js/likes.js', './js/mood.js', './js/anniversary.js',
     './js/lightbox.js', './js/ai.js', './js/blindbox.js', './js/presence.js', './js/theme.js',
-    './js/notifications.js', './js/effects.js', './js/app.js'
+    './js/notifications.js', './js/effects.js', './js/router.js', './js/app.js'
 ];
 
 const PRECACHE_URLS = PRECACHE_ASSETS.map(asset => new URL(asset, self.registration.scope).href);

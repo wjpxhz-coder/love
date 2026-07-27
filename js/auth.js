@@ -158,25 +158,43 @@ async function initAuth() {
     }
 }
 
-function openLoginModal() {
-    const dialog = document.getElementById('login-overlay');
+function openLoginModal(returnTo = '') {
+    const target = returnTo
+        ? `/login?return=${encodeURIComponent(returnTo)}`
+        : '/login';
+    if (typeof appNavigate === 'function') {
+        appNavigate(target);
+        return;
+    }
+    window.location.hash = `#${target}`;
+}
+
+function enterLoginPage() {
     const emailInput = document.getElementById('login-username');
     const passwordInput = document.getElementById('login-password');
     const errorElement = document.getElementById('login-error');
 
-    if (!dialog || dialog.open) return;
     if (emailInput) emailInput.value = '';
     if (passwordInput) passwordInput.value = '';
     if (errorElement) errorElement.textContent = '';
-    dialog.showModal();
     startLoginCanvas();
     setTimeout(() => emailInput?.focus(), 100);
 }
 
-function closeLoginModal() {
-    const dialog = document.getElementById('login-overlay');
-    if (dialog?.open) dialog.close();
+function leaveLoginPage() {
     stopLoginCanvas();
+}
+
+function closeLoginModal() {
+    if (isAuthenticated() && typeof completeLoginNavigation === 'function') {
+        completeLoginNavigation();
+        return;
+    }
+    if (typeof appBack === 'function') {
+        appBack('/');
+        return;
+    }
+    window.location.hash = '#/';
 }
 
 function toggleLoginPwEye() {
@@ -451,13 +469,18 @@ async function resetAuthenticatedUI() {
     }
     document.getElementById('notification-badge')?.classList.remove('show');
     document.getElementById('notification-panel')?.classList.remove('show');
-    document.getElementById('profile-page')?.classList.remove('show');
-    document.getElementById('edit-profile-page')?.classList.remove('show');
+    document.getElementById('profile-page')?.classList.remove('is-active');
+    document.getElementById('edit-profile-page')?.classList.remove('is-active');
 
     document.querySelectorAll('dialog[open]').forEach(dialog => {
-        if (dialog.id !== 'login-overlay') dialog.close();
+        dialog.close();
     });
     showLockedUI();
+
+    const activeRoute = typeof getCurrentAppRoute === 'function' ? getCurrentAppRoute() : null;
+    if (activeRoute?.protected && typeof forcePublicHomeRoute === 'function') {
+        forcePublicHomeRoute();
+    }
 
     const resetPromise = (async () => {
         await presenceCleanup;
@@ -631,6 +654,3 @@ document.getElementById('login-password')?.addEventListener('keydown', event => 
 document.getElementById('login-username')?.addEventListener('keydown', event => {
     if (event.key === 'Enter') document.getElementById('login-password')?.focus();
 });
-const loginDialog = document.getElementById('login-overlay');
-loginDialog?.addEventListener('cancel', stopLoginCanvas);
-loginDialog?.addEventListener('close', stopLoginCanvas);

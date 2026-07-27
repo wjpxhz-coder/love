@@ -100,16 +100,26 @@ function withViewTransition(action) {
 }
 
 function openProfilePage(targetAuthor = currentAuthor) {
-    if (!isAuthenticated()) {
-        openLoginModal();
+    const author = String(targetAuthor || currentAuthor || '').trim();
+    if (!author) return;
+    if (typeof appNavigate === 'function') {
+        appNavigate(`/profile/${encodeURIComponent(author)}`);
+        return;
+    }
+    window.location.hash = `#/profile/${encodeURIComponent(author)}`;
+}
+
+function enterProfilePage(route) {
+    const targetAuthor = String(route?.params?.author || currentAuthor || '');
+    const profile = allProfilesCache[targetAuthor];
+    if (!isAuthenticated()) return;
+    if (!profile) {
+        if (typeof showToast === 'function') showToast('没有找到这份个人资料。');
+        if (typeof appBack === 'function') appBack('/');
         return;
     }
 
-    const profile = allProfilesCache[targetAuthor];
-    if (!profile) return;
-
     withViewTransition(() => {
-        document.getElementById('profile-page')?.classList.add('show');
         renderProfilePage(targetAuthor);
         loadProfileStats(targetAuthor);
     });
@@ -117,9 +127,15 @@ function openProfilePage(targetAuthor = currentAuthor) {
 }
 
 function closeProfilePage() {
-    withViewTransition(() => {
-        document.getElementById('profile-page')?.classList.remove('show');
-    });
+    if (typeof stopProfileParticles === 'function') stopProfileParticles();
+    if (typeof appBack === 'function') {
+        appBack('/');
+        return;
+    }
+    window.location.hash = '#/';
+}
+
+function leaveProfilePage() {
     if (typeof stopProfileParticles === 'function') stopProfileParticles();
 }
 
@@ -195,6 +211,14 @@ async function loadProfileStats(targetAuthor) {
 }
 
 function openEditProfilePage() {
+    if (typeof appNavigate === 'function') {
+        appNavigate('/profile/edit');
+        return;
+    }
+    window.location.hash = '#/profile/edit';
+}
+
+function enterEditProfilePage() {
     if (!isAuthenticated() || !currentUserProfile) return;
     const page = document.getElementById('edit-profile-page');
     document.getElementById('edit-nickname').value = currentUserProfile.nickname || currentUserProfile.username;
@@ -205,7 +229,7 @@ function openEditProfilePage() {
     });
 
     clearPendingAvatar();
-    withViewTransition(() => page?.classList.add('show'));
+    page?.scrollTo({ top: 0 });
 }
 
 function clearPendingAvatar() {
@@ -221,9 +245,14 @@ function closeEditProfilePage() {
         if (typeof showToast === 'function') showToast('资料正在保存，请稍候…');
         return;
     }
-    withViewTransition(() => {
-        document.getElementById('edit-profile-page')?.classList.remove('show');
-    });
+    if (typeof appBack === 'function') {
+        appBack(`/profile/${encodeURIComponent(currentAuthor || '')}`);
+        return;
+    }
+    window.location.hash = '#/';
+}
+
+function leaveEditProfilePage() {
     clearPendingAvatar();
 }
 
@@ -345,7 +374,9 @@ async function saveProfile() {
         messageElement.textContent = '保存成功 ✨';
         clearPendingAvatar();
         setTimeout(() => {
-            if (isCurrentAuthSnapshot(epoch, userId)) closeEditProfilePage();
+            const stillEditingProfile = typeof isAppRouteActive !== 'function'
+                || isAppRouteActive('edit-profile');
+            if (isCurrentAuthSnapshot(epoch, userId) && stillEditingProfile) closeEditProfilePage();
         }, 800);
     } catch (error) {
         if (uploadedPath && !profilePersisted) {
@@ -365,8 +396,15 @@ async function saveProfile() {
 // 系统设置弹窗控制逻辑
 // ==========================================
 function openSettingsModal() {
-    const modal = document.getElementById('settingsModal');
-    if (!modal || !isAuthenticated()) return;
+    if (typeof appNavigate === 'function') {
+        appNavigate('/settings');
+        return;
+    }
+    window.location.hash = '#/settings';
+}
+
+function enterSettingsPage() {
+    if (!isAuthenticated()) return;
 
     const versionElement = document.getElementById('settingsVersion');
     if (versionElement && typeof APP_VERSION !== 'undefined') {
@@ -382,12 +420,14 @@ function openSettingsModal() {
         applyMoodReminderSettingsToForm();
         loadMoodReminderSettings({ syncForm: true });
     }
-    modal.showModal();
 }
 
 function closeSettingsModal() {
-    const modal = document.getElementById('settingsModal');
-    if (modal?.open) modal.close();
+    if (typeof appBack === 'function') {
+        appBack('/');
+        return;
+    }
+    window.location.hash = '#/';
 }
 
 function updateSettingsThemeButtons(theme) {
@@ -428,7 +468,6 @@ async function clearSpaceCache() {
 }
 
 function doSettingsLogout() {
-    closeSettingsModal();
-    closeProfilePage();
+    if (typeof forcePublicHomeRoute === 'function') forcePublicHomeRoute();
     if (typeof doLogout === 'function') doLogout();
 }

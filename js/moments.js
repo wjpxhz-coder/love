@@ -136,31 +136,31 @@ function resetMomentComposer(options = {}) {
 }
 
 function bindMomentModalLifecycle() {
-    const modal = document.getElementById('momentModal');
-    if (!modal || modal.dataset.lifecycleBound === 'true') return;
-    modal.dataset.lifecycleBound = 'true';
-    modal.addEventListener('cancel', event => {
-        if (isMomentSubmitting) {
-            event.preventDefault();
-            const message = document.getElementById('momentModalMsg');
-            if (message) message.textContent = '正在发布，请稍候…';
-            return;
-        }
-        resetMomentComposer();
-    });
-    modal.addEventListener('close', () => resetMomentComposer());
+    const page = document.getElementById('momentModal');
+    if (!page || page.dataset.lifecycleBound === 'true') return;
+    page.dataset.lifecycleBound = 'true';
     window.addEventListener('pagehide', () => resetMomentComposer());
 }
 
-function openMomentModal() {
-    const modal = document.getElementById('momentModal');
+function openMomentModal(options = {}) {
+    const milestone = options?.milestone === true;
+    const target = milestone ? '/moments/new?milestone=1' : '/moments/new';
+    if (typeof appNavigate === 'function') {
+        appNavigate(target);
+        return;
+    }
+    window.location.hash = `#${target}`;
+}
+
+function enterMomentPage(route) {
+    const page = document.getElementById('momentModal');
     const input = document.getElementById('momentTextInput');
     const previewContainer = document.getElementById('momentImagePreviewContainer');
-    if (!modal || !input || !previewContainer || !hasMomentAuthContext()) return;
+    if (!page || !input || !previewContainer || !hasMomentAuthContext()) return;
     bindMomentModalLifecycle();
     resetMomentComposer();
 
-    const titleEl = modal.querySelector('.modal-title');
+    const titleEl = page.querySelector('.modal-title');
 
     const p = allProfilesCache[currentAuthor] || {};
     if (titleEl) {
@@ -182,7 +182,7 @@ function openMomentModal() {
     document.getElementById('momentModalMsg').innerText = '';
     input.value = '';
     const milestoneCheckbox = document.getElementById('momentIsMilestone');
-    if (milestoneCheckbox) milestoneCheckbox.checked = false;
+    if (milestoneCheckbox) milestoneCheckbox.checked = route?.query?.milestone === '1';
 
     // 重置录音状态与预览
     const btnAudio = document.getElementById('btn-moment-audio');
@@ -198,19 +198,25 @@ function openMomentModal() {
     }
     if (previewAudio) previewAudio.style.display = 'none';
 
-    modal.showModal();
     setTimeout(() => input.focus(), 100);
 }
 
 function closeMomentModal(force = false) {
-    const modal = document.getElementById('momentModal');
     if (isMomentSubmitting && !force) {
         const message = document.getElementById('momentModalMsg');
         if (message) message.textContent = '正在发布，请稍候…';
         return;
     }
+    if (typeof appBack === 'function') {
+        appBack('/', { force });
+        return;
+    }
     resetMomentComposer();
-    if (modal && modal.open) modal.close();
+    window.location.hash = '#/';
+}
+
+function leaveMomentPage() {
+    resetMomentComposer();
 }
 
 function handleMomentPhotoSelect(event) {
@@ -470,8 +476,10 @@ async function executeMomentRecording() {
     momentRecordingShouldDiscard = false;
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const modal = document.getElementById('momentModal');
-        if (sessionId !== momentRecordingSessionId || !modal || !modal.open || !hasMomentAuthContext()) {
+        const isComposerActive = typeof isAppRouteActive === 'function'
+            ? isAppRouteActive('moment')
+            : document.getElementById('momentModal')?.classList.contains('is-active');
+        if (sessionId !== momentRecordingSessionId || !isComposerActive || !hasMomentAuthContext()) {
             stream.getTracks().forEach(track => track.stop());
             return;
         }
@@ -953,8 +961,15 @@ let currentFilters = {
 };
 
 function openFilterModal() {
+    if (typeof appNavigate === 'function') {
+        appNavigate('/memories/filter');
+        return;
+    }
+    window.location.hash = '#/memories/filter';
+}
+
+function enterFilterPage() {
     populateFilterYears();
-    document.getElementById('filterModal').showModal();
 }
 
 function populateFilterYears() {
@@ -971,7 +986,11 @@ function populateFilterYears() {
 }
 
 function closeFilterModal() {
-    document.getElementById('filterModal').close();
+    if (typeof appBack === 'function') {
+        appBack('/');
+        return;
+    }
+    window.location.hash = '#/';
 }
 
 function clearFilters() {

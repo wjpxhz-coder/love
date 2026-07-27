@@ -116,9 +116,11 @@ async function toggleMomentStar(momentId) {
         showMomentStarError();
     }
     
-    // 如果大事记弹窗当前打开，刷新大事记展示
-    const modal = document.getElementById('milestonesModal');
-    if (modal && modal.open) {
+    // 如果大事记页面当前打开，刷新大事记展示
+    const milestonesActive = typeof isAppRouteActive === 'function'
+        ? isAppRouteActive('milestones')
+        : document.getElementById('milestonesModal')?.classList.contains('is-active');
+    if (milestonesActive) {
         renderMilestonesContent();
     }
 }
@@ -126,20 +128,24 @@ async function toggleMomentStar(momentId) {
 // ── 大事记面板控制与渲染 ──
 
 function openMilestonesModal() {
-    if (!hasMilestoneAuthContext()) {
-        openLoginModal();
+    if (typeof appNavigate === 'function') {
+        appNavigate('/milestones');
         return;
     }
-    const modal = document.getElementById('milestonesModal');
-    if (!modal) return;
-    
-    modal.showModal();
+    window.location.hash = '#/milestones';
+}
+
+function enterMilestonesPage() {
+    if (!hasMilestoneAuthContext()) return;
     renderMilestonesContent();
 }
 
 function closeMilestonesModal() {
-    const modal = document.getElementById('milestonesModal');
-    if (modal) modal.close();
+    if (typeof appBack === 'function') {
+        appBack('/');
+        return;
+    }
+    window.location.hash = '#/';
 }
 
 function switchMilestoneTab(tabName) {
@@ -386,10 +392,7 @@ function renderPolaroidWall(items, container) {
 }
 
 function openAddMilestoneDirect() {
-    closeMilestonesModal();
     if (typeof openMomentModal === 'function') {
-        openMomentModal();
-        const chk = document.getElementById('momentIsMilestone');
-        if (chk) chk.checked = true;
+        openMomentModal({ milestone: true });
     }
 }

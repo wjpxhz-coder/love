@@ -41,7 +41,8 @@ async function registerDeviceMotion(epoch, userId, generation) {
 
 async function triggerBlindBox(requestPermission = false) {
     if (!isAuthenticated()) {
-        openLoginModal();
+        if (typeof appNavigate === 'function') appNavigate('/memories/blind-box');
+        else window.location.hash = '#/memories/blind-box';
         return;
     }
 
@@ -62,14 +63,26 @@ async function triggerBlindBox(requestPermission = false) {
     }
 
     if (!isBlindBoxSnapshotCurrent(epoch, userId, generation)) return;
-    const modal = document.getElementById('blindBoxModal');
-    if (!modal?.open) modal?.showModal();
+    if (typeof isAppRouteActive === 'function' && isAppRouteActive('blindbox')) {
+        fetchRandomMoment();
+    } else if (typeof appNavigate === 'function') {
+        appNavigate('/memories/blind-box');
+    } else {
+        window.location.hash = '#/memories/blind-box';
+    }
+}
+
+function enterBlindBoxPage() {
+    if (!isAuthenticated()) return;
     fetchRandomMoment();
 }
 
 function closeBlindBox() {
-    const modal = document.getElementById('blindBoxModal');
-    if (modal?.open) modal.close();
+    if (typeof appBack === 'function') {
+        appBack('/');
+        return;
+    }
+    window.location.hash = '#/';
 }
 
 function cleanupBlindBox() {
@@ -84,7 +97,6 @@ function cleanupBlindBox() {
     shakeLastTime = 0;
     isBlindBoxLoading = false;
     window.currentBlindBoxMoment = null;
-    closeBlindBox();
 }
 
 function handleShake(event) {
@@ -110,9 +122,11 @@ function handleShake(event) {
     if (delta <= 20 || now - shakeLastTime < 2500) return;
 
     shakeLastTime = now;
-    const modal = document.getElementById('blindBoxModal');
-    if (!modal?.open) modal?.showModal();
-    fetchRandomMoment();
+    if (typeof isAppRouteActive === 'function' && isAppRouteActive('blindbox')) {
+        fetchRandomMoment();
+    } else if (typeof appNavigate === 'function') {
+        appNavigate('/memories/blind-box');
+    }
 }
 
 async function fetchRandomByTypes(types = null) {
@@ -255,7 +269,8 @@ function locateToMoment() {
     const moment = window.currentBlindBoxMoment;
     const content = document.getElementById('timeline-content');
     if (!isAuthenticated() || !content || !moment) return;
-    closeBlindBox();
+    if (typeof appReplace === 'function') appReplace('/', { force: true });
+    else window.location.hash = '#/';
 
     const backWrap = document.createElement('div');
     backWrap.className = 'blind-box-back';

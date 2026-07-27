@@ -277,17 +277,24 @@ function setAIContent(message, state = '') {
 }
 
 function openAIModal() {
-    if (!isAuthenticated()) {
-        openLoginModal();
+    if (typeof appNavigate === 'function') {
+        appNavigate('/agnes');
         return;
     }
-    document.getElementById('aiModal')?.showModal();
+    window.location.hash = '#/agnes';
+}
+
+function enterAIPage() {
+    if (!isAuthenticated()) return;
     switchAITab('topic');
 }
 
 function closeAIModal() {
-    const modal = document.getElementById('aiModal');
-    if (modal?.open) modal.close();
+    if (typeof appBack === 'function') {
+        appBack('/');
+        return;
+    }
+    window.location.hash = '#/';
 }
 
 function toggleFabMenu() {
@@ -514,35 +521,40 @@ function resetAIChatMessages() {
 }
 
 function openAIChatModal() {
-    if (!isAuthenticated()) {
-        openLoginModal();
+    if (typeof appNavigate === 'function') {
+        appNavigate('/agnes/chat');
         return;
     }
+    window.location.hash = '#/agnes/chat';
+}
+
+function enterAIChatPage() {
+    if (!isAuthenticated()) return;
     bindAIChatModalLifecycle();
     ensureAIChatWelcome();
     renderPendingChatAttachments();
-    const modal = document.getElementById('aiChatOverlay');
-    if (modal && !modal.open) modal.showModal();
     document.getElementById('aiChatInput')?.focus();
 }
 
 function closeAIChatModal() {
+    if (typeof appBack === 'function') {
+        appBack('/');
+        return;
+    }
+    leaveAIChatPage();
+    window.location.hash = '#/';
+}
+
+function leaveAIChatPage() {
     closeAIDiaryPicker();
     resetAIDiaryPicker();
     clearPendingChatAttachments();
-    const modal = document.getElementById('aiChatOverlay');
-    if (modal?.open) modal.close();
 }
 
 function bindAIChatModalLifecycle() {
-    const modal = document.getElementById('aiChatOverlay');
-    if (!modal || modal.dataset.aiLifecycleBound === 'true') return;
-    modal.dataset.aiLifecycleBound = 'true';
-    modal.addEventListener('close', () => {
-        closeAIDiaryPicker();
-        resetAIDiaryPicker();
-        clearPendingChatAttachments();
-    });
+    const page = document.getElementById('aiChatOverlay');
+    if (!page || page.dataset.aiLifecycleBound === 'true') return;
+    page.dataset.aiLifecycleBound = 'true';
 }
 
 function handleChatKeyDown(event) {
