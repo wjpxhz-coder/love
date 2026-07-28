@@ -129,16 +129,14 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.8.0';
+const APP_VERSION = 'v3.8.1';
 const UPDATE_LOG = {
-    version: 'v3.8.0',
-    date: '2026-07-27',
-    title: '功能页面全面升级 ✨',
+    version: 'v3.8.1',
+    date: '2026-07-28',
+    title: '飘落动画持续运行 ✨',
     features: [
-        '发布动态、心情、筛选、盲盒、Agnes、设置和大事记均升级为完整页面 📖',
-        '每个功能页面都有独立地址，支持刷新、分享以及浏览器前进后退 🧭',
-        '登录后会自动回到原本想进入的页面，私密内容继续受登录保护 🔒',
-        '优化了桌面端、手机端、深色模式和键盘操作体验 ✨'
+        '修复滑动页面时飘落动画短暂停住的问题 🌸',
+        '主页、个人主页和登录页的粒子效果现在会持续运行 ✨'
     ]
 };
 
