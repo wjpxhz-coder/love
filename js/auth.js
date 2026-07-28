@@ -565,28 +565,26 @@ function startLoginCanvas() {
     loginCanvasAnim = { running: true, requestId: null };
     const animate = () => {
         if (!loginCanvasAnim?.running) return;
-        if (!isCanvasScrolling) {
-            context.clearRect(0, 0, canvas.width, canvas.height);
-            petals.forEach(petal => {
-                petal.sway += petal.swaySpeed;
-                petal.x += petal.speedX + Math.sin(petal.sway) * 0.8;
-                petal.y += petal.speedY;
-                petal.rot += petal.rotSpeed;
-                if (petal.y > canvas.height + 30) {
-                    petal.y = -30;
-                    petal.x = Math.random() * canvas.width;
-                }
-                context.save();
-                context.translate(petal.x, petal.y);
-                context.rotate(petal.rot);
-                context.globalAlpha = petal.alpha;
-                context.font = `${petal.size}px serif`;
-                context.textAlign = 'center';
-                context.textBaseline = 'middle';
-                context.fillText(petal.emoji, 0, 0);
-                context.restore();
-            });
-        }
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        petals.forEach(petal => {
+            petal.sway += petal.swaySpeed;
+            petal.x += petal.speedX + Math.sin(petal.sway) * 0.8;
+            petal.y += petal.speedY;
+            petal.rot += petal.rotSpeed;
+            if (petal.y > canvas.height + 30) {
+                petal.y = -30;
+                petal.x = Math.random() * canvas.width;
+            }
+            context.save();
+            context.translate(petal.x, petal.y);
+            context.rotate(petal.rot);
+            context.globalAlpha = petal.alpha;
+            context.font = `${petal.size}px serif`;
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(petal.emoji, 0, 0);
+            context.restore();
+        });
         if (loginCanvasAnim) loginCanvasAnim.requestId = requestAnimationFrame(animate);
     };
     animate();

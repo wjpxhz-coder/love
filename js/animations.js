@@ -141,10 +141,6 @@ resizeTimer = setTimeout(resize, 200);
     let animationActive = true;
     function animate() {
         if (!animationActive) return;
-        if (isCanvasScrolling) {
-            requestAnimationFrame(animate);
-            return;
-        }
         particles.forEach((p, i) => {
             p.sway += p.swaySpeed * (bothOnline ? 1.5 : 1);
             
@@ -220,10 +216,6 @@ function startProfileParticles() {
         });
     }
     function render() {
-        if (isCanvasScrolling) {
-            profileParticlesReq = requestAnimationFrame(render);
-            return;
-        }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         for (let i = 0; i < profileParticles.length; i++) {
             const p = profileParticles[i];
