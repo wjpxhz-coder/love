@@ -1,6 +1,7 @@
         html {
             scrollbar-color: var(--primary-light) transparent;
             scrollbar-width: thin;
+            background-color: var(--bg-1);
         }
 
 
@@ -32,20 +33,50 @@
 
         .skip-link {
             position: fixed;
-            top: 8px;
-            left: 8px;
+            top: calc(8px + env(safe-area-inset-top));
+            left: calc(8px + env(safe-area-inset-left));
             z-index: 10000;
-            padding: 10px 14px;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            clip-path: inset(50%);
+            white-space: nowrap;
             border-radius: 10px;
             background: var(--surface-elevated);
             color: var(--text);
             box-shadow: 0 4px 16px var(--shadow);
-            transform: translateY(-160%);
-            transition: transform 0.2s ease;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
         }
 
-        .skip-link:focus {
-            transform: translateY(0);
+        .skip-link:focus-visible {
+            width: auto;
+            height: auto;
+            padding: 10px 14px;
+            margin: 0;
+            overflow: visible;
+            clip: auto;
+            clip-path: none;
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        @supports not selector(:focus-visible) {
+            .skip-link:focus {
+                width: auto;
+                height: auto;
+                padding: 10px 14px;
+                margin: 0;
+                overflow: visible;
+                clip: auto;
+                clip-path: none;
+                opacity: 1;
+                pointer-events: auto;
+            }
         }
 
         #bg-layer {
