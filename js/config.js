@@ -1,16 +1,6 @@
 // ==========================================
 // 1. 配置区
 // ==========================================
-let isCanvasScrolling = false;
-let canvasScrollTimeout;
-window.addEventListener('scroll', () => {
-    isCanvasScrolling = true;
-    clearTimeout(canvasScrollTimeout);
-    canvasScrollTimeout = setTimeout(() => {
-        isCanvasScrolling = false;
-    }, 150);
-}, { passive: true });
-
 const startDate = new Date(2026, 4, 23, 1, 0, 0);
 
 // 当前登录用户的 profile
