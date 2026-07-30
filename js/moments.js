@@ -64,11 +64,12 @@ function revokeMomentObjectUrl(url) {
 }
 
 function clearMomentPhotoPreviews() {
+    const previewContainer = document.getElementById('momentImagePreviewContainer');
+    if (previewContainer) releaseMomentVideosWithin(previewContainer, true);
     momentPhotoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
     momentPhotoPreviewUrls.clear();
     momentSelectedFiles = [];
 
-    const previewContainer = document.getElementById('momentImagePreviewContainer');
     if (!previewContainer) return;
     previewContainer.querySelectorAll('.moment-preview-item').forEach(item => item.remove());
 }
@@ -242,16 +243,17 @@ function handleMomentPhotoSelect(event) {
         let media;
         if (file.type.startsWith('video/')) {
             media = document.createElement('video');
-            media.autoplay = true;
             media.muted = true;
             media.loop = true;
             media.playsInline = true;
+            media.preload = 'none';
             Object.assign(media.style, { width: '100%', height: '100%', objectFit: 'cover' });
         } else {
             media = document.createElement('img');
             media.alt = '预览';
         }
         media.src = objectUrl;
+        if (media.tagName === 'VIDEO') setupMomentVideoPlayback(media, true);
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'remove-btn';
@@ -261,11 +263,13 @@ function handleMomentPhotoSelect(event) {
         removeBtn.addEventListener('click', () => {
             const fileIndex = momentSelectedFiles.indexOf(file);
             if (fileIndex >= 0) momentSelectedFiles.splice(fileIndex, 1);
+            if (media.tagName === 'VIDEO') releaseMomentVideo(media, true);
             revokeMomentObjectUrl(objectUrl);
             previewItem.remove();
         });
         previewItem.append(media, removeBtn);
         previewContainer.insertBefore(previewItem, addBtn);
+        if (media.tagName === 'VIDEO') refreshMomentVideoPlayback(media);
     });
     
     // 清空 input 使得重复选择相同文件能触发 change
@@ -586,6 +590,124 @@ function deleteRecordedAudio() {
 }
 // --- 时光轴（无限滚动） ---
 let scrollObserver = null;
+let momentTimelineCursor = null;
+const renderedMomentIds = new Set();
+const managedMomentVideos = new Set();
+let momentVideoObserver = null;
+const momentVideoMotionPreference = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)')
+    : null;
+
+function isMomentVideoDisplayed(video) {
+    if (!video?.isConnected || video.hidden) return false;
+    const rect = video.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    const style = window.getComputedStyle(video);
+    return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+}
+
+function isMomentVideoInViewport(video) {
+    const rect = video.getBoundingClientRect();
+    return rect.bottom > 0
+        && rect.right > 0
+        && rect.top < window.innerHeight
+        && rect.left < window.innerWidth;
+}
+
+function updateMomentVideoPlayback(video) {
+    if (!(video instanceof HTMLVideoElement)) return;
+    const isAutoVideo = video.dataset.momentAutoplay === 'true';
+    const canPlay = document.visibilityState !== 'hidden'
+        && video.dataset.momentIntersecting === 'true'
+        && isMomentVideoDisplayed(video);
+    const reduceMotion = momentVideoMotionPreference?.matches === true;
+
+    if (!canPlay || (isAutoVideo && reduceMotion)) {
+        if (!video.paused) video.pause();
+        return;
+    }
+
+    if (isAutoVideo && video.paused) {
+        const playRequest = video.play();
+        if (playRequest && typeof playRequest.catch === 'function') {
+            playRequest.catch(() => {});
+        }
+    }
+}
+
+function ensureMomentVideoObserver() {
+    if (momentVideoObserver || typeof IntersectionObserver !== 'function') return;
+    momentVideoObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            const video = entry.target;
+            video.dataset.momentIntersecting = entry.isIntersecting ? 'true' : 'false';
+            updateMomentVideoPlayback(video);
+        });
+    }, { threshold: 0.01 });
+}
+
+function refreshMomentVideoPlayback(video) {
+    if (!(video instanceof HTMLVideoElement)) return;
+    video.dataset.momentIntersecting = isMomentVideoDisplayed(video) && isMomentVideoInViewport(video)
+        ? 'true'
+        : 'false';
+    updateMomentVideoPlayback(video);
+}
+
+function setupMomentVideoPlayback(video, autoplay = false) {
+    if (!(video instanceof HTMLVideoElement)) return;
+    video.autoplay = false;
+    video.removeAttribute('autoplay');
+    video.dataset.momentAutoplay = autoplay ? 'true' : 'false';
+    video.dataset.momentIntersecting = 'false';
+    managedMomentVideos.add(video);
+    ensureMomentVideoObserver();
+    if (momentVideoObserver) {
+        momentVideoObserver.observe(video);
+    } else {
+        refreshMomentVideoPlayback(video);
+    }
+}
+
+function releaseMomentVideo(video, unload = false) {
+    if (!(video instanceof HTMLVideoElement)) return;
+    video.pause();
+    if (momentVideoObserver) momentVideoObserver.unobserve(video);
+    managedMomentVideos.delete(video);
+    delete video.dataset.momentAutoplay;
+    delete video.dataset.momentIntersecting;
+    if (unload) {
+        video.removeAttribute('src');
+        video.load();
+    }
+}
+
+function releaseMomentVideosWithin(container, unload = false) {
+    if (!container) return;
+    if (container instanceof HTMLVideoElement) releaseMomentVideo(container, unload);
+    container.querySelectorAll?.('video').forEach(video => releaseMomentVideo(video, unload));
+}
+
+document.addEventListener('visibilitychange', () => {
+    managedMomentVideos.forEach(video => {
+        if (document.hidden) {
+            video.pause();
+        } else {
+            refreshMomentVideoPlayback(video);
+        }
+    });
+});
+
+if (momentVideoMotionPreference) {
+    const handleMomentMotionPreference = () => {
+        managedMomentVideos.forEach(video => refreshMomentVideoPlayback(video));
+    };
+    if (typeof momentVideoMotionPreference.addEventListener === 'function') {
+        momentVideoMotionPreference.addEventListener('change', handleMomentMotionPreference);
+    } else if (typeof momentVideoMotionPreference.addListener === 'function') {
+        momentVideoMotionPreference.addListener(handleMomentMotionPreference);
+    }
+}
 
 function createMomentNode(tagName, className, text) {
     const element = document.createElement(tagName);
@@ -646,12 +768,11 @@ function createMomentMedia(rawUrl, className, options = {}) {
     const isVideo = isVideoMediaUrl(url);
     const media = document.createElement(isVideo ? 'video' : 'img');
     media.className = className;
-    media.src = url;
     if (isVideo) {
         media.playsInline = true;
+        media.preload = options.controls ? 'metadata' : 'none';
         if (options.controls) media.controls = true;
         if (options.autoplay) {
-            media.autoplay = true;
             media.muted = true;
             media.loop = true;
         }
@@ -659,6 +780,8 @@ function createMomentMedia(rawUrl, className, options = {}) {
         media.alt = '我们的回忆';
         media.loading = 'lazy';
     }
+    media.src = url;
+    if (isVideo) setupMomentVideoPlayback(media, options.autoplay === true);
     if (options.lightbox) {
         media.dataset.momentAction = 'open-lightbox';
         media.tabIndex = 0;
@@ -803,6 +926,9 @@ function createMomentCardElement(item) {
     starButton.id = `moment-star-btn-${momentId}`;
     starButton.dataset.momentAction = 'toggle-star';
     starButton.dataset.momentId = String(momentId);
+    const starPending = typeof pendingMomentStarIds !== 'undefined' && pendingMomentStarIds.has(momentId);
+    starButton.disabled = starPending;
+    if (starPending) starButton.setAttribute('aria-busy', 'true');
     const likers = createMomentNode('span', 'moment-like-likers');
     likers.id = `moment-like-likers-${momentId}`;
     likeBar.append(likeButton, starButton, likers);
@@ -846,6 +972,7 @@ function createMomentCardElement(item) {
     textarea.className = 'comment-textarea';
     textarea.id = `comment-text-${momentId}`;
     textarea.placeholder = '写下你的想法…';
+    textarea.setAttribute('aria-label', '写下评论');
     textarea.rows = 2;
     textarea.style.marginTop = '0';
     const previews = createMomentNode('div', 'comment-img-previews');
@@ -928,6 +1055,7 @@ window.showAllImages = function(id) {
     const hiddenImgs = grid.querySelectorAll('.hidden-image');
     hiddenImgs.forEach(img => {
         img.style.display = 'block';
+        if (img instanceof HTMLVideoElement) refreshMomentVideoPlayback(img);
     });
     const btn = document.getElementById(`show-images-btn-${id}`);
     if (btn) btn.style.display = 'none';
@@ -1081,7 +1209,10 @@ async function fetchMoments(append = false) {
     if (!hasMomentAuthContext()) {
         if (scrollObserver) scrollObserver.disconnect();
         if (typeof clearAllCommentImageSelections === 'function') clearAllCommentImageSelections();
-        if (contentDiv) contentDiv.replaceChildren();
+        if (contentDiv) {
+            releaseMomentVideosWithin(contentDiv, true);
+            contentDiv.replaceChildren();
+        }
         return;
     }
     const requestAuthEpoch = getMomentAuthEpoch();
@@ -1108,16 +1239,26 @@ async function fetchMoments(append = false) {
         if (typeof clearAllCommentImageSelections === 'function') clearAllCommentImageSelections();
         currentPage = 0;
         hasMore = true;
+        momentTimelineCursor = null;
+        renderedMomentIds.clear();
+        releaseMomentVideosWithin(contentDiv, true);
         contentDiv.replaceChildren(createMomentNode('div', 'empty-state', '正在加载甜蜜回忆…'));
     }
-
-    const from = currentPage * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
 
     let query = supabaseClient.from('moments')
         .select('*')
         .order('created_at', { ascending: false })
-        .range(from, to);
+        .order('id', { ascending: false })
+        .limit(PAGE_SIZE);
+
+    if (append && momentTimelineCursor) {
+        const cursorCreatedAt = String(momentTimelineCursor.createdAt)
+            .replace(/\\/g, '\\\\')
+            .replace(/"/g, '\\"');
+        query = query.or(
+            `created_at.lt."${cursorCreatedAt}",and(created_at.eq."${cursorCreatedAt}",id.lt.${momentTimelineCursor.id})`
+        );
+    }
 
     // 应用筛选条件
     if (currentFilters.authors.length > 0) {
@@ -1171,23 +1312,44 @@ async function fetchMoments(append = false) {
         return;
     }
 
+    const pageData = data || [];
+    if (pageData.length < PAGE_SIZE) hasMore = false;
+
+    const lastItem = pageData[pageData.length - 1];
+    const lastItemId = normalizeMomentId(lastItem?.id);
+    if (lastItem && typeof lastItem.created_at === 'string' && lastItem.created_at && lastItemId) {
+        momentTimelineCursor = {
+            createdAt: lastItem.created_at,
+            id: lastItemId
+        };
+    } else if (pageData.length > 0) {
+        hasMore = false;
+    }
+
+    const uniquePageData = pageData.filter(item => {
+        const itemId = normalizeMomentId(item?.id);
+        if (!itemId || renderedMomentIds.has(itemId)) return false;
+        renderedMomentIds.add(itemId);
+        return true;
+    });
     const renderData = typeof hydrateMomentMediaRecord === 'function'
-        ? await Promise.all((data || []).map(item => hydrateMomentMediaRecord(item)))
-        : (data || []);
+        ? await Promise.all(uniquePageData.map(item => hydrateMomentMediaRecord(item)))
+        : uniquePageData;
     if (requestId !== activeMomentFetchRequest || !isMomentAuthEpochCurrent(requestAuthEpoch)) {
         finishRequest();
         return;
     }
 
-    if (renderData.length < PAGE_SIZE) hasMore = false;
-
-    if (!append && renderData.length === 0) {
+    if (!append && pageData.length === 0) {
         contentDiv.replaceChildren(createMomentNode('div', 'empty-state', '还没有记录哦，快去添加第一条回忆吧！'));
         finishRequest();
         return;
     }
 
-    if (!append) contentDiv.replaceChildren();
+    if (!append) {
+        releaseMomentVideosWithin(contentDiv, true);
+        contentDiv.replaceChildren();
+    }
 
     // 移除已有的加载指示器
     const existingLoader = contentDiv.querySelector('.load-more-indicator');
@@ -1208,7 +1370,9 @@ async function fetchMoments(append = false) {
         const card = createMomentCardElement(item);
         if (card) fragment.appendChild(card);
     });
+    const newVideos = Array.from(fragment.querySelectorAll('video'));
     contentDiv.appendChild(fragment);
+    newVideos.forEach(video => refreshMomentVideoPlayback(video));
 
     // 触发滚动入场
     setTimeout(() => initScrollReveal(), 50);
@@ -1275,6 +1439,7 @@ async function deleteMoment(id) {
     } else {
         const card = document.getElementById('card-' + momentId);
         if (card) {
+            releaseMomentVideosWithin(card, true);
             card.style.transition = 'opacity 0.3s, transform 0.3s';
             card.style.opacity = '0';
             card.style.transform = 'translateX(-16px)';

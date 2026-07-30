@@ -2,6 +2,11 @@
 // 大事记与收藏功能逻辑 (js/milestones.js)
 // ==========================================
 let starredMomentIds = new Set();
+const pendingMomentStarIds = new Map();
+let momentStarsCacheUserId = null;
+let momentStarsCacheAuthEpoch = null;
+let momentStarsLoaded = false;
+let momentStarsLoadPromise = null;
 let currentMilestoneTab = 'list'; // 'list' 或 'gallery'
 let milestoneRenderRequestId = 0;
 
@@ -28,31 +33,70 @@ function setMilestoneStatus(container, text, color = 'var(--text-muted)', paddin
     container.replaceChildren(status);
 }
 
-async function loadMomentStars() {
+function resetMomentStarsCache(userId = null, epoch = null) {
+    starredMomentIds.clear();
+    pendingMomentStarIds.clear();
+    momentStarsCacheUserId = userId;
+    momentStarsCacheAuthEpoch = epoch;
+    momentStarsLoaded = false;
+    momentStarsLoadPromise = null;
+}
+
+async function loadMomentStars(options = {}) {
     if (!hasMilestoneAuthContext()) {
-        starredMomentIds.clear();
+        resetMomentStarsCache();
+        return;
+    }
+    const userId = String(currentAuthUser.id || '');
+    if (!userId) {
+        resetMomentStarsCache();
         return;
     }
     const requestAuthEpoch = getMilestoneAuthEpoch();
+    if (momentStarsCacheUserId !== userId || momentStarsCacheAuthEpoch !== requestAuthEpoch) {
+        resetMomentStarsCache(userId, requestAuthEpoch);
+    }
+    if (momentStarsLoaded && options.force !== true) return;
+    if (momentStarsLoadPromise) {
+        await momentStarsLoadPromise;
+        return;
+    }
+
+    const loadPromise = (async () => {
+        try {
+            const { data, error } = await supabaseClient
+                .from('moment_stars')
+                .select('moment_id')
+                .eq('user_id', userId);
+
+            if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)
+                || String(currentAuthUser.id || '') !== userId
+                || momentStarsCacheUserId !== userId
+                || momentStarsCacheAuthEpoch !== requestAuthEpoch) return;
+            if (error) throw error;
+
+            const loadedIds = new Set();
+            (data || []).forEach(item => {
+                const id = Number(item.moment_id);
+                if (Number.isSafeInteger(id) && id > 0) loadedIds.add(id);
+            });
+            starredMomentIds = loadedIds;
+            momentStarsLoaded = true;
+        } catch (error) {
+            if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)
+                || String(currentAuthUser.id || '') !== userId
+                || momentStarsCacheUserId !== userId
+                || momentStarsCacheAuthEpoch !== requestAuthEpoch) return;
+            momentStarsLoaded = false;
+            console.error('加载收藏失败:', error);
+            if (typeof showToast === 'function') showToast('收藏加载失败，请稍后重试');
+        }
+    })();
+    momentStarsLoadPromise = loadPromise;
     try {
-        const { data, error } = await supabaseClient
-            .from('moment_stars')
-            .select('moment_id')
-            .eq('user_id', currentAuthUser.id);
-
-        if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
-        if (error) throw error;
-
-        starredMomentIds.clear();
-        (data || []).forEach(item => {
-            const id = Number(item.moment_id);
-            if (Number.isSafeInteger(id) && id > 0) starredMomentIds.add(id);
-        });
-    } catch (error) {
-        if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
-        starredMomentIds.clear();
-        console.error('加载收藏失败:', error);
-        if (typeof showToast === 'function') showToast('收藏加载失败，请稍后重试');
+        await loadPromise;
+    } finally {
+        if (momentStarsLoadPromise === loadPromise) momentStarsLoadPromise = null;
     }
 }
 
@@ -60,6 +104,16 @@ function setMomentStarButtonState(button, isStarred) {
     if (button) {
         button.classList.toggle('starred', isStarred);
         button.textContent = isStarred ? '⭐ 已收藏' : '☆ 收藏';
+    }
+}
+
+function setMomentStarButtonPending(button, isPending) {
+    if (!button) return;
+    button.disabled = isPending;
+    if (isPending) {
+        button.setAttribute('aria-busy', 'true');
+    } else {
+        button.removeAttribute('aria-busy');
     }
 }
 
@@ -77,11 +131,20 @@ async function toggleMomentStar(momentId) {
         return;
     }
     const requestAuthEpoch = getMilestoneAuthEpoch();
+    const requestUserId = String(currentAuthUser.id || '');
     momentId = Number(momentId);
     if (!Number.isSafeInteger(momentId) || momentId <= 0) return;
+    if (pendingMomentStarIds.has(momentId)) return;
+
+    const pendingOperation = Symbol(`moment-star-${momentId}`);
+    pendingMomentStarIds.set(momentId, pendingOperation);
     const hasStarred = starredMomentIds.has(momentId);
     const btn = document.getElementById(`moment-star-btn-${momentId}`);
+    if (hasStarred) starredMomentIds.delete(momentId);
+    else starredMomentIds.add(momentId);
     setMomentStarButtonState(btn, !hasStarred);
+    setMomentStarButtonPending(btn, true);
+    let didChange = false;
 
     try {
         let error = null;
@@ -90,7 +153,7 @@ async function toggleMomentStar(momentId) {
                 .from('moment_stars')
                 .delete()
                 .eq('moment_id', momentId)
-                .eq('user_id', currentAuthUser.id);
+                .eq('user_id', requestUserId);
             error = result.error;
         } else {
             const result = await supabaseClient
@@ -99,28 +162,42 @@ async function toggleMomentStar(momentId) {
             error = result.error;
         }
 
-        if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
+        if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)
+            || String(currentAuthUser.id || '') !== requestUserId) {
+            if (momentStarsCacheUserId === requestUserId
+                && momentStarsCacheAuthEpoch === requestAuthEpoch) {
+                momentStarsLoaded = false;
+            }
+            return;
+        }
         if (error) throw error;
 
-        if (hasStarred) starredMomentIds.delete(momentId);
-        else starredMomentIds.add(momentId);
+        didChange = true;
 
         if (!hasStarred && btn && typeof spawnHearts === 'function') {
             const rect = btn.getBoundingClientRect();
             spawnHearts(rect.left + rect.width / 2, rect.top);
         }
     } catch (error) {
-        if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
-        setMomentStarButtonState(btn, hasStarred);
+        if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)
+            || String(currentAuthUser.id || '') !== requestUserId) return;
+        if (hasStarred) starredMomentIds.add(momentId);
+        else starredMomentIds.delete(momentId);
+        setMomentStarButtonState(document.getElementById(`moment-star-btn-${momentId}`), hasStarred);
         console.error('收藏操作失败:', error);
         showMomentStarError();
+    } finally {
+        if (pendingMomentStarIds.get(momentId) === pendingOperation) {
+            pendingMomentStarIds.delete(momentId);
+            setMomentStarButtonPending(document.getElementById(`moment-star-btn-${momentId}`), false);
+        }
     }
     
     // 如果大事记页面当前打开，刷新大事记展示
     const milestonesActive = typeof isAppRouteActive === 'function'
         ? isAppRouteActive('milestones')
         : document.getElementById('milestonesModal')?.classList.contains('is-active');
-    if (milestonesActive) {
+    if (didChange && milestonesActive) {
         renderMilestonesContent();
     }
 }
@@ -181,6 +258,7 @@ async function renderMilestonesContent() {
             .from('moments')
             .select('*')
             .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
             .limit(500);
             
         if (error) throw error;

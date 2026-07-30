@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'love-diary-';
-const CACHE_NAME = 'love-diary-v3.8.2';
+const CACHE_NAME = 'love-diary-v3.9.0';
 
 // Only application-shell files are cached. Private API responses, user media,
 // and third-party resources are deliberately excluded from this allow-list.
@@ -7,10 +7,11 @@ const PRECACHE_ASSETS = [
     './index.html',
     './manifest.json',
     './icon-192.png',
+    './icon-512.png',
     './css/variables.css', './css/base.css', './css/header.css', './css/timer.css', './css/timeline.css',
     './css/dialogs.css', './css/comments.css', './css/ai-panel.css', './css/fab.css', './css/auth.css',
     './css/profile.css', './css/notifications.css', './css/mood.css', './css/anniversary.css',
-    './css/effects.css', './css/responsive.css', './css/pages.css',
+    './css/effects.css', './css/responsive.css', './css/pages.css', './css/refresh.css',
     './js/config.js', './js/animations.js', './js/timer.js', './js/auth.js', './js/profile.js',
     './js/moments.js', './js/milestones.js', './js/comments.js', './js/likes.js', './js/mood.js', './js/anniversary.js',
     './js/lightbox.js', './js/ai.js', './js/blindbox.js', './js/presence.js', './js/theme.js',
@@ -24,7 +25,9 @@ const OFFLINE_URL = new URL('./index.html', self.registration.scope).href;
 async function precacheShell() {
     const cache = await caches.open(CACHE_NAME);
     const results = await Promise.allSettled(PRECACHE_URLS.map(async url => {
-        const request = new Request(url, { cache: 'reload', credentials: 'same-origin' });
+        // Revalidate changed assets while allowing an HTTP 304, rather than
+        // forcing a second full download after the page has already loaded.
+        const request = new Request(url, { cache: 'no-cache', credentials: 'same-origin' });
         const response = await fetch(request);
         if (!response.ok) throw new Error(`${response.status} ${url}`);
         await cache.put(request, response);
@@ -32,21 +35,27 @@ async function precacheShell() {
 
     const failed = results.filter(result => result.status === 'rejected');
     if (failed.length) {
-        console.warn(`Service Worker: ${failed.length} shell asset(s) could not be precached.`, failed);
+        // Never activate a partially populated shell; the previous complete
+        // worker remains available until every required asset is ready.
+        await caches.delete(CACHE_NAME);
+        throw new Error(`Service Worker: ${failed.length} shell asset(s) could not be precached.`);
     }
 }
 
 self.addEventListener('install', event => {
-    // Individual optional asset failures no longer make the whole installation fail.
-    event.waitUntil(precacheShell());
+    event.waitUntil((async () => {
+        await precacheShell();
+        // Activate only after the complete versioned shell is available.
+        await self.skipWaiting();
+    })());
 });
 
 self.addEventListener('activate', event => {
     event.waitUntil((async () => {
         const keys = await caches.keys();
-        await Promise.all(keys
+        const previousAppCaches = keys
             .filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
-            .map(key => caches.delete(key)));
+        await Promise.all(previousAppCaches.map(key => caches.delete(key)));
         await self.clients.claim();
     })());
 });

@@ -129,14 +129,16 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.8.1';
+const APP_VERSION = 'v3.9.0';
 const UPDATE_LOG = {
-    version: 'v3.8.1',
-    date: '2026-07-28',
-    title: '飘落动画持续运行 ✨',
+    version: 'v3.9.0',
+    date: '2026-07-30',
+    title: '空间焕新，更稳也更清晰 💖',
     features: [
-        '修复滑动页面时飘落动画短暂停住的问题 🌸',
-        '主页、个人主页和登录页的粒子效果现在会持续运行 ✨'
+        '重做首页信息层级与移动端导航，内容更扎实、操作更顺手 🏡',
+        '修复会话恢复闪烁、分页重复、收藏连点和资料统计串页等问题 🛠️',
+        '优化视频播放、动画耗电、缓存清理与离线更新体验 🚀',
+        '统一发布、设置、盲盒、Agnes 和大事记等功能页的交互与视觉 ✨'
     ]
 };
 

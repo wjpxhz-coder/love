@@ -16,6 +16,32 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <script>
+        // This tiny bootstrap runs from the network-first HTML before cached
+        // shell files load. It makes a version change atomic even when an older
+        // worker still controls the first navigation.
+        (function refreshUpgradedShell() {
+            if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+
+            let reloadStarted = false;
+            navigator.serviceWorker.addEventListener('controllerchange', function() {
+                if (reloadStarted) return;
+                reloadStarted = true;
+                window.location.reload();
+            });
+
+            navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+                .then(function(registration) {
+                    if (registration.waiting) {
+                        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    }
+                    return registration.update();
+                })
+                .catch(function(error) {
+                    console.warn('Service Worker upgrade check failed:', error);
+                });
+        })();
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Nunito:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"
             integrity="sha384-nWa0WrJ8Dl90YqhjSU0vNB8IxSO54t6AmEmV83LMTb/Img+Af2MfK7XJE54mwpSR"
@@ -44,8 +70,9 @@
     <link rel="stylesheet" href="css/effects.css">
     <link rel="stylesheet" href="css/responsive.css">
     <link rel="stylesheet" href="css/pages.css">
+    <link rel="stylesheet" href="css/refresh.css">
 </head>
-<body>
+<body class="auth-pending">
 <a class="skip-link" id="skip-link" href="#main-content">跳到主要内容</a>
 <div id="bg-layer" aria-hidden="true"></div>
 
@@ -55,14 +82,26 @@
     <div class="resonance-text">此刻，TA 也在陪你看回忆 ✨</div>
 </div>
 
-<!-- 登录触发按钮（未登录时显示） -->
-<button id="login-trigger-btn" class="login-trigger-btn" type="button" onclick="openLoginModal()" aria-label="登录">👤</button>
+<nav class="app-utility-bar" aria-label="账户与显示设置">
+    <!-- 登录触发按钮（未登录时显示） -->
+    <button id="login-trigger-btn" class="login-trigger-btn" type="button" onclick="openLoginModal()" aria-label="登录">👤</button>
 
-<!-- 登录后头像按钮 -->
-<button id="user-avatar-btn" class="user-avatar-btn" type="button" onclick="toggleUserDropdown()"
-        aria-label="打开用户菜单" aria-controls="user-dropdown" aria-expanded="false">
-    <span class="avatar-placeholder" aria-hidden="true">🌸</span>
-</button>
+    <!-- 登录后头像按钮 -->
+    <button id="user-avatar-btn" class="user-avatar-btn" type="button" onclick="toggleUserDropdown()"
+            aria-label="打开用户菜单" aria-controls="user-dropdown" aria-expanded="false">
+        <span class="avatar-placeholder" aria-hidden="true">🌸</span>
+    </button>
+
+    <!-- 通知铃铛 -->
+    <button id="notification-bell" class="notification-bell" type="button" onclick="toggleNotificationPanel()"
+            aria-label="消息通知" aria-controls="notification-panel" aria-expanded="false">
+        🔔
+        <span id="notification-badge" class="notification-badge" aria-hidden="true"></span>
+    </button>
+
+    <button id="theme-toggle" class="theme-toggle" type="button" onclick="toggleTheme()"
+            aria-label="切换到深色主题" aria-pressed="false">🌙</button>
+</nav>
 
 <!-- 用户下拉菜单 -->
 <div id="user-dropdown" class="user-dropdown" aria-hidden="true">
@@ -71,12 +110,7 @@
     <button type="button" class="user-dropdown-item logout" onclick="doLogout()">🚪 退出登录</button>
 </div>
 
-<!-- 通知铃铛及面板 -->
-<button id="notification-bell" class="notification-bell" type="button" onclick="toggleNotificationPanel()"
-        aria-label="消息通知" aria-controls="notification-panel" aria-expanded="false">
-    🔔
-    <span id="notification-badge" class="notification-badge" aria-hidden="true"></span>
-</button>
+<!-- 通知面板 -->
 <aside id="notification-panel" class="notification-panel" aria-labelledby="notification-title" aria-hidden="true">
     <div class="notification-header">
         <span id="notification-title">消息通知</span>
@@ -87,141 +121,190 @@
     </ul>
 </aside>
 
-<button id="theme-toggle" class="theme-toggle" type="button" onclick="toggleTheme()"
-        aria-label="切换到深色主题" aria-pressed="false">🌙</button>
-
 <div id="star-field" aria-hidden="true"></div>
 
 <canvas id="sakura-canvas" aria-hidden="true"></canvas>
 <canvas id="sakura-canvas-foreground" aria-hidden="true"></canvas>
 
-<main class="container" id="main-content">
+<main class="container home-shell" id="main-content">
+    <section class="home-hero" aria-labelledby="home-title">
+        <header class="site-header">
+            <p class="home-eyebrow">OUR LITTLE UNIVERSE</p>
+            <h1 id="home-title" data-page-focus tabindex="-1">小蛇 <span aria-hidden="true">♡</span> 小奚</h1>
+            <p class="tagline">愿得一人心，白首不相离</p>
+            <div class="header-divider" aria-hidden="true">
+                <span></span><i>❀</i><span></span>
+            </div>
+        </header>
 
-    <header class="site-header">
-        <h1>小蛇 ♡ 小奚</h1>
-        <p class="tagline">愿得一人心，白首不相离</p>
-        <div class="header-divider">
-            <span></span><i>❀</i><span></span>
-        </div>
-    </header>
-
-    <section class="timer-section">
-        <h2 class="timer-label">我们已经相伴走过</h2>
-        <div class="timer-grid">
-            <div class="timer-card"><span class="num" id="t-days">0</span><span class="unit">天</span></div>
-            <div class="timer-card"><span class="num" id="t-hours">0</span><span class="unit">小时</span></div>
-            <div class="timer-card"><span class="num" id="t-minutes">0</span><span class="unit">分</span></div>
-            <div class="timer-card"><span class="num" id="t-seconds">0</span><span class="unit">秒</span></div>
-        </div>
-    </section>
-
-
-    <section class="anniv-section">
-        <h2 class="section-label">✨ 重要纪念日</h2>
-        <div class="anniv-grid" id="anniv-grid"></div>
-    </section>
-
-    <section class="mood-section">
-        <div class="mood-calendar-heading">
-            <h2 class="mood-section-title">🌈 心情日历</h2>
-            <button class="mood-today-btn" id="mood-calendar-today" type="button" onclick="goToCurrentMoodMonth()">回到今天</button>
-        </div>
-        <div id="mood-unlocked-content">
-            <div class="mood-calendar-toolbar" aria-label="心情日历月份导航">
-                <button class="mood-month-nav" type="button" onclick="changeMoodMonth(-1)" aria-label="查看上个月">‹</button>
-                <div class="mood-month-picker" role="group" aria-label="选择心情日历年月">
-                    <label class="visually-hidden" for="mood-calendar-year">年份</label>
-                    <select id="mood-calendar-year" onchange="selectMoodMonthFromPicker()" aria-describedby="mood-calendar-status"></select>
-                    <label class="visually-hidden" for="mood-calendar-month">月份</label>
-                    <select id="mood-calendar-month" onchange="selectMoodMonthFromPicker()" aria-describedby="mood-calendar-status">
-                        <option value="01">1 月</option><option value="02">2 月</option><option value="03">3 月</option>
-                        <option value="04">4 月</option><option value="05">5 月</option><option value="06">6 月</option>
-                        <option value="07">7 月</option><option value="08">8 月</option><option value="09">9 月</option>
-                        <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
-                    </select>
+        <div class="home-hero-dashboard">
+            <section class="timer-section" aria-labelledby="timer-label">
+                <h2 class="timer-label" id="timer-label">我们已经相伴走过</h2>
+                <div class="timer-grid">
+                    <div class="timer-card"><span class="num" id="t-days">0</span><span class="unit">天</span></div>
+                    <div class="timer-card"><span class="num" id="t-hours">0</span><span class="unit">小时</span></div>
+                    <div class="timer-card"><span class="num" id="t-minutes">0</span><span class="unit">分</span></div>
+                    <div class="timer-card"><span class="num" id="t-seconds">0</span><span class="unit">秒</span></div>
                 </div>
-                <button class="mood-month-nav" id="mood-calendar-next" type="button" onclick="changeMoodMonth(1)" aria-label="查看下个月">›</button>
-            </div>
-            <div class="mood-weekdays" aria-hidden="true">
-                <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
-            </div>
-            <div class="mood-calendar-grid" id="mood-heatmap" role="grid" aria-label="心情打卡月历"></div>
-            <div class="mood-calendar-status" id="mood-calendar-status" role="status" aria-live="polite"></div>
-            <div class="mood-checkin-row">
-                <span class="mood-checkin-label" id="mood-checkin-label">今天心情怎么样？</span>
-                <button class="btn-mood" id="mood-checkin-button" onclick="checkPassword('mood')">✨ 打卡心情</button>
-            </div>
-        </div>
-        <div class="locked-card" id="mood-locked-card" style="display: none;">
-            <div class="locked-icon">🔒</div>
-            <div class="locked-text">登录情侣空间，即可开启心情日历 🌈</div>
-            <button class="btn-locked-login" onclick="openLoginModal()">✨ 立即进入</button>
+            </section>
+
+            <section class="anniv-section" aria-labelledby="anniversary-label">
+                <h2 class="section-label" id="anniversary-label">重要纪念日</h2>
+                <div class="anniv-grid" id="anniv-grid"></div>
+            </section>
         </div>
     </section>
 
-    <div class="btn-group" id="main-btn-group" style="display: none;">
-        <button id="btn-moment" onclick="checkPassword('moment')">✨ 发布动态</button>
-        <button id="btn-blindbox" onclick="triggerBlindBox(true)" style="background: linear-gradient(135deg, #e3b0b8, #d4a0a8);">🎲 摇一摇盲盒</button>
+    <section class="home-auth-skeleton" id="home-auth-skeleton" aria-label="正在恢复情侣空间">
+        <div class="skeleton-line skeleton-line--title"></div>
+        <div class="skeleton-line"></div>
+        <div class="skeleton-grid" aria-hidden="true">
+            <span></span><span></span><span></span>
+        </div>
+    </section>
+
+    <section class="home-auth-gate" id="home-auth-gate" aria-labelledby="home-auth-title" hidden>
+        <div class="home-auth-copy">
+            <span class="home-auth-kicker">PRIVATE DIARY</span>
+            <h2 id="home-auth-title">回到只属于你们的空间</h2>
+            <p>登录后继续记录心情、共同回忆、语音与照片，让每一个普通日子都留在这里。</p>
+        </div>
+        <button class="home-auth-button" type="button" onclick="openLoginModal()">
+            <span aria-hidden="true">♡</span>
+            进入情侣空间
+        </button>
+    </section>
+
+    <nav class="home-quick-actions btn-group" id="main-btn-group" aria-label="快捷功能" hidden>
+        <button id="btn-moment" type="button" onclick="checkPassword('moment')">
+            <span aria-hidden="true">＋</span><span>发布动态</span>
+        </button>
+        <button type="button" onclick="checkPassword('mood')">
+            <span aria-hidden="true">☀</span><span>心情打卡</span>
+        </button>
+        <button id="btn-blindbox" type="button" onclick="triggerBlindBox(true)">
+            <span aria-hidden="true">◇</span><span>回忆盲盒</span>
+        </button>
+        <button type="button" onclick="openAIChatModal()">
+            <span aria-hidden="true">✦</span><span>Agnes 聊天</span>
+        </button>
+        <button type="button" onclick="openMilestonesModal()">
+            <span aria-hidden="true">⌁</span><span>大事记</span>
+        </button>
+    </nav>
+
+    <div class="home-private-dashboard" id="home-private-dashboard" hidden>
+        <section class="mood-section">
+            <div class="mood-calendar-heading">
+                <div>
+                    <span class="section-kicker">DAILY MOOD</span>
+                    <h2 class="mood-section-title">心情日历</h2>
+                </div>
+                <button class="mood-today-btn" id="mood-calendar-today" type="button" onclick="goToCurrentMoodMonth()">回到今天</button>
+            </div>
+            <div id="mood-unlocked-content">
+                <div class="mood-calendar-toolbar" aria-label="心情日历月份导航">
+                    <button class="mood-month-nav" type="button" onclick="changeMoodMonth(-1)" aria-label="查看上个月">‹</button>
+                    <div class="mood-month-picker" role="group" aria-label="选择心情日历年月">
+                        <label class="visually-hidden" for="mood-calendar-year">年份</label>
+                        <select id="mood-calendar-year" onchange="selectMoodMonthFromPicker()" aria-describedby="mood-calendar-status"></select>
+                        <label class="visually-hidden" for="mood-calendar-month">月份</label>
+                        <select id="mood-calendar-month" onchange="selectMoodMonthFromPicker()" aria-describedby="mood-calendar-status">
+                            <option value="01">1 月</option><option value="02">2 月</option><option value="03">3 月</option>
+                            <option value="04">4 月</option><option value="05">5 月</option><option value="06">6 月</option>
+                            <option value="07">7 月</option><option value="08">8 月</option><option value="09">9 月</option>
+                            <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
+                        </select>
+                    </div>
+                    <button class="mood-month-nav" id="mood-calendar-next" type="button" onclick="changeMoodMonth(1)" aria-label="查看下个月">›</button>
+                </div>
+                <div class="mood-weekdays" aria-hidden="true">
+                    <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+                </div>
+                <div class="mood-calendar-grid" id="mood-heatmap" role="grid" aria-label="心情打卡月历"></div>
+                <div class="mood-calendar-status" id="mood-calendar-status" role="status" aria-live="polite"></div>
+                <div class="mood-checkin-row">
+                    <span class="mood-checkin-label" id="mood-checkin-label">今天心情怎么样？</span>
+                    <button class="btn-mood" id="mood-checkin-button" onclick="checkPassword('mood')">记录心情</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="timeline-section" id="timeline-section">
+            <div class="timeline-heading">
+                <div>
+                    <span class="section-kicker">OUR MEMORIES</span>
+                    <h2 class="timeline-title">时光足迹</h2>
+                </div>
+                <button class="timeline-filter-button" type="button" onclick="openFilterModal()">筛选</button>
+            </div>
+            <div id="timeline-unlocked-content">
+                <button id="filter-indicator" class="filter-active-indicator" type="button" onclick="openFilterModal()">当前已开启筛选，点击修改</button>
+                <div class="timeline-track" id="timeline-content">
+                    <div class="empty-state">正在加载甜蜜回忆…</div>
+                </div>
+            </div>
+        </section>
     </div>
-
-    <section class="timeline-section">
-        <h2 class="timeline-title">⏳ 时光足迹</h2>
-        <div id="timeline-unlocked-content">
-            <button id="filter-indicator" class="filter-active-indicator" type="button" onclick="openFilterModal()">当前已开启筛选 (点击修改)</button>
-            <div class="timeline-track" id="timeline-content">
-                <div class="empty-state">正在加载甜蜜回忆…</div>
-            </div>
-        </div>
-        <div class="locked-card" id="timeline-locked-card" style="display: none;">
-            <div class="locked-icon">🔒</div>
-            <div class="locked-text">进入我们的专属空间，解锁全部甜蜜回忆时光… ⏳</div>
-            <button class="btn-locked-login" onclick="openLoginModal()">✨ 解锁空间</button>
-        </div>
-    </section>
-
 </main>
+
+<nav class="mobile-app-nav" id="mobile-app-nav" aria-label="主要导航" hidden>
+    <button type="button" onclick="document.getElementById('main-content').scrollIntoView({ behavior: 'smooth' })">
+        <span aria-hidden="true">⌂</span><span>首页</span>
+    </button>
+    <button type="button" onclick="document.getElementById('timeline-section').scrollIntoView({ behavior: 'smooth' })">
+        <span aria-hidden="true">◫</span><span>回忆</span>
+    </button>
+    <button class="mobile-app-nav-primary" type="button" onclick="checkPassword('moment')">
+        <span aria-hidden="true">＋</span><span>发布</span>
+    </button>
+    <button type="button" onclick="openAIChatModal()">
+        <span aria-hidden="true">✦</span><span>Agnes</span>
+    </button>
+    <button type="button" onclick="openProfilePage()">
+        <span aria-hidden="true">○</span><span>我的</span>
+    </button>
+</nav>
 
 <!-- 图文动态发布页面 -->
 <section class="app-page feature-page" id="momentModal" data-page-id="moment" aria-labelledby="moment-modal-title" aria-hidden="true" hidden inert>
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeMomentModal()">← 返回</button>
-            <div class="app-page-topbar-title">记录此刻</div>
+            <h1 class="app-page-topbar-title" id="moment-modal-title" data-page-focus tabindex="-1">记录此刻</h1>
             <span class="app-page-topbar-spacer" aria-hidden="true"></span>
         </header>
         <div class="app-page-scroll">
             <div class="app-page-content app-page-content--medium">
     <div class="modal-box app-page-card moment-page-card">
-        <h2 class="modal-title" id="moment-modal-title" data-page-focus tabindex="-1" style="margin-bottom: 16px;">✨ 发布动态</h2>
         <label class="visually-hidden" for="momentTextInput">动态内容</label>
-        <textarea class="modal-input" id="momentTextInput" placeholder="这一刻的想法..." rows="4" style="resize:vertical;text-align:left;margin-top:0; border: none; background: rgba(255,255,255,0.5); font-size: 1.05em;"></textarea>
+        <textarea class="modal-input moment-text-input" id="momentTextInput" placeholder="这一刻的想法..." rows="4"></textarea>
         
         <div id="momentImagePreviewContainer" class="moment-image-preview-container">
             <button class="moment-image-add-btn" type="button" onclick="document.getElementById('momentPhotoInput').click()" aria-label="添加照片或视频">
-                <span style="font-size: 2em; color: var(--text-muted); font-weight: 300;" aria-hidden="true">+</span>
+                <span class="moment-image-add-icon" aria-hidden="true">+</span>
             </button>
         </div>
         <input type="file" id="momentPhotoInput" accept="image/*,video/*" multiple style="display:none;" onchange="handleMomentPhotoSelect(event)">
         
         <!-- 新增的录音控件 -->
-        <div class="moment-audio-section" style="margin: 12px 0; display: flex; align-items: center; gap: 8px;">
-            <button id="btn-moment-audio" type="button" onclick="toggleMomentRecording()" aria-pressed="false" style="background: rgba(160, 212, 198, 0.15); border: 1px solid rgba(160, 212, 198, 0.3); color: #437f72; padding: 8px 16px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.9em; transition: all 0.2s; outline: none; font-family: inherit; user-select: none; -webkit-user-select: none;">
+        <div class="moment-audio-section">
+            <button class="moment-audio-button" id="btn-moment-audio" type="button" onclick="toggleMomentRecording()" aria-pressed="false">
                 <span class="audio-icon">🎙️</span> <span class="audio-text">录制声音</span>
             </button>
-            <div id="momentAudioPreview" style="display: none; align-items: center; gap: 8px; flex: 1;">
-                <audio id="momentAudioPlayer" controls style="height: 36px; flex: 1; border-radius: 18px; outline: none;"></audio>
-                <button id="btn-delete-audio" type="button" onclick="deleteRecordedAudio()" aria-label="删除录音" style="background: none; border: none; color: #ff5e7e; font-size: 1.4em; cursor: pointer; padding: 0 6px; display: flex; align-items: center; justify-content: center;">×</button>
+            <div class="moment-audio-preview" id="momentAudioPreview" style="display: none;">
+                <audio id="momentAudioPlayer" controls></audio>
+                <button class="moment-audio-delete" id="btn-delete-audio" type="button" onclick="deleteRecordedAudio()" aria-label="删除录音">×</button>
             </div>
         </div>
         
         <!-- 是否为大事记选项 -->
-        <label class="milestone-checkbox-label" style="display: flex; align-items: center; gap: 6px; margin: 12px 0; font-size: 0.9em; color: var(--primary); cursor: pointer; user-select: none; -webkit-user-select: none;">
-            <input type="checkbox" id="momentIsMilestone" style="accent-color: var(--primary); width: 16px; height: 16px; cursor: pointer;"> 🏆 设为重大事件 (大事记)
+        <label class="milestone-checkbox-label">
+            <input type="checkbox" id="momentIsMilestone"> 设为重大事件
         </label>
         
         <div class="modal-msg" id="momentModalMsg" role="status" aria-live="polite"></div>
-        <div class="modal-btns" style="margin-top: 16px;">
-            <button class="btn-cancel" onclick="closeMomentModal()">取消</button>
+        <div class="modal-btns">
             <button id="btn-submit-moment" onclick="submitMomentPost()">发布</button>
         </div>
     </div>
@@ -236,13 +319,12 @@
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeMoodModal()">← 返回</button>
-            <div class="app-page-topbar-title">心情日记</div>
+            <h1 class="app-page-topbar-title" id="mood-modal-title" data-page-focus tabindex="-1">心情日记</h1>
             <span class="app-page-topbar-spacer" aria-hidden="true"></span>
         </header>
         <div class="app-page-scroll">
             <div class="app-page-content app-page-content--narrow">
     <div class="modal-box app-page-card">
-        <h2 class="modal-title" id="mood-modal-title" data-page-focus tabindex="-1">今日心情打卡 🌈</h2>
         <div class="mood-emoji-row" id="moodEmojiRow">
             <button class="mood-emoji-btn" type="button" data-score="1" onclick="selectMood(1)" aria-label="心情很难过" aria-pressed="false">😢</button>
             <button class="mood-emoji-btn" type="button" data-score="2" onclick="selectMood(2)" aria-label="心情有点低落" aria-pressed="false">😕</button>
@@ -251,10 +333,9 @@
             <button class="mood-emoji-btn" type="button" data-score="5" onclick="selectMood(5)" aria-label="心情特别幸福" aria-pressed="false">🥰</button>
         </div>
         <label class="visually-hidden" for="moodNote">今天发生的事情</label>
-        <textarea class="modal-input" id="moodNote" maxlength="300" placeholder="说说今天发生了什么…（可选）" rows="3" style="resize:none;text-align:left;margin-top:4px;"></textarea>
+        <textarea class="modal-input mood-note-input" id="moodNote" maxlength="300" placeholder="说说今天发生了什么…（可选）" rows="3"></textarea>
         <div class="modal-msg" id="moodModalMsg" role="status" aria-live="polite"></div>
         <div class="modal-btns">
-            <button class="btn-cancel" onclick="closeMoodModal()">取消</button>
             <button id="mood-submit-button" onclick="submitMood()">记录</button>
         </div>
     </div>
@@ -268,17 +349,13 @@
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeMoodDayModal()">← 返回</button>
-            <div class="app-page-topbar-title">心情记录</div>
+            <h1 class="app-page-topbar-title" id="mood-day-modal-title" data-page-focus tabindex="-1">心情记录</h1>
             <span class="app-page-topbar-spacer" aria-hidden="true"></span>
         </header>
         <div class="app-page-scroll">
             <div class="app-page-content app-page-content--medium">
     <div class="modal-box app-page-card mood-day-modal-box">
-        <h2 class="modal-title" id="mood-day-modal-title" data-page-focus tabindex="-1">心情记录</h2>
         <div class="mood-day-list" id="mood-day-list"></div>
-        <div class="modal-btns">
-            <button class="btn-cancel" type="button" onclick="closeMoodDayModal()">关闭</button>
-        </div>
     </div>
             </div>
         </div>
@@ -290,15 +367,14 @@
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeFilterModal()">← 返回</button>
-            <div class="app-page-topbar-title">检索回忆</div>
+            <h1 class="app-page-topbar-title" id="filter-modal-title" data-page-focus tabindex="-1">检索回忆</h1>
             <span class="app-page-topbar-spacer" aria-hidden="true"></span>
         </header>
         <div class="app-page-scroll">
             <div class="app-page-content app-page-content--medium">
     <div class="modal-box app-page-card">
-        <h2 class="modal-title" id="filter-modal-title" data-page-focus tabindex="-1">检索回忆 📂</h2>
         
-        <div class="filter-section" style="margin-top: 16px;">
+        <div class="filter-section filter-section--first">
             <div class="filter-section-title">📅 按时间</div>
             <div class="filter-row">
                 <select id="filterYear" class="filter-select" aria-label="筛选年份">
@@ -337,9 +413,8 @@
             <input type="search" id="filterKeyword" class="filter-keyword" maxlength="100" placeholder="例如：约会 或 #旅游">
         </div>
 
-        <div class="modal-btns" style="margin-top: 24px;">
+        <div class="modal-btns">
             <button class="btn-cancel" onclick="clearFilters(); applyFilters();">重置</button>
-            <button class="btn-cancel" onclick="closeFilterModal()">取消</button>
             <button onclick="applyFilters()">筛选</button>
         </div>
     </div>
@@ -353,18 +428,16 @@
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeBlindBox()">← 返回</button>
-            <div class="app-page-topbar-title">回忆盲盒</div>
+            <h1 class="app-page-topbar-title" id="blind-box-title" data-page-focus tabindex="-1">回忆盲盒</h1>
             <span class="app-page-topbar-spacer" aria-hidden="true"></span>
         </header>
         <div class="app-page-scroll">
             <div class="app-page-content app-page-content--medium">
     <div class="modal-box app-page-card">
-        <h2 class="modal-title" id="blind-box-title" data-page-focus tabindex="-1">🎲 开启回忆盲盒...</h2>
         <div class="blind-box-content" id="blindBoxContent">
-            <div style="color:var(--text-muted); font-size: 0.9em;">闭上眼睛，正在穿越时空... ✨</div>
+            <div class="blind-box-status">闭上眼睛，正在穿越时空...</div>
         </div>
         <div class="modal-btns">
-            <button class="btn-cancel" onclick="closeBlindBox()">关上盒子</button>
             <button onclick="triggerBlindBox(false)">再摇一次</button>
         </div>
     </div>
@@ -405,14 +478,13 @@
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeAIModal()">← 返回</button>
-            <div class="app-page-topbar-title">Agnes 2.0</div>
+            <h1 class="app-page-topbar-title" id="ai-modal-title" data-page-focus tabindex="-1">Agnes 2.0</h1>
             <span class="app-page-topbar-spacer" aria-hidden="true"></span>
         </header>
         <div class="app-page-scroll">
             <div class="app-page-content app-page-content--wide">
     <div class="modal-box app-page-card ai-modal-box">
         <div class="ai-header-row">
-            <h2 class="modal-title" id="ai-modal-title" data-page-focus tabindex="-1" style="margin-bottom:0;">🤖 Agnes 2.0 情感助理</h2>
             <div class="ai-action-btns">
                 <button class="ai-refresh-btn" id="aiRefreshBtn" type="button" onclick="refreshAIContent()" aria-label="刷新内容">🔄</button>
             </div>
@@ -425,9 +497,6 @@
         <div class="ai-content-area" id="aiContentArea" role="tabpanel" aria-live="polite">
             <div class="ai-loading">思考中，请稍候... ✨</div>
         </div>
-        <div class="modal-btns">
-            <button class="btn-cancel" onclick="closeAIModal()">关闭</button>
-        </div>
     </div>
             </div>
         </div>
@@ -439,15 +508,12 @@
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeAIChatModal()">← 返回</button>
-            <div class="app-page-topbar-title">Agnes 2.0 聊天</div>
+            <h1 class="app-page-topbar-title" id="ai-chat-title" data-page-focus tabindex="-1">Agnes 2.0 聊天</h1>
             <span class="app-page-topbar-spacer" aria-hidden="true"></span>
         </header>
         <div class="app-page-scroll app-page-scroll--chat">
             <div class="app-page-content app-page-content--wide app-page-content--chat">
     <div class="ai-chat-box">
-        <div class="ai-chat-header">
-            <h2 id="ai-chat-title" data-page-focus tabindex="-1">💬 和 Agnes 2.0 聊聊</h2>
-        </div>
         <div class="ai-chat-messages" id="aiChatMessages" role="log" aria-live="polite" aria-relevant="additions text">
             <div class="ai-chat-welcome">
                 🌸 嗨~ 我是 Agnes 2.0，你们的专属情感小助理！<br>
@@ -487,7 +553,8 @@
 </section>
 
 <!-- 灯箱 -->
-<div id="lightbox" role="dialog" aria-modal="true" aria-label="媒体预览" aria-hidden="true" tabindex="-1" onclick="closeLightbox(event)">
+<div id="lightbox" role="dialog" aria-modal="true" aria-label="媒体预览" aria-hidden="true" tabindex="-1" onclick="closeLightbox(event)" inert>
+    <button id="lightbox-close" class="lightbox-close" type="button" onclick="closeLightbox(event)" aria-label="关闭媒体预览">×</button>
     <img id="lightbox-img" src="" alt="回忆放大" style="display:none;">
     <video id="lightbox-video" src="" controls style="display:none; max-width:90%; max-height:90%; border-radius:12px; margin: auto; position: absolute; top: 0; bottom: 0; left: 0; right: 0;"></video>
 </div>
@@ -525,13 +592,14 @@
     <canvas id="profile-particles-canvas" class="profile-particles-canvas" aria-hidden="true"></canvas>
     <div class="profile-topbar">
         <button class="profile-back-btn" onclick="closeProfilePage()">← 返回</button>
-        <div class="profile-topbar-title" id="profile-topbar-title" data-page-focus tabindex="-1">我的主页</div>
+        <h1 class="profile-topbar-title" id="profile-topbar-title" data-page-focus tabindex="-1">我的主页</h1>
         <div class="profile-topbar-right">
             <button class="profile-settings-btn" id="profile-settings-btn" type="button" onclick="openSettingsModal()" aria-label="设置">⚙️</button>
             <button class="profile-edit-btn" id="profile-edit-btn-top" onclick="openEditProfilePage()">✏️ 编辑资料</button>
         </div>
     </div>
     <div class="profile-body">
+        <div class="profile-content-card">
         <div class="profile-avatar-wrap" id="profile-avatar-wrap">
             <div class="profile-avatar-placeholder">🌸</div>
         </div>
@@ -549,6 +617,7 @@
             </div>
         </div>
         <button class="profile-action-btn" id="profile-edit-btn-bottom" onclick="openEditProfilePage()">✨ 修改个人资料</button>
+        </div>
     </div>
 </section>
 
@@ -556,10 +625,11 @@
 <section id="edit-profile-page" class="app-page edit-profile-page" data-page-id="edit-profile" aria-labelledby="edit-profile-title" aria-hidden="true" hidden inert>
     <div class="edit-topbar">
         <button class="edit-cancel-btn" onclick="closeEditProfilePage()">取消</button>
-        <h2 id="edit-profile-title" data-page-focus tabindex="-1" style="font-family:'ZCOOL KuaiLe',cursive; color:var(--primary); font-size:1.1em; letter-spacing:2px;">编辑资料</h2>
+        <h1 class="edit-profile-title" id="edit-profile-title" data-page-focus tabindex="-1">编辑资料</h1>
         <button class="edit-save-btn" id="edit-save-btn" onclick="saveProfile()">保存</button>
     </div>
     <div class="edit-body">
+        <div class="edit-profile-content-card">
         <div class="edit-avatar-area">
             <button class="edit-avatar-circle" type="button" onclick="document.getElementById('avatar-file-input').click()" id="edit-avatar-circle" aria-label="更换头像">
                 <span class="avatar-ph" aria-hidden="true">🌸</span>
@@ -576,6 +646,7 @@
             <input type="text" id="edit-bio" class="edit-input" placeholder="写下你的签名…" maxlength="300">
         </div>
         <div class="edit-msg" id="edit-msg" role="status" aria-live="polite"></div>
+        </div>
     </div>
 </section>
 
@@ -584,9 +655,9 @@
     <div class="modal-box version-modal-box">
         <div class="version-decor-heart">💝</div>
         <h2 class="modal-title" id="versionTitle">空间甜蜜升级 💖</h2>
-        <div class="version-tag" id="versionNumber">v3.5.0</div>
+        <div class="version-tag" id="versionNumber">v3.9.0</div>
         <div class="version-body">
-            <div class="version-date" id="versionDate">更新时间：2026-07-11</div>
+            <div class="version-date" id="versionDate">更新时间：2026-07-30</div>
             <ul class="version-changelog" id="versionChangelogList">
                 <!-- 动态插入更新特性 -->
             </ul>
@@ -602,14 +673,12 @@
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeSettingsModal()">← 返回</button>
-            <div class="app-page-topbar-title">系统设置</div>
+            <h1 class="app-page-topbar-title" id="settings-modal-title" data-page-focus tabindex="-1">系统设置</h1>
             <span class="app-page-topbar-spacer" aria-hidden="true"></span>
         </header>
         <div class="app-page-scroll">
             <div class="app-page-content app-page-content--medium">
     <div class="modal-box app-page-card settings-modal-box">
-        <h2 class="modal-title" id="settings-modal-title" data-page-focus tabindex="-1">⚙️ 系统设置</h2>
-        
         <div class="settings-group">
             <div class="settings-label">🎨 空间主题</div>
             <div class="theme-options">
@@ -654,12 +723,9 @@
         </div>
         
         <div class="settings-footer">
-            <span id="settingsVersion">当前版本：v3.5.0</span>
+            <span id="settingsVersion">当前版本：v3.9.0</span>
         </div>
         
-        <div class="modal-btns" style="margin-top: 24px;">
-            <button class="btn-cancel" onclick="closeSettingsModal()">关闭</button>
-        </div>
     </div>
             </div>
         </div>
@@ -671,14 +737,13 @@
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeMilestonesModal()">← 返回</button>
-            <div class="app-page-topbar-title">大事记</div>
+            <h1 class="app-page-topbar-title" id="milestones-modal-title" data-page-focus tabindex="-1">大事记</h1>
             <span class="app-page-topbar-spacer" aria-hidden="true"></span>
         </header>
         <div class="app-page-scroll">
             <div class="app-page-content app-page-content--wide">
     <div class="modal-box app-page-card milestones-modal-box">
         <div class="milestones-header">
-            <h2 class="modal-title" id="milestones-modal-title" data-page-focus tabindex="-1" style="margin-bottom: 12px;">🏆 大事记记录板</h2>
             <div class="milestones-tabs" role="tablist" aria-label="大事记视图">
                 <button class="milestone-tab active" id="tab-milestone-list" type="button" role="tab" aria-selected="true" aria-controls="milestonesContent" onclick="switchMilestoneTab('list')">⌛ 事件时间轴</button>
                 <button class="milestone-tab" id="tab-milestone-gallery" type="button" role="tab" aria-selected="false" aria-controls="milestonesContent" onclick="switchMilestoneTab('gallery')">📸 拍立得墙</button>
@@ -689,9 +754,8 @@
             <!-- 动态渲染大事记列表或照片墙 -->
         </div>
 
-        <div class="modal-btns" style="margin-top: 20px;">
-            <button class="btn-settings-action" id="btn-add-milestone-direct" onclick="openAddMilestoneDirect()" style="max-width: 160px;">✨ 记录新大事记</button>
-            <button class="btn-cancel" onclick="closeMilestonesModal()">关闭</button>
+        <div class="modal-btns">
+            <button class="btn-settings-action" id="btn-add-milestone-direct" onclick="openAddMilestoneDirect()">记录新大事记</button>
         </div>
     </div>
             </div>

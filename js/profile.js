@@ -2,6 +2,7 @@
 let pendingAvatarFile = null;
 let pendingAvatarPreviewUrl = '';
 let isProfileSaving = false;
+let profileStatsRequestGeneration = 0;
 
 function isCurrentAuthSnapshot(epoch, userId) {
     return epoch === authEpoch && currentAuthUser?.id === userId;
@@ -136,6 +137,7 @@ function closeProfilePage() {
 }
 
 function leaveProfilePage() {
+    profileStatsRequestGeneration += 1;
     if (typeof stopProfileParticles === 'function') stopProfileParticles();
 }
 
@@ -163,7 +165,25 @@ function renderProfilePage(targetAuthor = currentAuthor) {
     if (settingsButton) settingsButton.style.display = isSelf ? 'flex' : 'none';
 }
 
+function isCurrentProfileStatsRequest(requestGeneration, targetAuthor, epoch, userId) {
+    if (
+        requestGeneration !== profileStatsRequestGeneration
+        || !isCurrentAuthSnapshot(epoch, userId)
+    ) {
+        return false;
+    }
+
+    if (typeof getCurrentAppRoute === 'function') {
+        const route = getCurrentAppRoute();
+        return route?.id === 'profile'
+            && String(route.params?.author || '') === targetAuthor;
+    }
+
+    return typeof isAppRouteActive !== 'function' || isAppRouteActive('profile');
+}
+
 async function loadProfileStats(targetAuthor) {
+    const requestGeneration = ++profileStatsRequestGeneration;
     if (!isAuthenticated() || !allProfilesCache[targetAuthor]) return;
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
@@ -184,7 +204,12 @@ async function loadProfileStats(targetAuthor) {
             .in('type', ['photo', 'moment'])
     ]);
 
-    if (!isCurrentAuthSnapshot(epoch, userId)) return;
+    if (!isCurrentProfileStatsRequest(
+        requestGeneration,
+        targetAuthor,
+        epoch,
+        userId
+    )) return;
     if (countResult.error || mediaResult.error) {
         console.error('加载资料统计失败:', countResult.error || mediaResult.error);
         if (postsElement) postsElement.textContent = '—';
@@ -450,12 +475,19 @@ function setThemeDirect(theme) {
 }
 
 async function clearSpaceCache() {
+    const confirmed = window.confirm('确定要清理甜蜜记缓存并重新加载吗？登录状态和主题设置会保留。');
+    if (!confirmed) return;
+
     if (typeof showToast === 'function') showToast('正在清理缓存并刷新空间... 🧹');
 
     if ('caches' in window) {
         try {
             const keys = await caches.keys();
-            await Promise.all(keys.map(key => caches.delete(key)));
+            await Promise.all(
+                keys
+                    .filter(key => key.startsWith('love-diary-'))
+                    .map(key => caches.delete(key))
+            );
         } catch (error) {
             console.error('清理缓存失败:', error);
         }
