@@ -289,6 +289,10 @@ function enterAIPage() {
     switchAITab('topic');
 }
 
+function leaveAIPage() {
+    aiInteractionGeneration += 1;
+}
+
 function closeAIModal() {
     if (typeof appBack === 'function') {
         appBack('/');

@@ -1,7 +1,7 @@
         /* ── 通知铃铛及面板 ── */
         .notification-bell {
             position: fixed;
-            top: 16px;
+            top: calc(16px + env(safe-area-inset-top, 0px));
             right: 68px;
             z-index: 500;
             width: 42px; height: 42px;
@@ -39,12 +39,21 @@
         }
         .notification-panel {
             position: fixed;
-            top: 68px;
+            top: calc(68px + env(safe-area-inset-top, 0px));
             right: 16px;
             z-index: 600;
             width: 320px;
             max-width: calc(100vw - 32px);
             max-height: 60vh;
+            max-height: min(
+                60vh,
+                calc(
+                    100dvh
+                    - 84px
+                    - env(safe-area-inset-top, 0px)
+                    - env(safe-area-inset-bottom, 0px)
+                )
+            );
             background: var(--card);
             border: 1px solid var(--border);
             border-radius: 16px;

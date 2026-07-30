@@ -11,6 +11,7 @@ let authHydrationUserId = null;
 let authHydrationGeneration = 0;
 let authResetGeneration = 0;
 let authResetPromise = null;
+let initialAuthCheckComplete = false;
 
 let pendingDeleteId = null;
 let pendingCommentMomentId = null;
@@ -119,7 +120,7 @@ async function establishAuthenticatedUser(user, isNewLogin = false) {
 }
 
 async function initAuth() {
-    showLockedUI();
+    showPendingUI();
     localStorage.removeItem('lover_identity');
     localStorage.removeItem('all_profiles_cache');
 
@@ -129,6 +130,8 @@ async function initAuth() {
         if (errorElement) errorElement.textContent = message;
         document.getElementById('login-trigger-btn')?.setAttribute('title', message);
         console.warn(message);
+        initialAuthCheckComplete = true;
+        showLockedUI();
         return;
     }
 
@@ -140,6 +143,8 @@ async function initAuth() {
     } else if (data?.user) {
         await establishAuthenticatedUser(data.user, false);
     }
+    initialAuthCheckComplete = true;
+    if (!isAuthenticated()) showLockedUI();
 
     if (!authStateSubscription) {
         const { data: listener } = supabaseClient.auth.onAuthStateChange((event, session) => {
@@ -615,12 +620,41 @@ function executeAction(actionType) {
     else if (actionType === 'delete_comment') deleteComment(pendingDeleteCommentId, pendingDeleteCommentMomentId);
 }
 
+function setHomeAuthView(state) {
+    const body = document.body;
+    const skeleton = document.getElementById('home-auth-skeleton');
+    const gate = document.getElementById('home-auth-gate');
+    const dashboard = document.getElementById('home-private-dashboard');
+    const actions = document.getElementById('main-btn-group');
+    const mobileNav = document.getElementById('mobile-app-nav');
+
+    if (body) {
+        body.classList.toggle('auth-pending', state === 'pending');
+        body.dataset.authState = state;
+    }
+
+    if (skeleton) skeleton.hidden = state !== 'pending';
+    if (gate) gate.hidden = state !== 'locked';
+    if (dashboard) dashboard.hidden = state !== 'unlocked';
+    if (actions) actions.hidden = state !== 'unlocked';
+    if (mobileNav) mobileNav.hidden = state !== 'unlocked';
+}
+
+function showPendingUI() {
+    setHomeAuthView('pending');
+    document.getElementById('mood-unlocked-content')?.style.removeProperty('display');
+    document.getElementById('timeline-unlocked-content')?.style.removeProperty('display');
+    document.getElementById('fab-container')?.style.setProperty('display', 'none');
+}
+
 function showLockedUI() {
-    document.getElementById('mood-unlocked-content')?.style.setProperty('display', 'none');
-    document.getElementById('mood-locked-card')?.style.setProperty('display', 'flex');
-    document.getElementById('main-btn-group')?.style.setProperty('display', 'none');
-    document.getElementById('timeline-unlocked-content')?.style.setProperty('display', 'none');
-    document.getElementById('timeline-locked-card')?.style.setProperty('display', 'flex');
+    if (!initialAuthCheckComplete) {
+        showPendingUI();
+        return;
+    }
+    setHomeAuthView('locked');
+    document.getElementById('mood-unlocked-content')?.style.removeProperty('display');
+    document.getElementById('timeline-unlocked-content')?.style.removeProperty('display');
     document.getElementById('fab-container')?.style.setProperty('display', 'none');
 }
 
@@ -629,21 +663,21 @@ function hideLockedUI() {
     const mainButtons = document.getElementById('main-btn-group');
     const timelineContent = document.getElementById('timeline-unlocked-content');
 
+    initialAuthCheckComplete = true;
+    setHomeAuthView('unlocked');
     if (moodContent) {
-        moodContent.style.display = 'block';
+        moodContent.style.removeProperty('display');
         moodContent.classList.add('fade-in-section');
     }
-    document.getElementById('mood-locked-card')?.style.setProperty('display', 'none');
     if (mainButtons) {
-        mainButtons.style.display = 'flex';
+        mainButtons.style.removeProperty('display');
         mainButtons.classList.add('fade-in-section');
     }
     if (timelineContent) {
-        timelineContent.style.display = 'block';
+        timelineContent.style.removeProperty('display');
         timelineContent.classList.add('fade-in-section');
     }
-    document.getElementById('timeline-locked-card')?.style.setProperty('display', 'none');
-    document.getElementById('fab-container')?.style.setProperty('display', 'flex');
+    document.getElementById('fab-container')?.style.setProperty('display', 'none');
 }
 
 document.getElementById('login-password')?.addEventListener('keydown', event => {

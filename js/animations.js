@@ -3,13 +3,33 @@
 // ==========================================
 let bothOnline = false;
 let sakuraColor = '#f2b8c0'; // Retained for compatibility with other logic if any
+const animationsReducedMotionQuery = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)')
+    : null;
+
+function getAnimationDevicePixelRatio() {
+    return Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+}
+
+function sizeAnimationCanvas(canvas, context, width, height) {
+    const dpr = getAnimationDevicePixelRatio();
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
 
 (function() {
     const canvasBg = document.getElementById('sakura-canvas');
-    const ctxBg = canvasBg.getContext('2d');
     const canvasFg = document.getElementById('sakura-canvas-foreground');
+    if (!canvasBg || !canvasFg) return;
+    const ctxBg = canvasBg.getContext('2d');
     const ctxFg = canvasFg.getContext('2d');
+    if (!ctxBg || !ctxFg) return;
     let particles = [];
+    let canvasWidth = window.innerWidth;
+    let canvasHeight = window.innerHeight;
     
     let isMobile = window.innerWidth < 768;
     const PARTICLE_COUNT = isMobile ? 6 : 15;
@@ -22,26 +42,33 @@ let sakuraColor = '#f2b8c0'; // Retained for compatibility with other logic if a
     ];
 
     function resize() {
-        canvasBg.width = window.innerWidth;
-        canvasBg.height = window.innerHeight;
-        canvasFg.width = window.innerWidth;
-        canvasFg.height = window.innerHeight;
-        isMobile = window.innerWidth < 768;
+        const previousWidth = canvasWidth;
+        const previousHeight = canvasHeight;
+        canvasWidth = Math.max(window.innerWidth, 1);
+        canvasHeight = Math.max(window.innerHeight, 1);
+        sizeAnimationCanvas(canvasBg, ctxBg, canvasWidth, canvasHeight);
+        sizeAnimationCanvas(canvasFg, ctxFg, canvasWidth, canvasHeight);
+        if (previousWidth > 0 && previousHeight > 0) {
+            particles.forEach(particle => {
+                particle.x = particle.x * canvasWidth / previousWidth;
+                particle.y = particle.y * canvasHeight / previousHeight;
+            });
+        }
+        isMobile = canvasWidth < 768;
     }
     resize();
     let resizeTimer;
-window.addEventListener('resize', () => {
-clearTimeout(resizeTimer);
-resizeTimer = setTimeout(resize, 200);
-});
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(resize, 200);
+    });
 
     function newParticle(type, isForeground) {
-        const canvas = isForeground ? canvasFg : canvasBg;
         if (type === 'butterfly') {
             return {
                 type: 'butterfly',
                 isForeground: isForeground,
-                x: Math.random() * canvas.width,
+                x: Math.random() * canvasWidth,
                 y: -30,
                 size: 4 + Math.random() * 5,
                 speedY: 1.5 + Math.random() * 2.5,
@@ -59,7 +86,7 @@ resizeTimer = setTimeout(resize, 200);
             return {
                 type: 'petal',
                 isForeground: isForeground,
-                x: Math.random() * canvas.width,
+                x: Math.random() * canvasWidth,
                 y: -20,
                 size: 6 + Math.random() * 8,
                 speedY: 1.2 + Math.random() * 2.0,
@@ -76,8 +103,7 @@ resizeTimer = setTimeout(resize, 200);
     for (let i = 0; i < PARTICLE_COUNT; i++) {
         const isForeground = i % 3 === 0; // 约 1/3 的粒子在前景，2/3 在背景
         const p = newParticle(i % 2 === 0 ? 'butterfly' : 'petal', isForeground);
-        const canvas = isForeground ? canvasFg : canvasBg;
-        p.y = Math.random() * canvas.height;
+        p.y = Math.random() * canvasHeight;
         particles.push(p);
     }
 
@@ -138,14 +164,31 @@ resizeTimer = setTimeout(resize, 200);
         ctx.restore();
     }
 
-    let animationActive = true;
+    let animationFrameId = null;
+
+    function clearAnimationCanvases() {
+        ctxBg.clearRect(0, 0, canvasWidth, canvasHeight);
+        ctxFg.clearRect(0, 0, canvasWidth, canvasHeight);
+    }
+
+    function shouldRunAnimation() {
+        return !document.hidden && animationsReducedMotionQuery?.matches !== true;
+    }
+
+    function stopAnimation() {
+        if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+        clearAnimationCanvases();
+    }
+
     function animate() {
-        if (!animationActive) return;
+        animationFrameId = null;
+        if (!shouldRunAnimation()) {
+            clearAnimationCanvases();
+            return;
+        }
         particles.forEach((p, i) => {
             p.sway += p.swaySpeed * (bothOnline ? 1.5 : 1);
-            
-            const canvas = p.isForeground ? canvasFg : canvasBg;
-            const ctx = p.isForeground ? ctxFg : ctxBg;
             
             if (p.type === 'butterfly') {
                 p.wingAngle += p.wingSpeed * (bothOnline ? 1.5 : 1);
@@ -155,7 +198,7 @@ resizeTimer = setTimeout(resize, 200);
                 p.y += p.speedY * (bothOnline ? 1.3 : 1) - flapLift;
                 p.rot += p.rotSpeed * (bothOnline ? 1.5 : 1);
                 
-                if (p.y > canvas.height + 40 || p.x < -60 || p.x > canvas.width + 60) {
+                if (p.y > canvasHeight + 40 || p.x < -60 || p.x > canvasWidth + 60) {
                     particles[i] = newParticle('butterfly', p.isForeground);
                 }
             } else {
@@ -163,50 +206,84 @@ resizeTimer = setTimeout(resize, 200);
                 p.y += p.speedY * (bothOnline ? 1.3 : 1);
                 p.rot += p.rotSpeed * (bothOnline ? 1.5 : 1);
                 
-                if (p.y > canvas.height + 20) {
+                if (p.y > canvasHeight + 20) {
                     particles[i] = newParticle('petal', p.isForeground);
                 }
             }
         });
-        ctxBg.clearRect(0, 0, canvasBg.width, canvasBg.height);
-        ctxFg.clearRect(0, 0, canvasFg.width, canvasFg.height);
+        clearAnimationCanvases();
         particles.forEach(p => {
             const ctx = p.isForeground ? ctxFg : ctxBg;
             if (p.type === 'butterfly') drawButterfly(ctx, p);
             else drawPetal(ctx, p);
         });
-        requestAnimationFrame(animate);
+        animationFrameId = requestAnimationFrame(animate);
     }
-    animate();
+
+    function startAnimation() {
+        if (animationFrameId !== null || !shouldRunAnimation()) {
+            if (!shouldRunAnimation()) stopAnimation();
+            return;
+        }
+        animationFrameId = requestAnimationFrame(animate);
+    }
+    startAnimation();
 
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
-            animationActive = false;
+            stopAnimation();
         } else {
-            if (!animationActive) {
-                animationActive = true;
-                animate();
-            }
+            startAnimation();
         }
     });
+
+    const handleReducedMotionChange = () => {
+        if (animationsReducedMotionQuery?.matches) stopAnimation();
+        else startAnimation();
+    };
+    if (typeof animationsReducedMotionQuery?.addEventListener === 'function') {
+        animationsReducedMotionQuery.addEventListener('change', handleReducedMotionChange);
+    } else if (typeof animationsReducedMotionQuery?.addListener === 'function') {
+        animationsReducedMotionQuery.addListener(handleReducedMotionChange);
+    }
 })();
 // ==========================================
 // 个人主页专属：漫天飘落爱心和樱花粒子特效
 // ==========================================
-let profileParticlesReq;
+let profileParticlesReq = null;
 let profileParticles = [];
+let profileParticlesRequested = false;
 const emojis = ['🌸', '💮', '💖', '✨', '💕'];
+
+function pauseProfileParticles(clearCanvas = false) {
+    if (profileParticlesReq !== null) cancelAnimationFrame(profileParticlesReq);
+    profileParticlesReq = null;
+    if (clearCanvas) {
+        const canvas = document.getElementById('profile-particles-canvas');
+        const ctx = canvas?.getContext('2d');
+        if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+}
+
 function startProfileParticles() {
     const canvas = document.getElementById('profile-particles-canvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    if (!ctx) return;
+    profileParticlesRequested = true;
+    pauseProfileParticles();
+    const canvasWidth = Math.max(window.innerWidth, 1);
+    const canvasHeight = Math.max(window.innerHeight, 1);
+    sizeAnimationCanvas(canvas, ctx, canvasWidth, canvasHeight);
+    if (animationsReducedMotionQuery?.matches === true || document.hidden) {
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        return;
+    }
     profileParticles = [];
     for (let i = 0; i < (window.innerWidth < 768 ? 10 : 20); i++) {
         profileParticles.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height - canvas.height,
+            x: Math.random() * canvasWidth,
+            y: Math.random() * canvasHeight - canvasHeight,
             size: Math.random() * 12 + 10,
             speedY: Math.random() * 2.5 + 1.2,
             speedX: (Math.random() - 0.5) * 1.5,
@@ -216,15 +293,20 @@ function startProfileParticles() {
         });
     }
     function render() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        profileParticlesReq = null;
+        if (!profileParticlesRequested || animationsReducedMotionQuery?.matches === true || document.hidden) {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            return;
+        }
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
         for (let i = 0; i < profileParticles.length; i++) {
             const p = profileParticles[i];
             p.y += p.speedY;
             p.x += p.speedX;
             p.rotation += p.rotationSpeed;
-            if (p.y > canvas.height + 30) {
+            if (p.y > canvasHeight + 30) {
                 p.y = -30;
-                p.x = Math.random() * canvas.width;
+                p.x = Math.random() * canvasWidth;
             }
             ctx.save();
             ctx.translate(p.x, p.y);
@@ -238,10 +320,38 @@ function startProfileParticles() {
         }
         profileParticlesReq = requestAnimationFrame(render);
     }
-    if (profileParticlesReq) cancelAnimationFrame(profileParticlesReq);
     render();
 }
 
 function stopProfileParticles() {
-    if (profileParticlesReq) cancelAnimationFrame(profileParticlesReq);
+    profileParticlesRequested = false;
+    pauseProfileParticles(true);
 }
+
+const handleProfileMotionPreference = () => {
+    if (animationsReducedMotionQuery?.matches) {
+        pauseProfileParticles(true);
+    } else if (profileParticlesRequested && !document.hidden) {
+        startProfileParticles();
+    }
+};
+if (typeof animationsReducedMotionQuery?.addEventListener === 'function') {
+    animationsReducedMotionQuery.addEventListener('change', handleProfileMotionPreference);
+} else if (typeof animationsReducedMotionQuery?.addListener === 'function') {
+    animationsReducedMotionQuery.addListener(handleProfileMotionPreference);
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        pauseProfileParticles();
+    } else if (profileParticlesRequested && animationsReducedMotionQuery?.matches !== true) {
+        startProfileParticles();
+    }
+});
+
+let profileResizeTimer;
+window.addEventListener('resize', () => {
+    if (!profileParticlesRequested) return;
+    clearTimeout(profileResizeTimer);
+    profileResizeTimer = setTimeout(() => startProfileParticles(), 200);
+});

@@ -1,12 +1,12 @@
-window.onload = async function() { 
+async function initializeApp() {
     initTheme();
     createStarField();
-    renderAnniversaries(); 
+    renderAnniversaries();
     initAccessibleUiState();
     setTimeout(initCardGlow, 600);
 
-    // 默认保持私密内容锁定，真实 Auth 会话恢复后再解锁。
-    if (typeof showLockedUI === 'function') showLockedUI();
+    // 脚本位于页面底部，DOM 就绪后立即恢复会话，避免等待图片和字体加载完成。
+    if (typeof showPendingUI === 'function') showPendingUI();
 
     await initAuth();
     if (typeof initAppRouter === 'function') {
@@ -20,7 +20,13 @@ window.onload = async function() {
             completeLoginNavigation();
         }
     }
-};
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp, { once: true });
+} else {
+    initializeApp();
+}
 // ==========================================
 // 注册 Service Worker (PWA)
 // ==========================================
@@ -31,17 +37,18 @@ if ('serviceWorker' in navigator) {
                 updateViaCache: 'none'
             });
 
-            const announceUpdate = worker => {
+            const activateUpdate = worker => {
                 if (!worker || !navigator.serviceWorker.controller) return;
-                showToast('发现新版本，将在下次打开时自动启用。');
+                showToast('发现新版本，正在完成更新…');
+                worker.postMessage({ type: 'SKIP_WAITING' });
             };
 
-            if (registration.waiting) announceUpdate(registration.waiting);
+            if (registration.waiting) activateUpdate(registration.waiting);
             registration.addEventListener('updatefound', () => {
                 const worker = registration.installing;
                 if (!worker) return;
                 worker.addEventListener('statechange', () => {
-                    if (worker.state === 'installed') announceUpdate(worker);
+                    if (worker.state === 'installed') activateUpdate(worker);
                 });
             });
 
@@ -101,6 +108,12 @@ function initAccessibleUiState() {
         syncPasswordToggle();
         new MutationObserver(syncPasswordToggle).observe(passwordInput, { attributes: true, attributeFilter: ['type'] });
     }
+
+    const versionModal = document.getElementById('versionModal');
+    versionModal?.addEventListener('cancel', event => {
+        event.preventDefault();
+        closeVersionModal();
+    });
 }
 
 function onAppRouteEnter(route) {
@@ -121,10 +134,19 @@ function onAppRouteEnter(route) {
 
 function onAppRouteLeave(route) {
     if (!route) return;
+    // Restore the current route's inert snapshot before the router applies the
+    // next route, otherwise a lightbox opened during history navigation can
+    // overwrite the new page's interaction state.
+    const lightbox = document.getElementById('lightbox');
+    if (lightbox?.classList.contains('show') && typeof closeLightbox === 'function') {
+        closeLightbox();
+    }
     if (route.id === 'login' && typeof leaveLoginPage === 'function') leaveLoginPage();
     else if (route.id === 'moment' && typeof leaveMomentPage === 'function') leaveMomentPage();
     else if (route.id === 'mood' && typeof leaveMoodPage === 'function') leaveMoodPage();
     else if (route.id === 'mood-day' && typeof leaveMoodDayPage === 'function') leaveMoodDayPage();
+    else if (route.id === 'blindbox' && typeof leaveBlindBoxPage === 'function') leaveBlindBoxPage();
+    else if (route.id === 'ai' && typeof leaveAIPage === 'function') leaveAIPage();
     else if (route.id === 'ai-chat' && typeof leaveAIChatPage === 'function') leaveAIChatPage();
     else if (route.id === 'profile' && typeof leaveProfilePage === 'function') leaveProfilePage();
     else if (route.id === 'edit-profile' && typeof leaveEditProfilePage === 'function') leaveEditProfilePage();

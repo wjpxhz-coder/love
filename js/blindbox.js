@@ -77,6 +77,14 @@ function enterBlindBoxPage() {
     fetchRandomMoment();
 }
 
+function leaveBlindBoxPage() {
+    const content = document.getElementById('blindBoxContent');
+    if (content && typeof releaseMomentVideosWithin === 'function') {
+        releaseMomentVideosWithin(content, true);
+    }
+    cleanupBlindBox();
+}
+
 function closeBlindBox() {
     if (typeof appBack === 'function') {
         appBack('/');

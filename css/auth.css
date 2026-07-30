@@ -1,7 +1,7 @@
         /* ── 深色模式切换按钮 ── */
         .theme-toggle {
             position: fixed;
-            top: 16px;
+            top: calc(16px + env(safe-area-inset-top, 0px));
             right: 16px;
             z-index: 500;
             width: 42px; height: 42px;
@@ -25,7 +25,7 @@
         /* ── 登录按钮 ── */
         .login-trigger-btn {
             position: fixed;
-            top: 16px;
+            top: calc(16px + env(safe-area-inset-top, 0px));
             right: 120px;
             z-index: 500;
             width: 42px; height: 42px;
@@ -50,7 +50,7 @@
         /* ── 登录后头像按钮 ── */
         .user-avatar-btn {
             position: fixed;
-            top: 16px;
+            top: calc(16px + env(safe-area-inset-top, 0px));
             right: 120px;
             z-index: 500;
             width: 42px; height: 42px;
@@ -84,7 +84,7 @@
         /* ── 用户下拉菜单 ── */
         .user-dropdown {
             position: fixed;
-            top: 66px;
+            top: calc(66px + env(safe-area-inset-top, 0px));
             right: 112px;
             z-index: 600;
             background: var(--card);
@@ -147,9 +147,13 @@
         /* ── 浪漫登录弹窗 ── */
         #login-overlay {
             margin: 0;
-            padding: 0;
+            padding:
+                calc(16px + env(safe-area-inset-top, 0px))
+                16px
+                calc(16px + env(safe-area-inset-bottom, 0px));
             border: none;
             background: transparent;
+            box-sizing: border-box;
             width: 100vw;
             height: 100vh;
             height: 100dvh;
@@ -191,7 +195,12 @@
             transform: translateY(24px) scale(0.95);
             transition: all 0.45s cubic-bezier(0.25,0.8,0.25,1);
             text-align: center;
-            max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+            max-height: calc(
+                100dvh
+                - 2rem
+                - env(safe-area-inset-top, 0px)
+                - env(safe-area-inset-bottom, 0px)
+            );
             overflow-y: auto;
             overscroll-behavior: contain;
         }
