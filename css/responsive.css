@@ -129,3 +129,26 @@
                 display: none !important;
             }
         }
+
+        /* 经典首页：保持标题居中，并保留旧版路由聚焦时的酒红描边。 */
+        #home-title {
+            width: 100%;
+            text-align: center;
+        }
+
+        #home-title:focus,
+        #home-title:focus-visible {
+            outline: 3px solid var(--focus-ring) !important;
+            outline-offset: 3px;
+            box-shadow: none !important;
+        }
+
+        body[data-auth-state='locked'] #notification-bell {
+            display: flex !important;
+        }
+
+        @media (max-width: 680px) {
+            body[data-auth-state='unlocked'] {
+                padding-bottom: calc(60px + env(safe-area-inset-bottom));
+            }
+        }

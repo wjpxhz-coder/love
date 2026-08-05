@@ -53,6 +53,7 @@
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
+    <link rel="stylesheet" href="css/refresh.css">
     <link rel="stylesheet" href="css/variables.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/header.css">
@@ -70,7 +71,6 @@
     <link rel="stylesheet" href="css/effects.css">
     <link rel="stylesheet" href="css/responsive.css">
     <link rel="stylesheet" href="css/pages.css">
-    <link rel="stylesheet" href="css/refresh.css">
 </head>
 <body class="auth-pending">
 <a class="skip-link" id="skip-link" href="#main-content">跳到主要内容</a>
@@ -82,26 +82,24 @@
     <div class="resonance-text">此刻，TA 也在陪你看回忆 ✨</div>
 </div>
 
-<nav class="app-utility-bar" aria-label="账户与显示设置">
-    <!-- 登录触发按钮（未登录时显示） -->
-    <button id="login-trigger-btn" class="login-trigger-btn" type="button" onclick="openLoginModal()" aria-label="登录">👤</button>
+<!-- 登录触发按钮（未登录时显示） -->
+<button id="login-trigger-btn" class="login-trigger-btn" type="button" onclick="openLoginModal()" aria-label="登录">👤</button>
 
-    <!-- 登录后头像按钮 -->
-    <button id="user-avatar-btn" class="user-avatar-btn" type="button" onclick="toggleUserDropdown()"
-            aria-label="打开用户菜单" aria-controls="user-dropdown" aria-expanded="false">
-        <span class="avatar-placeholder" aria-hidden="true">🌸</span>
-    </button>
+<!-- 登录后头像按钮 -->
+<button id="user-avatar-btn" class="user-avatar-btn" type="button" onclick="toggleUserDropdown()"
+        aria-label="打开用户菜单" aria-controls="user-dropdown" aria-expanded="false">
+    <span class="avatar-placeholder" aria-hidden="true">🌸</span>
+</button>
 
-    <!-- 通知铃铛 -->
-    <button id="notification-bell" class="notification-bell" type="button" onclick="toggleNotificationPanel()"
-            aria-label="消息通知" aria-controls="notification-panel" aria-expanded="false">
-        🔔
-        <span id="notification-badge" class="notification-badge" aria-hidden="true"></span>
-    </button>
+<!-- 通知铃铛 -->
+<button id="notification-bell" class="notification-bell" type="button" onclick="toggleNotificationPanel()"
+        aria-label="消息通知" aria-controls="notification-panel" aria-expanded="false">
+    🔔
+    <span id="notification-badge" class="notification-badge" aria-hidden="true"></span>
+</button>
 
-    <button id="theme-toggle" class="theme-toggle" type="button" onclick="toggleTheme()"
-            aria-label="切换到深色主题" aria-pressed="false">🌙</button>
-</nav>
+<button id="theme-toggle" class="theme-toggle" type="button" onclick="toggleTheme()"
+        aria-label="切换到深色主题" aria-pressed="false">🌙</button>
 
 <!-- 用户下拉菜单 -->
 <div id="user-dropdown" class="user-dropdown" aria-hidden="true">
@@ -126,33 +124,28 @@
 <canvas id="sakura-canvas" aria-hidden="true"></canvas>
 <canvas id="sakura-canvas-foreground" aria-hidden="true"></canvas>
 
-<main class="container home-shell" id="main-content">
-    <section class="home-hero" aria-labelledby="home-title">
-        <header class="site-header">
-            <p class="home-eyebrow">OUR LITTLE UNIVERSE</p>
-            <h1 id="home-title" data-page-focus tabindex="-1">小蛇 <span aria-hidden="true">♡</span> 小奚</h1>
-            <p class="tagline">愿得一人心，白首不相离</p>
-            <div class="header-divider" aria-hidden="true">
-                <span></span><i>❀</i><span></span>
-            </div>
-        </header>
-
-        <div class="home-hero-dashboard">
-            <section class="timer-section" aria-labelledby="timer-label">
-                <h2 class="timer-label" id="timer-label">我们已经相伴走过</h2>
-                <div class="timer-grid">
-                    <div class="timer-card"><span class="num" id="t-days">0</span><span class="unit">天</span></div>
-                    <div class="timer-card"><span class="num" id="t-hours">0</span><span class="unit">小时</span></div>
-                    <div class="timer-card"><span class="num" id="t-minutes">0</span><span class="unit">分</span></div>
-                    <div class="timer-card"><span class="num" id="t-seconds">0</span><span class="unit">秒</span></div>
-                </div>
-            </section>
-
-            <section class="anniv-section" aria-labelledby="anniversary-label">
-                <h2 class="section-label" id="anniversary-label">重要纪念日</h2>
-                <div class="anniv-grid" id="anniv-grid"></div>
-            </section>
+<main class="container" id="main-content">
+    <header class="site-header">
+        <h1 id="home-title" data-page-focus tabindex="-1">小蛇 ♡ 小奚</h1>
+        <p class="tagline">愿得一人心，白首不相离</p>
+        <div class="header-divider" aria-hidden="true">
+            <span></span><i>❀</i><span></span>
         </div>
+    </header>
+
+    <section class="timer-section" aria-labelledby="timer-label">
+        <h2 class="timer-label" id="timer-label">我们已经相伴走过</h2>
+        <div class="timer-grid">
+            <div class="timer-card"><span class="num" id="t-days">0</span><span class="unit">天</span></div>
+            <div class="timer-card"><span class="num" id="t-hours">0</span><span class="unit">小时</span></div>
+            <div class="timer-card"><span class="num" id="t-minutes">0</span><span class="unit">分</span></div>
+            <div class="timer-card"><span class="num" id="t-seconds">0</span><span class="unit">秒</span></div>
+        </div>
+    </section>
+
+    <section class="anniv-section" aria-labelledby="anniversary-label">
+        <h2 class="section-label" id="anniversary-label">✨ 重要纪念日</h2>
+        <div class="anniv-grid" id="anniv-grid"></div>
     </section>
 
     <section class="home-auth-skeleton" id="home-auth-skeleton" aria-label="正在恢复情侣空间">
@@ -163,108 +156,65 @@
         </div>
     </section>
 
-    <section class="home-auth-gate" id="home-auth-gate" aria-labelledby="home-auth-title" hidden>
-        <div class="home-auth-copy">
-            <span class="home-auth-kicker">PRIVATE DIARY</span>
-            <h2 id="home-auth-title">回到只属于你们的空间</h2>
-            <p>登录后继续记录心情、共同回忆、语音与照片，让每一个普通日子都留在这里。</p>
+    <section class="mood-section" id="mood-section" aria-labelledby="mood-section-title">
+        <div class="mood-calendar-heading">
+            <h2 class="mood-section-title" id="mood-section-title">🌈 心情日历</h2>
+            <button class="mood-today-btn" id="mood-calendar-today" type="button" onclick="goToCurrentMoodMonth()">回到今天</button>
         </div>
-        <button class="home-auth-button" type="button" onclick="openLoginModal()">
-            <span aria-hidden="true">♡</span>
-            进入情侣空间
-        </button>
+        <div id="mood-unlocked-content" hidden>
+            <div class="mood-calendar-toolbar" aria-label="心情日历月份导航">
+                <button class="mood-month-nav" type="button" onclick="changeMoodMonth(-1)" aria-label="查看上个月">‹</button>
+                <div class="mood-month-picker" role="group" aria-label="选择心情日历年月">
+                    <label class="visually-hidden" for="mood-calendar-year">年份</label>
+                    <select id="mood-calendar-year" onchange="selectMoodMonthFromPicker()" aria-describedby="mood-calendar-status"></select>
+                    <label class="visually-hidden" for="mood-calendar-month">月份</label>
+                    <select id="mood-calendar-month" onchange="selectMoodMonthFromPicker()" aria-describedby="mood-calendar-status">
+                        <option value="01">1 月</option><option value="02">2 月</option><option value="03">3 月</option>
+                        <option value="04">4 月</option><option value="05">5 月</option><option value="06">6 月</option>
+                        <option value="07">7 月</option><option value="08">8 月</option><option value="09">9 月</option>
+                        <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
+                    </select>
+                </div>
+                <button class="mood-month-nav" id="mood-calendar-next" type="button" onclick="changeMoodMonth(1)" aria-label="查看下个月">›</button>
+            </div>
+            <div class="mood-weekdays" aria-hidden="true">
+                <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+            </div>
+            <div class="mood-calendar-grid" id="mood-heatmap" role="grid" aria-label="心情打卡月历"></div>
+            <div class="mood-calendar-status" id="mood-calendar-status" role="status" aria-live="polite"></div>
+            <div class="mood-checkin-row">
+                <span class="mood-checkin-label" id="mood-checkin-label">今天心情怎么样？</span>
+                <button class="btn-mood" id="mood-checkin-button" type="button" onclick="checkPassword('mood')">✨ 打卡心情</button>
+            </div>
+        </div>
+        <div class="locked-card" id="mood-locked-card" hidden>
+            <div class="locked-icon" aria-hidden="true">🔒</div>
+            <div class="locked-text">登录情侣空间，即可开启心情日历 🌈</div>
+            <button class="btn-locked-login" type="button" onclick="openLoginModal()">✨ 立即进入</button>
+        </div>
     </section>
 
-    <nav class="home-quick-actions btn-group" id="main-btn-group" aria-label="快捷功能" hidden>
-        <button id="btn-moment" type="button" onclick="checkPassword('moment')">
-            <span aria-hidden="true">＋</span><span>发布动态</span>
-        </button>
-        <button type="button" onclick="checkPassword('mood')">
-            <span aria-hidden="true">☀</span><span>心情打卡</span>
-        </button>
-        <button id="btn-blindbox" type="button" onclick="triggerBlindBox(true)">
-            <span aria-hidden="true">◇</span><span>回忆盲盒</span>
-        </button>
-        <button type="button" onclick="openAIChatModal()">
-            <span aria-hidden="true">✦</span><span>Agnes 聊天</span>
-        </button>
-        <button type="button" onclick="openMilestonesModal()">
-            <span aria-hidden="true">⌁</span><span>大事记</span>
-        </button>
+    <nav class="btn-group" id="main-btn-group" aria-label="快捷功能" hidden>
+        <button id="btn-moment" type="button" onclick="checkPassword('moment')">✨ 发布动态</button>
+        <button id="btn-blindbox" type="button" onclick="triggerBlindBox(true)"
+                style="background: linear-gradient(135deg, #e3b0b8, #d4a0a8);">🎲 摇一摇盲盒</button>
     </nav>
 
-    <div class="home-private-dashboard" id="home-private-dashboard" hidden>
-        <section class="mood-section">
-            <div class="mood-calendar-heading">
-                <div>
-                    <span class="section-kicker">DAILY MOOD</span>
-                    <h2 class="mood-section-title">心情日历</h2>
-                </div>
-                <button class="mood-today-btn" id="mood-calendar-today" type="button" onclick="goToCurrentMoodMonth()">回到今天</button>
+    <section class="timeline-section" id="timeline-section" aria-labelledby="timeline-title">
+        <h2 class="timeline-title" id="timeline-title">⏳ 时光足迹</h2>
+        <div id="timeline-unlocked-content" hidden>
+            <button id="filter-indicator" class="filter-active-indicator" type="button" onclick="openFilterModal()">当前已开启筛选（点击修改）</button>
+            <div class="timeline-track" id="timeline-content">
+                <div class="empty-state">正在加载甜蜜回忆…</div>
             </div>
-            <div id="mood-unlocked-content">
-                <div class="mood-calendar-toolbar" aria-label="心情日历月份导航">
-                    <button class="mood-month-nav" type="button" onclick="changeMoodMonth(-1)" aria-label="查看上个月">‹</button>
-                    <div class="mood-month-picker" role="group" aria-label="选择心情日历年月">
-                        <label class="visually-hidden" for="mood-calendar-year">年份</label>
-                        <select id="mood-calendar-year" onchange="selectMoodMonthFromPicker()" aria-describedby="mood-calendar-status"></select>
-                        <label class="visually-hidden" for="mood-calendar-month">月份</label>
-                        <select id="mood-calendar-month" onchange="selectMoodMonthFromPicker()" aria-describedby="mood-calendar-status">
-                            <option value="01">1 月</option><option value="02">2 月</option><option value="03">3 月</option>
-                            <option value="04">4 月</option><option value="05">5 月</option><option value="06">6 月</option>
-                            <option value="07">7 月</option><option value="08">8 月</option><option value="09">9 月</option>
-                            <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
-                        </select>
-                    </div>
-                    <button class="mood-month-nav" id="mood-calendar-next" type="button" onclick="changeMoodMonth(1)" aria-label="查看下个月">›</button>
-                </div>
-                <div class="mood-weekdays" aria-hidden="true">
-                    <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
-                </div>
-                <div class="mood-calendar-grid" id="mood-heatmap" role="grid" aria-label="心情打卡月历"></div>
-                <div class="mood-calendar-status" id="mood-calendar-status" role="status" aria-live="polite"></div>
-                <div class="mood-checkin-row">
-                    <span class="mood-checkin-label" id="mood-checkin-label">今天心情怎么样？</span>
-                    <button class="btn-mood" id="mood-checkin-button" onclick="checkPassword('mood')">记录心情</button>
-                </div>
-            </div>
-        </section>
-
-        <section class="timeline-section" id="timeline-section">
-            <div class="timeline-heading">
-                <div>
-                    <span class="section-kicker">OUR MEMORIES</span>
-                    <h2 class="timeline-title">时光足迹</h2>
-                </div>
-                <button class="timeline-filter-button" type="button" onclick="openFilterModal()">筛选</button>
-            </div>
-            <div id="timeline-unlocked-content">
-                <button id="filter-indicator" class="filter-active-indicator" type="button" onclick="openFilterModal()">当前已开启筛选，点击修改</button>
-                <div class="timeline-track" id="timeline-content">
-                    <div class="empty-state">正在加载甜蜜回忆…</div>
-                </div>
-            </div>
-        </section>
-    </div>
+        </div>
+        <div class="locked-card" id="timeline-locked-card" hidden>
+            <div class="locked-icon" aria-hidden="true">🔒</div>
+            <div class="locked-text">进入我们的专属空间，解锁全部甜蜜回忆时光… ⏳</div>
+            <button class="btn-locked-login" type="button" onclick="openLoginModal()">✨ 解锁空间</button>
+        </div>
+    </section>
 </main>
-
-<nav class="mobile-app-nav" id="mobile-app-nav" aria-label="主要导航" hidden>
-    <button type="button" onclick="document.getElementById('main-content').scrollIntoView({ behavior: 'smooth' })">
-        <span aria-hidden="true">⌂</span><span>首页</span>
-    </button>
-    <button type="button" onclick="document.getElementById('timeline-section').scrollIntoView({ behavior: 'smooth' })">
-        <span aria-hidden="true">◫</span><span>回忆</span>
-    </button>
-    <button class="mobile-app-nav-primary" type="button" onclick="checkPassword('moment')">
-        <span aria-hidden="true">＋</span><span>发布</span>
-    </button>
-    <button type="button" onclick="openAIChatModal()">
-        <span aria-hidden="true">✦</span><span>Agnes</span>
-    </button>
-    <button type="button" onclick="openProfilePage()">
-        <span aria-hidden="true">○</span><span>我的</span>
-    </button>
-</nav>
 
 <!-- 图文动态发布页面 -->
 <section class="app-page feature-page" id="momentModal" data-page-id="moment" aria-labelledby="moment-modal-title" aria-hidden="true" hidden inert>
@@ -655,9 +605,9 @@
     <div class="modal-box version-modal-box">
         <div class="version-decor-heart">💝</div>
         <h2 class="modal-title" id="versionTitle">空间甜蜜升级 💖</h2>
-        <div class="version-tag" id="versionNumber">v3.9.0</div>
+        <div class="version-tag" id="versionNumber">v3.9.1</div>
         <div class="version-body">
-            <div class="version-date" id="versionDate">更新时间：2026-07-30</div>
+            <div class="version-date" id="versionDate">更新时间：2026-08-05</div>
             <ul class="version-changelog" id="versionChangelogList">
                 <!-- 动态插入更新特性 -->
             </ul>
@@ -723,7 +673,7 @@
         </div>
         
         <div class="settings-footer">
-            <span id="settingsVersion">当前版本：v3.9.0</span>
+            <span id="settingsVersion">当前版本：v3.9.1</span>
         </div>
         
     </div>

@@ -6,6 +6,7 @@
             color: var(--text-muted);
             letter-spacing: 2px;
             margin-bottom: 18px;
+            text-align: center;
         }
 
         .timer-grid {
