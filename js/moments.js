@@ -1011,6 +1011,92 @@ function createMomentCardElement(item) {
     return card;
 }
 
+function focusLocatedMomentCard(card) {
+    if (!card) return;
+    const reveal = () => {
+        if (!card.isConnected) return;
+        card.classList.add('visible', 'blind-box-target');
+        const reduceMotion = typeof window.matchMedia === 'function'
+            && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        card.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+
+        if (!card.hasAttribute('tabindex')) {
+            card.tabIndex = -1;
+            card.addEventListener('blur', () => card.removeAttribute('tabindex'), { once: true });
+        }
+        try {
+            card.focus({ preventScroll: true });
+        } catch (_error) {
+            card.focus();
+        }
+        setTimeout(() => card.classList.remove('blind-box-target'), 2500);
+    };
+
+    if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => window.requestAnimationFrame(reveal));
+    } else {
+        setTimeout(reveal, 0);
+    }
+}
+
+function locateMomentOnTimeline(moment, options = {}) {
+    const momentId = normalizeMomentId(moment?.id);
+    const content = document.getElementById('timeline-content');
+    if (!momentId || !content || !hasMomentAuthContext()) return false;
+
+    let navigationSucceeded = true;
+    if (typeof appReplace === 'function') {
+        navigationSucceeded = appReplace('/', {
+            force: true,
+            focus: false,
+            scroll: false,
+            reason: 'locate-moment'
+        });
+    } else {
+        window.location.hash = '#/';
+    }
+    if (navigationSucceeded === false) return false;
+
+    const existingCard = document.getElementById(`card-${momentId}`);
+    if (existingCard) {
+        focusLocatedMomentCard(existingCard);
+        return true;
+    }
+
+    const card = createMomentCardElement(moment);
+    if (!card) {
+        if (typeof showToast === 'function') showToast('这条动态暂时无法显示。');
+        return false;
+    }
+
+    // 旧动态或被筛选隐藏的动态使用单条原文视图，避免为定位连续加载大量分页。
+    activeMomentFetchRequest += 1;
+    isLoading = false;
+    momentLoadingAuthEpoch = null;
+    scrollObserver?.disconnect();
+    if (typeof clearAllCommentImageSelections === 'function') clearAllCommentImageSelections();
+    releaseMomentVideosWithin(content, true);
+
+    const backWrap = createMomentNode('div', 'blind-box-back moment-locate-back');
+    const backButton = createMomentNode('button', '', options.backLabel || '🔙 返回动态列表');
+    backButton.type = 'button';
+    backButton.addEventListener('click', () => fetchMoments(false));
+    backWrap.appendChild(backButton);
+    content.replaceChildren(backWrap, card);
+
+    currentPage = 0;
+    hasMore = false;
+    momentTimelineCursor = null;
+    renderedMomentIds.clear();
+    renderedMomentIds.add(momentId);
+
+    if (typeof initScrollReveal === 'function') initScrollReveal();
+    if (typeof loadCommentCounts === 'function') loadCommentCounts([momentId]);
+    if (typeof loadMomentLikes === 'function') loadMomentLikes([momentId]);
+    focusLocatedMomentCard(card);
+    return true;
+}
+
 function runMomentAction(actionElement) {
     const momentId = normalizeMomentId(actionElement.dataset.momentId);
     const action = actionElement.dataset.momentAction;

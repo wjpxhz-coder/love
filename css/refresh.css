@@ -86,7 +86,10 @@ body {
 }
 
 #sakura-canvas,
-#sakura-canvas-foreground,
+#sakura-canvas-foreground {
+    opacity: 1;
+}
+
 #star-field {
     opacity: 0.22;
 }
@@ -1268,31 +1271,6 @@ body[data-auth-state='locked'] #notification-bell {
 }
 
 /* 大事记 */
-.milestones-header {
-    margin-bottom: 20px;
-    padding: 8px;
-    border: 1px solid var(--border);
-    border-radius: 15px;
-    background: var(--surface-elevated);
-}
-
-.milestones-tabs {
-    gap: 7px;
-    margin: 0;
-}
-
-.milestone-tab {
-    min-height: 44px;
-    border: 0;
-    border-radius: 10px;
-}
-
-.milestone-tab.active {
-    border: 0;
-    color: var(--primary);
-    background: var(--surface-subtle);
-}
-
 .milestones-content {
     max-height: none;
     padding: 0;
@@ -1530,7 +1508,10 @@ body[data-auth-state='locked'] #notification-bell {
     }
 
     #sakura-canvas,
-    #sakura-canvas-foreground,
+    #sakura-canvas-foreground {
+        opacity: 1;
+    }
+
     #star-field {
         opacity: 0.12;
     }
@@ -1706,7 +1687,7 @@ body[data-auth-state='locked'] #notification-bell {
 
     .mood-calendar-day,
     .mood-calendar-spacer {
-        min-height: 48px;
+        min-height: 68px;
     }
 
     .mood-checkin-label {

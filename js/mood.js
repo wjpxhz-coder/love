@@ -98,6 +98,22 @@ function compareMoodEntries(left, right) {
     return String(left.id).localeCompare(String(right.id), undefined, { numeric: true });
 }
 
+function normalizeMoodNotePreview(note) {
+    return typeof note === 'string' ? note.replace(/\s+/g, ' ').trim() : '';
+}
+
+function getLatestMoodNotePreview(entries) {
+    let latestPreview = null;
+    entries.forEach(entry => {
+        const note = normalizeMoodNotePreview(entry.note);
+        if (!note) return;
+        if (!latestPreview || compareMoodEntries(latestPreview.entry, entry) < 0) {
+            latestPreview = { entry, note };
+        }
+    });
+    return latestPreview;
+}
+
 function getMoodEntryById(entryId) {
     const targetId = String(entryId);
     for (const entries of Object.values(moodEntriesByDate)) {
@@ -298,6 +314,7 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
     if (entries.length) {
         const latestByMember = new Map();
         entries.forEach(entry => latestByMember.set(entry.user_id || entry.author, entry));
+        const notePreview = getLatestMoodNotePreview(entries);
         const previews = document.createElement('span');
         previews.className = 'mood-calendar-previews';
         latestByMember.forEach(entry => {
@@ -309,6 +326,14 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
         });
         cell.appendChild(previews);
 
+        if (notePreview) {
+            const note = document.createElement('span');
+            note.className = 'mood-calendar-note-preview';
+            note.textContent = notePreview.note;
+            note.title = `${notePreview.entry.author || '成员'}：${notePreview.note}`;
+            cell.appendChild(note);
+        }
+
         if (entries.length > 1) {
             const count = document.createElement('span');
             count.className = 'mood-entry-count';
@@ -316,7 +341,10 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
             cell.appendChild(count);
         }
         const labels = entries.map(entry => `${entry.author || '成员'}${MOOD_EMOJIS[Number(entry.score)] || ''}`).join('、');
-        cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}，${entries.length} 条心情记录：${labels}`);
+        const noteLabel = notePreview
+            ? `；最新内容，${notePreview.entry.author || '成员'}：${notePreview.note}`
+            : '';
+        cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}，${entries.length} 条心情记录：${labels}${noteLabel}，点击查看完整记录`);
         cell.addEventListener('click', () => openMoodDayModal(dateKey));
     } else if (dateKey === today) {
         cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}，尚未打卡，点击记录`);
