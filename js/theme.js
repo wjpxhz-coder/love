@@ -15,9 +15,10 @@ function applyTheme(theme) {
     updateThemeIcon(theme);
     const themeMeta = document.querySelector('meta[name="theme-color"]');
     if (themeMeta) themeMeta.content = theme === 'dark' ? '#0f0a1a' : '#8f4654';
-    if (!bothOnline) {
-        sakuraColor = theme === 'dark' ? '#c8a8d8' : '#f2b8c0';
-    }
+    window.homeSakuraEffect?.setAppearance({
+        theme,
+        bothOnline: typeof bothOnline !== 'undefined' && bothOnline
+    });
 }
 
 function toggleTheme() {

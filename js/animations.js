@@ -2,7 +2,6 @@
 // 2. 蝴蝶与樱花动画
 // ==========================================
 let bothOnline = false;
-let sakuraColor = '#f2b8c0'; // Retained for compatibility with other logic if any
 const animationsReducedMotionQuery = typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-reduced-motion: reduce)')
     : null;
@@ -20,151 +19,420 @@ function sizeAnimationCanvas(canvas, context, width, height) {
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-(function() {
+(function setupHomeSakuraEffect() {
     const canvasBg = document.getElementById('sakura-canvas');
     const canvasFg = document.getElementById('sakura-canvas-foreground');
     if (!canvasBg || !canvasFg) return;
     const ctxBg = canvasBg.getContext('2d');
     const ctxFg = canvasFg.getContext('2d');
     if (!ctxBg || !ctxFg) return;
+
+    const MOBILE_BREAKPOINT = 768;
+    const MAX_DELTA_MS = 50;
+    const PERFORMANCE_WINDOW_MS = 2000;
+    const PERFORMANCE_WARMUP_MS = 500;
+    const MIN_HEALTHY_FPS = 45;
+    const LONG_FRAME_MS = 50;
+    const LONG_FRAME_LIMIT = 3;
+    const FRAME_INTERVALS = [1000 / 60, 1000 / 60, 1000 / 30];
+
+    let canvasWidth = Math.max(window.innerWidth, 1);
+    let canvasHeight = Math.max(window.innerHeight, 1);
+    let isMobile = canvasWidth < MOBILE_BREAKPOINT;
     let particles = [];
-    let canvasWidth = window.innerWidth;
-    let canvasHeight = window.innerHeight;
-    
-    let isMobile = window.innerWidth < 768;
-    const PARTICLE_COUNT = isMobile ? 6 : 15;
+    let spriteCache = null;
+    let animationFrameId = null;
+    let routeActive = isInitialHomeLocation();
+    let qualityLevel = 0;
+    let lastRafTimestamp = 0;
+    let lastUpdateTimestamp = 0;
+    let frameAccumulator = 0;
+    let lastPresentedTimestamp = 0;
+    let healthWindowStart = 0;
+    let healthIntervalTotal = 0;
+    let healthFrameCount = 0;
+    let healthLongFrames = 0;
+    let resizeTimer = null;
+    let appearance = {
+        theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
+        bothOnline: false
+    };
 
-    // 蝴蝶多彩调色板
-    const colors = [
-        '#FF9A9E', '#A1C4FD', '#FDFBFB', '#FFECD2', 
-        '#ACE0F9', '#FBC2EB', '#A6C1EE', '#FD999A',
-        '#E2A9CE', '#FFD194', '#70E1F5', '#FFD1FF'
-    ];
+    function isInitialHomeLocation() {
+        const hash = window.location.hash;
+        return !hash
+            || hash === '#'
+            || !hash.startsWith('#/')
+            || hash === '#/'
+            || hash.startsWith('#/?');
+    }
 
-    function resize() {
+    function randomBetween(min, max) {
+        return min + Math.random() * (max - min);
+    }
+
+    function makePalette(theme, online) {
+        const isDark = theme === 'dark';
+        return {
+            highlight: isDark ? '#FFE0E8' : '#FFD7E0',
+            main: isDark ? '#F2A1BB' : '#F08FA8',
+            base: isDark ? '#C76B8B' : '#C95D79',
+            backHighlight: isDark ? '#FBE7ED' : '#FFE8ED',
+            backMain: isDark ? '#DFA6BB' : '#F3B4C4',
+            backBase: isDark ? '#B77791' : '#D58399',
+            edge: isDark ? 'rgba(255, 210, 226, 0.55)' : 'rgba(169, 67, 95, 0.48)',
+            vein: isDark ? 'rgba(128, 54, 91, 0.44)' : 'rgba(137, 53, 78, 0.36)',
+            butterflyRose: isDark ? '#E7A1B5' : '#D87891',
+            butterflyCream: isDark ? '#F3D8D4' : '#F6D4C7',
+            butterflyBody: isDark ? '#A77B89' : '#74515A',
+            accent: online ? '#D6A84A' : (isDark ? '#D6A6B6' : '#B77987'),
+            accentSoft: online ? 'rgba(255, 226, 160, 0.72)' : 'rgba(255, 239, 243, 0.52)'
+        };
+    }
+
+    function createMemorySprite(width, height, paint) {
+        const scale = 2;
+        const sprite = document.createElement('canvas');
+        sprite.width = width * scale;
+        sprite.height = height * scale;
+        const context = sprite.getContext('2d');
+        if (!context) return sprite;
+        context.setTransform(scale, 0, 0, scale, 0, 0);
+        paint(context, width, height);
+        return sprite;
+    }
+
+    function tracePetal(context, width, height, widthFactor) {
+        context.beginPath();
+        context.moveTo(0, height * 0.34);
+        context.bezierCurveTo(
+            -width * 0.18 * widthFactor, height * 0.2,
+            -width * 0.36 * widthFactor, -height * 0.06,
+            -width * 0.27 * widthFactor, -height * 0.27
+        );
+        context.bezierCurveTo(
+            -width * 0.22 * widthFactor, -height * 0.43,
+            -width * 0.08 * widthFactor, -height * 0.45,
+            0, -height * 0.32
+        );
+        context.bezierCurveTo(
+            width * 0.08 * widthFactor, -height * 0.45,
+            width * 0.22 * widthFactor, -height * 0.43,
+            width * 0.27 * widthFactor, -height * 0.27
+        );
+        context.bezierCurveTo(
+            width * 0.36 * widthFactor, -height * 0.06,
+            width * 0.18 * widthFactor, height * 0.2,
+            0, height * 0.34
+        );
+        context.closePath();
+    }
+
+    function paintPetalSprite(context, width, height, variant, palette) {
+        const petalWidth = width * 0.88;
+        const petalHeight = height * 0.9;
+        const widthFactors = [1, 0.94, 0.76, 0.58];
+        const isBack = variant === 1;
+        context.save();
+        context.translate(width / 2, height / 2);
+        context.rotate(variant === 2 ? -0.12 : (variant === 3 ? 0.14 : 0));
+
+        const fill = context.createLinearGradient(0, -petalHeight * 0.48, 0, petalHeight * 0.42);
+        fill.addColorStop(0, isBack ? palette.backHighlight : palette.highlight);
+        fill.addColorStop(0.52, isBack ? palette.backMain : palette.main);
+        fill.addColorStop(1, isBack ? palette.backBase : palette.base);
+        tracePetal(context, petalWidth, petalHeight, widthFactors[variant]);
+        context.fillStyle = fill;
+        context.fill();
+        context.lineWidth = 0.7;
+        context.strokeStyle = palette.edge;
+        context.stroke();
+
+        context.globalAlpha = isBack ? 0.28 : 0.42;
+        context.strokeStyle = palette.vein;
+        context.lineWidth = 0.55;
+        context.beginPath();
+        context.moveTo(0, petalHeight * 0.28);
+        context.bezierCurveTo(-petalWidth * 0.02, petalHeight * 0.08, -petalWidth * 0.03, -petalHeight * 0.12, 0, -petalHeight * 0.3);
+        context.moveTo(0, petalHeight * 0.2);
+        context.quadraticCurveTo(-petalWidth * 0.13, petalHeight * 0.02, -petalWidth * 0.16, -petalHeight * 0.14);
+        context.moveTo(0, petalHeight * 0.2);
+        context.quadraticCurveTo(petalWidth * 0.13, petalHeight * 0.02, petalWidth * 0.16, -petalHeight * 0.14);
+        context.stroke();
+
+        if (variant === 2) {
+            context.globalAlpha = 0.5;
+            context.strokeStyle = palette.highlight;
+            context.lineWidth = 1;
+            context.beginPath();
+            context.arc(petalWidth * 0.12, -petalHeight * 0.08, petalWidth * 0.12, -1.4, 1.25);
+            context.stroke();
+        }
+
+        context.globalAlpha = 0.6;
+        context.fillStyle = palette.accentSoft;
+        context.beginPath();
+        context.arc(0, petalHeight * 0.25, 1.45, 0, Math.PI * 2);
+        context.fill();
+        context.restore();
+    }
+
+    function paintBlossomSprite(context, width, height, palette) {
+        context.save();
+        context.translate(width / 2, height / 2);
+        for (let index = 0; index < 5; index += 1) {
+            context.save();
+            context.rotate(index * Math.PI * 2 / 5);
+            const petalFill = context.createLinearGradient(0, -height * 0.3, 0, height * 0.04);
+            petalFill.addColorStop(0, palette.highlight);
+            petalFill.addColorStop(0.58, palette.main);
+            petalFill.addColorStop(1, palette.base);
+            context.fillStyle = petalFill;
+            context.strokeStyle = palette.edge;
+            context.lineWidth = 0.65;
+            context.beginPath();
+            context.moveTo(0, height * 0.02);
+            context.bezierCurveTo(-width * 0.16, -height * 0.08, -width * 0.18, -height * 0.27, -width * 0.06, -height * 0.33);
+            context.quadraticCurveTo(0, -height * 0.26, width * 0.06, -height * 0.33);
+            context.bezierCurveTo(width * 0.18, -height * 0.27, width * 0.16, -height * 0.08, 0, height * 0.02);
+            context.closePath();
+            context.fill();
+            context.stroke();
+            context.restore();
+        }
+
+        context.fillStyle = palette.base;
+        context.beginPath();
+        context.arc(0, 0, width * 0.09, 0, Math.PI * 2);
+        context.fill();
+        context.strokeStyle = palette.accent;
+        context.lineWidth = 0.75;
+        for (let index = 0; index < 8; index += 1) {
+            const angle = index * Math.PI / 4;
+            context.beginPath();
+            context.moveTo(Math.cos(angle) * width * 0.03, Math.sin(angle) * height * 0.03);
+            context.lineTo(Math.cos(angle) * width * 0.14, Math.sin(angle) * height * 0.14);
+            context.stroke();
+            context.fillStyle = palette.accentSoft;
+            context.beginPath();
+            context.arc(Math.cos(angle) * width * 0.15, Math.sin(angle) * height * 0.15, 1.25, 0, Math.PI * 2);
+            context.fill();
+        }
+        context.restore();
+    }
+
+    function paintButterflySprite(context, width, height, flap, palette) {
+        context.save();
+        context.translate(width / 2, height / 2);
+        context.scale(flap, 1);
+        context.fillStyle = palette.butterflyRose;
+        context.strokeStyle = palette.accent;
+        context.lineWidth = 0.8;
+
+        context.beginPath();
+        context.moveTo(-2, -1);
+        context.bezierCurveTo(-width * 0.12, -height * 0.36, -width * 0.34, -height * 0.34, -width * 0.34, -height * 0.08);
+        context.bezierCurveTo(-width * 0.34, height * 0.04, -width * 0.16, height * 0.08, -2, 2);
+        context.closePath();
+        context.fill();
+        context.stroke();
+
+        context.beginPath();
+        context.moveTo(2, -1);
+        context.bezierCurveTo(width * 0.12, -height * 0.36, width * 0.34, -height * 0.34, width * 0.34, -height * 0.08);
+        context.bezierCurveTo(width * 0.34, height * 0.04, width * 0.16, height * 0.08, 2, 2);
+        context.closePath();
+        context.fill();
+        context.stroke();
+
+        context.fillStyle = palette.butterflyCream;
+        context.beginPath();
+        context.moveTo(-2, 1);
+        context.bezierCurveTo(-width * 0.11, height * 0.02, -width * 0.25, height * 0.2, -width * 0.2, height * 0.31);
+        context.quadraticCurveTo(-width * 0.08, height * 0.27, -2, 4);
+        context.closePath();
+        context.fill();
+        context.stroke();
+
+        context.beginPath();
+        context.moveTo(2, 1);
+        context.bezierCurveTo(width * 0.11, height * 0.02, width * 0.25, height * 0.2, width * 0.2, height * 0.31);
+        context.quadraticCurveTo(width * 0.08, height * 0.27, 2, 4);
+        context.closePath();
+        context.fill();
+        context.stroke();
+        context.restore();
+
+        context.fillStyle = palette.butterflyBody;
+        context.beginPath();
+        context.ellipse(width / 2, height / 2 + 1, 1.6, height * 0.2, 0, 0, Math.PI * 2);
+        context.fill();
+        context.strokeStyle = palette.butterflyBody;
+        context.lineWidth = 0.8;
+        context.beginPath();
+        context.moveTo(width / 2 - 0.5, height / 2 - height * 0.15);
+        context.quadraticCurveTo(width / 2 - 4, height / 2 - height * 0.3, width / 2 - 7, height / 2 - height * 0.28);
+        context.moveTo(width / 2 + 0.5, height / 2 - height * 0.15);
+        context.quadraticCurveTo(width / 2 + 4, height / 2 - height * 0.3, width / 2 + 7, height / 2 - height * 0.28);
+        context.stroke();
+    }
+
+    function rebuildSpriteCache() {
+        const palette = makePalette(appearance.theme, appearance.bothOnline);
+        const petals = [];
+        for (let variant = 0; variant < 4; variant += 1) {
+            petals.push(createMemorySprite(56, 64, (context, width, height) => {
+                paintPetalSprite(context, width, height, variant, palette);
+            }));
+        }
+        const blossom = createMemorySprite(68, 68, (context, width, height) => {
+            paintBlossomSprite(context, width, height, palette);
+        });
+        const flapStates = [0.32, 0.62, 1, 0.62];
+        const butterflies = flapStates.map(flap => createMemorySprite(68, 50, (context, width, height) => {
+            paintButterflySprite(context, width, height, flap, palette);
+        }));
+        spriteCache = { petals, blossom, butterflies };
+    }
+
+    function addSpecs(specs, type, layer, count) {
+        for (let index = 0; index < count; index += 1) specs.push({ type, layer });
+    }
+
+    function getParticleSpecs() {
+        const specs = [];
+        if (isMobile) {
+            addSpecs(specs, 'petal', 'background', 8);
+            addSpecs(specs, 'butterfly', 'background', 1);
+            addSpecs(specs, 'petal', 'foreground', 2);
+            addSpecs(specs, 'blossom', 'foreground', 1);
+        } else {
+            addSpecs(specs, 'petal', 'background', 16);
+            addSpecs(specs, 'blossom', 'background', 2);
+            addSpecs(specs, 'butterfly', 'background', 2);
+            addSpecs(specs, 'petal', 'foreground', 3);
+            addSpecs(specs, 'blossom', 'foreground', 1);
+        }
+
+        if (qualityLevel >= 1) {
+            const backgroundCount = specs.filter(spec => spec.layer === 'background').length;
+            let removeCount = backgroundCount - Math.ceil(backgroundCount * 0.75);
+            for (let index = specs.length - 1; index >= 0 && removeCount > 0; index -= 1) {
+                if (specs[index].layer === 'background' && specs[index].type === 'petal') {
+                    specs.splice(index, 1);
+                    removeCount -= 1;
+                }
+            }
+        }
+        return specs;
+    }
+
+    function resetParticle(particle, initial = false) {
+        const foreground = particle.layer === 'foreground';
+        particle.x = Math.random() * canvasWidth;
+        particle.y = initial
+            ? randomBetween(-canvasHeight * 0.08, canvasHeight)
+            : randomBetween(-90, -24);
+        particle.alpha = foreground ? randomBetween(0.55, 0.72) : randomBetween(0.32, 0.48);
+        particle.speedX = randomBetween(-5, 5);
+        particle.speedY = foreground ? randomBetween(66, 100) : randomBetween(44, 66);
+        particle.swayPhase = Math.random() * Math.PI * 2;
+        particle.swayFrequency = randomBetween(0.72, 1.45);
+        particle.swayVelocity = foreground ? randomBetween(11, 20) : randomBetween(7, 14);
+        particle.rotation = Math.random() * Math.PI * 2;
+        particle.rotationSpeed = randomBetween(-0.72, 0.72);
+        particle.flipPhase = Math.random() * Math.PI * 2;
+        particle.flipSpeed = randomBetween(1.25, 2.6);
+        particle.flapPhase = Math.random() * Math.PI * 2;
+        particle.flapSpeed = randomBetween(5.4, 8.2);
+        particle.spriteIndex = Math.floor(Math.random() * 4);
+
+        if (particle.type === 'petal') {
+            particle.size = foreground ? randomBetween(22, 30) : randomBetween(13, 20);
+        } else if (particle.type === 'blossom') {
+            particle.size = foreground ? randomBetween(28, 35) : randomBetween(18, 24);
+            particle.speedY *= 0.88;
+            particle.rotationSpeed *= 0.72;
+        } else {
+            particle.size = foreground ? randomBetween(26, 32) : randomBetween(20, 27);
+            particle.speedY = foreground ? randomBetween(48, 68) : randomBetween(34, 56);
+            particle.speedX = randomBetween(-8, 8);
+            particle.swayVelocity *= 1.35;
+            particle.rotationSpeed *= 0.4;
+        }
+    }
+
+    function createParticle(spec) {
+        const particle = { type: spec.type, layer: spec.layer };
+        resetParticle(particle, true);
+        return particle;
+    }
+
+    function syncParticlePopulation(forceRebuild = false) {
+        const specs = getParticleSpecs();
+        if (forceRebuild) particles = [];
+        const pool = particles.slice();
+        const nextParticles = [];
+        for (let index = 0; index < specs.length; index += 1) {
+            const spec = specs[index];
+            const matchIndex = pool.findIndex(particle => (
+                particle.type === spec.type && particle.layer === spec.layer
+            ));
+            if (matchIndex >= 0) nextParticles.push(pool.splice(matchIndex, 1)[0]);
+            else nextParticles.push(createParticle(spec));
+        }
+        particles = nextParticles;
+    }
+
+    function getHomeDprCaps() {
+        if (qualityLevel >= 2) return { background: 1, foreground: 1 };
+        return isMobile
+            ? { background: 1, foreground: 1.5 }
+            : { background: 1.25, foreground: 1.75 };
+    }
+
+    function sizeHomeCanvas(canvas, context, width, height, maxDpr) {
+        const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), maxDpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        context.setTransform(dpr, 0, 0, dpr, 0, 0);
+        context.imageSmoothingEnabled = true;
+        if ('imageSmoothingQuality' in context) context.imageSmoothingQuality = 'high';
+    }
+
+    function resetPerformanceSampling(timestamp = performance.now(), warmup = PERFORMANCE_WARMUP_MS) {
+        lastPresentedTimestamp = 0;
+        healthWindowStart = timestamp + warmup;
+        healthIntervalTotal = 0;
+        healthFrameCount = 0;
+        healthLongFrames = 0;
+    }
+
+    function resizeHomeCanvases() {
         const previousWidth = canvasWidth;
         const previousHeight = canvasHeight;
+        const previousMobile = isMobile;
         canvasWidth = Math.max(window.innerWidth, 1);
         canvasHeight = Math.max(window.innerHeight, 1);
-        sizeAnimationCanvas(canvasBg, ctxBg, canvasWidth, canvasHeight);
-        sizeAnimationCanvas(canvasFg, ctxFg, canvasWidth, canvasHeight);
-        if (previousWidth > 0 && previousHeight > 0) {
-            particles.forEach(particle => {
-                particle.x = particle.x * canvasWidth / previousWidth;
-                particle.y = particle.y * canvasHeight / previousHeight;
-            });
-        }
-        isMobile = canvasWidth < 768;
-    }
-    resize();
-    let resizeTimer;
-    window.addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(resize, 200);
-    });
+        isMobile = canvasWidth < MOBILE_BREAKPOINT;
 
-    function newParticle(type, isForeground) {
-        if (type === 'butterfly') {
-            return {
-                type: 'butterfly',
-                isForeground: isForeground,
-                x: Math.random() * canvasWidth,
-                y: -30,
-                size: 4 + Math.random() * 5,
-                speedY: 1.5 + Math.random() * 2.5,
-                speedX: -1.2 + Math.random() * 2.0,
-                rot: (Math.random() - 0.5) * 0.6,
-                rotSpeed: (Math.random() - 0.5) * 0.02,
-                alpha: 0.6 + Math.random() * 0.4,
-                sway: Math.random() * Math.PI * 2,
-                swaySpeed: 0.015 + Math.random() * 0.02,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                wingAngle: Math.random() * Math.PI * 2,
-                wingSpeed: 0.15 + Math.random() * 0.25
-            };
-        } else {
-            return {
-                type: 'petal',
-                isForeground: isForeground,
-                x: Math.random() * canvasWidth,
-                y: -20,
-                size: 6 + Math.random() * 8,
-                speedY: 1.2 + Math.random() * 2.0,
-                speedX: (Math.random() - 0.5) * 1.5,
-                rot: Math.random() * Math.PI * 2,
-                rotSpeed: (Math.random() - 0.5) * 0.03,
-                alpha: 0.5 + Math.random() * 0.4,
-                sway: Math.random() * Math.PI * 2,
-                swaySpeed: 0.008 + Math.random() * 0.01
-            };
-        }
-    }
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const isForeground = i % 3 === 0; // 约 1/3 的粒子在前景，2/3 在背景
-        const p = newParticle(i % 2 === 0 ? 'butterfly' : 'petal', isForeground);
-        p.y = Math.random() * canvasHeight;
-        particles.push(p);
-    }
-
-    function drawButterfly(ctx, b) {
-        ctx.save();
-        ctx.translate(b.x, b.y);
-        const currentRot = b.rot + Math.sin(b.sway) * 0.2;
-        ctx.rotate(currentRot);
-        ctx.globalAlpha = b.alpha;
-        
-        const flap = Math.abs(Math.cos(b.wingAngle)); 
-        
-        ctx.fillStyle = b.color;
-        if (bothOnline && !isMobile) {
-            // 移除 shadowBlur 优化性能
+        if (previousMobile !== isMobile) {
+            particles = [];
+        } else if (previousWidth > 0 && previousHeight > 0) {
+            for (let index = 0; index < particles.length; index += 1) {
+                particles[index].x = particles[index].x * canvasWidth / previousWidth;
+                particles[index].y = particles[index].y * canvasHeight / previousHeight;
+            }
         }
 
-        ctx.save();
-        ctx.scale(flap, 1);
-        ctx.beginPath();
-        ctx.ellipse(-b.size * 1.1, -b.size * 0.2, b.size * 1.2, b.size * 1.5, -Math.PI / 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(-b.size * 0.9, b.size * 1.2, b.size * 0.9, b.size * 1.1, Math.PI / 6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
-        ctx.save();
-        ctx.scale(flap, 1);
-        ctx.beginPath();
-        ctx.ellipse(b.size * 1.1, -b.size * 0.2, b.size * 1.2, b.size * 1.5, Math.PI / 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(b.size * 0.9, b.size * 1.2, b.size * 0.9, b.size * 1.1, -Math.PI / 6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-        
-        ctx.fillStyle = 'rgba(120, 100, 100, 0.7)';
-        ctx.beginPath();
-        ctx.ellipse(0, b.size * 0.5, b.size * 0.2, b.size * 1.5, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
+        const caps = getHomeDprCaps();
+        sizeHomeCanvas(canvasBg, ctxBg, canvasWidth, canvasHeight, caps.background);
+        sizeHomeCanvas(canvasFg, ctxFg, canvasWidth, canvasHeight, caps.foreground);
+        syncParticlePopulation();
+        resetPerformanceSampling();
     }
-
-    function drawPetal(ctx, p) {
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rot);
-        ctx.globalAlpha = p.alpha;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, p.size, p.size * 0.55, 0, 0, Math.PI * 2);
-        ctx.fillStyle = sakuraColor;
-        if (bothOnline && !isMobile) {
-            // 移除 shadowBlur 优化性能
-        }
-        ctx.fill();
-        ctx.restore();
-    }
-
-    let animationFrameId = null;
 
     function clearAnimationCanvases() {
         ctxBg.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -172,81 +440,212 @@ function sizeAnimationCanvas(canvas, context, width, height) {
     }
 
     function shouldRunAnimation() {
-        return !document.hidden && animationsReducedMotionQuery?.matches !== true;
+        return routeActive
+            && !document.hidden
+            && animationsReducedMotionQuery?.matches !== true;
     }
 
     function stopAnimation() {
         if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
+        lastRafTimestamp = 0;
+        lastUpdateTimestamp = 0;
+        frameAccumulator = 0;
+        resetPerformanceSampling();
         clearAnimationCanvases();
     }
 
-    function animate() {
-        animationFrameId = null;
-        if (!shouldRunAnimation()) {
-            clearAnimationCanvases();
+    function applyQualityLevel(nextLevel, timestamp) {
+        if (nextLevel <= qualityLevel || nextLevel > 2) return;
+        qualityLevel = nextLevel;
+        syncParticlePopulation();
+        if (qualityLevel >= 2) resizeHomeCanvases();
+        lastRafTimestamp = timestamp;
+        lastUpdateTimestamp = timestamp;
+        frameAccumulator = 0;
+        resetPerformanceSampling(timestamp);
+    }
+
+    function recordPresentedFrame(timestamp) {
+        if (qualityLevel >= 2) return;
+        if (lastPresentedTimestamp === 0) {
+            lastPresentedTimestamp = timestamp;
             return;
         }
-        particles.forEach((p, i) => {
-            p.sway += p.swaySpeed * (bothOnline ? 1.5 : 1);
-            
-            if (p.type === 'butterfly') {
-                p.wingAngle += p.wingSpeed * (bothOnline ? 1.5 : 1);
-                const flapLift = Math.sin(p.wingAngle) * 0.6;
-                
-                p.x += p.speedX + Math.sin(p.sway) * (bothOnline ? 1.8 : 1.2);
-                p.y += p.speedY * (bothOnline ? 1.3 : 1) - flapLift;
-                p.rot += p.rotSpeed * (bothOnline ? 1.5 : 1);
-                
-                if (p.y > canvasHeight + 40 || p.x < -60 || p.x > canvasWidth + 60) {
-                    particles[i] = newParticle('butterfly', p.isForeground);
-                }
-            } else {
-                p.x += p.speedX + Math.sin(p.sway) * (bothOnline ? 0.8 : 0.5);
-                p.y += p.speedY * (bothOnline ? 1.3 : 1);
-                p.rot += p.rotSpeed * (bothOnline ? 1.5 : 1);
-                
-                if (p.y > canvasHeight + 20) {
-                    particles[i] = newParticle('petal', p.isForeground);
-                }
+        const interval = timestamp - lastPresentedTimestamp;
+        lastPresentedTimestamp = timestamp;
+        if (timestamp < healthWindowStart) return;
+
+        healthIntervalTotal += interval;
+        healthFrameCount += 1;
+        if (interval > LONG_FRAME_MS) healthLongFrames += 1;
+        if (timestamp - healthWindowStart < PERFORMANCE_WINDOW_MS) return;
+
+        const averageInterval = healthFrameCount > 0
+            ? healthIntervalTotal / healthFrameCount
+            : 0;
+        const averageFps = averageInterval > 0 ? 1000 / averageInterval : 60;
+        const unhealthy = averageFps < MIN_HEALTHY_FPS || healthLongFrames >= LONG_FRAME_LIMIT;
+        healthWindowStart = timestamp;
+        healthIntervalTotal = 0;
+        healthFrameCount = 0;
+        healthLongFrames = 0;
+        if (unhealthy) applyQualityLevel(qualityLevel + 1, timestamp);
+    }
+
+    function updateParticles(deltaSeconds) {
+        const onlineMultiplier = appearance.bothOnline ? 1.1 : 1;
+        for (let index = 0; index < particles.length; index += 1) {
+            const particle = particles[index];
+            particle.swayPhase += particle.swayFrequency * deltaSeconds * onlineMultiplier;
+            particle.flipPhase += particle.flipSpeed * deltaSeconds * onlineMultiplier;
+            particle.rotation += particle.rotationSpeed * deltaSeconds * onlineMultiplier;
+            particle.x += (
+                particle.speedX + Math.sin(particle.swayPhase) * particle.swayVelocity
+            ) * deltaSeconds * onlineMultiplier;
+            particle.y += particle.speedY * deltaSeconds * onlineMultiplier;
+            if (particle.type === 'butterfly') {
+                particle.flapPhase += particle.flapSpeed * deltaSeconds * onlineMultiplier;
+                particle.y -= Math.sin(particle.flapPhase) * 4.5 * deltaSeconds;
             }
-        });
+
+            const margin = particle.size * 2;
+            if (particle.y > canvasHeight + margin) {
+                resetParticle(particle);
+            } else if (particle.x < -margin) {
+                particle.x = canvasWidth + margin;
+            } else if (particle.x > canvasWidth + margin) {
+                particle.x = -margin;
+            }
+        }
+    }
+
+    function drawParticle(context, particle) {
+        let sprite;
+        let drawWidth;
+        let drawHeight;
+        let flipScale = 1;
+        if (particle.type === 'petal') {
+            const facingBack = Math.sin(particle.flipPhase) < -0.12;
+            const spriteIndex = facingBack
+                ? 1
+                : particle.spriteIndex % spriteCache.petals.length;
+            sprite = spriteCache.petals[spriteIndex];
+            drawWidth = particle.size * 0.92;
+            drawHeight = particle.size * 1.18;
+            flipScale = 0.28 + Math.abs(Math.cos(particle.flipPhase)) * 0.72;
+        } else if (particle.type === 'blossom') {
+            sprite = spriteCache.blossom;
+            drawWidth = particle.size;
+            drawHeight = particle.size;
+            flipScale = 0.78 + Math.abs(Math.cos(particle.flipPhase)) * 0.22;
+        } else {
+            const normalizedFlap = (particle.flapPhase % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+            const frame = Math.floor(normalizedFlap / (Math.PI * 2) * spriteCache.butterflies.length)
+                % spriteCache.butterflies.length;
+            sprite = spriteCache.butterflies[frame];
+            drawWidth = particle.size * 1.36;
+            drawHeight = particle.size;
+        }
+
+        context.save();
+        context.translate(particle.x, particle.y);
+        context.rotate(particle.rotation);
+        context.scale(flipScale, 1);
+        context.globalAlpha = particle.alpha;
+        context.drawImage(sprite, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+        context.restore();
+    }
+
+    function drawFrame() {
         clearAnimationCanvases();
-        particles.forEach(p => {
-            const ctx = p.isForeground ? ctxFg : ctxBg;
-            if (p.type === 'butterfly') drawButterfly(ctx, p);
-            else drawPetal(ctx, p);
-        });
-        animationFrameId = requestAnimationFrame(animate);
+        for (let index = 0; index < particles.length; index += 1) {
+            const particle = particles[index];
+            drawParticle(particle.layer === 'foreground' ? ctxFg : ctxBg, particle);
+        }
+    }
+
+    function animate(timestamp) {
+        animationFrameId = null;
+        if (!shouldRunAnimation()) {
+            stopAnimation();
+            return;
+        }
+
+        const targetInterval = FRAME_INTERVALS[qualityLevel];
+        const rafElapsed = lastRafTimestamp > 0
+            ? Math.min(timestamp - lastRafTimestamp, MAX_DELTA_MS)
+            : targetInterval;
+        lastRafTimestamp = timestamp;
+        frameAccumulator += rafElapsed;
+
+        if (frameAccumulator >= targetInterval) {
+            const updateElapsed = lastUpdateTimestamp > 0
+                ? Math.min(timestamp - lastUpdateTimestamp, MAX_DELTA_MS)
+                : Math.min(frameAccumulator, MAX_DELTA_MS);
+            lastUpdateTimestamp = timestamp;
+            frameAccumulator = Math.max(0, frameAccumulator - targetInterval);
+            recordPresentedFrame(timestamp);
+            updateParticles(updateElapsed / 1000);
+            drawFrame();
+        }
+
+        if (shouldRunAnimation()) animationFrameId = requestAnimationFrame(animate);
     }
 
     function startAnimation() {
-        if (animationFrameId !== null || !shouldRunAnimation()) {
-            if (!shouldRunAnimation()) stopAnimation();
-            return;
-        }
+        if (animationFrameId !== null || !shouldRunAnimation()) return;
+        lastRafTimestamp = 0;
+        lastUpdateTimestamp = 0;
+        frameAccumulator = 0;
+        resetPerformanceSampling();
         animationFrameId = requestAnimationFrame(animate);
     }
-    startAnimation();
 
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            stopAnimation();
-        } else {
-            startAnimation();
-        }
-    });
+    function reconcileAnimationState() {
+        if (shouldRunAnimation()) startAnimation();
+        else stopAnimation();
+    }
 
-    const handleReducedMotionChange = () => {
-        if (animationsReducedMotionQuery?.matches) stopAnimation();
-        else startAnimation();
-    };
+    document.addEventListener('visibilitychange', reconcileAnimationState);
+    const handleReducedMotionChange = () => reconcileAnimationState();
     if (typeof animationsReducedMotionQuery?.addEventListener === 'function') {
         animationsReducedMotionQuery.addEventListener('change', handleReducedMotionChange);
     } else if (typeof animationsReducedMotionQuery?.addListener === 'function') {
         animationsReducedMotionQuery.addListener(handleReducedMotionChange);
     }
+
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            resizeHomeCanvases();
+            if (shouldRunAnimation()) drawFrame();
+        }, 200);
+    });
+
+    rebuildSpriteCache();
+    resizeHomeCanvases();
+
+    window.homeSakuraEffect = Object.freeze({
+        setRouteActive(isHome) {
+            const nextActive = Boolean(isHome);
+            if (routeActive === nextActive) return;
+            routeActive = nextActive;
+            reconcileAnimationState();
+        },
+        setAppearance(nextAppearance = {}) {
+            const nextTheme = nextAppearance.theme === 'dark' ? 'dark' : 'light';
+            const nextOnline = Boolean(nextAppearance.bothOnline);
+            if (appearance.theme === nextTheme && appearance.bothOnline === nextOnline) return;
+            appearance = { theme: nextTheme, bothOnline: nextOnline };
+            rebuildSpriteCache();
+            resetPerformanceSampling();
+        }
+    });
+
+    reconcileAnimationState();
 })();
+
 // ==========================================
 // 个人主页专属：漫天飘落爱心和樱花粒子特效
 // ==========================================

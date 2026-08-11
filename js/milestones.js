@@ -7,7 +7,6 @@ let momentStarsCacheUserId = null;
 let momentStarsCacheAuthEpoch = null;
 let momentStarsLoaded = false;
 let momentStarsLoadPromise = null;
-let currentMilestoneTab = 'list'; // 'list' 或 'gallery'
 let milestoneRenderRequestId = 0;
 
 function hasMilestoneAuthContext() {
@@ -225,19 +224,6 @@ function closeMilestonesModal() {
     window.location.hash = '#/';
 }
 
-function switchMilestoneTab(tabName) {
-    currentMilestoneTab = tabName;
-    const tabList = document.getElementById('tab-milestone-list');
-    const tabGallery = document.getElementById('tab-milestone-gallery');
-    
-    if (tabList && tabGallery) {
-        tabList.classList.toggle('active', tabName === 'list');
-        tabGallery.classList.toggle('active', tabName === 'gallery');
-    }
-    
-    renderMilestonesContent();
-}
-
 async function renderMilestonesContent() {
     const contentContainer = document.getElementById('milestonesContent');
     if (!contentContainer) return;
@@ -292,11 +278,7 @@ async function renderMilestonesContent() {
             return;
         }
 
-        if (currentMilestoneTab === 'list') {
-            renderTimelineList(items, contentContainer);
-        } else {
-            renderPolaroidWall(items, contentContainer);
-        }
+        renderTimelineList(items, contentContainer);
     } catch (e) {
         console.error('加载大事记失败:', e);
         if (requestId === milestoneRenderRequestId && isMilestoneAuthEpochCurrent(requestAuthEpoch)) {
@@ -344,6 +326,25 @@ function renderTimelineList(items, container) {
 
         const itemCard = document.createElement('div');
         itemCard.className = 'milestone-item-card';
+        itemCard.tabIndex = 0;
+        itemCard.setAttribute('role', 'link');
+        itemCard.setAttribute('aria-label', `查看 ${dateStr} 的动态${text ? `：${String(text).slice(0, 40)}` : ''}`);
+        itemCard.title = '点击查看原动态';
+        const locateMoment = () => {
+            if (typeof locateMomentOnTimeline === 'function') {
+                locateMomentOnTimeline(item, { backLabel: '🔙 返回动态列表' });
+            }
+        };
+        itemCard.addEventListener('click', event => {
+            const nestedControl = event.target.closest?.('button, a, input, textarea, select, [role="button"]');
+            if (nestedControl && nestedControl !== itemCard) return;
+            locateMoment();
+        });
+        itemCard.addEventListener('keydown', event => {
+            if (event.target !== itemCard || (event.key !== 'Enter' && event.key !== ' ')) return;
+            event.preventDefault();
+            locateMoment();
+        });
         const header = document.createElement('div');
         header.className = 'milestone-item-header';
         const date = document.createElement('span');
@@ -374,10 +375,14 @@ function renderTimelineList(items, container) {
             const showImage = () => {
                 if (typeof openLightbox === 'function') openLightbox(imageUrl);
             };
-            image.addEventListener('click', showImage);
+            image.addEventListener('click', event => {
+                event.stopPropagation();
+                showImage();
+            });
             image.addEventListener('keydown', event => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
+                    event.stopPropagation();
                     showImage();
                 }
             });
@@ -389,84 +394,6 @@ function renderTimelineList(items, container) {
     });
     
     container.appendChild(timeline);
-}
-
-function renderPolaroidWall(items, container) {
-    container.replaceChildren();
-    
-    // 筛选出有图片的项目
-    const photoItems = [];
-    items.forEach(item => {
-        try {
-            const parsed = JSON.parse(item.content);
-            const imageUrl = parsed && Array.isArray(parsed.images)
-                ? getMilestoneTrustedMediaUrl(parsed.images[0])
-                : '';
-            if (imageUrl) {
-                photoItems.push({
-                    id: item.id,
-                    text: parsed.text || '',
-                    image: imageUrl,
-                    date: new Date(item.created_at)
-                });
-            }
-        } catch (e) {}
-    });
-
-    if (photoItems.length === 0) {
-        setMilestoneStatus(
-            container,
-            '📸 目前大事记中还没有包含照片的内容哦~\n请在发布重大事件或收藏动态时，上传一张照片吧！',
-            'var(--text-muted)',
-            '50px 20px'
-        );
-        const empty = container.firstElementChild;
-        if (empty) Object.assign(empty.style, { fontSize: '0.92em', lineHeight: '1.6', whiteSpace: 'pre-line' });
-        return;
-    }
-
-    const wall = document.createElement('div');
-    wall.className = 'polaroid-wall';
-    
-    photoItems.forEach((item, index) => {
-        const dateStr = `${item.date.getFullYear()}.${String(item.date.getMonth() + 1).padStart(2, '0')}.${String(item.date.getDate()).padStart(2, '0')}`;
-        
-        // 旋转倾斜度（-5 到 +5 度，让相纸墙看起来自然生动）
-        const angle = (index % 3 === 0 ? -4 : (index % 3 === 1 ? 3 : -2)) + (Math.random() * 2 - 1);
-        
-        const card = document.createElement('div');
-        card.className = 'polaroid-card';
-        card.style.transform = `rotate(${angle}deg)`;
-        const imageWrapper = document.createElement('div');
-        imageWrapper.className = 'polaroid-img-wrapper';
-        imageWrapper.tabIndex = 0;
-        imageWrapper.setAttribute('role', 'button');
-        imageWrapper.setAttribute('aria-label', '查看大事记图片');
-        const image = document.createElement('img');
-        image.src = item.image;
-        image.alt = '大事记照片';
-        imageWrapper.appendChild(image);
-        const showImage = () => {
-            if (typeof openLightbox === 'function') openLightbox(item.image);
-        };
-        imageWrapper.addEventListener('click', showImage);
-        imageWrapper.addEventListener('keydown', event => {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                showImage();
-            }
-        });
-        const caption = document.createElement('div');
-        caption.className = 'polaroid-caption';
-        caption.textContent = String(item.text || '');
-        const date = document.createElement('div');
-        date.className = 'polaroid-date';
-        date.textContent = dateStr;
-        card.append(imageWrapper, caption, date);
-        wall.appendChild(card);
-    });
-    
-    container.appendChild(wall);
 }
 
 function openAddMilestoneDirect() {

@@ -95,7 +95,7 @@ function initAccessibleUiState() {
         });
     };
 
-    syncSelectedState('.ai-tab, .milestone-tab, .mood-emoji-btn, .theme-opt-btn');
+    syncSelectedState('.ai-tab, .mood-emoji-btn, .theme-opt-btn');
 
     const passwordToggle = document.getElementById('login-pw-eye');
     const passwordInput = document.getElementById('login-password');
@@ -118,6 +118,7 @@ function initAccessibleUiState() {
 
 function onAppRouteEnter(route) {
     if (!route) return;
+    window.homeSakuraEffect?.setRouteActive(route.id === 'home');
     if (route.id === 'login' && typeof enterLoginPage === 'function') enterLoginPage(route);
     else if (route.id === 'moment' && typeof enterMomentPage === 'function') enterMomentPage(route);
     else if (route.id === 'mood' && typeof enterMoodPage === 'function') enterMoodPage(route);

@@ -8,11 +8,18 @@ let presenceSpaceId = null;
 function profileForUserId(userId) {
     return Object.values(allProfilesCache || {}).find(profile => profile.user_id === userId) || null;
 }
+
+function syncHomeSakuraAppearance() {
+    window.homeSakuraEffect?.setAppearance({
+        theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
+        bothOnline
+    });
+}
+
 function resetPresenceUI() {
     bothOnline = false;
     document.getElementById('resonance-ui')?.classList.remove('show');
-    const theme = document.documentElement.getAttribute('data-theme');
-    sakuraColor = theme === 'dark' ? '#c8a8d8' : '#f2b8c0';
+    syncHomeSakuraAppearance();
 }
 
 async function initPresence() {
@@ -50,9 +57,7 @@ async function initPresence() {
             bothOnline = onlineUserIds.size >= 2;
             const ui = document.getElementById('resonance-ui');
             ui?.classList.toggle('show', bothOnline);
-            sakuraColor = bothOnline
-                ? '#ffd700'
-                : (document.documentElement.getAttribute('data-theme') === 'dark' ? '#c8a8d8' : '#f2b8c0');
+            syncHomeSakuraAppearance();
         })
         .on('broadcast', { event: 'miss_you' }, message => {
             if (presenceChannel !== channel || !isCurrentAuthSnapshot(epoch, targetUserId)) return;
