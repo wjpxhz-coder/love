@@ -302,15 +302,16 @@ function sizeAnimationCanvas(canvas, context, width, height) {
     function getParticleSpecs() {
         const specs = [];
         if (isMobile) {
-            addSpecs(specs, 'petal', 'background', 8);
+            addSpecs(specs, 'petal', 'background', 11);
+            addSpecs(specs, 'blossom', 'background', 1);
             addSpecs(specs, 'butterfly', 'background', 1);
-            addSpecs(specs, 'petal', 'foreground', 2);
+            addSpecs(specs, 'petal', 'foreground', 3);
             addSpecs(specs, 'blossom', 'foreground', 1);
         } else {
-            addSpecs(specs, 'petal', 'background', 16);
-            addSpecs(specs, 'blossom', 'background', 2);
+            addSpecs(specs, 'petal', 'background', 21);
+            addSpecs(specs, 'blossom', 'background', 3);
             addSpecs(specs, 'butterfly', 'background', 2);
-            addSpecs(specs, 'petal', 'foreground', 3);
+            addSpecs(specs, 'petal', 'foreground', 5);
             addSpecs(specs, 'blossom', 'foreground', 1);
         }
 
@@ -335,7 +336,7 @@ function sizeAnimationCanvas(canvas, context, width, height) {
             : randomBetween(-90, -24);
         particle.alpha = foreground ? randomBetween(0.55, 0.72) : randomBetween(0.32, 0.48);
         particle.speedX = randomBetween(-5, 5);
-        particle.speedY = foreground ? randomBetween(66, 100) : randomBetween(44, 66);
+        particle.speedY = foreground ? randomBetween(88, 126) : randomBetween(62, 90);
         particle.swayPhase = Math.random() * Math.PI * 2;
         particle.swayFrequency = randomBetween(0.72, 1.45);
         particle.swayVelocity = foreground ? randomBetween(11, 20) : randomBetween(7, 14);
