@@ -93,12 +93,78 @@ async function resolveMediaUrl(value) {
     return signedUrl;
 }
 
+/**
+ * 批量高效解析媒体签名地址，将多次网络往返聚合为单次批量接口调用。
+ */
+async function batchResolveMediaUrls(values) {
+    if (!Array.isArray(values) || values.length === 0) return [];
+    if (!currentAuthUser || !supabaseClient) {
+        return values.map(v => sanitizeMediaUrl(v)).filter(Boolean);
+    }
+
+    const requestUserId = currentAuthUser.id;
+    const requestAuthEpoch = typeof authEpoch === 'number' ? authEpoch : null;
+    const now = Date.now();
+    const uncachedPaths = new Set();
+
+    values.forEach(val => {
+        if (typeof val !== 'string' || !val.trim()) return;
+        const direct = sanitizeMediaUrl(val);
+        if (direct) return;
+        const objPath = getStorageObjectPath(val);
+        if (!objPath) return;
+        const cached = signedMediaUrlCache.get(objPath);
+        if (!cached || cached.expiresAt <= now) {
+            uncachedPaths.add(objPath);
+        }
+    });
+
+    if (uncachedPaths.size > 0) {
+        const pathList = Array.from(uncachedPaths);
+        try {
+            const { data, error } = await supabaseClient.storage
+                .from('photos')
+                .createSignedUrls(pathList, 60 * 60);
+
+            if (currentAuthUser && currentAuthUser.id === requestUserId
+                && (requestAuthEpoch === null || authEpoch === requestAuthEpoch)) {
+                if (!error && Array.isArray(data)) {
+                    data.forEach(item => {
+                        if (item && item.path && item.signedUrl) {
+                            const sanitized = sanitizeMediaUrl(item.signedUrl);
+                            if (sanitized) {
+                                signedMediaUrlCache.set(item.path, {
+                                    url: sanitized,
+                                    expiresAt: Date.now() + 50 * 60 * 1000
+                                });
+                            }
+                        }
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('批量创建媒体签名地址失败:', err);
+        }
+    }
+
+    // 回填解析结果
+    return values.map(val => {
+        if (typeof val !== 'string') return '';
+        const direct = sanitizeMediaUrl(val);
+        if (direct) return direct;
+        const objPath = getStorageObjectPath(val);
+        if (!objPath) return '';
+        const cached = signedMediaUrlCache.get(objPath);
+        return (cached && cached.expiresAt > Date.now()) ? cached.url : '';
+    });
+}
+
 async function hydrateStructuredMediaContent(rawContent) {
     try {
         const parsed = JSON.parse(rawContent);
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return rawContent;
-        if (Array.isArray(parsed.images)) {
-            parsed.images = (await Promise.all(parsed.images.map(resolveMediaUrl))).filter(Boolean);
+        if (Array.isArray(parsed.images) && parsed.images.length > 0) {
+            parsed.images = (await batchResolveMediaUrls(parsed.images)).filter(Boolean);
         }
         if (parsed.audio) parsed.audio = await resolveMediaUrl(parsed.audio);
         return JSON.stringify(parsed);
@@ -118,6 +184,36 @@ async function hydrateMomentMediaRecord(record) {
     return hydrated;
 }
 
+/**
+ * 批量为多条动态记录解析所有媒体地址，极大减少列表加载延迟。
+ */
+async function batchHydrateMomentMediaRecords(records) {
+    if (!Array.isArray(records) || records.length === 0) return records || [];
+    
+    // 收集这一批次全部需要签名的媒体路径
+    const allMediaValues = [];
+    records.forEach(rec => {
+        if (!rec || typeof rec !== 'object') return;
+        if (rec.type === 'photo' || rec.type === 'audio') {
+            if (rec.content) allMediaValues.push(rec.content);
+        } else if (rec.type === 'moment' && typeof rec.content === 'string') {
+            try {
+                const parsed = JSON.parse(rec.content);
+                if (parsed && typeof parsed === 'object') {
+                    if (Array.isArray(parsed.images)) allMediaValues.push(...parsed.images);
+                    if (parsed.audio) allMediaValues.push(parsed.audio);
+                }
+            } catch (_e) {}
+        }
+    });
+
+    if (allMediaValues.length > 0) {
+        await batchResolveMediaUrls(allMediaValues);
+    }
+
+    return Promise.all(records.map(rec => hydrateMomentMediaRecord(rec)));
+}
+
 function clearSignedMediaCache() {
     signedMediaUrlCache.clear();
 }
@@ -129,15 +225,17 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.5';
+const APP_VERSION = 'v3.9.6';
 const UPDATE_LOG = {
-    version: 'v3.9.5',
+    version: 'v3.9.6',
     date: '2026-08-18',
-    title: '动态多图与九宫格展示升级 ✨',
+    title: '全站性能飞升与动态秒传升级 🚀',
     features: [
-        '解除动态单次上传不超过 9 张照片的限制 📷',
-        '动态卡片默认展示前 9 张照片，整洁美观 🖼️',
-        '超过 9 张照片时支持一键展开查看全部与快捷收起 📂'
+        '新增客户端超清智能压缩，大幅缩减上传体积，动态秒发 ⚡',
+        '媒体资源批量并行签名与长效缓存，告别图片白屏等待 🖼️',
+        '回忆盲盒抽取链路深度优化，秒摇秒开更畅快 🎲',
+        '时光轴启用视口动态渲染优化，长列表滚动丝滑如初 💫'
     ]
 };
+
 

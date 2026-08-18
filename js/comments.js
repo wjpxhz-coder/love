@@ -480,15 +480,22 @@ async function submitComment(momentId) {
     try {
         let uploadedImgUrls = [];
         if (imageEntries.length > 0) {
-            for (const entry of imageEntries) {
-                const file = entry.file;
+            const uploadTasks = imageEntries.map(async (entry, index) => {
+                let file = entry.file;
+                if (typeof compressImageFile === 'function') {
+                    file = await compressImageFile(file, 1280, 1280, 0.82);
+                }
                 const ext = getCommentFileExtension(file);
-                const fileName = `${storageDirectory}/${Date.now()}_${Math.random().toString(36).substring(2,8)}.${ext}`;
-                const { error: upErr } = await supabaseClient.storage.from('photos').upload(fileName, file, { contentType: file.type, upsert: false });
+                const fileName = `${storageDirectory}/${Date.now()}_${index}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+                const { error: upErr } = await supabaseClient.storage.from('photos').upload(fileName, file, { contentType: file.type || 'application/octet-stream', upsert: false });
                 if (upErr) throw upErr;
-                uploadedObjectPaths.push(fileName);
-                uploadedImgUrls.push(createStorageReference(fileName));
-            }
+                return { fileName, ref: createStorageReference(fileName) };
+            });
+            const results = await Promise.all(uploadTasks);
+            results.forEach(res => {
+                uploadedObjectPaths.push(res.fileName);
+                uploadedImgUrls.push(res.ref);
+            });
         }
         if (!isCommentAuthEpochCurrent(requestAuthEpoch)) throw new Error('AUTH_CONTEXT_CHANGED');
 

@@ -130,6 +130,9 @@ function handleShake(event) {
     if (delta <= 20 || now - shakeLastTime < 2500) return;
 
     shakeLastTime = now;
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        try { navigator.vibrate([25, 40, 25]); } catch (_e) {}
+    }
     if (typeof isAppRouteActive === 'function' && isAppRouteActive('blindbox')) {
         fetchRandomMoment();
     } else if (typeof appNavigate === 'function') {
