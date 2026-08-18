@@ -11,7 +11,6 @@ let isMomentRecording = false;
 let momentAudioPreviewUrl = null;
 const momentPhotoPreviewUrls = new Set();
 let isMomentSubmitting = false;
-const MAX_MOMENT_MEDIA_COUNT = 9;
 const MAX_MOMENT_MEDIA_BYTES = 100 * 1024 * 1024;
 function isAllowedMomentMedia(file) {
     if (file.type.startsWith('image/') || file.type.startsWith('video/')) return true;
@@ -227,14 +226,12 @@ function handleMomentPhotoSelect(event) {
     const previewContainer = document.getElementById('momentImagePreviewContainer');
     if (!previewContainer) return;
     const addBtn = previewContainer.querySelector('.moment-image-add-btn');
-    const availableSlots = Math.max(0, MAX_MOMENT_MEDIA_COUNT - momentSelectedFiles.length - (momentAudioBlob ? 1 : 0));
     const validFiles = files.filter(file => isAllowedMomentMedia(file) && file.size <= MAX_MOMENT_MEDIA_BYTES);
-    const acceptedFiles = validFiles.slice(0, availableSlots);
-    if (acceptedFiles.length !== files.length) {
+    if (validFiles.length !== files.length) {
         const msgEl = document.getElementById('momentModalMsg');
-        if (msgEl) msgEl.textContent = '最多添加 9 个媒体；单个文件不超过 100MB，仅支持常见图文或视频。';
+        if (msgEl) msgEl.textContent = '单个文件不超过 100MB，仅支持常见图文或视频。';
     }
-    acceptedFiles.forEach(file => {
+    validFiles.forEach(file => {
         momentSelectedFiles.push(file);
         const objectUrl = URL.createObjectURL(file);
         momentPhotoPreviewUrls.add(objectUrl);
@@ -367,10 +364,9 @@ async function submitMomentPost() {
         return;
     }
 
-    if (momentSelectedFiles.length + (momentAudioBlob ? 1 : 0) > MAX_MOMENT_MEDIA_COUNT
-        || momentSelectedFiles.some(file => !isAllowedMomentMedia(file) || file.size > MAX_MOMENT_MEDIA_BYTES)
+    if (momentSelectedFiles.some(file => !isAllowedMomentMedia(file) || file.size > MAX_MOMENT_MEDIA_BYTES)
         || (momentAudioBlob && momentAudioBlob.size > MAX_MOMENT_MEDIA_BYTES)) {
-        msgEl.textContent = '媒体数量、格式或大小不符合要求，请重新选择。';
+        msgEl.textContent = '媒体格式或大小不符合要求，请重新选择。';
         return;
     }
 
@@ -472,10 +468,6 @@ async function toggleMomentRecording() {
 }
 
 async function executeMomentRecording() {
-    if (momentSelectedFiles.length >= MAX_MOMENT_MEDIA_COUNT) {
-        alert('一条动态最多包含 9 个媒体，请先移除一个文件再录音。');
-        return;
-    }
     const sessionId = ++momentRecordingSessionId;
     momentRecordingShouldDiscard = false;
     try {
@@ -888,22 +880,26 @@ function createMomentCardElement(item) {
         } else if (images.length > 1) {
             const grid = createMomentNode('div', 'moment-grid');
             grid.id = `moment-grid-${momentId}`;
+            const INITIAL_DISPLAY_COUNT = 9;
             images.forEach((url, index) => {
-                const media = createMomentMedia(url, `moment-grid-item${index >= 4 ? ' hidden-image' : ''}`, {
+                const isHidden = index >= INITIAL_DISPLAY_COUNT;
+                const media = createMomentMedia(url, `moment-grid-item${isHidden ? ' hidden-image' : ''}`, {
                     autoplay: isVideoMediaUrl(url), lightbox: true
                 });
                 if (!media) return;
-                if (index >= 4) media.style.display = 'none';
+                if (isHidden) media.style.display = 'none';
                 if (media.tagName === 'VIDEO') Object.assign(media.style, { cursor: 'zoom-in', objectFit: 'cover' });
                 grid.appendChild(media);
             });
             card.appendChild(grid);
-            if (images.length > 4) {
-                const showAll = createMomentNode('button', 'show-all-images-btn', `展开剩余 ${images.length - 4} 张照片 ↓`);
+            if (images.length > INITIAL_DISPLAY_COUNT) {
+                const remainingCount = images.length - INITIAL_DISPLAY_COUNT;
+                const showAll = createMomentNode('button', 'show-all-images-btn', `展开剩余 ${remainingCount} 张照片 ↓`);
                 showAll.type = 'button';
                 showAll.id = `show-images-btn-${momentId}`;
                 showAll.dataset.momentAction = 'show-images';
                 showAll.dataset.momentId = String(momentId);
+                showAll.dataset.remaining = String(remainingCount);
                 card.appendChild(showAll);
             }
         }
@@ -1137,14 +1133,30 @@ document.addEventListener('change', event => {
 
 window.showAllImages = function(id) {
     const grid = document.getElementById(`moment-grid-${id}`);
+    const btn = document.getElementById(`show-images-btn-${id}`);
     if (!grid) return;
     const hiddenImgs = grid.querySelectorAll('.hidden-image');
-    hiddenImgs.forEach(img => {
-        img.style.display = 'block';
-        if (img instanceof HTMLVideoElement) refreshMomentVideoPlayback(img);
-    });
-    const btn = document.getElementById(`show-images-btn-${id}`);
-    if (btn) btn.style.display = 'none';
+    const isExpanded = btn && btn.dataset.expanded === 'true';
+    if (!isExpanded) {
+        hiddenImgs.forEach(img => {
+            img.style.display = 'block';
+            if (img instanceof HTMLVideoElement) refreshMomentVideoPlayback(img);
+        });
+        if (btn) {
+            btn.dataset.expanded = 'true';
+            btn.textContent = '收起照片 ↑';
+        }
+    } else {
+        hiddenImgs.forEach(img => {
+            img.style.display = 'none';
+            if (img instanceof HTMLVideoElement) releaseMomentVideo(img, false);
+        });
+        if (btn) {
+            btn.dataset.expanded = 'false';
+            const remaining = btn.dataset.remaining || '';
+            btn.textContent = remaining ? `展开剩余 ${remaining} 张照片 ↓` : '展开照片 ↓';
+        }
+    }
 };
 
 window.toggleTextCollapse = function(id) {
