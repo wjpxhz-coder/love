@@ -25,6 +25,19 @@ function isAuthenticated() {
     return Boolean(currentAuthUser && currentAuthor);
 }
 
+function hasAuthContext() {
+    return Boolean(currentAuthUser && currentAuthor);
+}
+
+function getAuthEpoch() {
+    return typeof authEpoch === 'number' ? authEpoch : 0;
+}
+
+function isCurrentAuthSnapshot(epoch, userId) {
+    return epoch === authEpoch && currentAuthUser?.id === userId;
+}
+
+
 async function fetchAllProfiles() {
     if (!currentAuthUser) return;
 

@@ -4,6 +4,8 @@
 
 let presenceChannel = null;
 let presenceSpaceId = null;
+let bothOnline = false;
+
 
 function profileForUserId(userId) {
     return Object.values(allProfilesCache || {}).find(profile => profile.user_id === userId) || null;

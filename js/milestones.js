@@ -10,16 +10,19 @@ let momentStarsLoadPromise = null;
 let milestoneRenderRequestId = 0;
 
 function hasMilestoneAuthContext() {
-    return typeof currentAuthUser !== 'undefined' && Boolean(currentAuthUser) && Boolean(currentAuthor);
+    return typeof hasAuthContext === 'function' ? hasAuthContext() : Boolean(currentAuthUser && currentAuthor);
 }
 
 function getMilestoneAuthEpoch() {
-    return typeof authEpoch === 'number' ? authEpoch : 0;
+    return typeof getAuthEpoch === 'function' ? getAuthEpoch() : (typeof authEpoch === 'number' ? authEpoch : 0);
 }
 
 function isMilestoneAuthEpochCurrent(epoch) {
-    return hasMilestoneAuthContext() && getMilestoneAuthEpoch() === epoch;
+    return typeof isCurrentAuthSnapshot === 'function' && currentAuthUser
+        ? isCurrentAuthSnapshot(epoch, currentAuthUser.id)
+        : (hasMilestoneAuthContext() && getMilestoneAuthEpoch() === epoch);
 }
+
 
 function getMilestoneTrustedMediaUrl(value) {
     return typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(value) : '';

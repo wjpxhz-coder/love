@@ -9,16 +9,19 @@ const MAX_COMMENT_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_COMMENT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 function hasCommentAuthContext() {
-    return typeof currentAuthUser !== 'undefined' && Boolean(currentAuthUser) && Boolean(currentAuthor);
+    return typeof hasAuthContext === 'function' ? hasAuthContext() : Boolean(currentAuthUser && currentAuthor);
 }
 
 function getCommentAuthEpoch() {
-    return typeof authEpoch === 'number' ? authEpoch : 0;
+    return typeof getAuthEpoch === 'function' ? getAuthEpoch() : (typeof authEpoch === 'number' ? authEpoch : 0);
 }
 
 function isCommentAuthEpochCurrent(epoch) {
-    return hasCommentAuthContext() && getCommentAuthEpoch() === epoch;
+    return typeof isCurrentAuthSnapshot === 'function' && currentAuthUser
+        ? isCurrentAuthSnapshot(epoch, currentAuthUser.id)
+        : (hasCommentAuthContext() && getCommentAuthEpoch() === epoch);
 }
+
 
 function getCommentTrustedMediaUrl(value) {
     return typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(value) : '';

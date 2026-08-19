@@ -37,3 +37,23 @@ function updateThemeIcon(theme) {
         btn.setAttribute('aria-label', isDark ? '切换到浅色主题' : '切换到深色主题');
     }
 }
+
+function updateSettingsThemeButtons(theme) {
+    const lightButton = document.getElementById('theme-btn-light');
+    const darkButton = document.getElementById('theme-btn-dark');
+    if (!lightButton || !darkButton) return;
+
+    const isDark = theme === 'dark';
+    lightButton.classList.toggle('active', !isDark);
+    darkButton.classList.toggle('active', isDark);
+    lightButton.setAttribute('aria-pressed', String(!isDark));
+    darkButton.setAttribute('aria-pressed', String(isDark));
+}
+
+function setThemeDirect(theme) {
+    if (typeof applyTheme !== 'function' || !['light', 'dark'].includes(theme)) return;
+    localStorage.setItem('theme_preference', theme);
+    applyTheme(theme);
+    updateSettingsThemeButtons(theme);
+}
+
