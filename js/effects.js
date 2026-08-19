@@ -70,7 +70,13 @@ function showToast(message, duration = 3000) {
 
 function createHeartRain() {
     if (prefersReducedMotion()) return;
-    const heartCount = 24;
+
+    // 触发全屏桃花雨急落与中心花瓣浪漫绽放
+    if (typeof window.homeSakuraEffect?.triggerMissYouFlutter === 'function') {
+        window.homeSakuraEffect.triggerMissYouFlutter();
+    }
+
+    const heartCount = 18;
     const container = document.createElement('div');
     container.style.cssText = `
         position: fixed;
@@ -84,19 +90,19 @@ function createHeartRain() {
     `;
     document.body.appendChild(container);
     
-    const hearts = ['❤️', '💖', '💝', '💓', '💕', '💗'];
+    const elements = ['🌸', '💖', '✨', '💕', '💗', '❀'];
     
     for (let i = 0; i < heartCount; i++) {
-        const heart = document.createElement('div');
-        const emoji = hearts[Math.floor(Math.random() * hearts.length)];
-        heart.innerText = emoji;
+        const item = document.createElement('div');
+        const icon = elements[Math.floor(Math.random() * elements.length)];
+        item.innerText = icon;
         
         const startLeft = Math.random() * 100;
-        const size = 16 + Math.random() * 20;
-        const duration = 2 + Math.random() * 2.5;
-        const delay = Math.random() * 1.5;
+        const size = 16 + Math.random() * 18;
+        const duration = 2.2 + Math.random() * 2.2;
+        const delay = Math.random() * 1.2;
         
-        heart.style.cssText = `
+        item.style.cssText = `
             position: absolute;
             top: -50px;
             left: ${startLeft}vw;
@@ -105,8 +111,9 @@ function createHeartRain() {
             transform: translateY(0) rotate(0deg);
             animation: fallAndSway ${duration}s linear ${delay}s forwards;
             user-select: none;
+            filter: drop-shadow(0 2px 8px rgba(255, 105, 135, 0.35));
         `;
-        container.appendChild(heart);
+        container.appendChild(item);
     }
     
     setTimeout(() => {
@@ -273,5 +280,8 @@ document.addEventListener('click', (e) => {
     
     if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, .fab-container, .notification-panel, [role="button"]')) return;
     spawnHearts(e.clientX, e.clientY);
+    if (typeof window.homeSakuraEffect?.createBurst === 'function') {
+        window.homeSakuraEffect.createBurst(e.clientX, e.clientY, 14);
+    }
 });
 
