@@ -218,6 +218,34 @@ function clearSignedMediaCache() {
     signedMediaUrlCache.clear();
 }
 
+/**
+ * 统一安全解析动态内容（支持兼容旧版纯文本/照片/音频及新版结构化 JSON）。
+ */
+function parseMomentPayload(rawContent, type) {
+    if (type === 'photo') {
+        return { text: '', images: rawContent ? [rawContent] : [], audio: null, is_milestone: false };
+    }
+    if (type === 'audio') {
+        return { text: '', images: [], audio: rawContent || null, is_milestone: false };
+    }
+    if (type === 'text') {
+        return { text: String(rawContent || ''), images: [], audio: null, is_milestone: false };
+    }
+    try {
+        const parsed = JSON.parse(rawContent);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            return {
+                text: typeof parsed.text === 'string' ? parsed.text : '',
+                images: Array.isArray(parsed.images) ? parsed.images.filter(Boolean) : [],
+                audio: typeof parsed.audio === 'string' ? parsed.audio : null,
+                is_milestone: Boolean(parsed.is_milestone)
+            };
+        }
+    } catch (_e) {}
+    return { text: String(rawContent || ''), images: [], audio: null, is_milestone: false };
+}
+
+
 const supabaseClient = window.supabase?.createClient
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
         global: { fetch: (...args) => fetch(...args) }
@@ -225,17 +253,18 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.6';
+const APP_VERSION = 'v3.9.7';
 const UPDATE_LOG = {
-    version: 'v3.9.6',
-    date: '2026-08-18',
-    title: '全站性能飞升与动态秒传升级 🚀',
+    version: 'v3.9.7',
+    date: '2026-08-19',
+    title: '架构重构与代码质量飞跃 🛠️✨',
     features: [
-        '新增客户端超清智能压缩，大幅缩减上传体积，动态秒发 ⚡',
-        '媒体资源批量并行签名与长效缓存，告别图片白屏等待 🖼️',
-        '回忆盲盒抽取链路深度优化，秒摇秒开更畅快 🎲',
-        '时光轴启用视口动态渲染优化，长列表滚动丝滑如初 💫'
+        '核心认证与会话状态基础设施统一，各模块解耦稳健运行 🔐',
+        '系统设置与主题控制模块化拆分，提升代码内聚与可维护性 🎨',
+        '修复回忆盲盒定位时光轴后的分页光标状态，滑动浏览更流畅 🎲',
+        '优化全局动效与大文件处理超时机制，体验更丝滑 💫'
     ]
 };
+
 
 

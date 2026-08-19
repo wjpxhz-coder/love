@@ -19,16 +19,19 @@ function isAllowedMomentMedia(file) {
 }
 
 function hasMomentAuthContext() {
-    return typeof currentAuthUser !== 'undefined' && Boolean(currentAuthUser) && Boolean(currentAuthor);
+    return typeof hasAuthContext === 'function' ? hasAuthContext() : Boolean(currentAuthUser && currentAuthor);
 }
 
 function getMomentAuthEpoch() {
-    return typeof authEpoch === 'number' ? authEpoch : 0;
+    return typeof getAuthEpoch === 'function' ? getAuthEpoch() : (typeof authEpoch === 'number' ? authEpoch : 0);
 }
 
 function isMomentAuthEpochCurrent(epoch) {
-    return hasMomentAuthContext() && getMomentAuthEpoch() === epoch;
+    return typeof isCurrentAuthSnapshot === 'function' && currentAuthUser
+        ? isCurrentAuthSnapshot(epoch, currentAuthUser.id)
+        : (hasMomentAuthContext() && getMomentAuthEpoch() === epoch);
 }
+
 
 function getMomentProfileAvatarUrl(profile) {
     if (typeof getProfileAvatarUrl === 'function') return getProfileAvatarUrl(profile);
@@ -352,33 +355,42 @@ async function compressImageFile(file, maxWidth = 1920, maxHeight = 1920, qualit
 async function getFFmpeg() {
     if (ffmpegInstance) return ffmpegInstance;
 
-    await new Promise((resolve, reject) => {
+    const loadWithTimeout = (promise, ms, name) => {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} 加载超时`)), ms))
+        ]);
+    };
+
+    await loadWithTimeout(new Promise((resolve, reject) => {
         if (window.FFmpegWASM) return resolve();
         const script = document.createElement('script');
         script.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
         script.onload = resolve;
         script.onerror = reject;
         document.head.appendChild(script);
-    });
+    }), 12000, 'FFmpeg-WASM-JS');
 
-    await new Promise((resolve, reject) => {
+    await loadWithTimeout(new Promise((resolve, reject) => {
         if (window.FFmpegUtil) return resolve();
         const script = document.createElement('script');
         script.src = 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js';
         script.onload = resolve;
         script.onerror = reject;
         document.head.appendChild(script);
-    });
+    }), 12000, 'FFmpeg-Util-JS');
 
     const { FFmpeg } = window.FFmpegWASM;
     const ffmpeg = new FFmpeg();
-    await ffmpeg.load({
+    await loadWithTimeout(ffmpeg.load({
         coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
         wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm'
-    });
+    }), 15000, 'FFmpeg-Core-WASM');
+
     ffmpegInstance = ffmpeg;
     return ffmpeg;
 }
+
 
 function isMomentVideoFile(file) {
     if (file.type.startsWith('video/')) return true;

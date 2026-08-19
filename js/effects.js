@@ -219,10 +219,20 @@ function initScrollReveal() {
 }
 
 // --- 爱心粒子 ---
+let lastSpawnHeartTime = 0;
+const MAX_ACTIVE_LOVE_PARTICLES = 12;
+
 function spawnHearts(x, y) {
     if (prefersReducedMotion()) return;
+    const now = Date.now();
+    if (now - lastSpawnHeartTime < 120) return;
+    lastSpawnHeartTime = now;
+
+    const currentParticles = document.querySelectorAll('.love-particle');
+    if (currentParticles.length >= MAX_ACTIVE_LOVE_PARTICLES) return;
+
     const hearts = ['💕', '💖', '💗', '✨', '🌸', '💘'];
-    const count = 4 + Math.floor(Math.random() * 3);
+    const count = Math.min(3 + Math.floor(Math.random() * 2), MAX_ACTIVE_LOVE_PARTICLES - currentParticles.length);
     for (let i = 0; i < count; i++) {
         const particle = document.createElement('div');
         particle.className = 'love-particle';
@@ -261,6 +271,7 @@ document.addEventListener('click', (e) => {
         panel.classList.remove('show');
     }
     
-    if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, .fab-container, .notification-panel')) return;
+    if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, .fab-container, .notification-panel, [role="button"]')) return;
     spawnHearts(e.clientX, e.clientY);
 });
+

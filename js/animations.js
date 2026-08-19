@@ -1,7 +1,6 @@
 // ==========================================
 // 2. 蝴蝶与樱花动画
 // ==========================================
-let bothOnline = false;
 const animationsReducedMotionQuery = typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-reduced-motion: reduce)')
     : null;

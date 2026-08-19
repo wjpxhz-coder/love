@@ -278,28 +278,9 @@ async function fetchRandomMoment() {
 
 function locateToMoment() {
     const moment = window.currentBlindBoxMoment;
-    const content = document.getElementById('timeline-content');
-    if (!isAuthenticated() || !content || !moment) return;
-    if (typeof appReplace === 'function') appReplace('/', { force: true });
-    else window.location.hash = '#/';
-
-    const backWrap = document.createElement('div');
-    backWrap.className = 'blind-box-back';
-    const backButton = document.createElement('button');
-    backButton.type = 'button';
-    backButton.textContent = '🔙 返回全部回忆';
-    backButton.addEventListener('click', () => fetchMoments());
-    backWrap.appendChild(backButton);
-
-    const card = typeof createMomentCardElement === 'function' ? createMomentCardElement(moment) : null;
-    content.replaceChildren(backWrap);
-    if (card) content.appendChild(card);
-    hasMore = false;
-
-    if (typeof initScrollReveal === 'function') initScrollReveal();
-    if (typeof loadCommentCounts === 'function') loadCommentCounts([moment.id]);
-    if (typeof loadMomentLikes === 'function') loadMomentLikes([moment.id]);
-    card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    card?.classList.add('blind-box-target');
-    setTimeout(() => card?.classList.remove('blind-box-target'), 2500);
+    if (!moment || !isAuthenticated()) return;
+    if (typeof locateMomentOnTimeline === 'function') {
+        locateMomentOnTimeline(moment, { backLabel: '🔙 返回全部回忆' });
+    }
 }
+
