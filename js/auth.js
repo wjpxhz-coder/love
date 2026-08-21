@@ -376,11 +376,15 @@ function scrubPrivateDom() {
         'edit-msg': '',
         'momentModalMsg': '',
         'moodModalMsg': '',
-        'mood-reminder-message': ''
+        'mood-reminder-message': '',
+        'moodSelectedHint': '请点击表情选择今天的心情'
     };
     Object.entries(textDefaults).forEach(([id, value]) => {
         const element = document.getElementById(id);
-        if (element) element.textContent = value;
+        if (element) {
+            element.textContent = value;
+            element.classList.remove('active');
+        }
     });
 
     ['edit-nickname', 'edit-bio', 'momentTextInput', 'moodNote', 'aiChatInput'].forEach(id => {

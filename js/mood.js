@@ -1,9 +1,40 @@
 // ==========================================
 // 心情打卡与月历
 // ==========================================
-const MOOD_EMOJIS = ['', '😢', '😕', '😊', '😄', '🥰'];
+const MOOD_EMOJIS = ['', '😢', '😕', '😊', '😄', '🥰', '😚', '😭', '😜', '😌', '🥺', '🥳', '😋', '🥱', '😡', '🤒', '🤔'];
+const MOOD_DESCRIPTIONS = {
+    1: '难过沮丧 😢',
+    2: '有点低落 😕',
+    3: '心情不错 😊',
+    4: '特别开心 😄',
+    5: '幸福满满 🥰',
+    6: '想你亲亲 😚',
+    7: '大哭委屈 😭',
+    8: '调皮搞怪 😜',
+    9: '惬意舒适 😌',
+    10: '委屈撒娇 🥺',
+    11: '嗨皮庆祝 🥳',
+    12: '馋嘴干饭 😋',
+    13: '困意满满 🥱',
+    14: '生气炸毛 😡',
+    15: '身体不适 🤒',
+    16: '发呆想事 🤔'
+};
 const MOOD_TIME_ZONE = 'Asia/Shanghai';
 const MOOD_ENTRY_FIELDS = 'id, user_id, date, score, author, note, created_at, updated_at';
+
+function updateMoodSelectedHint(score) {
+    const hint = document.getElementById('moodSelectedHint');
+    if (!hint) return;
+    const normalizedScore = Number(score);
+    if (normalizedScore && MOOD_DESCRIPTIONS[normalizedScore]) {
+        hint.textContent = `当前选择：${MOOD_DESCRIPTIONS[normalizedScore]}`;
+        hint.classList.add('active');
+    } else {
+        hint.textContent = '请点击表情选择今天的心情';
+        hint.classList.remove('active');
+    }
+}
 
 let selectedMoodScore = 0;
 let editingMoodId = null;
@@ -130,6 +161,7 @@ function resetMoodComposer(entry = null) {
         button.classList.toggle('selected', selected);
         button.setAttribute('aria-pressed', String(selected));
     });
+    updateMoodSelectedHint(selectedMoodScore);
     document.getElementById('moodNote').value = entry?.note || '';
     document.getElementById('moodModalMsg').textContent = '';
 }
@@ -203,7 +235,7 @@ function leaveMoodPage() {
 
 function selectMood(score) {
     const normalizedScore = Number(score);
-    if (!Number.isInteger(normalizedScore) || normalizedScore < 1 || normalizedScore > 5) return;
+    if (!Number.isInteger(normalizedScore) || normalizedScore < 1 || normalizedScore >= MOOD_EMOJIS.length) return;
 
     selectedMoodScore = normalizedScore;
     document.querySelectorAll('.mood-emoji-btn').forEach(button => {
@@ -211,6 +243,7 @@ function selectMood(score) {
         button.classList.toggle('selected', selected);
         button.setAttribute('aria-pressed', String(selected));
     });
+    updateMoodSelectedHint(selectedMoodScore);
 }
 
 async function submitMood() {
@@ -285,9 +318,13 @@ async function submitMood() {
         if (typeof refreshMoodReminderState === 'function') await refreshMoodReminderState();
     } catch (error) {
         console.error('保存心情失败:', error);
-        messageElement.textContent = error?.code === '23505'
-            ? '数据库仍限制每天一条记录，请先执行最新迁移。'
-            : '保存失败，请稍后重试。';
+        if (error?.code === '23505') {
+            messageElement.textContent = '数据库仍限制每天一条记录，请先执行最新迁移。';
+        } else if (error?.code === '23514') {
+            messageElement.textContent = '数据库表情编号受限，请先执行最新数据库迁移。';
+        } else {
+            messageElement.textContent = '保存失败，请稍后重试。';
+        }
     } finally {
         isMoodSaving = false;
         if (submitButton) {
