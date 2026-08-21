@@ -276,12 +276,24 @@
             <div class="app-page-content app-page-content--narrow">
     <div class="modal-box app-page-card">
         <div class="mood-emoji-row" id="moodEmojiRow">
-            <button class="mood-emoji-btn" type="button" data-score="1" onclick="selectMood(1)" aria-label="心情很难过" aria-pressed="false">😢</button>
-            <button class="mood-emoji-btn" type="button" data-score="2" onclick="selectMood(2)" aria-label="心情有点低落" aria-pressed="false">😕</button>
-            <button class="mood-emoji-btn" type="button" data-score="3" onclick="selectMood(3)" aria-label="心情不错" aria-pressed="false">😊</button>
-            <button class="mood-emoji-btn" type="button" data-score="4" onclick="selectMood(4)" aria-label="心情很好" aria-pressed="false">😄</button>
-            <button class="mood-emoji-btn" type="button" data-score="5" onclick="selectMood(5)" aria-label="心情特别幸福" aria-pressed="false">🥰</button>
+            <button class="mood-emoji-btn" type="button" data-score="5" onclick="selectMood(5)" aria-label="幸福满满" aria-pressed="false" title="幸福满满">🥰</button>
+            <button class="mood-emoji-btn" type="button" data-score="6" onclick="selectMood(6)" aria-label="想你亲亲" aria-pressed="false" title="想你亲亲">😚</button>
+            <button class="mood-emoji-btn" type="button" data-score="4" onclick="selectMood(4)" aria-label="特别开心" aria-pressed="false" title="特别开心">😄</button>
+            <button class="mood-emoji-btn" type="button" data-score="3" onclick="selectMood(3)" aria-label="心情不错" aria-pressed="false" title="心情不错">😊</button>
+            <button class="mood-emoji-btn" type="button" data-score="9" onclick="selectMood(9)" aria-label="惬意舒适" aria-pressed="false" title="惬意舒适">😌</button>
+            <button class="mood-emoji-btn" type="button" data-score="8" onclick="selectMood(8)" aria-label="调皮搞怪" aria-pressed="false" title="调皮搞怪">😜</button>
+            <button class="mood-emoji-btn" type="button" data-score="11" onclick="selectMood(11)" aria-label="嗨皮庆祝" aria-pressed="false" title="嗨皮庆祝">🥳</button>
+            <button class="mood-emoji-btn" type="button" data-score="12" onclick="selectMood(12)" aria-label="馋嘴干饭" aria-pressed="false" title="馋嘴干饭">😋</button>
+            <button class="mood-emoji-btn" type="button" data-score="10" onclick="selectMood(10)" aria-label="委屈撒娇" aria-pressed="false" title="委屈撒娇">🥺</button>
+            <button class="mood-emoji-btn" type="button" data-score="13" onclick="selectMood(13)" aria-label="困意满满" aria-pressed="false" title="困意满满">🥱</button>
+            <button class="mood-emoji-btn" type="button" data-score="16" onclick="selectMood(16)" aria-label="发呆想事" aria-pressed="false" title="发呆想事">🤔</button>
+            <button class="mood-emoji-btn" type="button" data-score="2" onclick="selectMood(2)" aria-label="有点低落" aria-pressed="false" title="有点低落">😕</button>
+            <button class="mood-emoji-btn" type="button" data-score="1" onclick="selectMood(1)" aria-label="难过沮丧" aria-pressed="false" title="难过沮丧">😢</button>
+            <button class="mood-emoji-btn" type="button" data-score="7" onclick="selectMood(7)" aria-label="大哭委屈" aria-pressed="false" title="大哭委屈">😭</button>
+            <button class="mood-emoji-btn" type="button" data-score="14" onclick="selectMood(14)" aria-label="生气炸毛" aria-pressed="false" title="生气炸毛">😡</button>
+            <button class="mood-emoji-btn" type="button" data-score="15" onclick="selectMood(15)" aria-label="身体不适" aria-pressed="false" title="身体不适">🤒</button>
         </div>
+        <div class="mood-selected-hint" id="moodSelectedHint" aria-live="polite">请点击表情选择今天的心情</div>
         <label class="visually-hidden" for="moodNote">今天发生的事情</label>
         <textarea class="modal-input mood-note-input" id="moodNote" maxlength="300" placeholder="说说今天发生了什么…（可选）" rows="3"></textarea>
         <div class="modal-msg" id="moodModalMsg" role="status" aria-live="polite"></div>
