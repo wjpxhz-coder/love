@@ -739,11 +739,21 @@ async function submitMomentPost() {
         const momentContent = JSON.stringify(momentPayload);
 
         if (isEditing) {
-            const { error: dbError } = await supabaseClient
+            let { error: dbError } = await supabaseClient
                 .from('moments')
                 .update({ type: 'moment', content: momentContent })
                 .eq('id', editingMomentId);
-            if (dbError) throw dbError;
+
+            if (dbError) {
+                console.warn('直接 UPDATE 失败，尝试 RPC update_moment:', dbError);
+                const { error: rpcError } = await supabaseClient.rpc('update_moment', {
+                    p_moment_id: editingMomentId,
+                    p_content: momentContent
+                });
+                if (rpcError) {
+                    throw dbError || rpcError;
+                }
+            }
         } else {
             const { error: dbError } = await supabaseClient
                 .from('moments')
@@ -766,7 +776,12 @@ async function submitMomentPost() {
         if (!databaseCommitted) await removeUploadedMomentObjects(uploadedObjectPaths);
         console.error(isEditing ? '保存修改失败:' : '发布动态失败:', err);
         if (isMomentAuthEpochCurrent(requestAuthEpoch)) {
-            msgEl.textContent = isEditing ? '保存失败，请检查网络或稍后重试。' : '发布失败，请检查网络或稍后重试。';
+            const errorMsg = String(err?.message || err || '');
+            if (errorMsg.includes('policy') || errorMsg.includes('permission') || err?.code === '42501') {
+                msgEl.textContent = '保存失败：数据库尚未开启动态更新权限，请在 Supabase SQL Editor 中执行迁移脚本。';
+            } else {
+                msgEl.textContent = isEditing ? `保存失败：${errorMsg || '请检查网络或稍后重试。'}` : '发布失败，请检查网络或稍后重试。';
+            }
         }
     } finally {
         isMomentSubmitting = false;
