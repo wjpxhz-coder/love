@@ -567,40 +567,95 @@ async function compressImageFile(file, maxWidth = 1920, maxHeight = 1920, qualit
     }
 }
 
+async function loadScriptWithFallback(urls, globalVarCheck, timeoutMs = 15000, name = 'Script') {
+    if (globalVarCheck()) return;
+    let lastErr = null;
+    for (const url of urls) {
+        try {
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = url;
+                const timer = setTimeout(() => {
+                    script.remove();
+                    reject(new Error(`${name} 从 ${url} 加载超时`));
+                }, timeoutMs);
+                script.onload = () => {
+                    clearTimeout(timer);
+                    if (globalVarCheck()) resolve();
+                    else reject(new Error(`${name} 加载后全局变量未就绪`));
+                };
+                script.onerror = () => {
+                    clearTimeout(timer);
+                    script.remove();
+                    reject(new Error(`${name} 从 ${url} 加载网络错误`));
+                };
+                document.head.appendChild(script);
+            });
+            return;
+        } catch (err) {
+            console.warn(`[VideoOptimize] ${err.message}，尝试备用镜像源...`);
+            lastErr = err;
+        }
+    }
+    throw lastErr || new Error(`${name} 所有镜像源均加载失败`);
+}
+
 async function getFFmpeg() {
     if (ffmpegInstance) return ffmpegInstance;
 
-    const loadWithTimeout = (promise, ms, name) => {
-        return Promise.race([
-            promise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} 加载超时`)), ms))
-        ]);
-    };
+    await loadScriptWithFallback(
+        [
+            'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd/ffmpeg.js',
+            'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js'
+        ],
+        () => Boolean(window.FFmpegWASM && window.FFmpegWASM.FFmpeg),
+        15000,
+        'FFmpeg-WASM-JS'
+    );
 
-    await loadWithTimeout(new Promise((resolve, reject) => {
-        if (window.FFmpegWASM) return resolve();
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-    }), 12000, 'FFmpeg-WASM-JS');
-
-    await loadWithTimeout(new Promise((resolve, reject) => {
-        if (window.FFmpegUtil) return resolve();
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js';
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-    }), 12000, 'FFmpeg-Util-JS');
+    await loadScriptWithFallback(
+        [
+            'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-util/0.12.1/umd/index.js',
+            'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js'
+        ],
+        () => Boolean(window.FFmpegUtil && window.FFmpegUtil.fetchFile),
+        15000,
+        'FFmpeg-Util-JS'
+    );
 
     const { FFmpeg } = window.FFmpegWASM;
     const ffmpeg = new FFmpeg();
-    await loadWithTimeout(ffmpeg.load({
-        coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
-        wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm'
-    }), 15000, 'FFmpeg-Core-WASM');
+
+    const coreSources = [
+        {
+            coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+            wasmURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm'
+        },
+        {
+            coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+            wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm'
+        }
+    ];
+
+    let loaded = false;
+    let lastCoreErr = null;
+    for (const src of coreSources) {
+        try {
+            await Promise.race([
+                ffmpeg.load(src),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('FFmpeg-Core 加载超时')), 25000))
+            ]);
+            loaded = true;
+            break;
+        } catch (e) {
+            console.warn('[VideoOptimize] FFmpeg core 加载失败，尝试备用源:', e);
+            lastCoreErr = e;
+        }
+    }
+
+    if (!loaded) throw lastCoreErr || new Error('FFmpeg Core 核心加载失败');
 
     ffmpegInstance = ffmpeg;
     return ffmpeg;
@@ -614,12 +669,16 @@ function isMomentVideoFile(file) {
 }
 
 async function compressVideoFile(file, onProgress) {
+    if (!file || !isMomentVideoFile(file)) return file;
+    // 如果视频小于等于 3MB，本身就已经较小，跳过转码
+    if (file.size <= 3 * 1024 * 1024) return file;
+
     try {
         const ffmpeg = await getFFmpeg();
         const { fetchFile } = window.FFmpegUtil;
 
         ffmpeg.on('progress', ({ progress }) => {
-            if (onProgress) onProgress(Math.round(progress * 100));
+            if (onProgress) onProgress(Math.min(99, Math.max(1, Math.round(progress * 100))));
         });
 
         const inputExt = getMomentFileExtension(file) || 'mp4';
@@ -628,27 +687,46 @@ async function compressVideoFile(file, onProgress) {
 
         await ffmpeg.writeFile(inputName, await fetchFile(file));
 
+        // 转码优化参数：
+        // 1. scale='min(1280,iw)':-2 限制最大宽度 1280px 并保持宽高比与偶数尺寸
+        // 2. -vcodec libx264 -crf 28 超清画质兼顾高压缩比
+        // 3. -preset ultrafast 极速编码
+        // 4. -movflags +faststart 把元数据移至文件头部，实现边下边播秒开
+        // 5. -c:a aac -b:a 128k 高保真音频压缩
         await ffmpeg.exec([
             '-i', inputName,
+            '-vf', "scale='min(1280,iw)':-2",
             '-vcodec', 'libx264',
             '-crf', '28',
             '-preset', 'ultrafast',
+            '-movflags', '+faststart',
+            '-c:a', 'aac',
+            '-b:a', '128k',
             outputName
         ]);
 
         const data = await ffmpeg.readFile(outputName);
         const newBlob = new Blob([data.buffer], { type: 'video/mp4' });
 
-        await ffmpeg.deleteFile(inputName);
-        await ffmpeg.deleteFile(outputName);
+        await ffmpeg.deleteFile(inputName).catch(() => {});
+        await ffmpeg.deleteFile(outputName).catch(() => {});
         ffmpeg.off('progress');
 
-        return new File([newBlob], file.name.replace(/\.[^/.]+$/, "") + "_compressed.mp4", {
+        if (newBlob.size >= file.size) {
+            console.log(`[VideoOptimize] 压缩后体积未减小，使用原文件`);
+            return file;
+        }
+
+        console.log(`[VideoOptimize] 视频优化完成: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(newBlob.size / 1024 / 1024).toFixed(2)}MB (节省 ${Math.round((1 - newBlob.size / file.size) * 100)}%)`);
+
+        return new File([newBlob], file.name.replace(/\.[^/.]+$/, "") + "_optimized.mp4", {
             type: 'video/mp4'
         });
     } catch (e) {
-        console.error("Video compression failed", e);
-        if (ffmpegInstance) ffmpegInstance.off('progress');
+        console.error("Video compression failed, fallback to original file", e);
+        if (ffmpegInstance) {
+            try { ffmpegInstance.off('progress'); } catch (_) {}
+        }
         return file;
     }
 }
@@ -696,13 +774,13 @@ async function submitMomentPost() {
             const totalFiles = momentSelectedFiles.length;
             const processedFiles = [];
 
-            // 第一阶段：客户端智能优化（超清压缩图片，压缩过大视频）
+            // 第一阶段：客户端智能优化（超清压缩图片，智能优化 3MB+ 视频）
             for (let i = 0; i < totalFiles; i++) {
                 let file = momentSelectedFiles[i];
-                if (isMomentVideoFile(file) && file.size > 20 * 1024 * 1024) {
-                    btn.textContent = `⏳ 准备压缩视频 (${i + 1}/${totalFiles})...`;
+                if (isMomentVideoFile(file) && file.size > 3 * 1024 * 1024) {
+                    btn.textContent = `⏳ 准备优化视频 (${i + 1}/${totalFiles})...`;
                     file = await compressVideoFile(file, (progress) => {
-                        btn.textContent = `⏳ 压缩视频 ${progress}% (${i + 1}/${totalFiles})...`;
+                        btn.textContent = `⏳ 视频优化中 ${progress}% (${i + 1}/${totalFiles})...`;
                     });
                 } else if (file.type.startsWith('image/')) {
                     btn.textContent = `⏳ 正在优化画质 (${i + 1}/${totalFiles})...`;
@@ -1148,11 +1226,25 @@ function createMomentMedia(rawUrl, className, options = {}) {
     media.className = className;
     if (isVideo) {
         media.playsInline = true;
-        media.preload = options.controls ? 'metadata' : 'none';
+        media.setAttribute('playsinline', '');
+        media.preload = options.controls ? 'metadata' : (options.preload || 'none');
         if (options.controls) media.controls = true;
         if (options.autoplay) {
             media.muted = true;
             media.loop = true;
+        }
+
+        // 骨架屏流光占位与加载首帧完成后平滑淡入
+        media.classList.add('media-loading');
+        const handleVideoLoaded = () => {
+            media.classList.remove('media-loading');
+            media.classList.add('media-loaded');
+        };
+        if (media.readyState >= 2) {
+            handleVideoLoaded();
+        } else {
+            media.addEventListener('loadeddata', handleVideoLoaded, { once: true });
+            media.addEventListener('error', handleVideoLoaded, { once: true });
         }
     } else {
         media.alt = '我们的回忆';
@@ -1179,7 +1271,7 @@ function createMomentMedia(rawUrl, className, options = {}) {
         }
     }
     media.src = url;
-    if (isVideo) setupMomentVideoPlayback(media, options.autoplay === true);
+    if (isVideo && options.autoplay) setupMomentVideoPlayback(media, true);
     if (options.lightbox) {
         media.dataset.momentAction = 'open-lightbox';
         media.tabIndex = 0;
@@ -1334,15 +1426,30 @@ function createMomentCardElement(item, options = {}) {
             const INITIAL_DISPLAY_COUNT = 9;
             images.forEach((url, index) => {
                 const isHidden = index >= INITIAL_DISPLAY_COUNT;
+                const isVid = isVideoMediaUrl(url);
                 const media = createMomentMedia(url, `moment-grid-item${isHidden ? ' hidden-image' : ''}`, {
-                    autoplay: isVideoMediaUrl(url),
+                    autoplay: false, // 九宫格中不自动并发全量拉取，节省流量与带宽
+                    preload: 'metadata',
                     lightbox: true,
                     priority: isPriorityCard && index < 4
                 });
                 if (!media) return;
                 if (isHidden) media.style.display = 'none';
-                if (media.tagName === 'VIDEO') Object.assign(media.style, { cursor: 'zoom-in', objectFit: 'cover' });
-                grid.appendChild(media);
+                if (isVid) {
+                    const wrap = createMomentNode('div', `moment-grid-video-wrap${isHidden ? ' hidden-image' : ''}`);
+                    wrap.dataset.momentAction = 'open-lightbox';
+                    wrap.dataset.mediaSrc = url;
+                    wrap.tabIndex = 0;
+                    wrap.setAttribute('role', 'button');
+                    wrap.setAttribute('aria-label', '打开视频预览');
+                    if (isHidden) wrap.style.display = 'none';
+                    wrap.appendChild(media);
+                    const badge = createMomentNode('span', 'moment-video-badge', '▶');
+                    wrap.appendChild(badge);
+                    grid.appendChild(wrap);
+                } else {
+                    grid.appendChild(media);
+                }
             });
             card.appendChild(grid);
             if (images.length > INITIAL_DISPLAY_COUNT) {
@@ -1581,7 +1688,14 @@ function runMomentAction(actionElement) {
         confirmDelete(momentId);
     }
     else if (action === 'open-profile' && typeof openProfilePage === 'function') openProfilePage(actionElement.dataset.author || '');
-    else if (action === 'open-lightbox' && typeof openLightbox === 'function') openLightbox(actionElement.currentSrc || actionElement.src);
+    else if (action === 'open-lightbox' && typeof openLightbox === 'function') {
+        const targetSrc = actionElement.dataset.mediaSrc
+            || actionElement.currentSrc
+            || actionElement.src
+            || actionElement.querySelector('img, video')?.currentSrc
+            || actionElement.querySelector('img, video')?.src;
+        if (targetSrc) openLightbox(targetSrc);
+    }
     else if (action === 'show-images') showAllImages(momentId);
     else if (action === 'toggle-text') toggleTextCollapse(momentId);
     else if (action === 'toggle-like' && typeof toggleMomentLike === 'function') toggleMomentLike(momentId);
