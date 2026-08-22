@@ -1257,6 +1257,10 @@ body[data-auth-state='locked'] #notification-bell {
     border-radius: 11px;
 }
 
+.storage-size-badge {
+    min-height: 44px;
+}
+
 .settings-tip {
     color: var(--text-muted);
     font-size: 0.8rem;
