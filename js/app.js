@@ -189,7 +189,7 @@ function showVersionModal(versionName, useConfigLog = true) {
 
     if (verNumEl) verNumEl.textContent = displayVersion || (typeof UPDATE_LOG !== 'undefined' ? UPDATE_LOG.version : 'latest');
     
-    list.replaceChildren();
+    if (list) list.replaceChildren();
 
     if (useConfigLog && typeof UPDATE_LOG !== 'undefined') {
         if (verDateEl) verDateEl.textContent = `更新时间：${UPDATE_LOG.date}`;
@@ -198,7 +198,7 @@ function showVersionModal(versionName, useConfigLog = true) {
         UPDATE_LOG.features.forEach(feat => {
             const li = document.createElement('li');
             li.textContent = feat;
-            list.appendChild(li);
+            if (list) list.appendChild(li);
         });
     } else {
         // 自动降级：展示通用更新说明
@@ -213,7 +213,7 @@ function showVersionModal(versionName, useConfigLog = true) {
         defaultFeats.forEach(feat => {
             const li = document.createElement('li');
             li.textContent = feat;
-            list.appendChild(li);
+            if (list) list.appendChild(li);
         });
     }
 

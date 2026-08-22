@@ -22,6 +22,11 @@ function isAllowedMomentMedia(file) {
     return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4', 'webm', 'mov', 'm4v'].includes(ext);
 }
 
+function escapePostgresLike(str) {
+    if (typeof str !== 'string') return '';
+    return str.replace(/([%_\\])/g, '\\$1');
+}
+
 function hasMomentAuthContext() {
     return typeof hasAuthContext === 'function' ? hasAuthContext() : Boolean(currentAuthUser && currentAuthor);
 }
@@ -480,7 +485,8 @@ function handleMomentPhotoSelect(event) {
     });
     
     // 清空 input 使得重复选择相同文件能触发 change
-    document.getElementById('momentPhotoInput').value = '';
+    const photoInput = document.getElementById('momentPhotoInput');
+    if (photoInput) photoInput.value = '';
 }
 
 // --- 图像与视频压缩功能 ---
@@ -734,7 +740,8 @@ async function compressVideoFile(file, onProgress) {
 async function submitMomentPost() {
     if (!hasMomentAuthContext() || isMomentSubmitting) return;
     const requestAuthEpoch = getMomentAuthEpoch();
-    const text = document.getElementById('momentTextInput').value.trim();
+    const textInput = document.getElementById('momentTextInput');
+    const text = textInput ? textInput.value.trim() : '';
     const msgEl = document.getElementById('momentModalMsg');
     const isEditing = Boolean(editingMomentId);
     
@@ -745,26 +752,26 @@ async function submitMomentPost() {
     const hasExistingAudio = Boolean(editingAudioRef);
 
     if (!hasText && !hasNewFiles && !hasExistingMedia && !hasNewAudio && !hasExistingAudio) {
-        msgEl.innerText = '写点什么、发张照片或录段声音吧！';
+        if (msgEl) msgEl.innerText = '写点什么、发张照片或录段声音吧！';
         return;
     }
 
     if (momentSelectedFiles.some(file => !isAllowedMomentMedia(file) || file.size > MAX_MOMENT_MEDIA_BYTES)
         || (momentAudioBlob && momentAudioBlob.size > MAX_MOMENT_MEDIA_BYTES)) {
-        msgEl.textContent = '媒体格式或大小不符合要求，请重新选择。';
+        if (msgEl) msgEl.textContent = '媒体格式或大小不符合要求，请重新选择。';
         return;
     }
 
     const storageDirectory = getMomentStorageDirectory();
     if (!storageDirectory || typeof createStorageReference !== 'function') {
-        msgEl.innerText = '当前会话缺少空间信息，请重新登录后再试。';
+        if (msgEl) msgEl.innerText = '当前会话缺少空间信息，请重新登录后再试。';
         return;
     }
 
     const btn = document.getElementById('btn-submit-moment');
-    const orig = btn.textContent;
+    const orig = btn ? btn.textContent : '';
     isMomentSubmitting = true;
-    btn.disabled = true;
+    if (btn) btn.disabled = true;
     const uploadedObjectPaths = [];
     let databaseCommitted = false;
 
@@ -899,16 +906,18 @@ async function submitMomentPost() {
         console.error(isEditing ? '保存修改失败:' : '发布动态失败:', err);
         if (isMomentAuthEpochCurrent(requestAuthEpoch)) {
             const errorMsg = String(err?.message || err || '');
-            if (errorMsg.includes('policy') || errorMsg.includes('permission') || err?.code === '42501') {
-                msgEl.textContent = '保存失败：数据库尚未开启动态更新权限，请在 Supabase SQL Editor 中执行迁移脚本。';
+            if (isEditing && (err?.code === '42501' || errorMsg.includes('policy') || errorMsg.includes('permission'))) {
+                if (msgEl) msgEl.textContent = '保存失败：缺少空间操作权限，请检查网络或重新登录。';
             } else {
-                msgEl.textContent = isEditing ? `保存失败：${errorMsg || '请检查网络或稍后重试。'}` : '发布失败，请检查网络或稍后重试。';
+                if (msgEl) msgEl.textContent = isEditing ? '保存修改失败，请检查网络或稍后重试。' : '发布失败，请检查网络或稍后重试。';
             }
         }
     } finally {
         isMomentSubmitting = false;
-        btn.textContent = orig;
-        btn.disabled = false;
+        if (btn) {
+            btn.textContent = orig;
+            btn.disabled = false;
+        }
     }
 }
 
@@ -1948,13 +1957,15 @@ async function fetchMoments(append = false) {
         .order('id', { ascending: false })
         .limit(PAGE_SIZE);
 
-    if (append && momentTimelineCursor) {
-        const cursorCreatedAt = String(momentTimelineCursor.createdAt)
-            .replace(/\\/g, '\\\\')
-            .replace(/"/g, '\\"');
-        query = query.or(
-            `created_at.lt."${cursorCreatedAt}",and(created_at.eq."${cursorCreatedAt}",id.lt.${momentTimelineCursor.id})`
-        );
+    if (append && momentTimelineCursor && momentTimelineCursor.createdAt && momentTimelineCursor.id != null) {
+        const cursorId = Number(momentTimelineCursor.id);
+        const cursorDate = new Date(momentTimelineCursor.createdAt);
+        if (Number.isSafeInteger(cursorId) && cursorId > 0 && !isNaN(cursorDate.getTime())) {
+            const cursorCreatedAt = cursorDate.toISOString();
+            query = query.or(
+                `created_at.lt."${cursorCreatedAt}",and(created_at.eq."${cursorCreatedAt}",id.lt.${cursorId})`
+            );
+        }
     }
 
     // 应用筛选条件
@@ -1970,7 +1981,10 @@ async function fetchMoments(append = false) {
         }
     }
     if (currentFilters.keyword) {
-        query = query.ilike('content', `%${currentFilters.keyword}%`);
+        const escapedKeyword = escapePostgresLike(currentFilters.keyword);
+        if (escapedKeyword) {
+            query = query.ilike('content', `%${escapedKeyword}%`);
+        }
     }
     if (currentFilters.year) {
         let startYear = parseInt(currentFilters.year);

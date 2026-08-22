@@ -208,7 +208,7 @@ async function loadComments(momentId) {
     if (!likesError && likesData) {
         likesData.forEach(l => {
             likesMap[l.comment_id] = (likesMap[l.comment_id] || 0) + 1;
-            if (l.user_id === currentAuthUser.id) userLikedMap[l.comment_id] = true;
+            if (currentAuthUser && l.user_id === currentAuthUser.id) userLikedMap[l.comment_id] = true;
         });
     }
 
@@ -310,7 +310,7 @@ async function loadComments(momentId) {
         likeButton.append(heart, count);
         likeButton.addEventListener('click', () => toggleCommentLike(commentId, momentId));
         time.appendChild(likeButton);
-        if (c.user_id === currentAuthUser.id) {
+        if (currentAuthUser && c.user_id === currentAuthUser.id) {
             const recall = document.createElement('button');
             recall.type = 'button';
             recall.textContent = '撤回';
@@ -355,13 +355,14 @@ async function toggleCommentLike(commentId, momentId) {
     let error = null;
     if (isLiked) {
         // 取消点赞
+        if (!currentAuthUser || !currentAuthUser.id) return;
         const res = await supabaseClient.from('comment_likes')
             .delete()
             .eq('comment_id', commentId)
             .eq('user_id', currentAuthUser.id);
         error = res.error;
         if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
-        if (!error) {
+        if (!error && currentAuthUser) {
             await supabaseClient.from('notifications')
                 .update({ type: 'recalled', content: '此点赞互动已被对方撤回' })
                 .eq('type', 'like')
@@ -400,7 +401,7 @@ async function updateSingleLike(commentId) {
     if (error || !isCommentAuthEpochCurrent(requestAuthEpoch)) return;
 
     const count = data ? data.length : 0;
-    const userLiked = data ? data.some(l => l.user_id === currentAuthUser.id) : false;
+    const userLiked = (data && currentAuthUser) ? data.some(l => l.user_id === currentAuthUser.id) : false;
 
     const heart = btn.querySelector('.like-heart');
     const countEl = btn.querySelector('.like-count');
