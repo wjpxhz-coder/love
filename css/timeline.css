@@ -172,6 +172,119 @@
             box-shadow: none;
         }
 
+        /* ── 动态卡片更多操作菜单 (···) ── */
+        .moment-actions-menu {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .moment-menu-trigger {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: none;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 700;
+            line-height: 1;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: none;
+            padding: 0;
+        }
+
+        .moment-menu-trigger:hover,
+        .moment-menu-trigger:focus-visible {
+            background: rgba(200, 155, 155, 0.15);
+            color: var(--primary);
+            border-color: var(--border);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .moment-menu-dropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            min-width: 110px;
+            background: var(--surface-elevated, #fff);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px var(--shadow), 0 2px 6px rgba(0,0,0,0.06);
+            padding: 5px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            opacity: 0;
+            visibility: hidden;
+            transform: scale(0.92) translateY(-6px);
+            transform-origin: top right;
+            transition: opacity 0.18s cubic-bezier(0.2, 0.9, 0.3, 1), transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1), visibility 0.18s;
+        }
+
+        .moment-menu-dropdown.is-open {
+            opacity: 1;
+            visibility: visible;
+            transform: scale(1) translateY(0);
+        }
+
+        .moment-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 7px 10px;
+            border: none;
+            background: none;
+            border-radius: 8px;
+            font-size: 0.82em;
+            color: var(--text);
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.15s ease, color 0.15s ease;
+            box-shadow: none;
+            font-family: inherit;
+        }
+
+        .moment-menu-item:hover,
+        .moment-menu-item:focus-visible {
+            background: rgba(200, 155, 155, 0.12);
+            color: var(--primary);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .moment-menu-item--danger {
+            color: #d64555;
+        }
+
+        .moment-menu-item--danger:hover,
+        .moment-menu-item--danger:focus-visible {
+            background: rgba(214, 69, 85, 0.12);
+            color: #bd2d3e;
+        }
+
+        .moment-edited-badge {
+            font-size: 0.7em;
+            color: var(--text-muted);
+            background: rgba(180, 150, 160, 0.1);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1px 6px;
+            letter-spacing: 0.3px;
+            user-select: none;
+        }
+
         .card-text {
             font-size: 0.95em;
             line-height: 1.8;

@@ -11,6 +11,10 @@ let isMomentRecording = false;
 let momentAudioPreviewUrl = null;
 const momentPhotoPreviewUrls = new Set();
 let isMomentSubmitting = false;
+let editingMomentId = null;
+let editingExistingMedia = []; // Array of { ref: string, url: string, isVideo: boolean }
+let editingAudioRef = null;
+let editingAudioUrl = null;
 const MAX_MOMENT_MEDIA_BYTES = 100 * 1024 * 1024;
 function isAllowedMomentMedia(file) {
     if (file.type.startsWith('image/') || file.type.startsWith('video/')) return true;
@@ -71,6 +75,7 @@ function clearMomentPhotoPreviews() {
     momentPhotoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
     momentPhotoPreviewUrls.clear();
     momentSelectedFiles = [];
+    editingExistingMedia = [];
 
     if (!previewContainer) return;
     previewContainer.querySelectorAll('.moment-preview-item').forEach(item => item.remove());
@@ -116,6 +121,11 @@ function cancelMomentRecording() {
 function resetMomentComposer(options = {}) {
     const { clearPhotos = true, clearAudio = true, clearText = true } = options;
     cancelMomentRecording();
+    editingMomentId = null;
+    editingExistingMedia = [];
+    editingAudioRef = null;
+    editingAudioUrl = null;
+
     if (clearPhotos) clearMomentPhotoPreviews();
     if (clearAudio) {
         momentAudioBlob = null;
@@ -128,13 +138,18 @@ function resetMomentComposer(options = {}) {
     if (btnAudio) btnAudio.style.display = 'flex';
     if (clearText) {
         const textInput = document.getElementById('momentTextInput');
-        if (textInput) textInput.value = '';
+        if (textInput) {
+            textInput.value = '';
+            textInput.disabled = false;
+        }
         const milestone = document.getElementById('momentIsMilestone');
         if (milestone) milestone.checked = false;
         const message = document.getElementById('momentModalMsg');
         if (message) message.textContent = '';
         const title = document.getElementById('moment-modal-title');
-        if (title) title.textContent = '✨ 发布动态';
+        if (title) title.textContent = '记录此刻';
+        const submitBtn = document.getElementById('btn-submit-moment');
+        if (submitBtn) submitBtn.textContent = '发布';
     }
 }
 
@@ -146,6 +161,10 @@ function bindMomentModalLifecycle() {
 }
 
 function openMomentModal(options = {}) {
+    if (options?.editId) {
+        openMomentEditModal(options.editId);
+        return;
+    }
     const milestone = options?.milestone === true;
     const target = milestone ? '/moments/new?milestone=1' : '/moments/new';
     if (typeof appNavigate === 'function') {
@@ -155,7 +174,60 @@ function openMomentModal(options = {}) {
     window.location.hash = `#${target}`;
 }
 
-function enterMomentPage(route) {
+function openMomentEditModal(momentId) {
+    const id = normalizeMomentId(momentId);
+    if (!id) return;
+    const target = `/moments/edit/${encodeURIComponent(String(id))}`;
+    if (typeof appNavigate === 'function') {
+        appNavigate(target);
+        return;
+    }
+    window.location.hash = `#${target}`;
+}
+
+function renderExistingMediaPreviews(existingList) {
+    const previewContainer = document.getElementById('momentImagePreviewContainer');
+    if (!previewContainer || !Array.isArray(existingList)) return;
+    const addBtn = previewContainer.querySelector('.moment-image-add-btn');
+
+    existingList.forEach(item => {
+        const previewItem = document.createElement('div');
+        previewItem.className = 'moment-preview-item';
+        let media;
+        if (item.isVideo) {
+            media = document.createElement('video');
+            media.muted = true;
+            media.loop = true;
+            media.playsInline = true;
+            media.preload = 'none';
+            Object.assign(media.style, { width: '100%', height: '100%', objectFit: 'cover' });
+        } else {
+            media = document.createElement('img');
+            media.alt = '预览';
+        }
+        media.src = item.url;
+        if (media.tagName === 'VIDEO') setupMomentVideoPlayback(media, true);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-btn';
+        removeBtn.textContent = '×';
+        removeBtn.setAttribute('aria-label', '移除此媒体');
+        Object.assign(removeBtn.style, { border: '0', padding: '0' });
+        removeBtn.addEventListener('click', () => {
+            const index = editingExistingMedia.indexOf(item);
+            if (index >= 0) editingExistingMedia.splice(index, 1);
+            if (media.tagName === 'VIDEO') releaseMomentVideo(media, true);
+            previewItem.remove();
+        });
+
+        previewItem.append(media, removeBtn);
+        previewContainer.insertBefore(previewItem, addBtn);
+        if (media.tagName === 'VIDEO') refreshMomentVideoPlayback(media);
+    });
+}
+
+async function enterMomentPage(route) {
     const page = document.getElementById('momentModal');
     const input = document.getElementById('momentTextInput');
     const previewContainer = document.getElementById('momentImagePreviewContainer');
@@ -163,7 +235,13 @@ function enterMomentPage(route) {
     bindMomentModalLifecycle();
     resetMomentComposer();
 
-    const titleEl = page.querySelector('.modal-title');
+    const requestAuthEpoch = getMomentAuthEpoch();
+    const editId = route?.params?.id ? normalizeMomentId(route.params.id) : null;
+
+    const titleEl = document.getElementById('moment-modal-title') || page.querySelector('.modal-title');
+    const submitBtn = document.getElementById('btn-submit-moment');
+    const msgEl = document.getElementById('momentModalMsg');
+    const milestoneCheckbox = document.getElementById('momentIsMilestone');
 
     const p = allProfilesCache[currentAuthor] || {};
     if (titleEl) {
@@ -179,13 +257,11 @@ function enterMomentPage(route) {
             });
             titleEl.appendChild(avatar);
         }
-        titleEl.appendChild(document.createTextNode('✨ 发布动态'));
+        titleEl.appendChild(document.createTextNode(editId ? '✏️ 编辑动态' : '✨ 发布动态'));
     }
 
-    document.getElementById('momentModalMsg').innerText = '';
-    input.value = '';
-    const milestoneCheckbox = document.getElementById('momentIsMilestone');
-    if (milestoneCheckbox) milestoneCheckbox.checked = route?.query?.milestone === '1';
+    if (msgEl) msgEl.textContent = '';
+    if (submitBtn) submitBtn.textContent = editId ? '保存修改' : '发布';
 
     // 重置录音状态与预览
     const btnAudio = document.getElementById('btn-moment-audio');
@@ -201,13 +277,115 @@ function enterMomentPage(route) {
     }
     if (previewAudio) previewAudio.style.display = 'none';
 
-    setTimeout(() => input.focus(), 100);
+    if (!editId) {
+        input.value = '';
+        if (milestoneCheckbox) milestoneCheckbox.checked = route?.query?.milestone === '1';
+        setTimeout(() => input.focus(), 100);
+        return;
+    }
+
+    // 编辑模式：拉取动态记录并回显
+    editingMomentId = editId;
+    input.disabled = true;
+    if (msgEl) msgEl.textContent = '正在加载动态详情…';
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('moments')
+            .select('*')
+            .eq('id', editId)
+            .maybeSingle();
+
+        if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
+        if (error || !data) {
+            console.error('加载待编辑动态失败:', error);
+            if (typeof showToast === 'function') showToast('无法读取该动态，可能已被删除。');
+            closeMomentModal(true);
+            return;
+        }
+
+        let rawText = '';
+        let rawImages = [];
+        let rawAudio = null;
+        let isMilestone = false;
+
+        if (data.type === 'moment') {
+            try {
+                const parsed = JSON.parse(data.content);
+                if (parsed && typeof parsed === 'object') {
+                    rawText = typeof parsed.text === 'string' ? parsed.text : '';
+                    rawImages = Array.isArray(parsed.images) ? parsed.images : [];
+                    rawAudio = parsed.audio || null;
+                    isMilestone = parsed.is_milestone === true;
+                }
+            } catch (e) {
+                rawText = data.content || '';
+            }
+        } else if (data.type === 'text') {
+            rawText = data.content || '';
+        } else if (data.type === 'photo') {
+            rawImages = data.content ? [data.content] : [];
+        } else if (data.type === 'audio') {
+            rawAudio = data.content || null;
+        }
+
+        input.value = rawText;
+        if (milestoneCheckbox) milestoneCheckbox.checked = isMilestone;
+        if (msgEl) msgEl.textContent = '';
+
+        if (rawImages.length > 0) {
+            const resolvedImages = typeof batchResolveMediaUrls === 'function'
+                ? await batchResolveMediaUrls(rawImages)
+                : rawImages.map(u => sanitizeMediaUrl(u));
+
+            if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
+
+            editingExistingMedia = rawImages.map((ref, i) => ({
+                ref: ref,
+                url: resolvedImages[i] || sanitizeMediaUrl(ref),
+                isVideo: isVideoMediaUrl(ref) || isVideoMediaUrl(resolvedImages[i])
+            })).filter(item => Boolean(item.url));
+
+            renderExistingMediaPreviews(editingExistingMedia);
+        }
+
+        if (rawAudio) {
+            const resolvedAudio = typeof resolveMediaUrl === 'function'
+                ? await resolveMediaUrl(rawAudio)
+                : sanitizeMediaUrl(rawAudio);
+
+            if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
+
+            if (resolvedAudio) {
+                editingAudioRef = rawAudio;
+                editingAudioUrl = resolvedAudio;
+                const player = document.getElementById('momentAudioPlayer');
+                if (player) {
+                    player.src = resolvedAudio;
+                    player.load();
+                }
+                if (previewAudio) previewAudio.style.display = 'flex';
+                if (btnAudio) btnAudio.style.display = 'none';
+            }
+        }
+    } catch (err) {
+        console.error('加载待编辑动态异常:', err);
+        if (isMomentAuthEpochCurrent(requestAuthEpoch)) {
+            if (typeof showToast === 'function') showToast('加载动态失败，请稍后重试。');
+            closeMomentModal(true);
+        }
+    } finally {
+        if (isMomentAuthEpochCurrent(requestAuthEpoch)) {
+            input.disabled = false;
+            setTimeout(() => input.focus(), 100);
+        }
+    }
 }
 
 function closeMomentModal(force = false) {
     if (isMomentSubmitting && !force) {
         const message = document.getElementById('momentModalMsg');
-        if (message) message.textContent = '正在发布，请稍候…';
+        if (message) message.textContent = editingMomentId ? '正在保存，请稍候…' : '正在发布，请稍候…';
         return;
     }
     if (typeof appBack === 'function') {
@@ -451,8 +629,15 @@ async function submitMomentPost() {
     const requestAuthEpoch = getMomentAuthEpoch();
     const text = document.getElementById('momentTextInput').value.trim();
     const msgEl = document.getElementById('momentModalMsg');
+    const isEditing = Boolean(editingMomentId);
     
-    if (!text && momentSelectedFiles.length === 0 && !momentAudioBlob) {
+    const hasText = Boolean(text);
+    const hasNewFiles = momentSelectedFiles.length > 0;
+    const hasExistingMedia = editingExistingMedia.length > 0;
+    const hasNewAudio = Boolean(momentAudioBlob);
+    const hasExistingAudio = Boolean(editingAudioRef);
+
+    if (!hasText && !hasNewFiles && !hasExistingMedia && !hasNewAudio && !hasExistingAudio) {
         msgEl.innerText = '写点什么、发张照片或录段声音吧！';
         return;
     }
@@ -519,7 +704,7 @@ async function submitMomentPost() {
             });
         }
 
-        btn.textContent = '⏳ 正在保存记录…';
+        btn.textContent = isEditing ? '⏳ 正在保存修改…' : '⏳ 正在保存记录…';
         let audioUrl = null;
         if (momentAudioBlob) {
             const audioType = momentAudioBlob.type || 'audio/webm';
@@ -537,27 +722,51 @@ async function submitMomentPost() {
         const chkIsMilestone = document.getElementById('momentIsMilestone');
         const isMilestone = chkIsMilestone ? chkIsMilestone.checked : false;
 
-        const momentContent = JSON.stringify({
-            text: text,
-            images: uploadedUrls,
-            audio: audioUrl,
-            is_milestone: isMilestone
-        });
+        const retainedImages = editingExistingMedia.map(item => item.ref).filter(Boolean);
+        const finalImages = [...retainedImages, ...uploadedUrls];
+        const finalAudio = audioUrl || editingAudioRef || null;
 
-        const { error: dbError } = await supabaseClient.from('moments')
-            .insert([{ type: 'moment', content: momentContent }]);
+        const momentPayload = {
+            text: text,
+            images: finalImages,
+            audio: finalAudio,
+            is_milestone: isMilestone
+        };
+        if (isEditing) {
+            momentPayload.updated_at = new Date().toISOString();
+        }
+
+        const momentContent = JSON.stringify(momentPayload);
+
+        if (isEditing) {
+            const { error: dbError } = await supabaseClient
+                .from('moments')
+                .update({ type: 'moment', content: momentContent })
+                .eq('id', editingMomentId);
+            if (dbError) throw dbError;
+        } else {
+            const { error: dbError } = await supabaseClient
+                .from('moments')
+                .insert([{ type: 'moment', content: momentContent }]);
+            if (dbError) throw dbError;
+        }
         
-        if (dbError) throw dbError;
         databaseCommitted = true;
         if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
         
         closeMomentModal(true);
         fetchMoments();
+        if (typeof renderMilestonesContent === 'function') {
+            renderMilestonesContent();
+        }
+        if (typeof showToast === 'function') {
+            showToast(isEditing ? '动态已修改 ✨' : '动态已发布 ✨');
+        }
     } catch (err) {
         if (!databaseCommitted) await removeUploadedMomentObjects(uploadedObjectPaths);
-        console.error('发布动态失败:', err);
+        console.error(isEditing ? '保存修改失败:' : '发布动态失败:', err);
         if (isMomentAuthEpochCurrent(requestAuthEpoch)) {
-            msgEl.textContent = '发布失败，请检查网络或稍后重试。';
+            msgEl.textContent = isEditing ? '保存失败，请检查网络或稍后重试。' : '发布失败，请检查网络或稍后重试。';
         }
     } finally {
         isMomentSubmitting = false;
@@ -688,6 +897,8 @@ function resetMomentAudioBtn() {
 function deleteRecordedAudio() {
     cancelMomentRecording();
     momentAudioBlob = null;
+    editingAudioRef = null;
+    editingAudioUrl = null;
     const previewEl = document.getElementById('momentAudioPreview');
     const playerEl = document.getElementById('momentAudioPlayer');
     const btn = document.getElementById('btn-moment-audio');
@@ -935,6 +1146,7 @@ function createMomentCardElement(item, options = {}) {
         }
     }
     const isMilestone = Boolean(parsedMoment && parsedMoment.is_milestone === true);
+    const isEdited = Boolean(parsedMoment && (parsedMoment.updated_at || parsedMoment.edited_at));
     const card = createMomentNode('div', `moment-card${isMilestone ? ' milestone' : ''}`);
     card.id = `card-${momentId}`;
 
@@ -945,6 +1157,16 @@ function createMomentCardElement(item, options = {}) {
         ? ''
         : createdAt.toLocaleString('zh-CN', { hour12: false });
     meta.appendChild(createMomentNode('span', 'time-text', dateText));
+
+    if (isEdited) {
+        const editedDate = new Date(parsedMoment.updated_at || parsedMoment.edited_at);
+        const editedTitle = Number.isNaN(editedDate.getTime())
+            ? '已编辑'
+            : `最后编辑于 ${editedDate.toLocaleString('zh-CN', { hour12: false })}`;
+        const editedBadge = createMomentNode('span', 'moment-edited-badge', '已编辑');
+        editedBadge.title = editedTitle;
+        meta.appendChild(editedBadge);
+    }
 
     const author = typeof item.author === 'string' ? item.author : '';
     if (author) {
@@ -979,13 +1201,44 @@ function createMomentCardElement(item, options = {}) {
     const canDelete = item.user_id === currentAuthUser?.id
         && !Number.isNaN(createdAt.getTime())
         && Date.now() - createdAt.getTime() < 86400000;
+
+    const actionsMenu = createMomentNode('div', 'moment-actions-menu');
+    actionsMenu.id = `moment-menu-${momentId}`;
+
+    const triggerBtn = createMomentNode('button', 'moment-menu-trigger');
+    triggerBtn.type = 'button';
+    triggerBtn.setAttribute('aria-label', '更多操作');
+    triggerBtn.setAttribute('aria-haspopup', 'true');
+    triggerBtn.setAttribute('aria-expanded', 'false');
+    triggerBtn.dataset.momentAction = 'toggle-menu';
+    triggerBtn.dataset.momentId = String(momentId);
+    triggerBtn.appendChild(document.createTextNode('···'));
+    actionsMenu.appendChild(triggerBtn);
+
+    const dropdown = createMomentNode('div', 'moment-menu-dropdown');
+    dropdown.id = `moment-dropdown-${momentId}`;
+    dropdown.setAttribute('role', 'menu');
+
+    const editItem = createMomentNode('button', 'moment-menu-item');
+    editItem.type = 'button';
+    editItem.setAttribute('role', 'menuitem');
+    editItem.dataset.momentAction = 'edit';
+    editItem.dataset.momentId = String(momentId);
+    editItem.appendChild(document.createTextNode('✏️ 编辑'));
+    dropdown.appendChild(editItem);
+
     if (canDelete) {
-        const deleteButton = createMomentNode('button', 'delete-btn', '撤回');
-        deleteButton.type = 'button';
-        deleteButton.dataset.momentAction = 'delete';
-        deleteButton.dataset.momentId = String(momentId);
-        header.appendChild(deleteButton);
+        const deleteItem = createMomentNode('button', 'moment-menu-item moment-menu-item--danger');
+        deleteItem.type = 'button';
+        deleteItem.setAttribute('role', 'menuitem');
+        deleteItem.dataset.momentAction = 'delete';
+        deleteItem.dataset.momentId = String(momentId);
+        deleteItem.appendChild(document.createTextNode('🗑️ 撤回'));
+        dropdown.appendChild(deleteItem);
     }
+
+    actionsMenu.appendChild(dropdown);
+    header.appendChild(actionsMenu);
     card.appendChild(header);
 
     if (item.type === 'text') {
@@ -1234,11 +1487,40 @@ function locateMomentOnTimeline(moment, options = {}) {
     return true;
 }
 
+function toggleMomentActionMenu(momentId) {
+    const dropdown = document.getElementById(`moment-dropdown-${momentId}`);
+    const trigger = document.querySelector(`[data-moment-action="toggle-menu"][data-moment-id="${momentId}"]`);
+    if (!dropdown) return;
+    const isOpen = dropdown.classList.contains('is-open');
+    closeAllMomentActionMenus();
+    if (!isOpen) {
+        dropdown.classList.add('is-open');
+        if (trigger) trigger.setAttribute('aria-expanded', 'true');
+    }
+}
+
+function closeAllMomentActionMenus() {
+    document.querySelectorAll('.moment-menu-dropdown.is-open').forEach(menu => {
+        menu.classList.remove('is-open');
+    });
+    document.querySelectorAll('.moment-menu-trigger[aria-expanded="true"]').forEach(btn => {
+        btn.setAttribute('aria-expanded', 'false');
+    });
+}
+
 function runMomentAction(actionElement) {
     const momentId = normalizeMomentId(actionElement.dataset.momentId);
     const action = actionElement.dataset.momentAction;
     if (action !== 'open-profile' && action !== 'open-lightbox' && !momentId) return;
-    if (action === 'delete') confirmDelete(momentId);
+    if (action === 'toggle-menu') {
+        toggleMomentActionMenu(momentId);
+    } else if (action === 'edit') {
+        closeAllMomentActionMenus();
+        openMomentEditModal(momentId);
+    } else if (action === 'delete') {
+        closeAllMomentActionMenus();
+        confirmDelete(momentId);
+    }
     else if (action === 'open-profile' && typeof openProfilePage === 'function') openProfilePage(actionElement.dataset.author || '');
     else if (action === 'open-lightbox' && typeof openLightbox === 'function') openLightbox(actionElement.currentSrc || actionElement.src);
     else if (action === 'show-images') showAllImages(momentId);
@@ -1253,6 +1535,9 @@ function runMomentAction(actionElement) {
 }
 
 document.addEventListener('click', event => {
+    if (!event.target.closest('.moment-actions-menu')) {
+        closeAllMomentActionMenus();
+    }
     const actionElement = event.target.closest('[data-moment-action]');
     if (actionElement) runMomentAction(actionElement);
 });
