@@ -64,7 +64,15 @@ function openLightbox(src) {
 
     if (isLightboxVideoUrl(safeSrc)) {
         video.src = safeSrc;
+        video.preload = 'auto';
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
         video.style.display = 'block';
+        video.load();
+        const playPromise = video.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(() => {});
+        }
     } else {
         img.src = safeSrc;
         img.style.display = 'block';

@@ -205,9 +205,27 @@ function renderBlindBoxMoment(moment) {
                         const url = sanitizeMediaUrl(rawUrl);
                         const video = typeof isVideoMediaUrl === 'function' && isVideoMediaUrl(url);
                         const media = typeof createMomentMedia === 'function'
-                            ? createMomentMedia(url, 'moment-grid-item', { autoplay: video, lightbox: !video })
+                            ? createMomentMedia(url, 'moment-grid-item', { autoplay: false, preload: 'metadata', lightbox: true })
                             : null;
-                        if (media) grid.appendChild(media);
+                        if (media) {
+                            if (video) {
+                                const wrap = document.createElement('div');
+                                wrap.className = 'moment-grid-video-wrap';
+                                wrap.dataset.momentAction = 'open-lightbox';
+                                wrap.dataset.mediaSrc = url;
+                                wrap.tabIndex = 0;
+                                wrap.setAttribute('role', 'button');
+                                wrap.setAttribute('aria-label', '打开视频预览');
+                                wrap.appendChild(media);
+                                const badge = document.createElement('span');
+                                badge.className = 'moment-video-badge';
+                                badge.textContent = '▶';
+                                wrap.appendChild(badge);
+                                grid.appendChild(wrap);
+                            } else {
+                                grid.appendChild(media);
+                            }
+                        }
                     });
                     if (grid.childElementCount) content.appendChild(grid);
                 }
