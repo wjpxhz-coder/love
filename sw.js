@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'love-diary-';
-const CACHE_NAME = 'love-diary-v3.9.10-more-moods';
+const CACHE_NAME = 'love-diary-v3.9.11-optimized-icons';
 
 // Only application-shell files are cached. Private API responses, user media,
 // and third-party resources are deliberately excluded from this allow-list.
