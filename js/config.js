@@ -292,9 +292,9 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.14';
+const APP_VERSION = 'v3.9.15';
 const UPDATE_LOG = {
-    version: 'v3.9.14',
+    version: 'v3.9.15',
     date: '2026-08-22',
     title: '动态全功能编辑与大事记标记上线 ✨✏️',
     features: [
