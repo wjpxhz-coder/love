@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'love-diary-';
-const CACHE_NAME = 'love-diary-v3.9.12-fast-media';
+const CACHE_NAME = 'love-diary-v3.9.13-fast-media';
 const MEDIA_CACHE_NAME = 'love-diary-media-v1';
 const MAX_MEDIA_CACHE_ENTRIES = 250;
 
@@ -128,8 +128,13 @@ async function cacheFirstStorageMedia(request) {
     if (cached) return cached;
 
     try {
-        const response = await fetch(request);
-        if (response.ok || response.type === 'opaque') {
+        let response;
+        try {
+            response = await fetch(request.url, { mode: 'cors', credentials: 'omit' });
+        } catch (_corsErr) {
+            response = await fetch(request);
+        }
+        if (response && (response.ok || response.type === 'opaque')) {
             // 写入本地媒体缓存，保证后续加载 0ms 命中
             cache.put(canonicalKey, response.clone()).then(() => {
                 trimMediaCache(cache);

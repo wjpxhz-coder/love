@@ -623,7 +623,7 @@
     <div class="modal-box version-modal-box">
         <div class="version-decor-heart">💝</div>
         <h2 class="modal-title" id="versionTitle">架构重构与代码质量飞跃 🛠️✨</h2>
-        <div class="version-tag" id="versionNumber">v3.9.7</div>
+        <div class="version-tag" id="versionNumber">v3.9.13</div>
         <div class="version-body">
             <div class="version-date" id="versionDate">更新时间：2026-08-19</div>
 
@@ -680,10 +680,19 @@
             <div class="settings-tip mood-reminder-message" id="mood-reminder-message" role="status" aria-live="polite"></div>
         </div>
         
-        <div class="settings-group">
+        <div class="settings-group settings-storage-group">
             <div class="settings-label">🧹 空间存储</div>
-            <button class="btn-settings-action" onclick="clearSpaceCache()">清理缓存并重载</button>
-            <div class="settings-tip">清理后将自动刷新页面重新获取最新内容，并保留您的登录状态。</div>
+            <div class="storage-action-item">
+                <button class="btn-settings-action" id="btn-clear-web-cache" type="button" onclick="clearWebCache()">清除网页缓存并重载</button>
+                <div class="settings-tip">用于获取最新网站功能与更新，不会删除本地已缓存的照片，并保留登录状态。</div>
+            </div>
+            <div class="storage-action-item storage-photo-item">
+                <div class="storage-btn-row">
+                    <button class="btn-settings-action" id="btn-clear-photo-cache" type="button" onclick="clearPhotoCache()">清理本地照片缓存</button>
+                    <span class="storage-size-badge" id="photoCacheSizeDisplay" onclick="updatePhotoCacheSizeDisplay()" title="点击重新计算已缓存大小" role="status" aria-live="polite">0 B</span>
+                </div>
+                <div class="settings-tip">清理本地已下载的照片和媒体。清理后再次查看照片将重新从云端加载。</div>
+            </div>
         </div>
         
         <div class="settings-group">
@@ -692,7 +701,7 @@
         </div>
         
         <div class="settings-footer">
-            <span id="settingsVersion">当前版本：v3.9.7</span>
+            <span id="settingsVersion">当前版本：v3.9.13</span>
         </div>
 
         
