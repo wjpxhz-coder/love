@@ -74,7 +74,7 @@ function sanitizeMediaUrl(value, { allowBlob = false } = {}) {
         const url = new URL(value, window.location.href);
         if (allowBlob && url.protocol === 'blob:') return url.href;
 
-        const isLocalDevelopment = url.hostname === window.location.hostname
+        const isLocalDevelopment = (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]')
             && (url.protocol === 'http:' || url.protocol === 'https:');
         const isTrustedHttps = url.protocol === 'https:' && TRUSTED_MEDIA_HOSTS.has(url.hostname);
         return isLocalDevelopment || isTrustedHttps ? url.href : '';
