@@ -9,6 +9,7 @@
         { id: 'home', pattern: '/', label: '', elementId: null, protected: false },
         { id: 'login', pattern: '/login', label: '登录', elementId: 'login-overlay', protected: false },
         { id: 'moment', pattern: '/moments/new', label: '发布动态', elementId: 'momentModal', protected: true },
+        { id: 'moment', pattern: '/moments/edit/:id', label: '编辑动态', elementId: 'momentModal', protected: true },
         { id: 'mood', pattern: '/mood/check-in', label: '心情打卡', elementId: 'moodModal', protected: true },
         { id: 'mood', pattern: '/mood/edit/:id', label: '编辑心情', elementId: 'moodModal', protected: true },
         { id: 'mood-day', pattern: '/mood/day/:date', label: '心情记录', elementId: 'moodDayModal', protected: true },
