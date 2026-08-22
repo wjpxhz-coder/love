@@ -334,17 +334,33 @@ async function enterMomentPage(route) {
         if (msgEl) msgEl.textContent = '';
 
         if (rawImages.length > 0) {
-            const resolvedImages = typeof batchResolveMediaUrls === 'function'
-                ? await batchResolveMediaUrls(rawImages)
-                : rawImages.map(u => sanitizeMediaUrl(u));
+            let resolvedImages = [];
+            try {
+                resolvedImages = typeof batchResolveMediaUrls === 'function'
+                    ? await batchResolveMediaUrls(rawImages)
+                    : [];
+            } catch (e) {
+                console.warn('批量解析媒体地址失败:', e);
+            }
 
             if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
 
-            editingExistingMedia = rawImages.map((ref, i) => ({
-                ref: ref,
-                url: resolvedImages[i] || sanitizeMediaUrl(ref),
-                isVideo: isVideoMediaUrl(ref) || isVideoMediaUrl(resolvedImages[i])
-            })).filter(item => Boolean(item.url));
+            editingExistingMedia = await Promise.all(rawImages.map(async (ref, i) => {
+                let resolved = (resolvedImages && resolvedImages[i]) || '';
+                if (!resolved && typeof resolveMediaUrl === 'function') {
+                    try {
+                        resolved = await resolveMediaUrl(ref);
+                    } catch (_err) {}
+                }
+                if (!resolved) {
+                    resolved = sanitizeMediaUrl(ref);
+                }
+                return {
+                    ref: ref,
+                    url: resolved,
+                    isVideo: isVideoMediaUrl(ref) || (resolved ? isVideoMediaUrl(resolved) : false)
+                };
+            }));
 
             renderExistingMediaPreviews(editingExistingMedia);
         }
@@ -739,19 +755,34 @@ async function submitMomentPost() {
         const momentContent = JSON.stringify(momentPayload);
 
         if (isEditing) {
-            let { error: dbError } = await supabaseClient
-                .from('moments')
-                .update({ type: 'moment', content: momentContent })
-                .eq('id', editingMomentId);
+            let updateSuccess = false;
+            let lastError = null;
 
-            if (dbError) {
-                console.warn('直接 UPDATE 失败，尝试 RPC update_moment:', dbError);
-                const { error: rpcError } = await supabaseClient.rpc('update_moment', {
+            // 优先尝试原子化 RPC 更新（通过标准 HTTP POST，无 CORS 限制，安全性最高）
+            try {
+                const { data: rpcSuccess, error: rpcError } = await supabaseClient.rpc('update_moment', {
                     p_moment_id: editingMomentId,
                     p_content: momentContent
                 });
-                if (rpcError) {
-                    throw dbError || rpcError;
+                if (!rpcError && rpcSuccess === true) {
+                    updateSuccess = true;
+                } else if (rpcError) {
+                    lastError = rpcError;
+                    console.warn('RPC update_moment 未成功，尝试直接表更新:', rpcError);
+                }
+            } catch (rpcEx) {
+                lastError = rpcEx;
+                console.warn('RPC update_moment 异常，尝试直接表更新:', rpcEx);
+            }
+
+            // 降级尝试直接 UPDATE (HTTP PATCH)
+            if (!updateSuccess) {
+                const { error: directError } = await supabaseClient
+                    .from('moments')
+                    .update({ type: 'moment', content: momentContent })
+                    .eq('id', editingMomentId);
+                if (directError) {
+                    throw directError || lastError;
                 }
             }
         } else {
