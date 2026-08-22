@@ -281,19 +281,19 @@ let ffmpegInstance = null;
 
 /**
  * 客户端高保真智能图片压缩：
- * 1. 保留 2K 超清分辨率（最大边长 1920px，完全满足手机视网膜 Retina 屏与电脑端点对点清晰显示）。
- * 2. 采用高保真质量系数（quality = 0.84），消除不可见高频冗余数据，使 10MB 手机原图缩减至 200KB~400KB。
+ * 1. 优先输出高效现代 WebP 格式（质量 0.80），体积相比 JPEG 减小 40%~60%，极大加速上传和首屏下载。
+ * 2. 如浏览器不支持 WebP 导出，平滑降级为 JPEG。
  * 3. 动图（GIF）自动跳过压缩，保护完整帧动效。
- * 4. 智能格式兼容：自动将 HEIC 或异常格式转为标准 JPEG/WebP，确保通过存储安全策略。
+ * 4. 2K 超清分辨率自适应（最大边长 1920px，完美适配 Retina 视网膜屏与桌面端）。
  */
-async function compressImageFile(file, maxWidth = 1920, maxHeight = 1920, quality = 0.84) {
+async function compressImageFile(file, maxWidth = 1920, maxHeight = 1920, quality = 0.80) {
     if (!file || !file.type.startsWith('image/')) return file;
     // GIF 动图不进行有损压缩
     if (file.type === 'image/gif' || (typeof file.name === 'string' && file.name.toLowerCase().endsWith('.gif'))) {
         return file;
     }
-    // 已经很小的标准图片直接放行
-    if (file.size <= 300 * 1024 && (file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp')) {
+    // 已经很小的 WebP/JPEG 小图直接放行
+    if (file.size <= 150 * 1024 && (file.type === 'image/webp' || file.type === 'image/jpeg')) {
         return file;
     }
 
@@ -337,14 +337,22 @@ async function compressImageFile(file, maxWidth = 1920, maxHeight = 1920, qualit
 
         ctx.drawImage(image, 0, 0, width, height);
 
-        const targetMime = isPng ? 'image/png' : 'image/jpeg';
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, targetMime, quality));
-        if (!blob || (blob.size >= file.size && (file.type === 'image/jpeg' || file.type === 'image/png'))) {
+        // 优先尝试 WebP，如浏览器不支持则回退为 JPEG/PNG
+        let blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
+        let targetMime = 'image/webp';
+        let ext = 'webp';
+
+        if (!blob || blob.type !== 'image/webp') {
+            targetMime = isPng ? 'image/png' : 'image/jpeg';
+            ext = isPng ? 'png' : 'jpg';
+            blob = await new Promise(resolve => canvas.toBlob(resolve, targetMime, quality));
+        }
+
+        if (!blob || (blob.size >= file.size && file.type === targetMime)) {
             return file;
         }
 
         const baseName = (file.name || 'photo').replace(/\.[^/.]+$/, '');
-        const ext = targetMime === 'image/png' ? 'png' : 'jpg';
         return new File([blob], `${baseName}.${ext}`, { type: targetMime });
     } catch (err) {
         console.warn('图片前端压缩处理失败，降级使用原图:', err);
@@ -878,8 +886,27 @@ function createMomentMedia(rawUrl, className, options = {}) {
         }
     } else {
         media.alt = '我们的回忆';
-        media.loading = 'lazy';
+        if (options.priority) {
+            media.loading = 'eager';
+            media.fetchPriority = 'high';
+        } else {
+            media.loading = 'lazy';
+            media.fetchPriority = 'auto';
+        }
         media.decoding = 'async';
+
+        // 骨架屏流光占位与加载完成后平滑淡入
+        media.classList.add('media-loading');
+        const handleLoaded = () => {
+            media.classList.remove('media-loading');
+            media.classList.add('media-loaded');
+        };
+        if (media.complete) {
+            handleLoaded();
+        } else {
+            media.addEventListener('load', handleLoaded, { once: true });
+            media.addEventListener('error', handleLoaded, { once: true });
+        }
     }
     media.src = url;
     if (isVideo) setupMomentVideoPlayback(media, options.autoplay === true);
@@ -892,9 +919,11 @@ function createMomentMedia(rawUrl, className, options = {}) {
     return media;
 }
 
-function createMomentCardElement(item) {
+function createMomentCardElement(item, options = {}) {
     const momentId = normalizeMomentId(item && item.id);
     if (!momentId) return null;
+
+    const isPriorityCard = options?.isInitialBatch && (options?.cardIndex ?? 0) < 3;
 
     let parsedMoment = null;
     if (item.type === 'moment') {
@@ -963,7 +992,7 @@ function createMomentCardElement(item) {
         const textElement = createCardTextElement(item.content, momentId);
         if (textElement) card.appendChild(textElement);
     } else if (item.type === 'photo') {
-        const media = createMomentMedia(item.content, 'card-img', { lightbox: true });
+        const media = createMomentMedia(item.content, 'card-img', { lightbox: true, priority: isPriorityCard });
         if (media) card.appendChild(media);
     } else if (item.type === 'audio') {
         const audio = createMomentAudio(item.content);
@@ -980,7 +1009,8 @@ function createMomentCardElement(item) {
         if (images.length === 1) {
             const single = createMomentMedia(images[0], 'moment-single-image', {
                 controls: isVideoMediaUrl(images[0]),
-                lightbox: !isVideoMediaUrl(images[0])
+                lightbox: !isVideoMediaUrl(images[0]),
+                priority: isPriorityCard
             });
             if (single) {
                 if (single.tagName === 'VIDEO') Object.assign(single.style, { width: '100%', borderRadius: '12px', marginTop: '10px' });
@@ -993,7 +1023,9 @@ function createMomentCardElement(item) {
             images.forEach((url, index) => {
                 const isHidden = index >= INITIAL_DISPLAY_COUNT;
                 const media = createMomentMedia(url, `moment-grid-item${isHidden ? ' hidden-image' : ''}`, {
-                    autoplay: isVideoMediaUrl(url), lightbox: true
+                    autoplay: isVideoMediaUrl(url),
+                    lightbox: true,
+                    priority: isPriorityCard && index < 4
                 });
                 if (!media) return;
                 if (isHidden) media.style.display = 'none';
@@ -1573,10 +1605,32 @@ async function fetchMoments(append = false) {
         }
     }
 
+    // 预热首屏前 4 张图片
+    if (!append) {
+        const topUrls = [];
+        renderData.slice(0, 3).forEach(item => {
+            if (item.type === 'photo' && item.content) topUrls.push(item.content);
+            else if (item.type === 'moment' && typeof item.content === 'string') {
+                try {
+                    const parsed = JSON.parse(item.content);
+                    if (Array.isArray(parsed.images)) topUrls.push(...parsed.images.slice(0, 4));
+                } catch (_e) {}
+            }
+        });
+        topUrls.slice(0, 4).forEach(url => {
+            const safe = sanitizeMediaUrl(url);
+            if (safe && !isVideoMediaUrl(safe)) {
+                const preloadImg = new Image();
+                preloadImg.decoding = 'async';
+                preloadImg.src = safe;
+            }
+        });
+    }
+
     // 渲染新卡片
     const fragment = document.createDocumentFragment();
-    renderData.forEach(item => {
-        const card = createMomentCardElement(item);
+    renderData.forEach((item, cardIndex) => {
+        const card = createMomentCardElement(item, { cardIndex, isInitialBatch: !append });
         if (card) fragment.appendChild(card);
     });
     const newVideos = Array.from(fragment.querySelectorAll('video'));

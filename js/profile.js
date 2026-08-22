@@ -349,14 +349,18 @@ async function saveProfile() {
         };
 
         if (pendingAvatarFile) {
-            const extension = avatarExtensionForType(pendingAvatarFile.type);
+            let avatarFileToUpload = pendingAvatarFile;
+            if (typeof compressImageFile === 'function') {
+                avatarFileToUpload = await compressImageFile(pendingAvatarFile, 400, 400, 0.85);
+            }
+            const extension = avatarExtensionForType(avatarFileToUpload.type);
             const uniqueId = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
             uploadedPath = `${currentUserProfile.space_id}/${userId}/avatars/${uniqueId}.${extension}`;
 
             const { error: uploadError } = await supabaseClient.storage
                 .from('photos')
-                .upload(uploadedPath, pendingAvatarFile, {
-                    contentType: pendingAvatarFile.type,
+                .upload(uploadedPath, avatarFileToUpload, {
+                    contentType: avatarFileToUpload.type,
                     cacheControl: '3600',
                     upsert: false
                 });

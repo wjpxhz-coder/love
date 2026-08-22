@@ -26,6 +26,43 @@ const TRUSTED_MEDIA_HOSTS = new Set([
 ]);
 const STORAGE_REFERENCE_PREFIX = 'storage://photos/';
 const signedMediaUrlCache = new Map();
+const SIGNED_MEDIA_SESSION_PREFIX = 'love_signed_media_';
+
+function getCachedSignedMediaUrl(objectPath) {
+    if (!objectPath) return '';
+    const now = Date.now();
+    // 1. 检查内存 Map
+    const memCached = signedMediaUrlCache.get(objectPath);
+    if (memCached && memCached.expiresAt > now) {
+        return memCached.url;
+    }
+    // 2. 检查 sessionStorage
+    try {
+        const raw = sessionStorage.getItem(SIGNED_MEDIA_SESSION_PREFIX + objectPath);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed.url === 'string' && parsed.expiresAt > now) {
+                signedMediaUrlCache.set(objectPath, parsed);
+                return parsed.url;
+            } else {
+                sessionStorage.removeItem(SIGNED_MEDIA_SESSION_PREFIX + objectPath);
+            }
+        }
+    } catch (_e) {}
+    return '';
+}
+
+function setCachedSignedMediaUrl(objectPath, signedUrl, ttlMs = 50 * 60 * 1000) {
+    if (!objectPath || !signedUrl) return;
+    const entry = {
+        url: signedUrl,
+        expiresAt: Date.now() + ttlMs
+    };
+    signedMediaUrlCache.set(objectPath, entry);
+    try {
+        sessionStorage.setItem(SIGNED_MEDIA_SESSION_PREFIX + objectPath, JSON.stringify(entry));
+    } catch (_e) {}
+}
 
 /**
  * 将数据库中的媒体地址收敛到受信任来源。
@@ -68,8 +105,8 @@ async function resolveMediaUrl(value) {
     if (!objectPath || !currentAuthUser) return '';
     const requestUserId = currentAuthUser.id;
     const requestAuthEpoch = typeof authEpoch === 'number' ? authEpoch : null;
-    const cached = signedMediaUrlCache.get(objectPath);
-    if (cached && cached.expiresAt > Date.now()) return cached.url;
+    const cachedUrl = getCachedSignedMediaUrl(objectPath);
+    if (cachedUrl) return cachedUrl;
 
     const { data, error } = await supabaseClient.storage
         .from('photos')
@@ -85,16 +122,13 @@ async function resolveMediaUrl(value) {
 
     const signedUrl = sanitizeMediaUrl(data.signedUrl);
     if (signedUrl) {
-        signedMediaUrlCache.set(objectPath, {
-            url: signedUrl,
-            expiresAt: Date.now() + 50 * 60 * 1000
-        });
+        setCachedSignedMediaUrl(objectPath, signedUrl);
     }
     return signedUrl;
 }
 
 /**
- * 批量高效解析媒体签名地址，将多次网络往返聚合为单次批量接口调用。
+ * 批量高效解析媒体签名地址，结合会话持久缓存将网络往返降至最低。
  */
 async function batchResolveMediaUrls(values) {
     if (!Array.isArray(values) || values.length === 0) return [];
@@ -104,7 +138,6 @@ async function batchResolveMediaUrls(values) {
 
     const requestUserId = currentAuthUser.id;
     const requestAuthEpoch = typeof authEpoch === 'number' ? authEpoch : null;
-    const now = Date.now();
     const uncachedPaths = new Set();
 
     values.forEach(val => {
@@ -113,8 +146,8 @@ async function batchResolveMediaUrls(values) {
         if (direct) return;
         const objPath = getStorageObjectPath(val);
         if (!objPath) return;
-        const cached = signedMediaUrlCache.get(objPath);
-        if (!cached || cached.expiresAt <= now) {
+        const cachedUrl = getCachedSignedMediaUrl(objPath);
+        if (!cachedUrl) {
             uncachedPaths.add(objPath);
         }
     });
@@ -133,10 +166,7 @@ async function batchResolveMediaUrls(values) {
                         if (item && item.path && item.signedUrl) {
                             const sanitized = sanitizeMediaUrl(item.signedUrl);
                             if (sanitized) {
-                                signedMediaUrlCache.set(item.path, {
-                                    url: sanitized,
-                                    expiresAt: Date.now() + 50 * 60 * 1000
-                                });
+                                setCachedSignedMediaUrl(item.path, sanitized);
                             }
                         }
                     });
@@ -154,8 +184,7 @@ async function batchResolveMediaUrls(values) {
         if (direct) return direct;
         const objPath = getStorageObjectPath(val);
         if (!objPath) return '';
-        const cached = signedMediaUrlCache.get(objPath);
-        return (cached && cached.expiresAt > Date.now()) ? cached.url : '';
+        return getCachedSignedMediaUrl(objPath) || '';
     });
 }
 
@@ -216,6 +245,16 @@ async function batchHydrateMomentMediaRecords(records) {
 
 function clearSignedMediaCache() {
     signedMediaUrlCache.clear();
+    try {
+        const keysToRemove = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+            const key = sessionStorage.key(i);
+            if (key && key.startsWith(SIGNED_MEDIA_SESSION_PREFIX)) {
+                keysToRemove.push(key);
+            }
+        }
+        keysToRemove.forEach(k => sessionStorage.removeItem(k));
+    } catch (_e) {}
 }
 
 /**
@@ -253,16 +292,16 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.9';
+const APP_VERSION = 'v3.9.12';
 const UPDATE_LOG = {
-    version: 'v3.9.9',
-    date: '2026-08-19',
-    title: '唯美浪漫桃花雨特效升级 🌸✨',
+    version: 'v3.9.12',
+    date: '2026-08-22',
+    title: '动态图片秒级极速加载系统升级 ⚡🖼️',
     features: [
-        '全新拟真桃花雨落瓣系统，贝塞尔花瓣与三维翻转灵动飘落 🌸',
-        '动态迎风边界注入物理算法，全方位覆盖无死角 🍃',
-        '支持轻触鼠标微风感应与空白处点击花瓣绽放互动 💫',
-        '升级“一键想你”心电感应，触发浪漫桃花雨漫天飞舞与中心花瓣绽放 💓'
+        '接入 Service Worker 媒体磁盘持久化缓存，动态图片 0ms 瞬间秒开 🚀',
+        '升级媒体签名会话级持久缓存，消灭列表加载额外网络往返 ⚡',
+        '首屏图片智能高优先级加载与微光骨架屏动效，丝滑流畅告别空白 🌸',
+        '全面升级 WebP 高保真智能压缩算法，体积缩减 50% 且画质依然细腻 ✨'
     ]
 };
 

@@ -276,6 +276,17 @@ async function loadComments(momentId) {
             image.src = url;
             image.alt = '评论图片';
             image.loading = 'lazy';
+            image.decoding = 'async';
+            image.classList.add('media-loading');
+            const onImgLoad = () => {
+                image.classList.remove('media-loading');
+                image.classList.add('media-loaded');
+            };
+            if (image.complete) onImgLoad();
+            else {
+                image.addEventListener('load', onImgLoad, { once: true });
+                image.addEventListener('error', onImgLoad, { once: true });
+            }
             image.addEventListener('click', () => {
                 if (typeof openLightbox === 'function') openLightbox(url);
             });
