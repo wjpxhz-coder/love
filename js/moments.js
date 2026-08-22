@@ -207,6 +207,19 @@ function renderExistingMediaPreviews(existingList) {
         }
         media.src = item.url;
         if (media.tagName === 'VIDEO') setupMomentVideoPlayback(media, true);
+        if (media.tagName === 'IMG') {
+            media.addEventListener('error', async () => {
+                if (item.ref && typeof resolveMediaUrl === 'function') {
+                    try {
+                        const freshUrl = await resolveMediaUrl(item.ref);
+                        if (freshUrl && freshUrl !== media.src) {
+                            item.url = freshUrl;
+                            media.src = freshUrl;
+                        }
+                    } catch (_e) {}
+                }
+            }, { once: true });
+        }
 
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
