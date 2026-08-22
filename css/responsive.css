@@ -130,7 +130,7 @@
             }
         }
 
-        /* 经典首页：保持标题居中，并保留旧版路由聚焦时的酒红描边。 */
+        /* 经典首页：保持标题居中，移除聚焦描边 */
         #home-title {
             width: 100%;
             text-align: center;
@@ -138,8 +138,7 @@
 
         #home-title:focus,
         #home-title:focus-visible {
-            outline: 3px solid var(--focus-ring) !important;
-            outline-offset: 3px;
+            outline: none !important;
             box-shadow: none !important;
         }
 
