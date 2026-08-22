@@ -54,3 +54,5 @@ $function$;
 
 revoke all on function public.update_moment(bigint, text) from public, anon;
 grant execute on function public.update_moment(bigint, text) to authenticated;
+
+notify pgrst, 'reload schema';
