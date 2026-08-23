@@ -1198,11 +1198,11 @@ function isVideoMediaUrl(url) {
 function createCardTextElement(text, momentId) {
     const safeText = typeof text === 'string' ? text : String(text || '');
     if (!safeText) return null;
-    if (safeText.length <= 80) return createMomentNode('div', 'card-text', safeText);
+    if (safeText.length <= 100) return createMomentNode('div', 'card-text', safeText);
 
     const container = createMomentNode('div', 'card-text-container');
     container.id = `text-container-${momentId}`;
-    const collapsed = createMomentNode('div', 'card-text text-collapsed', `${safeText.slice(0, 80)}...`);
+    const collapsed = createMomentNode('div', 'card-text text-collapsed', `${safeText.slice(0, 100)}...`);
     collapsed.style.display = 'block';
     const expanded = createMomentNode('div', 'card-text text-expanded', safeText);
     expanded.style.display = 'none';
@@ -1355,7 +1355,16 @@ function createMomentCardElement(item, options = {}) {
         authorBadge.appendChild(document.createTextNode(String(authorProfile.nickname || author)));
         meta.appendChild(authorBadge);
     }
-    if (isMilestone) meta.appendChild(createMomentNode('span', 'milestone-badge-timeline', '🏆 大事记'));
+    if (isMilestone) {
+        meta.appendChild(createMomentNode('span', 'milestone-badge-timeline', '🏆 大事记'));
+    } else if (options?.showMilestoneDays) {
+        meta.appendChild(createMomentNode('span', 'milestone-badge-timeline star', '⭐ 收藏'));
+    }
+    if (options?.showMilestoneDays && !Number.isNaN(createdAt.getTime())) {
+        const diffMs = Date.now() - createdAt.getTime();
+        const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+        meta.appendChild(createMomentNode('span', 'milestone-days-badge', `已过 ${diffDays} 天 💖`));
+    }
     header.appendChild(meta);
 
     const canDelete = item.user_id === currentAuthUser?.id

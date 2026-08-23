@@ -61,24 +61,24 @@
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
-    <link rel="stylesheet" href="css/refresh.css?v=3.9.15">
-    <link rel="stylesheet" href="css/variables.css?v=3.9.15">
-    <link rel="stylesheet" href="css/base.css?v=3.9.15">
-    <link rel="stylesheet" href="css/header.css?v=3.9.15">
-    <link rel="stylesheet" href="css/timer.css?v=3.9.15">
-    <link rel="stylesheet" href="css/timeline.css?v=3.9.15">
-    <link rel="stylesheet" href="css/dialogs.css?v=3.9.15">
-    <link rel="stylesheet" href="css/comments.css?v=3.9.15">
-    <link rel="stylesheet" href="css/ai-panel.css?v=3.9.15">
-    <link rel="stylesheet" href="css/fab.css?v=3.9.15">
-    <link rel="stylesheet" href="css/auth.css?v=3.9.15">
-    <link rel="stylesheet" href="css/profile.css?v=3.9.15">
-    <link rel="stylesheet" href="css/notifications.css?v=3.9.15">
-    <link rel="stylesheet" href="css/mood.css?v=3.9.15">
-    <link rel="stylesheet" href="css/anniversary.css?v=3.9.15">
-    <link rel="stylesheet" href="css/effects.css?v=3.9.15">
-    <link rel="stylesheet" href="css/responsive.css?v=3.9.15">
-    <link rel="stylesheet" href="css/pages.css?v=3.9.15">
+    <link rel="stylesheet" href="css/refresh.css?v=3.9.16">
+    <link rel="stylesheet" href="css/variables.css?v=3.9.16">
+    <link rel="stylesheet" href="css/base.css?v=3.9.16">
+    <link rel="stylesheet" href="css/header.css?v=3.9.16">
+    <link rel="stylesheet" href="css/timer.css?v=3.9.16">
+    <link rel="stylesheet" href="css/timeline.css?v=3.9.16">
+    <link rel="stylesheet" href="css/dialogs.css?v=3.9.16">
+    <link rel="stylesheet" href="css/comments.css?v=3.9.16">
+    <link rel="stylesheet" href="css/ai-panel.css?v=3.9.16">
+    <link rel="stylesheet" href="css/fab.css?v=3.9.16">
+    <link rel="stylesheet" href="css/auth.css?v=3.9.16">
+    <link rel="stylesheet" href="css/profile.css?v=3.9.16">
+    <link rel="stylesheet" href="css/notifications.css?v=3.9.16">
+    <link rel="stylesheet" href="css/mood.css?v=3.9.16">
+    <link rel="stylesheet" href="css/anniversary.css?v=3.9.16">
+    <link rel="stylesheet" href="css/effects.css?v=3.9.16">
+    <link rel="stylesheet" href="css/responsive.css?v=3.9.16">
+    <link rel="stylesheet" href="css/pages.css?v=3.9.16">
 </head>
 <body class="auth-pending">
 <a class="skip-link" id="skip-link" href="#main-content">跳到主要内容</a>
@@ -625,7 +625,7 @@
     <div class="modal-box version-modal-box">
         <div class="version-decor-heart">💝</div>
         <h2 class="modal-title" id="versionTitle">架构重构与代码质量飞跃 🛠️✨</h2>
-        <div class="version-tag" id="versionNumber">v3.9.13</div>
+        <div class="version-tag" id="versionNumber">v3.9.16</div>
         <div class="version-body">
             <div class="version-date" id="versionDate">更新时间：2026-08-19</div>
 
@@ -703,7 +703,7 @@
         </div>
         
         <div class="settings-footer">
-            <span id="settingsVersion">当前版本：v3.9.13</span>
+            <span id="settingsVersion">当前版本：v3.9.16</span>
         </div>
 
         
@@ -714,50 +714,48 @@
 </section>
 
 <!-- 大事记/重大事件记录板页面 -->
-<section class="app-page feature-page milestones-dialog" id="milestonesModal" data-page-id="milestones" aria-labelledby="milestones-modal-title" aria-hidden="true" hidden inert>
+<section class="app-page feature-page milestones-page-section" id="milestonesModal" data-page-id="milestones" aria-labelledby="milestones-modal-title" aria-hidden="true" hidden inert>
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeMilestonesModal()">← 返回</button>
             <h1 class="app-page-topbar-title" id="milestones-modal-title" data-page-focus tabindex="-1">大事记</h1>
-            <span class="app-page-topbar-spacer" aria-hidden="true"></span>
+            <button class="app-page-action-btn" type="button" onclick="openAddMilestoneDirect()" aria-label="记录新大事记">+ 记录</button>
         </header>
         <div class="app-page-scroll">
-            <div class="app-page-content app-page-content--wide">
-    <div class="modal-box app-page-card milestones-modal-box">
-        <div class="milestones-content" id="milestonesContent">
-            <!-- 动态渲染大事记时间轴 -->
-        </div>
-
-        <div class="modal-btns">
-            <button class="btn-settings-action" id="btn-add-milestone-direct" onclick="openAddMilestoneDirect()">记录新大事记</button>
-        </div>
-    </div>
+            <div class="app-page-content milestones-page-content">
+                <div class="timeline-track milestones-timeline-track" id="milestonesContent">
+                    <!-- 动态渲染大事记时间轴卡片 -->
+                </div>
             </div>
         </div>
+        <button class="milestones-fab-btn" type="button" onclick="openAddMilestoneDirect()" aria-label="记录新大事记">
+            <span class="milestones-fab-icon">✨</span>
+            <span class="milestones-fab-text">记录大事记</span>
+        </button>
     </div>
 </section>
 
-<script src="js/config.js?v=3.9.15"></script>
-<script src="js/animations.js?v=3.9.15"></script>
-<script src="js/timer.js?v=3.9.15"></script>
-<script src="js/auth.js?v=3.9.15"></script>
-<script src="js/profile.js?v=3.9.15"></script>
-<script src="js/moments.js?v=3.9.15"></script>
-<script src="js/milestones.js?v=3.9.15"></script>
-<script src="js/comments.js?v=3.9.15"></script>
-<script src="js/likes.js?v=3.9.15"></script>
-<script src="js/mood.js?v=3.9.15"></script>
-<script src="js/anniversary.js?v=3.9.15"></script>
-<script src="js/lightbox.js?v=3.9.15"></script>
-<script src="js/ai.js?v=3.9.15"></script>
-<script src="js/blindbox.js?v=3.9.15"></script>
-<script src="js/presence.js?v=3.9.15"></script>
-<script src="js/theme.js?v=3.9.15"></script>
-<script src="js/notifications.js?v=3.9.15"></script>
-<script src="js/effects.js?v=3.9.15"></script>
-<script src="js/settings.js?v=3.9.15"></script>
-<script src="js/router.js?v=3.9.15"></script>
-<script src="js/app.js?v=3.9.15"></script>
+<script src="js/config.js?v=3.9.16"></script>
+<script src="js/animations.js?v=3.9.16"></script>
+<script src="js/timer.js?v=3.9.16"></script>
+<script src="js/auth.js?v=3.9.16"></script>
+<script src="js/profile.js?v=3.9.16"></script>
+<script src="js/moments.js?v=3.9.16"></script>
+<script src="js/milestones.js?v=3.9.16"></script>
+<script src="js/comments.js?v=3.9.16"></script>
+<script src="js/likes.js?v=3.9.16"></script>
+<script src="js/mood.js?v=3.9.16"></script>
+<script src="js/anniversary.js?v=3.9.16"></script>
+<script src="js/lightbox.js?v=3.9.16"></script>
+<script src="js/ai.js?v=3.9.16"></script>
+<script src="js/blindbox.js?v=3.9.16"></script>
+<script src="js/presence.js?v=3.9.16"></script>
+<script src="js/theme.js?v=3.9.16"></script>
+<script src="js/notifications.js?v=3.9.16"></script>
+<script src="js/effects.js?v=3.9.16"></script>
+<script src="js/settings.js?v=3.9.16"></script>
+<script src="js/router.js?v=3.9.16"></script>
+<script src="js/app.js?v=3.9.16"></script>
 
 </body>
 </html>
