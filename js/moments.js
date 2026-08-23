@@ -669,15 +669,21 @@ async function getFFmpeg() {
 
 
 function isMomentVideoFile(file) {
-    if (file.type.startsWith('video/')) return true;
-    const ext = String(file.name).split('.').pop().toLowerCase();
-    return ['mp4', 'webm', 'mov', 'm4v', 'quicktime'].includes(ext);
+    if (!file) return false;
+    if (file.type && file.type.startsWith('video/')) return true;
+    const ext = String(file.name || '').split('.').pop().toLowerCase();
+    return ['mp4', 'webm', 'mov', 'm4v', 'quicktime', 'ogg'].includes(ext);
 }
 
 async function compressVideoFile(file, onProgress) {
     if (!file || !isMomentVideoFile(file)) return file;
-    // 如果视频小于等于 3MB，本身就已经较小，跳过转码
-    if (file.size <= 3 * 1024 * 1024) return file;
+    const ext = getMomentFileExtension(file) || '';
+    const isAppleFormat = ['mov', 'quicktime', 'm4v', 'hevc'].includes(ext) || (file.type && (file.type.includes('quicktime') || file.type.includes('hevc')));
+
+    // 仅当是标准 mp4 且体积 <= 3MB 时才跳过转码；若是苹果格式或大体积视频，一律强制转码为全平台通用的 H.264 MP4
+    if (!isAppleFormat && file.size <= 3 * 1024 * 1024 && file.type === 'video/mp4') {
+        return file;
+    }
 
     try {
         const ffmpeg = await getFFmpeg();
@@ -695,7 +701,7 @@ async function compressVideoFile(file, onProgress) {
 
         // 转码优化参数：
         // 1. scale='min(1280,iw)':-2 限制最大宽度 1280px 并保持宽高比与偶数尺寸
-        // 2. -vcodec libx264 -crf 28 超清画质兼顾高压缩比
+        // 2. -vcodec libx264 -pix_fmt yuv420p -crf 28 超清画质兼顾高压缩比与全端（Windows/Mac/iOS/Android）硬解兼容
         // 3. -preset ultrafast 极速编码
         // 4. -movflags +faststart 把元数据移至文件头部，实现边下边播秒开
         // 5. -c:a aac -b:a 128k 高保真音频压缩
@@ -703,6 +709,7 @@ async function compressVideoFile(file, onProgress) {
             '-i', inputName,
             '-vf', "scale='min(1280,iw)':-2",
             '-vcodec', 'libx264',
+            '-pix_fmt', 'yuv420p',
             '-crf', '28',
             '-preset', 'ultrafast',
             '-movflags', '+faststart',
@@ -718,7 +725,7 @@ async function compressVideoFile(file, onProgress) {
         await ffmpeg.deleteFile(outputName).catch(() => {});
         ffmpeg.off('progress');
 
-        if (newBlob.size >= file.size) {
+        if (!isAppleFormat && newBlob.size >= file.size) {
             console.log(`[VideoOptimize] 压缩后体积未减小，使用原文件`);
             return file;
         }
@@ -1189,7 +1196,7 @@ function normalizeMomentId(value) {
 function isVideoMediaUrl(url) {
     try {
         const parsed = new URL(url);
-        return /\.(mp4|mov|webm|ogg)$/i.test(parsed.pathname) || parsed.pathname.includes('/video');
+        return /\.(mp4|mov|webm|ogg|m4v|quicktime)$/i.test(parsed.pathname) || parsed.pathname.includes('/video');
     } catch (error) {
         return false;
     }
@@ -1236,11 +1243,14 @@ function createMomentMedia(rawUrl, className, options = {}) {
     if (isVideo) {
         media.playsInline = true;
         media.setAttribute('playsinline', '');
-        media.preload = options.controls ? 'metadata' : (options.preload || 'none');
+        media.preload = options.controls ? 'metadata' : (options.preload || 'metadata');
         if (options.controls) media.controls = true;
         if (options.autoplay) {
             media.muted = true;
             media.loop = true;
+        } else {
+            // 静音以确保浏览器允许预取和解码首帧
+            media.muted = true;
         }
 
         // 骨架屏流光占位与加载首帧完成后平滑淡入
@@ -1249,10 +1259,12 @@ function createMomentMedia(rawUrl, className, options = {}) {
             media.classList.remove('media-loading');
             media.classList.add('media-loaded');
         };
-        if (media.readyState >= 2) {
+        if (media.readyState >= 1) {
             handleVideoLoaded();
         } else {
+            media.addEventListener('loadedmetadata', handleVideoLoaded, { once: true });
             media.addEventListener('loadeddata', handleVideoLoaded, { once: true });
+            media.addEventListener('canplay', handleVideoLoaded, { once: true });
             media.addEventListener('error', handleVideoLoaded, { once: true });
         }
     } else {
@@ -1279,10 +1291,16 @@ function createMomentMedia(rawUrl, className, options = {}) {
             media.addEventListener('error', handleLoaded, { once: true });
         }
     }
-    media.src = url;
+    // 对于视频，自动追加 #t=0.001 强制 Chromium/Safari 寻道并渲染第一帧作为海报封面
+    if (isVideo && !url.includes('#t=')) {
+        media.src = `${url}#t=0.001`;
+    } else {
+        media.src = url;
+    }
     if (isVideo && options.autoplay) setupMomentVideoPlayback(media, true);
     if (options.lightbox) {
         media.dataset.momentAction = 'open-lightbox';
+        media.dataset.mediaSrc = url;
         media.tabIndex = 0;
         media.setAttribute('role', 'button');
         media.setAttribute('aria-label', isVideo ? '打开视频预览' : '打开图片预览');
