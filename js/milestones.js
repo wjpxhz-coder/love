@@ -281,7 +281,7 @@ async function renderMilestonesContent() {
             return;
         }
 
-        renderTimelineList(items, contentContainer);
+        renderMilestonesTimelineList(items, contentContainer);
     } catch (e) {
         console.error('加载大事记失败:', e);
         if (requestId === milestoneRenderRequestId && isMilestoneAuthEpochCurrent(requestAuthEpoch)) {
@@ -290,113 +290,42 @@ async function renderMilestonesContent() {
     }
 }
 
-function renderTimelineList(items, container) {
+function renderMilestonesTimelineList(items, container) {
+    if (typeof releaseMomentVideosWithin === 'function') {
+        releaseMomentVideosWithin(container, true);
+    }
     container.replaceChildren();
-    const timeline = document.createElement('div');
-    timeline.className = 'milestone-timeline';
     
-    items.forEach(item => {
-        let text = '';
-        let images = [];
-        let isMilestone = false;
-        try {
-            const parsed = JSON.parse(item.content);
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                text = typeof parsed.text === 'string' ? parsed.text : '';
-                images = Array.isArray(parsed.images) ? parsed.images : [];
-                isMilestone = parsed.is_milestone === true;
-            }
-        } catch (e) {
-            text = item.content || '';
-        }
-        
-        const dateObj = new Date(item.created_at);
-        const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-        
-        // 计算已过天数
-        const diffMs = Date.now() - dateObj.getTime();
-        const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
-        const itemEl = document.createElement('div');
-        itemEl.className = 'milestone-list-item';
-
-        const dotLine = document.createElement('div');
-        dotLine.className = 'milestone-dot-line';
-        const dot = document.createElement('div');
-        dot.className = `milestone-dot${isMilestone ? ' gold' : ''}`;
-        const line = document.createElement('div');
-        line.className = 'milestone-line';
-        dotLine.append(dot, line);
-
-        const itemCard = document.createElement('div');
-        itemCard.className = 'milestone-item-card';
-        itemCard.tabIndex = 0;
-        itemCard.setAttribute('role', 'link');
-        itemCard.setAttribute('aria-label', `查看 ${dateStr} 的动态${text ? `：${String(text).slice(0, 40)}` : ''}`);
-        itemCard.title = '点击查看原动态';
-        const locateMoment = () => {
-            if (typeof locateMomentOnTimeline === 'function') {
-                locateMomentOnTimeline(item, { backLabel: '🔙 返回动态列表' });
-            }
-        };
-        itemCard.addEventListener('click', event => {
-            const nestedControl = event.target.closest?.('button, a, input, textarea, select, [role="button"]');
-            if (nestedControl && nestedControl !== itemCard) return;
-            locateMoment();
-        });
-        itemCard.addEventListener('keydown', event => {
-            if (event.target !== itemCard || (event.key !== 'Enter' && event.key !== ' ')) return;
-            event.preventDefault();
-            locateMoment();
-        });
-        const header = document.createElement('div');
-        header.className = 'milestone-item-header';
-        const date = document.createElement('span');
-        date.className = 'milestone-item-date';
-        date.textContent = dateStr;
-        const badge = document.createElement('span');
-        badge.className = `milestone-badge-top${isMilestone ? '' : ' star'}`;
-        badge.textContent = isMilestone ? '🏆 大事记' : '⭐ 收藏';
-        const days = document.createElement('span');
-        days.className = 'milestone-days';
-        days.textContent = `已过 ${diffDays} 天 💖`;
-        header.append(date, badge, days);
-
-        const body = document.createElement('div');
-        body.className = 'milestone-item-body';
-        const textElement = document.createElement('div');
-        textElement.className = 'milestone-item-text';
-        textElement.textContent = String(text || '');
-        body.appendChild(textElement);
-        const imageUrl = images.length > 0 ? getMilestoneTrustedMediaUrl(images[0]) : '';
-        if (imageUrl) {
-            const image = document.createElement('div');
-            image.className = 'milestone-item-img';
-            image.style.backgroundImage = `url("${imageUrl}")`;
-            image.tabIndex = 0;
-            image.setAttribute('role', 'button');
-            image.setAttribute('aria-label', '查看大事记图片');
-            const showImage = () => {
-                if (typeof openLightbox === 'function') openLightbox(imageUrl);
-            };
-            image.addEventListener('click', event => {
-                event.stopPropagation();
-                showImage();
+    const fragment = document.createDocumentFragment();
+    items.forEach((item, cardIndex) => {
+        if (typeof createMomentCardElement === 'function') {
+            const card = createMomentCardElement(item, {
+                cardIndex,
+                isInitialBatch: true,
+                showMilestoneDays: true
             });
-            image.addEventListener('keydown', event => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    showImage();
-                }
-            });
-            body.appendChild(image);
+            if (card) fragment.appendChild(card);
         }
-        itemCard.append(header, body);
-        itemEl.append(dotLine, itemCard);
-        timeline.appendChild(itemEl);
     });
     
-    container.appendChild(timeline);
+    const newVideos = Array.from(fragment.querySelectorAll('video'));
+    container.appendChild(fragment);
+    
+    if (typeof refreshMomentVideoPlayback === 'function') {
+        newVideos.forEach(video => refreshMomentVideoPlayback(video));
+    }
+    
+    if (typeof initScrollReveal === 'function') {
+        setTimeout(() => initScrollReveal(), 50);
+    }
+    
+    const momentIds = items.map(item => item.id);
+    if (typeof loadCommentCounts === 'function') {
+        loadCommentCounts(momentIds);
+    }
+    if (typeof loadMomentLikes === 'function') {
+        loadMomentLikes(momentIds);
+    }
 }
 
 function openAddMilestoneDirect() {
