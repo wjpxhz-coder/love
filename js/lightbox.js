@@ -35,7 +35,7 @@ function getLightboxFocusableElements(lightbox) {
 function isLightboxVideoUrl(url) {
     try {
         const parsed = new URL(url);
-        return /\.(mp4|mov|webm|ogg)$/i.test(parsed.pathname) || parsed.pathname.includes('/video');
+        return /\.(mp4|mov|webm|ogg|m4v|quicktime)$/i.test(parsed.pathname) || parsed.pathname.includes('/video');
     } catch (error) {
         return false;
     }
@@ -63,12 +63,22 @@ function openLightbox(src) {
     video.load();
 
     if (isLightboxVideoUrl(safeSrc)) {
-        video.src = safeSrc;
+        const cleanVideoSrc = safeSrc.replace(/#t=[\d.]+.*$/, '');
+        video.src = cleanVideoSrc;
         video.preload = 'auto';
+        video.currentTime = 0;
         video.playsInline = true;
         video.setAttribute('playsinline', '');
         video.style.display = 'block';
         video.load();
+
+        video.onerror = () => {
+            console.warn('[Lightbox] 视频加载失败，可能是当前浏览器不支持该视频编码 (如苹果 MOV/HEVC):', cleanVideoSrc);
+            if (typeof showToast === 'function') {
+                showToast('该视频格式在当前浏览器无法直接播放，可在手机端查看或长按/右键保存', 4500);
+            }
+        };
+
         const playPromise = video.play();
         if (playPromise && typeof playPromise.catch === 'function') {
             playPromise.catch(() => {});
@@ -95,6 +105,7 @@ function closeLightbox(event) {
     lightbox.setAttribute('aria-hidden', 'true');
     lightbox.inert = true;
     if (video) {
+        video.onerror = null;
         video.pause();
         video.removeAttribute('src');
         video.load();
