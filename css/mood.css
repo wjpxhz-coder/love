@@ -42,55 +42,114 @@
 .mood-calendar-heading { margin-bottom: 14px; }
 .mood-calendar-toolbar { margin-bottom: 8px; }
 
-.mood-today-btn,
-.mood-month-nav {
-    border: 1px solid var(--glass-border);
-    background: rgba(255,255,255,0.42);
+.mood-today-btn {
+    border: 1px solid var(--border);
+    background: var(--surface);
     color: var(--primary);
-    box-shadow: none;
+    box-shadow: 0 2px 6px var(--shadow);
     cursor: pointer;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.78em;
+    font-weight: 600;
+    transition: all 0.2s ease;
 }
 
-.mood-today-btn {
-    padding: 6px 11px;
-    border-radius: 18px;
-    font-size: 0.76em;
+.mood-today-btn:hover {
+    transform: translateY(-1px);
+    border-color: var(--primary-light);
+    box-shadow: 0 4px 12px var(--shadow);
 }
 
 .mood-month-picker {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
 }
 
 .mood-month-picker select {
-    min-height: 34px;
-    border: 1px solid var(--glass-border);
-    border-radius: 10px;
-    padding: 5px 7px;
-    background: rgba(255,255,255,0.42);
+    min-height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px 10px;
+    background: var(--surface);
     color: var(--text);
     font: inherit;
     font-weight: 700;
     letter-spacing: 0;
     cursor: pointer;
+    box-shadow: 0 2px 6px var(--shadow);
+    transition: all 0.2s ease;
 }
 
-#mood-calendar-year { width: 78px; }
-#mood-calendar-month { width: 67px; }
+.mood-month-picker select:hover,
+.mood-month-picker select:focus-visible {
+    border-color: var(--primary-light);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(143, 70, 84, 0.12), 0 3px 8px var(--shadow);
+}
+
+#mood-calendar-year { width: 82px; }
+#mood-calendar-month { width: 70px; }
 
 .mood-month-nav {
-    width: 34px;
-    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
     padding: 0;
-    border-radius: 50%;
-    font-size: 1.45em;
-    line-height: 1;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--primary);
+    box-shadow: 0 2px 6px var(--shadow);
+    cursor: pointer;
+    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    user-select: none;
+}
+
+.mood-nav-icon {
+    width: 18px;
+    height: 18px;
+    display: block;
+    stroke: currentColor;
+    transition: transform 0.2s ease;
+}
+
+.mood-month-nav:not(:disabled):hover {
+    background: var(--surface-elevated, #ffffff);
+    border-color: var(--primary-light);
+    color: var(--primary);
+    box-shadow: 0 4px 14px var(--shadow), 0 0 0 1px rgba(143, 70, 84, 0.12);
+}
+
+.mood-month-prev:not(:disabled):hover {
+    transform: translateX(-2px);
+}
+
+.mood-month-next:not(:disabled):hover {
+    transform: translateX(2px);
+}
+
+.mood-month-nav:not(:disabled):active {
+    transform: scale(0.92);
+    box-shadow: 0 1px 3px var(--shadow);
+}
+
+.mood-month-nav:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(143, 70, 84, 0.18), 0 2px 6px var(--shadow);
 }
 
 .mood-month-nav:disabled {
-    opacity: 0.32;
+    opacity: 0.28;
     cursor: not-allowed;
+    box-shadow: none;
+    pointer-events: none;
+    transform: none;
 }
 
 .mood-weekdays,
