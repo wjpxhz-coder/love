@@ -1837,7 +1837,8 @@ function populateFilterYears() {
     const select = document.getElementById('filterYear');
     if (!select) return;
     const selected = select.value;
-    const firstYear = Number.isFinite(startDate?.getFullYear?.()) ? startDate.getFullYear() : new Date().getFullYear();
+    const configuredStartYear = Number.isFinite(startDate?.getFullYear?.()) ? startDate.getFullYear() : 2025;
+    const firstYear = Math.min(2025, configuredStartYear);
     const lastYear = Math.max(firstYear, new Date().getFullYear());
     select.replaceChildren(new Option('所有年份', ''));
     for (let year = firstYear; year <= lastYear; year += 1) {

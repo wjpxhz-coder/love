@@ -119,10 +119,12 @@ function updateMoodMonthPicker(monthKey) {
 
     const [selectedYear, selectedMonth] = normalizeMoodMonthKey(monthKey).split('-');
     const currentYear = Number(getCurrentMoodMonthKey().slice(0, 4));
-    const firstYear = 2000;
-    if (yearPicker.options.length !== currentYear - firstYear + 1) {
+    const firstYear = 2025;
+    const latestYear = Math.max(currentYear, Number(selectedYear) || 2025, firstYear);
+    const expectedOptionCount = latestYear - firstYear + 1;
+    if (yearPicker.options.length !== expectedOptionCount || yearPicker.options[0]?.value !== String(latestYear)) {
         const options = document.createDocumentFragment();
-        for (let year = currentYear; year >= firstYear; year -= 1) {
+        for (let year = latestYear; year >= firstYear; year -= 1) {
             const option = document.createElement('option');
             option.value = String(year);
             option.textContent = `${year} 年`;
@@ -535,11 +537,13 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
 
 function renderMoodCalendar(monthKey, entriesByDate) {
     const heatmap = document.getElementById('mood-heatmap');
+    const prevButton = document.getElementById('mood-calendar-prev');
     const nextButton = document.getElementById('mood-calendar-next');
     if (!heatmap || !updateMoodMonthPicker(monthKey)) return;
 
     const bounds = getMoodMonthBounds(monthKey);
     const currentMonth = getCurrentMoodMonthKey();
+    if (prevButton) prevButton.disabled = monthKey <= '2025-01';
     if (nextButton) nextButton.disabled = monthKey >= currentMonth;
 
     const fragment = document.createDocumentFragment();
@@ -576,7 +580,9 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
 
     const requestedMonth = normalizeMoodMonthKey(monthKey);
     const currentMonth = getCurrentMoodMonthKey();
-    currentMoodMonthKey = requestedMonth > currentMonth ? currentMonth : requestedMonth;
+    let boundedMonth = requestedMonth > currentMonth ? currentMonth : requestedMonth;
+    if (boundedMonth < '2025-01') boundedMonth = '2025-01';
+    currentMoodMonthKey = boundedMonth;
     const bounds = getMoodMonthBounds(currentMoodMonthKey);
     const requestId = ++moodLoadRequestId;
     const epoch = authEpoch;
@@ -635,15 +641,18 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
 
 function changeMoodMonth(offset) {
     const nextMonth = shiftMoodMonth(currentMoodMonthKey || getCurrentMoodMonthKey(), Number(offset) || 0);
-    if (nextMonth > getCurrentMoodMonthKey()) return;
+    if (nextMonth > getCurrentMoodMonthKey() || nextMonth < '2025-01') return;
     loadMoods(nextMonth);
 }
 
 function selectMoodMonth(monthKey) {
-    const selectedMonth = normalizeMoodMonthKey(monthKey);
+    let selectedMonth = normalizeMoodMonthKey(monthKey);
     if (selectedMonth > getCurrentMoodMonthKey()) {
         goToCurrentMoodMonth();
         return;
+    }
+    if (selectedMonth < '2025-01') {
+        selectedMonth = '2025-01';
     }
     loadMoods(selectedMonth);
 }
