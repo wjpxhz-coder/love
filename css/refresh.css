@@ -1548,6 +1548,10 @@ body[data-auth-state='locked'] #notification-bell {
     font-size: 1.08rem;
     font-weight: 800;
     letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
 }
 
 .profile-page.app-page .profile-body {
@@ -2149,16 +2153,20 @@ body[data-auth-state='locked'] #notification-bell {
     }
 
     .mood-month-picker select {
-        padding-right: 3px;
-        padding-left: 3px;
+        padding-right: 6px;
+        padding-left: 6px;
     }
 
     #mood-calendar-year {
-        width: 70px;
+        width: 88px;
+        min-width: 86px;
+        text-align: center;
     }
 
     #mood-calendar-month {
-        width: 59px;
+        width: 68px;
+        min-width: 64px;
+        text-align: center;
     }
 
     .app-page-topbar-title {
