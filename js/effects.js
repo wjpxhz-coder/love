@@ -79,7 +79,7 @@ function createHeartRain() {
         window.homeSakuraEffect.triggerMissYouFlutter();
     }
 
-    const heartCount = 18;
+    const heartCount = 14;
     const container = document.createElement('div');
     container.style.cssText = `
         position: fixed;
@@ -101,27 +101,32 @@ function createHeartRain() {
         item.innerText = icon;
         
         const startLeft = Math.random() * 100;
-        const size = 16 + Math.random() * 18;
-        const duration = 2.2 + Math.random() * 2.2;
-        const delay = Math.random() * 1.2;
+        const size = 16 + Math.random() * 16;
+        const duration = 2.0 + Math.random() * 1.8;
+        const delay = Math.random() * 0.8;
+        const swayX = (Math.random() - 0.5) * 80;
+        const rotEnd = (Math.random() > 0.5 ? 1 : -1) * (180 + Math.random() * 240);
         
         item.style.cssText = `
-            position: absolute;
-            top: -50px;
-            left: ${startLeft}vw;
+            position: fixed;
+            top: 0;
+            left: 0;
+            --start-x: ${startLeft}vw;
+            --sway-x: ${swayX}px;
+            --rot-end: ${rotEnd}deg;
             font-size: ${size}px;
             opacity: 0;
-            transform: translateY(0) rotate(0deg);
-            animation: fallAndSway ${duration}s linear ${delay}s forwards;
+            will-change: transform, opacity;
+            animation: fallAndSway ${duration}s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${delay}s forwards;
             user-select: none;
-            filter: drop-shadow(0 2px 8px rgba(255, 105, 135, 0.35));
+            text-shadow: 0 2px 8px rgba(255, 105, 135, 0.35);
         `;
         container.appendChild(item);
     }
     
     setTimeout(() => {
         container.remove();
-    }, 5000);
+    }, 4500);
 }
 
 let isSendingMissYou = false;
@@ -230,34 +235,34 @@ function initScrollReveal() {
 
 // --- 爱心与甜美粒子 ---
 let lastSpawnHeartTime = 0;
-const MAX_ACTIVE_LOVE_PARTICLES = 14;
+const MAX_ACTIVE_LOVE_PARTICLES = 8;
 
 function spawnHearts(x, y) {
     if (prefersReducedMotion()) return;
     const now = Date.now();
-    if (now - lastSpawnHeartTime < 120) return;
+    if (now - lastSpawnHeartTime < 100) return;
     lastSpawnHeartTime = now;
 
     const currentParticles = document.querySelectorAll('.love-particle');
     if (currentParticles.length >= MAX_ACTIVE_LOVE_PARTICLES) return;
 
     const hearts = ['💖', '🌸', '✨', '🎀', '🍬', '🍓', '💕', '🧁', '💗', '⭐', '❀'];
-    const count = Math.min(3 + Math.floor(Math.random() * 2), MAX_ACTIVE_LOVE_PARTICLES - currentParticles.length);
+    const count = Math.min(2, MAX_ACTIVE_LOVE_PARTICLES - currentParticles.length);
     for (let i = 0; i < count; i++) {
         const particle = document.createElement('div');
         particle.className = 'love-particle';
         particle.textContent = hearts[Math.floor(Math.random() * hearts.length)];
-        const tx = (Math.random() - 0.5) * 130;
-        const ty = -(45 + Math.random() * 90);
-        const rot = (Math.random() - 0.5) * 90;
+        const tx = (Math.random() - 0.5) * 110;
+        const ty = -(40 + Math.random() * 70);
+        const rot = (Math.random() - 0.5) * 80;
         particle.style.left = x + 'px';
         particle.style.top = y + 'px';
         particle.style.setProperty('--tx', tx + 'px');
         particle.style.setProperty('--ty', ty + 'px');
         particle.style.setProperty('--rot', rot + 'deg');
-        particle.style.fontSize = (15 + Math.random() * 10) + 'px';
+        particle.style.fontSize = (15 + Math.random() * 8) + 'px';
         document.body.appendChild(particle);
-        setTimeout(() => particle.remove(), 1300);
+        setTimeout(() => particle.remove(), 1100);
     }
 }
 // --- 纪念日卡片光晕 ---
@@ -284,7 +289,7 @@ document.addEventListener('click', (e) => {
     if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, .fab-container, .notification-panel, [role="button"]')) return;
     spawnHearts(e.clientX, e.clientY);
     if (typeof window.homeSakuraEffect?.createBurst === 'function') {
-        window.homeSakuraEffect.createBurst(e.clientX, e.clientY, 14);
+        window.homeSakuraEffect.createBurst(e.clientX, e.clientY, 8);
     }
 });
 
