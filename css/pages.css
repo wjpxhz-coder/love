@@ -157,7 +157,7 @@ dialog.native-dialog.app-page::backdrop {
     padding: 6px 14px;
     border: none;
     border-radius: 999px;
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark, #8f4654));
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark, #b5737a));
     color: #fff;
     font-family: inherit;
     font-size: 0.88rem;
