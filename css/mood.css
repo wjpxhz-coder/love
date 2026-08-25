@@ -130,11 +130,12 @@
     background: rgba(200,155,155,0.06);
     border: 1px solid transparent;
     box-shadow: none;
-    cursor: default;
+    cursor: pointer;
 }
 
-.mood-calendar-day.has-entries,
-.mood-calendar-day.today { cursor: pointer; }
+.mood-calendar-day.empty-day {
+    background: rgba(200,155,155,0.04);
+}
 
 .mood-calendar-day.has-entries {
     background: rgba(200,155,155,0.11);
@@ -575,6 +576,115 @@
 [data-theme="dark"] .mood-day-entry.is-special {
     border-color: rgba(255, 215, 0, 0.4);
     background: linear-gradient(145deg, rgba(50, 40, 20, 0.6), rgba(35, 28, 15, 0.5));
+}
+
+/* 单日详情页顶部一键标记按钮 */
+.mood-day-mark-btn {
+    padding: 5px 12px;
+    border-radius: 18px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.42);
+    color: var(--primary);
+    font-size: 0.8em;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mood-day-mark-btn:hover {
+    background: rgba(255, 255, 255, 0.7);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(181, 115, 122, 0.2);
+}
+
+.mood-day-mark-btn.is-active {
+    background: linear-gradient(135deg, #fff8e1, #ffecb3);
+    border-color: rgba(255, 193, 7, 0.85);
+    color: #b87b00;
+    box-shadow: 0 0 12px rgba(255, 193, 7, 0.4);
+}
+
+[data-theme="dark"] .mood-day-mark-btn.is-active {
+    background: linear-gradient(135deg, rgba(70, 56, 20, 0.9), rgba(50, 40, 15, 0.9));
+    border-color: rgba(255, 215, 0, 0.75);
+    color: #ffd54f;
+    box-shadow: 0 0 14px rgba(255, 215, 0, 0.3);
+}
+
+/* 单日无记录时的空状态与快捷操作卡片 */
+.mood-day-empty-actions {
+    padding: 30px 16px 20px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.mood-day-empty-decor {
+    font-size: 2.4em;
+    line-height: 1;
+    animation: starTwinkle 2.5s ease-in-out infinite;
+}
+
+.mood-day-empty-tip {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.92em;
+}
+
+.mood-day-btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 8px;
+    width: 100%;
+}
+
+.btn-mood-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border-radius: 24px;
+    border: 1px solid var(--glass-border);
+    font-size: 0.86em;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn-mood-mark-direct {
+    background: linear-gradient(135deg, rgba(255, 248, 225, 0.95), rgba(255, 236, 179, 0.85));
+    border-color: rgba(255, 193, 7, 0.8);
+    color: #b87b00;
+    box-shadow: 0 3px 12px rgba(255, 193, 7, 0.25);
+}
+
+.btn-mood-mark-direct:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 16px rgba(255, 193, 7, 0.4);
+}
+
+.btn-mood-mark-direct.is-active {
+    background: linear-gradient(135deg, #ffc107, #ff9800);
+    border-color: #ff9800;
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(255, 152, 0, 0.45);
+}
+
+.btn-mood-add-direct {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #ffffff;
+    box-shadow: 0 3px 12px rgba(181, 115, 122, 0.28);
+}
+
+.btn-mood-add-direct:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 16px rgba(181, 115, 122, 0.4);
 }
 
 /* 设置中的站内提醒 */

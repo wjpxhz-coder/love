@@ -59,6 +59,7 @@ function updateMoodSelectedHint(score) {
 
 let selectedMoodScore = 0;
 let editingMoodId = null;
+let targetMoodCheckinDate = null;
 let isMoodSaving = false;
 let currentMoodMonthKey = '';
 let moodEntriesByDate = {};
@@ -194,7 +195,8 @@ function resetMoodComposer(entry = null) {
     document.getElementById('moodModalMsg').textContent = '';
 }
 
-function openMoodModal(entryId = null) {
+function openMoodModal(entryId = null, targetDate = null) {
+    targetMoodCheckinDate = targetDate || null;
     const target = entryId === null
         ? '/mood/check-in'
         : `/mood/edit/${encodeURIComponent(String(entryId))}`;
@@ -203,6 +205,10 @@ function openMoodModal(entryId = null) {
         return;
     }
     window.location.hash = `#${target}`;
+}
+
+function openMoodModalForDate(dateKey = activeMoodDetailDate) {
+    openMoodModal(null, dateKey || getAppDateKey());
 }
 
 async function loadMoodEntryForRoute(entryId) {
@@ -257,7 +263,16 @@ async function enterMoodPage(route) {
     editingMoodId = entry ? entry.id : null;
     const title = document.getElementById('mood-modal-title');
     const submitButton = document.getElementById('mood-submit-button');
-    if (title) title.textContent = entry ? `编辑 ${formatMoodDateTitle(entry.date)} 的心情` : '今日心情打卡 🌈';
+    const checkinDate = entry ? entry.date : (targetMoodCheckinDate || getAppDateKey());
+    if (title) {
+        if (entry) {
+            title.textContent = `编辑 ${formatMoodDateTitle(entry.date)} 的心情`;
+        } else if (checkinDate !== getAppDateKey()) {
+            title.textContent = `记录 ${formatMoodDateTitle(checkinDate)} 的心情 🌈`;
+        } else {
+            title.textContent = '今日心情打卡 🌈';
+        }
+    }
     if (submitButton) submitButton.textContent = entry ? '保存修改' : '记录';
     resetMoodComposer(entry);
 }
@@ -274,6 +289,7 @@ function closeMoodModal() {
 function leaveMoodPage() {
     editingMoodId = null;
     moodDetailReturnDate = '';
+    targetMoodCheckinDate = null;
 }
 
 function selectMood(score) {
@@ -298,7 +314,7 @@ async function submitMood() {
     }
     if (isMoodSaving) return;
     if (!selectedMoodScore) {
-        messageElement.textContent = '请先选择今天的心情哦！';
+        messageElement.textContent = '请先选择心情表情哦！';
         return;
     }
 
@@ -313,7 +329,8 @@ async function submitMood() {
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
     const entryBeingEdited = editingMoodId === null ? null : getMoodEntryById(editingMoodId);
-    const returnDate = entryBeingEdited?.date || '';
+    const targetDate = entryBeingEdited ? entryBeingEdited.date : (targetMoodCheckinDate || getAppDateKey());
+    const returnDate = targetDate;
     isMoodSaving = true;
     if (submitButton) {
         submitButton.disabled = true;
@@ -342,7 +359,7 @@ async function submitMood() {
                 result = await supabaseClient
                     .from('moods')
                     .insert([{
-                        date: getAppDateKey(),
+                        date: targetDate,
                         ...payload
                     }])
                     .select(selectFields)
@@ -371,7 +388,7 @@ async function submitMood() {
                     result = await supabaseClient
                         .from('moods')
                         .insert([{
-                            date: getAppDateKey(),
+                            date: targetDate,
                             ...fallbackPayload
                         }])
                         .select(MOOD_ENTRY_FIELDS_LEGACY)
@@ -398,7 +415,7 @@ async function submitMood() {
                 result = await supabaseClient
                     .from('moods')
                     .insert([{
-                        date: getAppDateKey(),
+                        date: targetDate,
                         ...fallbackPayload
                     }])
                     .select(MOOD_ENTRY_FIELDS_LEGACY)
@@ -409,9 +426,10 @@ async function submitMood() {
         if (result.error) throw result.error;
         if (!isCurrentAuthSnapshot(epoch, userId)) return;
 
-        if (!entryBeingEdited) todayOwnMoodCount += 1;
+        if (!entryBeingEdited && targetDate === getAppDateKey()) todayOwnMoodCount += 1;
 
         editingMoodId = null;
+        targetMoodCheckinDate = null;
         await loadMoods(currentMoodMonthKey || getCurrentMoodMonthKey());
         if (!isCurrentAuthSnapshot(epoch, userId)) return;
         if (typeof appBack === 'function') {
@@ -450,7 +468,11 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
     cell.className = 'mood-calendar-day';
     cell.setAttribute('role', 'gridcell');
     if (dateKey === today) cell.classList.add('today');
-    if (entries.length) cell.classList.add('has-entries');
+    if (entries.length) {
+        cell.classList.add('has-entries');
+    } else {
+        cell.classList.add('empty-day');
+    }
 
     const isSpecialDay = entries.some(entry => isMoodEntrySpecial(entry));
     if (isSpecialDay) {
@@ -503,12 +525,10 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
         const specialLabel = isSpecialDay ? '，✨ 特别纪念日' : '';
         cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}${specialLabel}，${entries.length} 条心情记录：${labels}${noteLabel}，点击查看完整记录`);
         cell.addEventListener('click', () => openMoodDayModal(dateKey));
-    } else if (dateKey === today) {
-        cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}，尚未打卡，点击记录`);
-        cell.addEventListener('click', () => openMoodModal());
     } else {
-        cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}，没有心情记录`);
-        cell.disabled = true;
+        const specialLabel = isSpecialDay ? '，✨ 特别纪念日' : '';
+        cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}${specialLabel}，尚未打卡，点击查看或记录`);
+        cell.addEventListener('click', () => openMoodDayModal(dateKey));
     }
     return cell;
 }
@@ -707,8 +727,26 @@ function openMoodDayModal(dateKey) {
     window.location.hash = `#${target}`;
 }
 
+function updateMoodDayMarkButton(isSpecial) {
+    const markButton = document.getElementById('mood-day-mark-button');
+    if (markButton) {
+        markButton.classList.toggle('is-active', Boolean(isSpecial));
+        markButton.textContent = isSpecial ? '✨ 已点亮金光' : '✨ 标记这天';
+        markButton.title = isSpecial ? '点击取消这天的金光标记' : '点击为这一天点亮金光';
+    }
+    const emptyMarkBtn = document.getElementById('mood-day-empty-mark-btn');
+    if (emptyMarkBtn) {
+        emptyMarkBtn.classList.toggle('is-active', Boolean(isSpecial));
+        emptyMarkBtn.textContent = isSpecial ? '✨ 取消金光' : '✨ 点亮金光';
+    }
+}
+
 async function enterMoodDayPage(route) {
     const dateKey = String(route?.params?.date || '');
+    if (!dateKey) {
+        if (typeof appBack === 'function') appBack('/');
+        return;
+    }
     let entries = moodEntriesByDate[dateKey] || [];
     if (!entries.length && /^\d{4}-\d{2}-\d{2}$/.test(dateKey) && isAuthenticated()) {
         await loadMoods(dateKey.slice(0, 7));
@@ -716,19 +754,160 @@ async function enterMoodDayPage(route) {
         if (currentMoodDayRoute && currentMoodDayRoute.fullPath !== route?.fullPath) return;
         entries = moodEntriesByDate[dateKey] || [];
     }
-    if (!entries.length) {
-        if (typeof appBack === 'function') appBack('/');
-        return;
-    }
+
     activeMoodDetailDate = dateKey;
     const title = document.getElementById('mood-day-modal-title');
     const list = document.getElementById('mood-day-list');
+    const emptyActions = document.getElementById('mood-day-empty-actions');
     if (!title || !list) return;
+
     const hasSpecialInDay = entries.some(entry => isMoodEntrySpecial(entry));
     title.textContent = `${formatMoodDateTitle(dateKey)}${hasSpecialInDay ? ' ✨' : ''} · ${entries.length} 条`;
+
+    if (!entries.length) {
+        list.replaceChildren();
+        if (emptyActions) emptyActions.hidden = false;
+        updateMoodDayMarkButton(hasSpecialInDay);
+        return;
+    }
+
+    if (emptyActions) emptyActions.hidden = true;
+    updateMoodDayMarkButton(hasSpecialInDay);
+
     const fragment = document.createDocumentFragment();
     entries.forEach(entry => fragment.appendChild(createMoodDayEntry(entry)));
     list.replaceChildren(fragment);
+}
+
+async function toggleMoodDaySpecial(targetDateKey = activeMoodDetailDate) {
+    if (!isAuthenticated()) {
+        openLoginModal();
+        return;
+    }
+    const dateKey = targetDateKey || activeMoodDetailDate;
+    if (!dateKey || isMoodSaving) return;
+
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+    const entries = moodEntriesByDate[dateKey] || [];
+    const isCurrentlySpecial = entries.some(entry => isMoodEntrySpecial(entry));
+    const markButton = document.getElementById('mood-day-mark-button');
+    const emptyMarkBtn = document.getElementById('mood-day-empty-mark-btn');
+
+    isMoodSaving = true;
+    if (markButton) markButton.disabled = true;
+    if (emptyMarkBtn) emptyMarkBtn.disabled = true;
+
+    try {
+        if (!isCurrentlySpecial) {
+            // 开启标记：若当前用户在该天已有心情，直接更新；若无，则为该天新建一条特别标记记录
+            const ownEntry = entries.find(entry => entry.user_id === userId);
+            if (ownEntry) {
+                if (moodSupportsSpecialColumn) {
+                    let res = await supabaseClient
+                        .from('moods')
+                        .update({ is_special: true })
+                        .eq('id', ownEntry.id)
+                        .eq('user_id', userId)
+                        .select(MOOD_ENTRY_FIELDS_PRIMARY)
+                        .single();
+                    if (res.error && (res.error.code === '42703' || String(res.error.message).includes('is_special'))) {
+                        moodSupportsSpecialColumn = false;
+                        const fallbackNote = ownEntry.note ? `✨[特别日子] ${getDisplayMoodNote(ownEntry.note)}` : '✨[特别日子]';
+                        await supabaseClient
+                            .from('moods')
+                            .update({ note: fallbackNote })
+                            .eq('id', ownEntry.id)
+                            .eq('user_id', userId);
+                    }
+                } else {
+                    const fallbackNote = ownEntry.note ? `✨[特别日子] ${getDisplayMoodNote(ownEntry.note)}` : '✨[特别日子]';
+                    await supabaseClient
+                        .from('moods')
+                        .update({ note: fallbackNote })
+                        .eq('id', ownEntry.id)
+                        .eq('user_id', userId);
+                }
+            } else {
+                // 当前用户没有记录，创建一条专属标记（默认 score 5 幸福满满）
+                if (moodSupportsSpecialColumn) {
+                    let res = await supabaseClient
+                        .from('moods')
+                        .insert([{
+                            date: dateKey,
+                            score: 5,
+                            note: null,
+                            is_special: true
+                        }])
+                        .select(MOOD_ENTRY_FIELDS_PRIMARY)
+                        .single();
+                    if (res.error && (res.error.code === '42703' || String(res.error.message).includes('is_special'))) {
+                        moodSupportsSpecialColumn = false;
+                        await supabaseClient
+                            .from('moods')
+                            .insert([{
+                                date: dateKey,
+                                score: 5,
+                                note: '✨[特别日子]'
+                            }]);
+                    }
+                } else {
+                    await supabaseClient
+                        .from('moods')
+                        .insert([{
+                            date: dateKey,
+                            score: 5,
+                            note: '✨[特别日子]'
+                        }]);
+                }
+                if (dateKey === getAppDateKey()) todayOwnMoodCount += 1;
+            }
+            if (typeof showToast === 'function') showToast(`已为 ${formatMoodDateTitle(dateKey)} 点亮金光 ✨`);
+        } else {
+            // 取消标记：遍历当天当前用户的记录并移除标记
+            const ownEntries = entries.filter(entry => entry.user_id === userId);
+            for (const entry of ownEntries) {
+                const cleanNote = getDisplayMoodNote(entry.note);
+                if (moodSupportsSpecialColumn) {
+                    let res = await supabaseClient
+                        .from('moods')
+                        .update({ is_special: false, note: cleanNote || null })
+                        .eq('id', entry.id)
+                        .eq('user_id', userId);
+                    if (res.error && (res.error.code === '42703' || String(res.error.message).includes('is_special'))) {
+                        moodSupportsSpecialColumn = false;
+                        await supabaseClient
+                            .from('moods')
+                            .update({ note: cleanNote || null })
+                            .eq('id', entry.id)
+                            .eq('user_id', userId);
+                    }
+                } else {
+                    await supabaseClient
+                        .from('moods')
+                        .update({ note: cleanNote || null })
+                        .eq('id', entry.id)
+                        .eq('user_id', userId);
+                }
+            }
+            if (typeof showToast === 'function') showToast('已取消该天的金光标记');
+        }
+
+        if (!isCurrentAuthSnapshot(epoch, userId)) return;
+        await loadMoods(dateKey.slice(0, 7));
+        if (!isCurrentAuthSnapshot(epoch, userId)) return;
+        if (typeof isAppRouteActive !== 'function' || isAppRouteActive('mood-day')) {
+            enterMoodDayPage({ params: { date: dateKey } });
+        }
+        if (typeof refreshMoodReminderState === 'function') await refreshMoodReminderState();
+    } catch (error) {
+        console.error('切换特别标记失败:', error);
+        if (typeof showToast === 'function') showToast('操作失败，请稍后重试。');
+    } finally {
+        isMoodSaving = false;
+        if (markButton) markButton.disabled = false;
+        if (emptyMarkBtn) emptyMarkBtn.disabled = false;
+    }
 }
 
 function closeMoodDayModal() {
@@ -792,8 +971,10 @@ function resetMoodState() {
     currentMoodMonthKey = '';
     moodEntriesByDate = {};
     activeMoodDetailDate = '';
+    targetMoodCheckinDate = null;
     editingMoodId = null;
     isMoodSaving = false;
     todayOwnMoodCount = 0;
 }
+
 
