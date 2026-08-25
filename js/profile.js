@@ -380,7 +380,7 @@ function renderProfilePage(targetAuthor = currentAuthor) {
     const editButtonBottom = document.getElementById('profile-edit-btn-bottom');
     const settingsButton = document.getElementById('profile-settings-btn');
 
-    if (editButtonTop) editButtonTop.style.display = isSelf ? 'inline-flex' : 'none';
+    if (editButtonTop) editButtonTop.style.display = isSelf ? '' : 'none';
     if (settingsButton) settingsButton.style.display = isSelf ? 'flex' : 'none';
 
     if (editButtonBottom) {

@@ -110,8 +110,16 @@
     box-shadow: 0 0 0 3px rgba(143, 70, 84, 0.12), 0 3px 8px var(--shadow);
 }
 
-#mood-calendar-year { width: 82px; }
-#mood-calendar-month { width: 70px; }
+#mood-calendar-year {
+    width: 94px;
+    min-width: 90px;
+    text-align: center;
+}
+#mood-calendar-month {
+    width: 74px;
+    min-width: 70px;
+    text-align: center;
+}
 
 .mood-month-nav {
     display: inline-flex;
