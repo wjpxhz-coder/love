@@ -128,20 +128,18 @@
 }
 @keyframes fallAndSway {
     0% {
-        top: -50px;
         opacity: 0;
-        transform: translateX(0) rotate(0deg);
+        transform: translate3d(var(--start-x, 50vw), -60px, 0) rotate(0deg);
     }
-    10% {
+    12% {
         opacity: 0.95;
     }
-    90% {
+    88% {
         opacity: 0.95;
     }
     100% {
-        top: 105vh;
         opacity: 0;
-        transform: translateX(50px) rotate(360deg);
+        transform: translate3d(calc(var(--start-x, 50vw) + var(--sway-x, 40px)), 105vh, 0) rotate(var(--rot-end, 360deg));
     }
 }
 

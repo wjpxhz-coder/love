@@ -119,6 +119,113 @@ function sizeAnimationCanvas(canvas, context, width, height) {
 
     let currentPalette = getPalette(appearance.theme, appearance.bothOnline);
 
+    // ── 离屏纹理预烘焙缓存（彻底消除逐帧动态创建 RadialGradient 的 GC 与性能开销） ──
+    const petalTextures = {
+        petals: [],
+        blossoms: []
+    };
+
+    function bakeTextures() {
+        const palette = currentPalette;
+        const TEXTURE_SIZE = 64;
+        const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+        const texDim = Math.round(TEXTURE_SIZE * dpr);
+
+        petalTextures.petals = [];
+        petalTextures.blossoms = [];
+
+        // 1. 预烘焙 3 种色调的拟真单瓣桃花 (Petal)
+        for (let i = 0; i < palette.shades.length; i++) {
+            const shade = palette.shades[i];
+            const canvas = document.createElement('canvas');
+            canvas.width = texDim;
+            canvas.height = texDim;
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            const cx = 32;
+            const cy = 56;
+            const s = 26;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.bezierCurveTo(-s * 0.8, -s * 0.6, -s * 0.7, -s * 1.5, 0, -s * 1.8);
+            ctx.bezierCurveTo(s * 0.7, -s * 1.5, s * 0.8, -s * 0.6, 0, 0);
+
+            const grad = ctx.createRadialGradient(0, -s * 0.4, 0, 0, -s * 0.9, s * 1.2);
+            grad.addColorStop(0, shade.c1);
+            grad.addColorStop(0.65, shade.c2);
+            grad.addColorStop(1, shade.c3);
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // 中心细脉纹
+            ctx.beginPath();
+            ctx.moveTo(0, -s * 0.1);
+            ctx.quadraticCurveTo(s * 0.05, -s * 0.8, 0, -s * 1.4);
+            ctx.strokeStyle = shade.vein;
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+
+            // 双方在线同频金色微光
+            if (appearance.bothOnline && palette.goldAccent) {
+                ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)';
+                ctx.lineWidth = 0.8;
+                ctx.stroke();
+            }
+
+            ctx.restore();
+            petalTextures.petals.push(canvas);
+        }
+
+        // 2. 预烘焙 3 种色调的五瓣盛开小桃花 (Blossom)
+        for (let i = 0; i < palette.shades.length; i++) {
+            const shade = palette.shades[i];
+            const canvas = document.createElement('canvas');
+            canvas.width = texDim;
+            canvas.height = texDim;
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            const cx = 32;
+            const cy = 32;
+            const bs = 16;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+
+            for (let b = 0; b < 5; b++) {
+                ctx.save();
+                ctx.rotate(b * Math.PI * 2 / 5);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.bezierCurveTo(-bs * 0.45, -bs * 0.4, -bs * 0.4, -bs * 0.9, 0, -bs * 1.15);
+                ctx.bezierCurveTo(bs * 0.4, -bs * 0.9, bs * 0.45, -bs * 0.4, 0, 0);
+                const bgrad = ctx.createRadialGradient(0, -bs * 0.2, 0, 0, -bs * 0.6, bs * 0.9);
+                bgrad.addColorStop(0, shade.c1);
+                bgrad.addColorStop(0.7, shade.c2);
+                bgrad.addColorStop(1, shade.c3);
+                ctx.fillStyle = bgrad;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 花蕊中心
+            ctx.beginPath();
+            ctx.arc(0, 0, bs * 0.22, 0, Math.PI * 2);
+            ctx.fillStyle = appearance.bothOnline ? '#ffd166' : shade.c3;
+            ctx.fill();
+
+            ctx.restore();
+            petalTextures.blossoms.push(canvas);
+        }
+    }
+
+    bakeTextures();
+
     // ── 桃花花瓣粒子核心类 ──
     class PeachPetal {
         constructor(layer = 'background', isBurst = false, bx = 0, by = 0, initSpawn = false) {
@@ -138,7 +245,7 @@ function sizeAnimationCanvas(canvas, context, width, height) {
                 this.vx = Math.cos(angle) * speed;
                 this.vy = Math.sin(angle) * speed;
                 this.life = 1.0;
-                this.decay = 0.009 + Math.random() * 0.014;
+                this.decay = 0.01 + Math.random() * 0.015;
             } else {
                 this.vx = (Math.random() - 0.5) * 0.8;
                 this.vy = isFg ? (1.5 + Math.random() * 2.2) : (1.1 + Math.random() * 1.8);
@@ -264,8 +371,6 @@ function sizeAnimationCanvas(canvas, context, width, height) {
         draw(ctx) {
             if (this.isBurst && this.life <= 0) return;
 
-            const palette = currentPalette;
-            const shade = palette.shades[this.shadeIndex];
             const s = this.baseSize;
 
             ctx.save();
@@ -275,60 +380,21 @@ function sizeAnimationCanvas(canvas, context, width, height) {
             ctx.globalAlpha = (this.isBurst ? this.life : 1) * this.opacity;
 
             if (this.type === 'petal') {
-                // 贝塞尔曲线拟真桃花花瓣
-                ctx.beginPath();
-                ctx.moveTo(0, 0); // 花瓣根部
-                ctx.bezierCurveTo(-s * 0.8, -s * 0.6, -s * 0.7, -s * 1.5, 0, -s * 1.8); // 左缘与尖端凹口
-                ctx.bezierCurveTo(s * 0.7, -s * 1.5, s * 0.8, -s * 0.6, 0, 0); // 右缘闭合
-
-                const grad = ctx.createRadialGradient(0, -s * 0.4, 0, 0, -s * 0.9, s * 1.2);
-                grad.addColorStop(0, shade.c1);
-                grad.addColorStop(0.65, shade.c2);
-                grad.addColorStop(1, shade.c3);
-                ctx.fillStyle = grad;
-                ctx.fill();
-
-                // 花瓣中心细脉纹
-                ctx.beginPath();
-                ctx.moveTo(0, -s * 0.1);
-                ctx.quadraticCurveTo(s * 0.05, -s * 0.8, 0, -s * 1.4);
-                ctx.strokeStyle = shade.vein;
-                ctx.lineWidth = 0.6;
-                ctx.stroke();
-
-                // 双方在线同频共振金色微光
-                if (appearance.bothOnline && palette.goldAccent) {
-                    ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)';
-                    ctx.lineWidth = 0.75;
-                    ctx.stroke();
+                const tex = petalTextures.petals[this.shadeIndex];
+                if (tex) {
+                    const scale = s / 26;
+                    ctx.drawImage(tex, -32 * scale, -56 * scale, 64 * scale, 64 * scale);
                 }
             } else if (this.type === 'blossom') {
-                // 五瓣盛开小桃花
-                const bs = s * 0.9;
-                for (let i = 0; i < 5; i++) {
-                    ctx.save();
-                    ctx.rotate(i * Math.PI * 2 / 5);
-                    ctx.beginPath();
-                    ctx.moveTo(0, 0);
-                    ctx.bezierCurveTo(-bs * 0.45, -bs * 0.4, -bs * 0.4, -bs * 0.9, 0, -bs * 1.15);
-                    ctx.bezierCurveTo(bs * 0.4, -bs * 0.9, bs * 0.45, -bs * 0.4, 0, 0);
-                    const bgrad = ctx.createRadialGradient(0, -bs * 0.2, 0, 0, -bs * 0.6, bs * 0.9);
-                    bgrad.addColorStop(0, shade.c1);
-                    bgrad.addColorStop(0.7, shade.c2);
-                    bgrad.addColorStop(1, shade.c3);
-                    ctx.fillStyle = bgrad;
-                    ctx.fill();
-                    ctx.restore();
+                const tex = petalTextures.blossoms[this.shadeIndex];
+                if (tex) {
+                    const scale = (s * 0.9) / 16;
+                    ctx.drawImage(tex, -32 * scale, -32 * scale, 64 * scale, 64 * scale);
                 }
-                // 花蕊中心
-                ctx.beginPath();
-                ctx.arc(0, 0, bs * 0.2, 0, Math.PI * 2);
-                ctx.fillStyle = appearance.bothOnline ? '#ffd166' : shade.c3;
-                ctx.fill();
             } else if (this.type === 'butterfly') {
                 // 灵动微蝶
                 const flap = 0.35 + Math.abs(Math.cos(this.flip * 2.2)) * 0.65;
-                const b = palette.butterfly;
+                const b = currentPalette.butterfly;
                 ctx.scale(flap, 1);
                 ctx.fillStyle = b.wing;
                 ctx.beginPath();
@@ -350,8 +416,15 @@ function sizeAnimationCanvas(canvas, context, width, height) {
         }
     }
 
-    function createPetalBurst(x, y, count = 16) {
-        for (let i = 0; i < count; i++) {
+    const MAX_BURST_PETALS = 36;
+    function createPetalBurst(x, y, count = 10) {
+        const availableSlots = Math.max(0, MAX_BURST_PETALS - burstPetals.length);
+        const spawnCount = Math.min(count, availableSlots);
+        if (spawnCount <= 0 && burstPetals.length >= MAX_BURST_PETALS) {
+            burstPetals.splice(0, Math.min(count, 12));
+        }
+        const finalCount = Math.min(count, 14);
+        for (let i = 0; i < finalCount; i++) {
             burstPetals.push(new PeachPetal('foreground', true, x, y));
         }
     }
@@ -603,9 +676,10 @@ function sizeAnimationCanvas(canvas, context, width, height) {
             if (appearance.theme === nextTheme && appearance.bothOnline === nextOnline) return;
             appearance = { theme: nextTheme, bothOnline: nextOnline };
             currentPalette = getPalette(appearance.theme, appearance.bothOnline);
+            bakeTextures();
             resetPerformanceSampling();
         },
-        createBurst(x, y, count = 16) {
+        createBurst(x, y, count = 10) {
             if (!shouldRunAnimation()) return;
             createPetalBurst(x, y, count);
         },
@@ -613,22 +687,24 @@ function sizeAnimationCanvas(canvas, context, width, height) {
             if (animationsReducedMotionQuery?.matches === true) return;
             const cx = canvasWidth / 2;
             const cy = canvasHeight * 0.42;
-            createPetalBurst(cx, cy, 28);
-            createPetalBurst(cx - canvasWidth * 0.22, cy + 30, 16);
-            createPetalBurst(cx + canvasWidth * 0.22, cy + 30, 16);
+            // 先清理旧爆发，注入全新浪漫绽放
+            burstPetals.length = 0;
+            createPetalBurst(cx, cy, 18);
+            createPetalBurst(cx - canvasWidth * 0.22, cy + 25, 10);
+            createPetalBurst(cx + canvasWidth * 0.22, cy + 25, 10);
 
             // 补充注入一波浪漫飞落的桃花瓣
-            const extraCount = isMobile ? 12 : 24;
+            const extraCount = isMobile ? 8 : 16;
             for (let i = 0; i < extraCount; i++) {
                 const p = new PeachPetal('foreground', false, 0, 0, false);
-                p.vy *= 1.4;
-                p.y = -Math.random() * 100 - 20;
+                p.vy *= 1.35;
+                p.y = -Math.random() * 80 - 20;
                 p.x = Math.random() * canvasWidth;
                 fgPetals.push(p);
             }
             setTimeout(() => {
                 syncPetalsPopulation();
-            }, 6000);
+            }, 5000);
         }
     });
 
