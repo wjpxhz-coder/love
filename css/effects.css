@@ -29,27 +29,46 @@
     transform: translateX(-50%) translateY(0);
 }
 .resonance-hearts {
-    font-size: 1.4em;
-    display: flex;
-    gap: -3px;
-    animation: heartbeat 1.2s infinite;
+    font-size: 1.35em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    white-space: nowrap;
+    animation: heartbeat 1.2s ease-in-out infinite;
     filter: drop-shadow(0 2px 8px rgba(255, 101, 132, 0.35));
     line-height: 1;
+    user-select: none;
+}
+.resonance-hearts .heart-icon {
+    display: inline-block;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.resonance-hearts .heart-icon:last-child {
+    margin-left: -5px;
 }
 .resonance-text {
     font-size: 0.88em;
     color: var(--primary);
     font-weight: 600;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     white-space: nowrap;
-    display: flex;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-flex;
     align-items: center;
+    min-width: 0;
+    flex: 1 1 auto;
 }
 .resonance-text-short {
     display: none;
 }
 .resonance-text-full {
     display: inline;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 @media (max-width: 680px) {
@@ -68,12 +87,19 @@
     }
     .resonance-hearts {
         font-size: 1.15em;
+        flex-shrink: 0;
+    }
+    .resonance-hearts .heart-icon:last-child {
+        margin-left: -4px;
     }
     .resonance-text {
         font-size: 0.78em;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.3px;
         overflow: hidden;
         text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+        flex: 1 1 auto;
     }
     .resonance-text-full {
         display: none;

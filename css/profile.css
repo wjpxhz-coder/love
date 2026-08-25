@@ -20,7 +20,7 @@
     display: flex;
 }
 
-/* 漂浮樱花与粒子画布 */
+/* 漂浮樱花与粒子画布 (置于最顶层，覆盖在所有卡片之上，不阻挡点击交互) */
 .profile-particles-canvas {
     position: fixed;
     top: 0;
@@ -28,7 +28,7 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
-    z-index: 0;
+    z-index: 50;
     will-change: transform;
 }
 
