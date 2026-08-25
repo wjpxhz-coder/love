@@ -1,17 +1,17 @@
                 :root[data-theme="light"], :root {
             color-scheme: light;
-            --primary: #8f4654;
-            --primary-light: #a45f6b;
-            --gold: #806431;
+            --primary: #b5737a;
+            --primary-light: #d4a0a8;
+            --gold: #c9a970;
             --bg: #fdf8f6;
             --text: #4a3535;
-            --text-muted: #735d5f;
+            --text-muted: #a08888;
             --surface: #fffaf8;
             --surface-elevated: #fffdfc;
             --surface-subtle: rgba(255, 250, 248, 0.72);
             --field-bg: #ffffff;
             --on-primary: #ffffff;
-            --focus-ring: #713743;
+            --focus-ring: #b5737a;
             --card: rgba(255, 252, 250, 0.9);
             --border: rgba(200, 155, 155, 0.22);
             --shadow: rgba(180, 120, 120, 0.13);

@@ -14,7 +14,7 @@ function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     updateThemeIcon(theme);
     const themeMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeMeta) themeMeta.content = theme === 'dark' ? '#0f0a1a' : '#8f4654';
+    if (themeMeta) themeMeta.content = theme === 'dark' ? '#0f0a1a' : '#b5737a';
     window.homeSakuraEffect?.setAppearance({
         theme,
         bothOnline: typeof bothOnline !== 'undefined' && bothOnline
