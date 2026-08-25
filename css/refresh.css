@@ -596,7 +596,7 @@ body[data-auth-state='locked'] #notification-bell {
 }
 
 .mood-month-nav {
-    border-radius: 10px;
+    border-radius: 12px;
 }
 
 .mood-calendar-day {
