@@ -1,292 +1,325 @@
-        /* ── 同频共振 UI ── */
-        .resonance-ui {
-            position: fixed;
-            top: 76px;
-            left: 50%;
-            transform: translateX(-50%) translateY(-20px);
-            background: rgba(255, 255, 255, 0.85);
-            padding: 10px 24px;
-            border-radius: 30px;
-            box-shadow: 0 4px 20px rgba(255, 182, 193, 0.6);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 1px solid rgba(255, 215, 0, 0.4);
-        }
-        .resonance-ui.show {
-            opacity: 1;
-            visibility: visible;
-            transform: translateX(-50%) translateY(0);
-        }
-        .resonance-hearts {
-            font-size: 1.5em;
-            display: flex;
-            gap: -5px;
-            animation: heartbeat 1.2s infinite;
-        }
-        .resonance-text {
-            font-size: 0.9em;
-            color: var(--primary);
-            font-weight: 600;
-            letter-spacing: 1px;
-            white-space: nowrap;
-        }
+/* ── 同频共振 UI ── */
+.resonance-ui {
+    position: fixed;
+    top: 76px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 10px 26px;
+    border-radius: 30px;
+    box-shadow: 0 8px 30px var(--shadow-hover);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 1.5px solid var(--border);
+}
+.resonance-ui.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+.resonance-hearts {
+    font-size: 1.6em;
+    display: flex;
+    gap: -4px;
+    animation: heartbeat 1.2s infinite;
+    filter: drop-shadow(0 2px 8px rgba(255, 101, 132, 0.35));
+}
+.resonance-text {
+    font-size: 0.92em;
+    color: var(--primary);
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    white-space: nowrap;
+}
 
-        @media (max-width: 480px) {
-            .resonance-ui {
-                padding: 8px 16px;
-                gap: 8px;
-                top: 70px;
-            }
-            .resonance-text {
-                font-size: 0.75em;
-            }
-        }
-        @keyframes heartbeat {
-            0%, 100% { transform: scale(1); }
-            15% { transform: scale(1.15); }
-            30% { transform: scale(1); }
-            45% { transform: scale(1.15); }
-        }
+@media (max-width: 480px) {
+    .resonance-ui {
+        padding: 8px 18px;
+        gap: 8px;
+        top: 70px;
+    }
+    .resonance-text {
+        font-size: 0.78em;
+    }
+}
+@keyframes heartbeat {
+    0%, 100% { transform: scale(1); }
+    15% { transform: scale(1.18); }
+    30% { transform: scale(1); }
+    45% { transform: scale(1.18); }
+}
 
-        /* ── 盲盒 UI ── */
-        #blindBoxModal .modal-box {
-            text-align: center;
-            background: linear-gradient(135deg, #fff9fb, #fff);
-            border: 2px solid rgba(255, 182, 193, 0.4);
-        }
-        .blind-box-content {
-            margin: 15px 0;
-            min-height: 100px;
-            max-height: 60vh;
-            overflow-y: auto;
-            overflow-x: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-        }
-        .blind-box-content::-webkit-scrollbar {
-            width: 4px;
-        }
-        .blind-box-content::-webkit-scrollbar-thumb {
-            background: var(--primary-light);
-            border-radius: 4px;
-        }
-        .blind-box-status {
-            color: var(--text-muted);
-            font-size: 0.9em;
-        }
-        .blind-box-img {
-            max-width: 100%;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            margin-bottom: 12px;
-        }
-        .blind-box-text {
-            font-size: 0.95em;
-            color: var(--text);
-            background: rgba(255,255,255,0.7);
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 12px;
-            word-wrap: break-word;
-            width: 100%;
-        }
-        .blind-box-meta {
-            font-size: 0.8em;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-        }
-        .blind-box-prompt {
-            color: var(--primary);
-            font-weight: 600;
-            font-size: 1.05em;
-            letter-spacing: 1px;
-            margin-top: 10px;
-        }
-        .blind-box-locate {
-            margin-top: 15px;
-            padding: 6px 16px;
-            font-size: 0.85em;
-        }
-        .blind-box-back {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .blind-box-back button {
-            display: inline-flex;
-            padding: 8px 16px;
-            border: 1px dashed var(--primary-light);
-            background: rgba(164, 95, 107, 0.1);
-            color: var(--primary);
-            box-shadow: none;
-            font-size: 0.9em;
-        }
-        .blind-box-target {
-            box-shadow: 0 0 20px rgba(143, 70, 84, 0.6) !important;
-            transition: box-shadow 0.25s ease;
-        }
-        /* ── 动态渐变背景动画 ── */
-        @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
+/* ── 盲盒 UI ── */
+#blindBoxModal .modal-box {
+    text-align: center;
+    background: var(--glass-bg);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 2px solid var(--border);
+    border-radius: var(--jelly-radius-lg, 28px);
+    box-shadow: 0 16px 48px var(--shadow-hover);
+}
+.blind-box-content {
+    margin: 16px 0;
+    min-height: 100px;
+    max-height: 60vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+}
+.blind-box-content::-webkit-scrollbar {
+    width: 4px;
+}
+.blind-box-content::-webkit-scrollbar-thumb {
+    background: var(--primary-light);
+    border-radius: 4px;
+}
+.blind-box-status {
+    color: var(--text-muted);
+    font-size: 0.92em;
+}
+.blind-box-img {
+    max-width: 100%;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    margin-bottom: 12px;
+}
+.blind-box-text {
+    font-size: 0.96em;
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.75);
+    padding: 12px 14px;
+    border-radius: 14px;
+    margin-bottom: 12px;
+    word-wrap: break-word;
+    width: 100%;
+    border: 1px solid var(--border);
+}
+[data-theme='dark'] .blind-box-text {
+    background: rgba(45, 28, 66, 0.75);
+}
+.blind-box-meta {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+.blind-box-prompt {
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 1.1em;
+    letter-spacing: 1px;
+    margin-top: 10px;
+}
+.blind-box-locate {
+    margin-top: 15px;
+    padding: 7px 18px;
+    font-size: 0.88em;
+    border-radius: 20px;
+}
+.blind-box-back {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+    text-align: center;
+}
+.blind-box-back button {
+    display: inline-flex;
+    padding: 8px 18px;
+    border: 1.5px dashed var(--primary-light);
+    background: rgba(255, 101, 132, 0.08);
+    color: var(--primary);
+    box-shadow: none;
+    border-radius: 20px;
+    font-size: 0.9em;
+    font-weight: 600;
+    transition: all 0.25s ease;
+}
+.blind-box-back button:hover {
+    background: rgba(255, 101, 132, 0.16);
+    transform: translateY(-2px);
+}
+.blind-box-target {
+    box-shadow: 0 0 24px var(--primary-glow) !important;
+    transition: box-shadow 0.3s ease;
+}
+/* ── 动态渐变背景动画 ── */
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
 
-        /* ── 星光粒子层 ── */
-        #star-field {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            pointer-events: none;
-            z-index: 0;
-            overflow: hidden;
-        }
-        .star {
-            position: absolute;
-            background: rgba(255, 255, 255, 0.7);
-            border-radius: 50%;
-            animation: twinkle var(--duration, 3s) ease-in-out infinite;
-        }
-        @keyframes twinkle {
-            0%, 100% { opacity: 0.15; transform: scale(0.8); }
-            50% { opacity: 0.8; transform: scale(1.4); }
-        }
+/* ── 星光粒子层 ── */
+#star-field {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+.star {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+    animation: twinkle var(--duration, 3s) ease-in-out infinite;
+}
+@keyframes twinkle {
+    0%, 100% { opacity: 0.2; transform: scale(0.8); }
+    50% { opacity: 0.95; transform: scale(1.4); }
+}
 
-        /* ── 爱心粒子 ── */
-        .love-particle {
-            position: fixed;
-            pointer-events: none;
-            z-index: 9999;
-            font-size: 16px;
-            animation: floatUp 1.2s ease-out forwards;
-        }
-        @keyframes floatUp {
-            0% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
-            100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.3) rotate(var(--rot)); }
-        }
+/* ── 爱心与梦幻粒子 ── */
+.love-particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    font-size: 18px;
+    filter: drop-shadow(0 3px 8px rgba(255, 101, 132, 0.45));
+    animation: floatUp 1.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes floatUp {
+    0% { opacity: 1; transform: translate(0, 0) scale(0.6) rotate(0deg); }
+    30% { transform: translate(calc(var(--tx) * 0.4), calc(var(--ty) * 0.4)) scale(1.15) rotate(calc(var(--rot) * 0.4)); }
+    100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.3) rotate(var(--rot)); }
+}
 
-        /* ── 渐变文字 shimmer ── */
-        @keyframes shimmerText {
-            0% { background-position: 0% center; }
-            100% { background-position: 200% center; }
-        }
+/* ── 渐变文字 shimmer ── */
+@keyframes shimmerText {
+    0% { background-position: 0% center; }
+    100% { background-position: 200% center; }
+}
 
-        /* ── 按钮光扫效果 ── */
-        button::after {
-            content: '';
-            position: absolute;
-            top: -50%; left: -50%;
-            width: 200%; height: 200%;
-            background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%);
-            transform: rotate(25deg) translateX(-150%);
-            transition: transform 0.65s ease;
-            pointer-events: none;
-        }
-        button:hover::after {
-            transform: rotate(25deg) translateX(100%);
-        }
-        /* 禁用一些小按钮的光扫 */
-        .delete-btn::after, .comment-toggle-btn::after, .comment-write-btn::after,
-        .comment-cancel-btn::after, .btn-cancel::after, .mood-emoji-btn::after,
-        .ai-tab::after, .theme-toggle::after, .ai-refresh-btn::after,
-        .ai-chat-close-btn::after, .ai-chat-send-btn::after,
-        .moment-like-btn::after, .comment-img-upload-btn::after,
-        .notification-read-all::after, .user-dropdown-item::after,
-        .moment-image-add-btn::after, .edit-avatar-circle::after { display: none; }
+/* ── 按钮光扫效果与Q弹反馈 ── */
+button {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+}
 
-        /* ── 计时器翻页动画 ── */
-        .timer-card .num.flip {
-            animation: flipDigit 0.5s ease;
-        }
-        @keyframes flipDigit {
-            0% { transform: rotateX(0) scale(1); }
-            30% { transform: rotateX(90deg) scale(0.9); opacity: 0.3; }
-            60% { transform: rotateX(-20deg) scale(1.05); opacity: 0.8; }
-            100% { transform: rotateX(0) scale(1); opacity: 1; }
-        }
+button:active {
+    transform: scale(0.95) !important;
+}
 
-        /* ── 纪念日脉冲发光 ── */
-        .anniv-card.today {
-            animation: pulseBorder 2s ease-in-out infinite;
-        }
-        @keyframes pulseBorder {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(201, 169, 112, 0.4), 0 3px 16px var(--shadow); }
-            50% { box-shadow: 0 0 0 8px rgba(201, 169, 112, 0), 0 3px 16px var(--shadow); }
-        }
+button::after {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.25) 50%, transparent 100%);
+    transform: rotate(25deg) translateX(-150%);
+    transition: transform 0.65s ease;
+    pointer-events: none;
+}
+button:hover::after {
+    transform: rotate(25deg) translateX(100%);
+}
+/* 禁用一些小按钮的光扫 */
+.delete-btn::after, .comment-toggle-btn::after, .comment-write-btn::after,
+.comment-cancel-btn::after, .btn-cancel::after, .mood-emoji-btn::after,
+.ai-tab::after, .theme-toggle::after, .ai-refresh-btn::after,
+.ai-chat-close-btn::after, .ai-chat-send-btn::after,
+.moment-like-btn::after, .comment-img-upload-btn::after,
+.notification-read-all::after, .user-dropdown-item::after,
+.moment-image-add-btn::after, .edit-avatar-circle::after { display: none; }
 
-        /* ── 纪念日卡片光晕 ── */
-        .anniv-card .glow {
-            position: absolute;
-            width: 120px; height: 120px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(212, 160, 168, 0.3), transparent 70%);
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-            opacity: 0;
-            transition: opacity 0.45s cubic-bezier(0.25, 1, 0.5, 1);
-        }
-        .anniv-card:hover .glow { opacity: 1; }
+/* ── 计时器翻页动画 ── */
+.timer-card .num.flip {
+    animation: flipDigit 0.5s ease;
+}
+@keyframes flipDigit {
+    0% { transform: rotateX(0) scale(1); }
+    30% { transform: rotateX(90deg) scale(0.9); opacity: 0.3; }
+    60% { transform: rotateX(-20deg) scale(1.05); opacity: 0.8; }
+    100% { transform: rotateX(0) scale(1); opacity: 1; }
+}
 
-        /* ── 时光轴流光 ── */
-        .timeline-track::after {
-            content: '';
-            position: absolute;
-            left: 6.5px;
-            top: 0;
-            width: 2px;
-            height: 40px;
-            background: linear-gradient(to bottom, transparent, var(--gold), transparent);
-            border-radius: 2px;
-            animation: flowingLight 3.5s linear infinite;
-            z-index: 1;
-        }
-        @keyframes flowingLight {
-            0% { top: -40px; opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { top: calc(100% + 40px); opacity: 0; }
-        }
+/* ── 纪念日脉冲发光 ── */
+.anniv-card.today {
+    animation: pulseBorder 2.4s ease-in-out infinite;
+}
+@keyframes pulseBorder {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245, 175, 95, 0.4), 0 6px 24px var(--shadow); }
+    50% { box-shadow: 0 0 0 10px rgba(245, 175, 95, 0), 0 8px 28px var(--shadow-hover); }
+}
 
-        /* ── 标题入场动画 ── */
-        @keyframes titleAppear {
-            0% { opacity: 0; transform: scale(0.85) translateY(20px); filter: blur(8px); }
-            100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
-        }
-        @keyframes taglineAppear {
-            0% { opacity: 0; transform: translateY(12px); }
-            100% { opacity: 1; transform: translateY(0); }
-        }
-        /* 录音微动效 */
-        .recording-active {
-            animation: recordingPulse 1.2s infinite alternate !important;
-        }
-        @keyframes recordingPulse {
-            0% { box-shadow: 0 0 5px rgba(255,100,100,0.4); transform: scale(1); }
-            100% { box-shadow: 0 0 20px rgba(255,100,100,0.8); transform: scale(1.03); }
-        }
+/* ── 纪念日卡片光晕 ── */
+.anniv-card .glow {
+    position: absolute;
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 163, 181, 0.38), transparent 70%);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.anniv-card:hover .glow { opacity: 1; }
 
-        /* 动态文本折叠/展开按钮 */
-        .toggle-text-btn {
-            background: none;
-            border: none;
-            color: var(--primary);
-            font-weight: 700;
-            cursor: pointer;
-            padding: 4px 0;
-            margin-top: 4px;
-            font-size: 0.88em;
-            outline: none;
-            transition: color 0.2s ease;
-            display: inline-block;
-        }
-        .toggle-text-btn:hover {
-            color: var(--primary-light);
-        }
+/* ── 时光轴流光 ── */
+.timeline-track::after {
+    content: '';
+    position: absolute;
+    left: 6.5px;
+    top: 0;
+    width: 2px;
+    height: 44px;
+    background: linear-gradient(to bottom, transparent, var(--gold), transparent);
+    border-radius: 2px;
+    animation: flowingLight 3.5s linear infinite;
+    z-index: 1;
+}
+@keyframes flowingLight {
+    0% { top: -44px; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: calc(100% + 44px); opacity: 0; }
+}
+
+/* ── 标题入场动画 ── */
+@keyframes titleAppear {
+    0% { opacity: 0; transform: scale(0.85) translateY(20px); filter: blur(8px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+@keyframes taglineAppear {
+    0% { opacity: 0; transform: translateY(12px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+/* 录音微动效 */
+.recording-active {
+    animation: recordingPulse 1.2s infinite alternate !important;
+}
+@keyframes recordingPulse {
+    0% { box-shadow: 0 0 5px rgba(255,100,100,0.4); transform: scale(1); }
+    100% { box-shadow: 0 0 20px rgba(255,100,100,0.8); transform: scale(1.03); }
+}
+
+/* 动态文本折叠/展开按钮 */
+.toggle-text-btn {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-weight: 700;
+    cursor: pointer;
+    padding: 4px 0;
+    margin-top: 4px;
+    font-size: 0.88em;
+    outline: none;
+    transition: color 0.2s ease;
+    display: inline-block;
+}
+.toggle-text-btn:hover {
+    color: var(--primary-light);
+}
+

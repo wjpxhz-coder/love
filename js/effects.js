@@ -15,7 +15,7 @@ function showToast(message, duration = 3000) {
         container.setAttribute('aria-atomic', 'false');
         container.style.cssText = `
             position: fixed;
-            top: 20px;
+            top: 24px;
             left: 50%;
             transform: translateX(-50%) translateY(-20px);
             z-index: 9999;
@@ -24,31 +24,34 @@ function showToast(message, duration = 3000) {
             align-items: center;
             gap: 10px;
             pointer-events: none;
-            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: all 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
         `;
         document.body.appendChild(container);
     }
     
     const toast = document.createElement('div');
     toast.style.cssText = `
-        background: rgba(255, 255, 255, 0.9);
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
         color: var(--primary);
-        padding: 10px 20px;
-        border-radius: 20px;
-        box-shadow: 0 4px 15px rgba(212, 107, 122, 0.2);
+        padding: 11px 24px;
+        border-radius: 24px;
+        box-shadow: 0 8px 30px var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
         font-weight: 600;
-        font-size: 0.9em;
+        font-size: 0.92em;
+        letter-spacing: 0.5px;
         opacity: 0;
-        transform: translateY(-10px);
-        transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-        border: 1px solid rgba(212, 107, 122, 0.15);
+        transform: translateY(-12px) scale(0.92);
+        transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        border: 1.5px solid var(--border);
     `;
     
     const theme = document.documentElement.getAttribute('data-theme');
     if (theme === 'dark') {
-        toast.style.background = 'rgba(30, 30, 30, 0.9)';
-        toast.style.color = '#ff9a9e';
-        toast.style.borderColor = 'rgba(255, 154, 158, 0.15)';
+        toast.style.background = 'rgba(38, 22, 54, 0.85)';
+        toast.style.color = '#ff8fab';
+        toast.style.borderColor = 'rgba(255, 143, 171, 0.3)';
     }
 
     toast.innerText = message;
@@ -56,15 +59,15 @@ function showToast(message, duration = 3000) {
     
     setTimeout(() => {
         toast.style.opacity = '1';
-        toast.style.transform = 'translateY(0)';
+        toast.style.transform = 'translateY(0) scale(1)';
     }, 10);
     
     setTimeout(() => {
         toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-20px)';
+        toast.style.transform = 'translateY(-20px) scale(0.92)';
         setTimeout(() => {
             toast.remove();
-        }, 300);
+        }, 350);
     }, duration);
 }
 
@@ -90,7 +93,7 @@ function createHeartRain() {
     `;
     document.body.appendChild(container);
     
-    const elements = ['🌸', '💖', '✨', '💕', '💗', '❀'];
+    const elements = ['🌸', '💖', '✨', '🎀', '🍬', '🍓', '💕', '🧁', '💗', '❀', '💫'];
     
     for (let i = 0; i < heartCount; i++) {
         const item = document.createElement('div');
@@ -225,9 +228,9 @@ function initScrollReveal() {
     });
 }
 
-// --- 爱心粒子 ---
+// --- 爱心与甜美粒子 ---
 let lastSpawnHeartTime = 0;
-const MAX_ACTIVE_LOVE_PARTICLES = 12;
+const MAX_ACTIVE_LOVE_PARTICLES = 14;
 
 function spawnHearts(x, y) {
     if (prefersReducedMotion()) return;
@@ -238,21 +241,21 @@ function spawnHearts(x, y) {
     const currentParticles = document.querySelectorAll('.love-particle');
     if (currentParticles.length >= MAX_ACTIVE_LOVE_PARTICLES) return;
 
-    const hearts = ['💕', '💖', '💗', '✨', '🌸', '💘'];
+    const hearts = ['💖', '🌸', '✨', '🎀', '🍬', '🍓', '💕', '🧁', '💗', '⭐', '❀'];
     const count = Math.min(3 + Math.floor(Math.random() * 2), MAX_ACTIVE_LOVE_PARTICLES - currentParticles.length);
     for (let i = 0; i < count; i++) {
         const particle = document.createElement('div');
         particle.className = 'love-particle';
         particle.textContent = hearts[Math.floor(Math.random() * hearts.length)];
-        const tx = (Math.random() - 0.5) * 120;
-        const ty = -(40 + Math.random() * 80);
+        const tx = (Math.random() - 0.5) * 130;
+        const ty = -(45 + Math.random() * 90);
         const rot = (Math.random() - 0.5) * 90;
         particle.style.left = x + 'px';
         particle.style.top = y + 'px';
         particle.style.setProperty('--tx', tx + 'px');
         particle.style.setProperty('--ty', ty + 'px');
         particle.style.setProperty('--rot', rot + 'deg');
-        particle.style.fontSize = (14 + Math.random() * 10) + 'px';
+        particle.style.fontSize = (15 + Math.random() * 10) + 'px';
         document.body.appendChild(particle);
         setTimeout(() => particle.remove(), 1300);
     }

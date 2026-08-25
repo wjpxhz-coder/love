@@ -2,12 +2,28 @@
 .mood-section {
     position: static;
     top: auto;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 242, 248, 0.93) 100%);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1.5px solid rgba(255, 255, 255, 0.95);
+    outline: 1.5px solid rgba(255, 185, 205, 0.45);
     border-radius: 24px;
-    padding: 24px 24px 20px;
-    box-shadow: 0 8px 40px var(--shadow), inset 0 1px 0 var(--glass-highlight);
-    margin-bottom: 24px;
+    padding: 24px 20px 20px;
+    box-shadow: 0 10px 32px rgba(255, 94, 131, 0.14), inset 0 2px 2px #ffffff;
+    margin-bottom: 26px;
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease, outline-color 0.3s ease;
+}
+
+.mood-section:hover {
+    outline-color: rgba(255, 160, 185, 0.8);
+    box-shadow: 0 14px 38px rgba(255, 94, 131, 0.2);
+}
+
+[data-theme='dark'] .mood-section {
+    background: linear-gradient(145deg, rgba(44, 26, 62, 0.92) 0%, rgba(34, 18, 50, 0.92) 100%);
+    border-color: rgba(255, 255, 255, 0.12);
+    outline-color: rgba(255, 143, 171, 0.3);
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45), inset 0 1.5px 1px rgba(255, 255, 255, 0.1);
 }
 
 .mood-section-title {
@@ -17,8 +33,9 @@
     margin: 0;
     color: var(--primary);
     font-family: 'ZCOOL KuaiLe', cursive;
-    font-size: 1.15em;
+    font-size: 1.3em;
     letter-spacing: 2px;
+    filter: drop-shadow(0 2px 4px rgba(255, 77, 121, 0.2));
 }
 
 .mood-calendar-heading,
@@ -39,27 +56,31 @@
     justify-content: space-between;
 }
 
-.mood-calendar-heading { margin-bottom: 14px; }
-.mood-calendar-toolbar { margin-bottom: 8px; }
+.mood-calendar-heading { margin-bottom: 16px; }
+.mood-calendar-toolbar { margin-bottom: 10px; }
+
 
 .mood-today-btn {
-    border: 1px solid var(--border);
-    background: var(--surface);
+    border: 1.5px solid rgba(255, 185, 205, 0.6);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 240, 246, 0.9));
     color: var(--primary);
-    box-shadow: 0 2px 6px var(--shadow);
+    box-shadow: 0 4px 14px rgba(255, 105, 140, 0.15);
     cursor: pointer;
-    padding: 6px 14px;
+    padding: 8px 18px;
     border-radius: 20px;
-    font-size: 0.78em;
-    font-weight: 600;
-    transition: all 0.2s ease;
+    font-size: 0.85em;
+    font-weight: 700;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .mood-today-btn:hover {
-    transform: translateY(-1px);
-    border-color: var(--primary-light);
-    box-shadow: 0 4px 12px var(--shadow);
+    transform: translateY(-3px) scale(1.05);
+    border-color: var(--primary);
+    background: #ffffff;
+    box-shadow: 0 6px 18px rgba(255, 77, 121, 0.25);
 }
+
+
 
 .mood-month-picker {
     display: flex;
@@ -172,8 +193,8 @@
 .mood-calendar-day,
 .mood-calendar-spacer {
     min-width: 0;
-    min-height: 72px;
-    border-radius: 11px;
+    min-height: 74px;
+    border-radius: 14px;
 }
 
 .mood-calendar-day {
@@ -183,39 +204,47 @@
     align-items: center;
     justify-content: flex-start;
     gap: 2px;
-    padding: 5px 2px 4px;
+    padding: 6px 2px 5px;
     overflow: hidden;
     color: var(--text);
-    background: rgba(200,155,155,0.06);
-    border: 1px solid transparent;
+    background: rgba(255, 182, 193, 0.1);
+    border: 1px solid rgba(255, 182, 193, 0.18);
     box-shadow: none;
     cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .mood-calendar-day.empty-day {
-    background: rgba(200,155,155,0.04);
+    background: rgba(255, 182, 193, 0.05);
+    border-color: transparent;
 }
 
 .mood-calendar-day.has-entries {
-    background: rgba(200,155,155,0.11);
-    border-color: rgba(181,115,122,0.16);
+    background: rgba(255, 182, 193, 0.18);
+    border-color: rgba(255, 101, 132, 0.3);
 }
 
-.mood-calendar-day.today { border-color: var(--primary); }
+.mood-calendar-day.today {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1.5px var(--primary-glow);
+}
 
 .mood-calendar-day:not(:disabled):hover,
 .mood-calendar-day:not(:disabled):focus-visible {
-    transform: translateY(-2px);
-    background: rgba(200,155,155,0.18);
+    transform: translateY(-3px) scale(1.04);
+    background: rgba(255, 182, 193, 0.3);
+    border-color: var(--primary);
+    box-shadow: 0 6px 16px var(--shadow);
 }
 
 .mood-calendar-day:disabled { opacity: 1; }
 
 .mood-calendar-day-number {
     align-self: flex-start;
-    margin-left: 3px;
+    margin-left: 4px;
     color: var(--text-muted);
-    font-size: 0.72em;
+    font-size: 0.75em;
+    font-weight: 500;
 }
 
 .mood-calendar-day.today .mood-calendar-day-number {
@@ -227,7 +256,7 @@
     display: flex;
     justify-content: center;
     max-width: 100%;
-    font-size: 0.92em;
+    font-size: 0.95em;
     line-height: 1;
 }
 
@@ -238,7 +267,7 @@
     width: 100%;
     overflow: hidden;
     color: var(--text-muted);
-    font-size: 0.56em;
+    font-size: 0.58em;
     line-height: 1.15;
     text-align: left;
     overflow-wrap: anywhere;
@@ -249,26 +278,33 @@
 .mood-entry-count {
     max-width: 100%;
     color: var(--text-muted);
-    font-size: 0.58em;
+    font-size: 0.6em;
     white-space: nowrap;
 }
 
 .mood-calendar-status {
     min-height: 20px;
-    margin: 7px 0 5px;
+    margin: 8px 0 6px;
     color: var(--text-muted);
-    font-size: 0.74em;
+    font-size: 0.76em;
     text-align: center;
 }
 
 .mood-checkin-row { gap: 10px; }
-.mood-checkin-label { color: var(--text-muted); font-size: 0.85em; }
+.mood-checkin-label { color: var(--text-muted); font-size: 0.88em; font-weight: 500; }
 
 .btn-mood {
-    padding: 9px 20px;
+    padding: 10px 22px;
     border-radius: 30px;
-    box-shadow: 0 4px 14px rgba(181,115,122,0.25);
-    font-size: 0.85em;
+    box-shadow: 0 4px 16px var(--shadow);
+    font-size: 0.88em;
+    font-weight: 600;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+
+.btn-mood:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 8px 22px var(--shadow-hover);
 }
 
 /* 心情弹窗 emoji 选择 */
@@ -277,7 +313,7 @@
     grid-template-columns: repeat(8, 1fr);
     gap: 10px 8px;
     justify-items: center;
-    margin: 16px 0 10px;
+    margin: 18px 0 12px;
 }
 
 .mood-emoji-btn {
@@ -289,29 +325,29 @@
     padding: 0;
     border: 2px solid transparent;
     border-radius: 50%;
-    background: rgba(200,155,155,0.08);
+    background: rgba(255, 182, 193, 0.12);
     box-shadow: none;
     font-size: 1.45em;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .mood-emoji-btn:hover {
-    transform: scale(1.18);
-    background: rgba(200,155,155,0.16);
-    box-shadow: 0 4px 12px rgba(181,115,122,0.18);
+    transform: scale(1.22);
+    background: rgba(255, 182, 193, 0.24);
+    box-shadow: 0 4px 14px var(--shadow);
 }
 
 .mood-emoji-btn.selected {
     border-color: var(--primary);
-    background: rgba(181,115,122,0.16);
-    transform: scale(1.2);
-    box-shadow: 0 4px 14px rgba(181,115,122,0.28);
+    background: rgba(255, 101, 132, 0.2);
+    transform: scale(1.25);
+    box-shadow: 0 6px 18px var(--shadow-hover);
 }
 
 .mood-selected-hint {
     margin: 4px 0 14px;
-    font-size: 0.85em;
+    font-size: 0.88em;
     color: var(--text-muted);
     text-align: center;
     min-height: 20px;
