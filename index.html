@@ -72,7 +72,7 @@
     <link rel="stylesheet" href="css/ai-panel.css?v=3.9.20">
     <link rel="stylesheet" href="css/fab.css?v=3.9.20">
     <link rel="stylesheet" href="css/auth.css?v=3.9.20">
-    <link rel="stylesheet" href="css/profile.css?v=3.9.20">
+    <link rel="stylesheet" href="css/profile.css?v=3.9.21">
     <link rel="stylesheet" href="css/notifications.css?v=3.9.20">
     <link rel="stylesheet" href="css/mood.css?v=3.9.20">
     <link rel="stylesheet" href="css/anniversary.css?v=3.9.20">
@@ -589,7 +589,7 @@
     <canvas id="profile-particles-canvas" class="profile-particles-canvas" aria-hidden="true"></canvas>
     <div class="profile-topbar">
         <button class="profile-back-btn" onclick="closeProfilePage()">← 返回</button>
-        <h1 class="profile-topbar-title" id="profile-topbar-title" data-page-focus tabindex="-1">我的主页</h1>
+        <h1 class="profile-topbar-title" id="profile-topbar-title" data-page-focus tabindex="-1">💖 我的主页 💖</h1>
         <div class="profile-topbar-right">
             <button class="profile-settings-btn" id="profile-settings-btn" type="button" onclick="openSettingsModal()" aria-label="设置">⚙️</button>
             <button class="profile-edit-btn" id="profile-edit-btn-top" onclick="openEditProfilePage()">✏️ 编辑资料</button>
@@ -597,23 +597,77 @@
     </div>
     <div class="profile-body">
         <div class="profile-content-card">
-        <div class="profile-avatar-wrap" id="profile-avatar-wrap">
-            <div class="profile-avatar-placeholder">🌸</div>
-        </div>
-        <div class="profile-nickname" id="profile-nickname">昵称</div>
-        <div class="profile-username" id="profile-username">@账号</div>
-        <div class="profile-bio" id="profile-bio">还没有签名，快去编辑一下吧~ 💕</div>
-        <div class="profile-stats">
-            <div class="profile-stat-card">
-                <div class="profile-stat-num" id="stat-posts">0</div>
-                <div class="profile-stat-label">📝 发布动态</div>
+            <!-- 头像与皇冠装饰区 -->
+            <div class="profile-avatar-container">
+                <div class="profile-avatar-wrap" id="profile-avatar-wrap">
+                    <div class="profile-avatar-placeholder">🌸</div>
+                </div>
+                <span class="profile-avatar-crown" aria-hidden="true">👑</span>
+                <span class="profile-decor-sparkle sparkle-1" aria-hidden="true">✨</span>
+                <span class="profile-decor-sparkle sparkle-2" aria-hidden="true">🌸</span>
             </div>
-            <div class="profile-stat-card">
-                <div class="profile-stat-num" id="stat-photos">0</div>
-                <div class="profile-stat-label">📸 上传照片</div>
+
+            <!-- 昵称与账号 -->
+            <div class="profile-nickname" id="profile-nickname">昵称</div>
+            <div class="profile-username" id="profile-username">@账号</div>
+
+            <!-- 专属情话/头顶短语 -->
+            <div class="profile-quote" id="profile-quote">💖 小笨蛋 我爱你！ 💖</div>
+
+            <!-- 相伴天数胶囊条 -->
+            <div class="profile-together-pill" id="profile-together-pill">
+                <span class="pill-heart">💖</span> 我们已经相伴 <span class="pill-days" id="profile-together-days">0</span> 天
             </div>
-        </div>
-        <button class="profile-action-btn" id="profile-edit-btn-bottom" onclick="openEditProfilePage()">✨ 修改个人资料</button>
+
+            <!-- 统计信息 -->
+            <div class="profile-stats">
+                <div class="profile-stat-card">
+                    <div class="profile-stat-icon-wrap icon-posts">📝</div>
+                    <div class="profile-stat-info">
+                        <div class="profile-stat-num" id="stat-posts">0</div>
+                        <div class="profile-stat-label">发布动态</div>
+                    </div>
+                </div>
+                <div class="profile-stat-card">
+                    <div class="profile-stat-icon-wrap icon-photos">🖼️</div>
+                    <div class="profile-stat-info">
+                        <div class="profile-stat-num" id="stat-photos">0</div>
+                        <div class="profile-stat-label">上传照片</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 关于我 -->
+            <div class="profile-section-card profile-about-card">
+                <div class="profile-section-title">💖 关于我</div>
+                <div class="profile-about-list">
+                    <div class="profile-about-item">
+                        <span class="about-label"><span class="about-icon">🎂</span> 生日</span>
+                        <span class="about-value" id="profile-about-birthday">2003.05.20</span>
+                    </div>
+                    <div class="profile-about-item">
+                        <span class="about-label"><span class="about-icon">📍</span> 所在地</span>
+                        <span class="about-value" id="profile-about-location">中国 · 北京</span>
+                    </div>
+                    <div class="profile-about-item">
+                        <span class="about-label"><span class="about-icon">🌸</span> 个性签名</span>
+                        <span class="about-value" id="profile-about-bio">热爱生活，喜欢你 💕</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 我们的纪念日 -->
+            <div class="profile-section-card profile-anniv-card-section">
+                <div class="profile-section-title">💖 我们的纪念日</div>
+                <div class="profile-anniv-grid" id="profile-anniv-grid">
+                    <!-- 动态生成 3 个纪念日卡片 -->
+                </div>
+            </div>
+
+            <!-- 底部操作大按钮 -->
+            <button class="profile-action-btn" id="profile-edit-btn-bottom" onclick="handleProfileBottomAction()">
+                ✨ 装扮我的小窝
+            </button>
         </div>
     </div>
 </section>
@@ -627,22 +681,34 @@
     </div>
     <div class="edit-body">
         <div class="edit-profile-content-card">
-        <div class="edit-avatar-area">
-            <button class="edit-avatar-circle" type="button" onclick="document.getElementById('avatar-file-input').click()" id="edit-avatar-circle" aria-label="更换头像">
-                <span class="avatar-ph" aria-hidden="true">🌸</span>
-            </button>
-            <div class="edit-avatar-label">点击更换头像</div>
-            <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" onchange="handleAvatarSelect(event)">
-        </div>
-        <div class="edit-field">
-            <label for="edit-nickname">昵称</label>
-            <input type="text" id="edit-nickname" class="edit-input" placeholder="你的昵称" maxlength="40">
-        </div>
-        <div class="edit-field">
-            <label for="edit-bio">一句话签名</label>
-            <input type="text" id="edit-bio" class="edit-input" placeholder="写下你的签名…" maxlength="300">
-        </div>
-        <div class="edit-msg" id="edit-msg" role="status" aria-live="polite"></div>
+            <div class="edit-avatar-area">
+                <button class="edit-avatar-circle" type="button" onclick="document.getElementById('avatar-file-input').click()" id="edit-avatar-circle" aria-label="更换头像">
+                    <span class="avatar-ph" aria-hidden="true">🌸</span>
+                </button>
+                <div class="edit-avatar-label">点击更换头像</div>
+                <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" onchange="handleAvatarSelect(event)">
+            </div>
+            <div class="edit-field">
+                <label for="edit-nickname">昵称</label>
+                <input type="text" id="edit-nickname" class="edit-input" placeholder="你的昵称" maxlength="40">
+            </div>
+            <div class="edit-field">
+                <label for="edit-quote">头顶专属情话 / 短语</label>
+                <input type="text" id="edit-quote" class="edit-input" placeholder="例如：小笨蛋 我爱你！" maxlength="60">
+            </div>
+            <div class="edit-field">
+                <label for="edit-birthday">生日</label>
+                <input type="text" id="edit-birthday" class="edit-input" placeholder="例如：2003.05.20" maxlength="30">
+            </div>
+            <div class="edit-field">
+                <label for="edit-location">所在地</label>
+                <input type="text" id="edit-location" class="edit-input" placeholder="例如：中国 · 北京" maxlength="50">
+            </div>
+            <div class="edit-field">
+                <label for="edit-bio">个性签名</label>
+                <textarea id="edit-bio" class="edit-input edit-textarea" placeholder="写下你的个性签名…" maxlength="300" rows="3"></textarea>
+            </div>
+            <div class="edit-msg" id="edit-msg" role="status" aria-live="polite"></div>
         </div>
     </div>
 </section>
@@ -766,7 +832,7 @@
 <script src="js/animations.js?v=3.9.19"></script>
 <script src="js/timer.js?v=3.9.19"></script>
 <script src="js/auth.js?v=3.9.19"></script>
-<script src="js/profile.js?v=3.9.19"></script>
+<script src="js/profile.js?v=3.9.21"></script>
 <script src="js/moments.js?v=3.9.19"></script>
 <script src="js/milestones.js?v=3.9.19"></script>
 <script src="js/comments.js?v=3.9.19"></script>
