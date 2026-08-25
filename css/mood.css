@@ -320,6 +320,263 @@
 
 .mood-day-entry-actions button.danger { color: #b54f5d; }
 
+/* ── 心情日历“标记这一天”金光特效与星徽 ── */
+.mood-calendar-day.is-special {
+    background: linear-gradient(145deg, rgba(255, 250, 230, 0.95) 0%, rgba(255, 243, 205, 0.85) 60%, rgba(255, 230, 150, 0.65) 100%) !important;
+    border-color: rgba(255, 193, 7, 0.9) !important;
+    box-shadow: 0 0 14px rgba(255, 193, 7, 0.55), 0 0 28px rgba(255, 215, 0, 0.35), inset 0 0 8px rgba(255, 235, 59, 0.4) !important;
+    animation: goldenGlowPulse 3.6s ease-in-out infinite alternate;
+}
+
+[data-theme="dark"] .mood-calendar-day.is-special {
+    background: linear-gradient(145deg, rgba(65, 52, 20, 0.9) 0%, rgba(50, 40, 15, 0.85) 60%, rgba(40, 32, 10, 0.75) 100%) !important;
+    border-color: rgba(255, 215, 0, 0.85) !important;
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.5), 0 0 32px rgba(255, 193, 7, 0.3), inset 0 0 10px rgba(255, 235, 59, 0.25) !important;
+}
+
+.mood-calendar-day.is-special .mood-calendar-day-number {
+    color: #b87b00;
+    font-weight: 800;
+    text-shadow: 0 0 4px rgba(255, 215, 0, 0.5);
+}
+
+[data-theme="dark"] .mood-calendar-day.is-special .mood-calendar-day-number {
+    color: #ffd54f;
+    text-shadow: 0 0 6px rgba(255, 215, 0, 0.7);
+}
+
+/* 金色流光扫光效果 */
+.mood-calendar-day.is-special::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -70%;
+    width: 240%;
+    height: 200%;
+    background: linear-gradient(
+        115deg,
+        transparent 20%,
+        rgba(255, 255, 255, 0.4) 45%,
+        rgba(255, 235, 59, 0.6) 50%,
+        rgba(255, 255, 255, 0.4) 55%,
+        transparent 80%
+    );
+    transform: rotate(25deg);
+    animation: goldenShimmerSweep 5s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* 右上角悬浮闪烁星徽 */
+.mood-special-star {
+    position: absolute;
+    top: 2px;
+    right: 3px;
+    font-size: 0.72em;
+    line-height: 1;
+    filter: drop-shadow(0 0 4px rgba(255, 193, 7, 0.85));
+    animation: starTwinkle 2.5s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* 兼具今日与标记时的金红交融 */
+.mood-calendar-day.today.is-special {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 16px rgba(255, 193, 7, 0.7), 0 0 30px rgba(181, 115, 122, 0.45), inset 0 0 10px rgba(255, 215, 0, 0.45) !important;
+}
+
+/* 金光呼吸动画 */
+@keyframes goldenGlowPulse {
+    0% {
+        box-shadow: 0 0 10px rgba(255, 193, 7, 0.45), 0 0 20px rgba(255, 215, 0, 0.25), inset 0 0 6px rgba(255, 235, 59, 0.3);
+        border-color: rgba(255, 193, 7, 0.75);
+    }
+    100% {
+        box-shadow: 0 0 18px rgba(255, 193, 7, 0.8), 0 0 34px rgba(255, 215, 0, 0.55), inset 0 0 12px rgba(255, 235, 59, 0.6);
+        border-color: rgba(255, 215, 0, 1);
+    }
+}
+
+/* 流光扫光动画 */
+@keyframes goldenShimmerSweep {
+    0%, 55% {
+        transform: translateX(-120%) rotate(25deg);
+        opacity: 0;
+    }
+    60% {
+        opacity: 0.85;
+    }
+    85% {
+        transform: translateX(120%) rotate(25deg);
+        opacity: 0.85;
+    }
+    90%, 100% {
+        transform: translateX(120%) rotate(25deg);
+        opacity: 0;
+    }
+}
+
+/* 星星微光闪烁动画 */
+@keyframes starTwinkle {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 0.85;
+        filter: drop-shadow(0 0 3px rgba(255, 193, 7, 0.7));
+    }
+    50% {
+        transform: scale(1.25) rotate(15deg);
+        opacity: 1;
+        filter: drop-shadow(0 0 7px rgba(255, 215, 0, 1));
+    }
+}
+
+/* ── 心情编辑弹窗“标记这一天”开关控件 ── */
+.mood-special-toggle-row {
+    margin: 12px 0 16px;
+}
+
+.mood-special-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1.5px solid var(--glass-border);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] .mood-special-toggle {
+    background: rgba(40, 30, 35, 0.5);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.mood-special-toggle:hover {
+    background: rgba(255, 255, 255, 0.65);
+    border-color: rgba(255, 193, 7, 0.5);
+    transform: translateY(-1px);
+}
+
+.mood-special-toggle input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+.mood-special-toggle-switch {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    border-radius: 12px;
+    background: rgba(180, 180, 180, 0.35);
+    transition: background 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s;
+    flex-shrink: 0;
+}
+
+.mood-special-toggle-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s;
+}
+
+/* 勾选开启状态 */
+.mood-special-toggle input:checked + .mood-special-toggle-switch {
+    background: linear-gradient(135deg, #ffc107, #ff9800);
+    box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+}
+
+.mood-special-toggle input:checked + .mood-special-toggle-switch .mood-special-toggle-knob {
+    transform: translateX(18px);
+    background: #fffdf0;
+}
+
+.mood-special-toggle.is-active,
+.mood-special-toggle:has(input:checked) {
+    background: linear-gradient(135deg, rgba(255, 248, 225, 0.85), rgba(255, 243, 205, 0.7));
+    border-color: rgba(255, 193, 7, 0.8);
+    box-shadow: 0 3px 14px rgba(255, 193, 7, 0.25);
+}
+
+[data-theme="dark"] .mood-special-toggle.is-active,
+[data-theme="dark"] .mood-special-toggle:has(input:checked) {
+    background: linear-gradient(135deg, rgba(60, 48, 20, 0.8), rgba(45, 36, 15, 0.7));
+    border-color: rgba(255, 215, 0, 0.65);
+    box-shadow: 0 3px 16px rgba(255, 215, 0, 0.2);
+}
+
+.mood-special-toggle-content {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    gap: 2px;
+}
+
+.mood-special-toggle-title {
+    font-size: 0.9em;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: color 0.2s;
+}
+
+.mood-special-toggle input:checked ~ .mood-special-toggle-content .mood-special-toggle-title {
+    color: #b87b00;
+}
+
+[data-theme="dark"] .mood-special-toggle input:checked ~ .mood-special-toggle-content .mood-special-toggle-title {
+    color: #ffd54f;
+}
+
+.mood-special-toggle-desc {
+    font-size: 0.74em;
+    color: var(--text-muted);
+}
+
+/* ── 单日详情页的高光纪念日徽章与卡片高亮 ── */
+.mood-day-special-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #fff8e1, #ffecb3);
+    border: 1px solid rgba(255, 193, 7, 0.6);
+    color: #b87b00;
+    font-size: 0.72em;
+    font-weight: 700;
+    box-shadow: 0 1px 4px rgba(255, 193, 7, 0.2);
+}
+
+[data-theme="dark"] .mood-day-special-tag {
+    background: linear-gradient(135deg, rgba(70, 56, 20, 0.85), rgba(50, 40, 15, 0.85));
+    border-color: rgba(255, 215, 0, 0.6);
+    color: #ffd54f;
+}
+
+.mood-day-entry.is-special {
+    border-color: rgba(255, 193, 7, 0.45);
+    background: linear-gradient(145deg, rgba(255, 252, 240, 0.65), rgba(255, 248, 225, 0.45));
+    box-shadow: 0 2px 10px rgba(255, 193, 7, 0.12);
+}
+
+[data-theme="dark"] .mood-day-entry.is-special {
+    border-color: rgba(255, 215, 0, 0.4);
+    background: linear-gradient(145deg, rgba(50, 40, 20, 0.6), rgba(35, 28, 15, 0.5));
+}
+
 /* 设置中的站内提醒 */
 .mood-reminder-toggle {
     display: flex;
@@ -368,4 +625,11 @@
     .mood-entry-count { font-size: 0.52em; }
     .mood-emoji-row { grid-template-columns: repeat(4, 1fr); gap: 10px 6px; }
     .mood-emoji-btn { width: 46px; height: 46px; font-size: 1.4em; }
+    .mood-special-toggle { padding: 8px 10px; gap: 9px; }
+    .mood-special-toggle-switch { width: 38px; height: 22px; }
+    .mood-special-toggle-knob { width: 18px; height: 18px; }
+    .mood-special-toggle input:checked + .mood-special-toggle-switch .mood-special-toggle-knob { transform: translateX(16px); }
+    .mood-special-toggle-title { font-size: 0.85em; }
+    .mood-special-toggle-desc { font-size: 0.7em; }
 }
+

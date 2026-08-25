@@ -61,24 +61,24 @@
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
-    <link rel="stylesheet" href="css/refresh.css?v=3.9.16">
-    <link rel="stylesheet" href="css/variables.css?v=3.9.16">
-    <link rel="stylesheet" href="css/base.css?v=3.9.16">
-    <link rel="stylesheet" href="css/header.css?v=3.9.16">
-    <link rel="stylesheet" href="css/timer.css?v=3.9.16">
-    <link rel="stylesheet" href="css/timeline.css?v=3.9.16">
-    <link rel="stylesheet" href="css/dialogs.css?v=3.9.16">
-    <link rel="stylesheet" href="css/comments.css?v=3.9.16">
-    <link rel="stylesheet" href="css/ai-panel.css?v=3.9.16">
-    <link rel="stylesheet" href="css/fab.css?v=3.9.16">
-    <link rel="stylesheet" href="css/auth.css?v=3.9.16">
-    <link rel="stylesheet" href="css/profile.css?v=3.9.16">
-    <link rel="stylesheet" href="css/notifications.css?v=3.9.16">
-    <link rel="stylesheet" href="css/mood.css?v=3.9.16">
-    <link rel="stylesheet" href="css/anniversary.css?v=3.9.16">
-    <link rel="stylesheet" href="css/effects.css?v=3.9.16">
-    <link rel="stylesheet" href="css/responsive.css?v=3.9.16">
-    <link rel="stylesheet" href="css/pages.css?v=3.9.16">
+    <link rel="stylesheet" href="css/refresh.css?v=3.9.17">
+    <link rel="stylesheet" href="css/variables.css?v=3.9.17">
+    <link rel="stylesheet" href="css/base.css?v=3.9.17">
+    <link rel="stylesheet" href="css/header.css?v=3.9.17">
+    <link rel="stylesheet" href="css/timer.css?v=3.9.17">
+    <link rel="stylesheet" href="css/timeline.css?v=3.9.17">
+    <link rel="stylesheet" href="css/dialogs.css?v=3.9.17">
+    <link rel="stylesheet" href="css/comments.css?v=3.9.17">
+    <link rel="stylesheet" href="css/ai-panel.css?v=3.9.17">
+    <link rel="stylesheet" href="css/fab.css?v=3.9.17">
+    <link rel="stylesheet" href="css/auth.css?v=3.9.17">
+    <link rel="stylesheet" href="css/profile.css?v=3.9.17">
+    <link rel="stylesheet" href="css/notifications.css?v=3.9.17">
+    <link rel="stylesheet" href="css/mood.css?v=3.9.17">
+    <link rel="stylesheet" href="css/anniversary.css?v=3.9.17">
+    <link rel="stylesheet" href="css/effects.css?v=3.9.17">
+    <link rel="stylesheet" href="css/responsive.css?v=3.9.17">
+    <link rel="stylesheet" href="css/pages.css?v=3.9.17">
 </head>
 <body class="auth-pending">
 <a class="skip-link" id="skip-link" href="#main-content">跳到主要内容</a>
@@ -304,6 +304,21 @@
         <div class="mood-selected-hint" id="moodSelectedHint" aria-live="polite">请点击表情选择今天的心情</div>
         <label class="visually-hidden" for="moodNote">今天发生的事情</label>
         <textarea class="modal-input mood-note-input" id="moodNote" maxlength="300" placeholder="说说今天发生了什么…（可选）" rows="3"></textarea>
+        
+        <!-- 标记这一天开关 -->
+        <div class="mood-special-toggle-row">
+            <label class="mood-special-toggle" for="moodIsSpecial">
+                <input type="checkbox" id="moodIsSpecial" onchange="handleMoodSpecialToggle(this.checked)">
+                <span class="mood-special-toggle-switch" aria-hidden="true">
+                    <span class="mood-special-toggle-knob"></span>
+                </span>
+                <span class="mood-special-toggle-content">
+                    <span class="mood-special-toggle-title">✨ 标记这一天</span>
+                    <span class="mood-special-toggle-desc">在心情日历主页点亮璀璨金光</span>
+                </span>
+            </label>
+        </div>
+
         <div class="modal-msg" id="moodModalMsg" role="status" aria-live="polite"></div>
         <div class="modal-btns">
             <button id="mood-submit-button" onclick="submitMood()">记录</button>
@@ -625,9 +640,9 @@
     <div class="modal-box version-modal-box">
         <div class="version-decor-heart">💝</div>
         <h2 class="modal-title" id="versionTitle">架构重构与代码质量飞跃 🛠️✨</h2>
-        <div class="version-tag" id="versionNumber">v3.9.16</div>
+        <div class="version-tag" id="versionNumber">v3.9.17</div>
         <div class="version-body">
-            <div class="version-date" id="versionDate">更新时间：2026-08-19</div>
+            <div class="version-date" id="versionDate">更新时间：2026-08-25</div>
 
             <ul class="version-changelog" id="versionChangelogList">
                 <!-- 动态插入更新特性 -->
@@ -703,7 +718,7 @@
         </div>
         
         <div class="settings-footer">
-            <span id="settingsVersion">当前版本：v3.9.16</span>
+            <span id="settingsVersion">当前版本：v3.9.17</span>
         </div>
 
         
@@ -735,27 +750,27 @@
     </div>
 </section>
 
-<script src="js/config.js?v=3.9.16"></script>
-<script src="js/animations.js?v=3.9.16"></script>
-<script src="js/timer.js?v=3.9.16"></script>
-<script src="js/auth.js?v=3.9.16"></script>
-<script src="js/profile.js?v=3.9.16"></script>
-<script src="js/moments.js?v=3.9.16"></script>
-<script src="js/milestones.js?v=3.9.16"></script>
-<script src="js/comments.js?v=3.9.16"></script>
-<script src="js/likes.js?v=3.9.16"></script>
-<script src="js/mood.js?v=3.9.16"></script>
-<script src="js/anniversary.js?v=3.9.16"></script>
-<script src="js/lightbox.js?v=3.9.16"></script>
-<script src="js/ai.js?v=3.9.16"></script>
-<script src="js/blindbox.js?v=3.9.16"></script>
-<script src="js/presence.js?v=3.9.16"></script>
-<script src="js/theme.js?v=3.9.16"></script>
-<script src="js/notifications.js?v=3.9.16"></script>
-<script src="js/effects.js?v=3.9.16"></script>
-<script src="js/settings.js?v=3.9.16"></script>
-<script src="js/router.js?v=3.9.16"></script>
-<script src="js/app.js?v=3.9.16"></script>
+<script src="js/config.js?v=3.9.17"></script>
+<script src="js/animations.js?v=3.9.17"></script>
+<script src="js/timer.js?v=3.9.17"></script>
+<script src="js/auth.js?v=3.9.17"></script>
+<script src="js/profile.js?v=3.9.17"></script>
+<script src="js/moments.js?v=3.9.17"></script>
+<script src="js/milestones.js?v=3.9.17"></script>
+<script src="js/comments.js?v=3.9.17"></script>
+<script src="js/likes.js?v=3.9.17"></script>
+<script src="js/mood.js?v=3.9.17"></script>
+<script src="js/anniversary.js?v=3.9.17"></script>
+<script src="js/lightbox.js?v=3.9.17"></script>
+<script src="js/ai.js?v=3.9.17"></script>
+<script src="js/blindbox.js?v=3.9.17"></script>
+<script src="js/presence.js?v=3.9.17"></script>
+<script src="js/theme.js?v=3.9.17"></script>
+<script src="js/notifications.js?v=3.9.17"></script>
+<script src="js/effects.js?v=3.9.17"></script>
+<script src="js/settings.js?v=3.9.17"></script>
+<script src="js/router.js?v=3.9.17"></script>
+<script src="js/app.js?v=3.9.17"></script>
 
 </body>
 </html>

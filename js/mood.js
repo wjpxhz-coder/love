@@ -21,7 +21,28 @@ const MOOD_DESCRIPTIONS = {
     16: '发呆想事 🤔'
 };
 const MOOD_TIME_ZONE = 'Asia/Shanghai';
-const MOOD_ENTRY_FIELDS = 'id, user_id, date, score, author, note, created_at, updated_at';
+const MOOD_ENTRY_FIELDS_PRIMARY = 'id, user_id, date, score, author, note, is_special, created_at, updated_at';
+const MOOD_ENTRY_FIELDS_LEGACY = 'id, user_id, date, score, author, note, created_at, updated_at';
+let moodSupportsSpecialColumn = true;
+
+function isMoodEntrySpecial(entry) {
+    if (!entry) return false;
+    if (entry.is_special === true || entry.is_special === 'true' || entry.is_special === 1) return true;
+    if (typeof entry.note === 'string' && entry.note.includes('✨[特别日子]')) return true;
+    return false;
+}
+
+function getDisplayMoodNote(note) {
+    if (typeof note !== 'string') return '';
+    return note.replace(/✨\[特别日子\]\s*/g, '').trim();
+}
+
+function handleMoodSpecialToggle(checked) {
+    const toggleLabel = document.querySelector('.mood-special-toggle');
+    if (toggleLabel) {
+        toggleLabel.classList.toggle('is-active', Boolean(checked));
+    }
+}
 
 function updateMoodSelectedHint(score) {
     const hint = document.getElementById('moodSelectedHint');
@@ -130,7 +151,8 @@ function compareMoodEntries(left, right) {
 }
 
 function normalizeMoodNotePreview(note) {
-    return typeof note === 'string' ? note.replace(/\s+/g, ' ').trim() : '';
+    const clean = getDisplayMoodNote(note);
+    return typeof clean === 'string' ? clean.replace(/\s+/g, ' ').trim() : '';
 }
 
 function getLatestMoodNotePreview(entries) {
@@ -162,7 +184,13 @@ function resetMoodComposer(entry = null) {
         button.setAttribute('aria-pressed', String(selected));
     });
     updateMoodSelectedHint(selectedMoodScore);
-    document.getElementById('moodNote').value = entry?.note || '';
+    document.getElementById('moodNote').value = entry ? getDisplayMoodNote(entry.note) : '';
+    const isSpecial = isMoodEntrySpecial(entry);
+    const specialCheckbox = document.getElementById('moodIsSpecial');
+    if (specialCheckbox) {
+        specialCheckbox.checked = isSpecial;
+        handleMoodSpecialToggle(isSpecial);
+    }
     document.getElementById('moodModalMsg').textContent = '';
 }
 
@@ -181,13 +209,28 @@ async function loadMoodEntryForRoute(entryId) {
     if (!isAuthenticated()) return null;
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
+    const selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
     let query = supabaseClient
         .from('moods')
-        .select(MOOD_ENTRY_FIELDS)
+        .select(selectFields)
         .eq('id', entryId)
         .eq('user_id', userId);
     if (currentUserProfile?.space_id) query = query.eq('space_id', currentUserProfile.space_id);
-    const { data, error } = await query.maybeSingle();
+    let { data, error } = await query.maybeSingle();
+
+    if (error && moodSupportsSpecialColumn && (error.code === '42703' || String(error.message).includes('is_special'))) {
+        moodSupportsSpecialColumn = false;
+        let retryQuery = supabaseClient
+            .from('moods')
+            .select(MOOD_ENTRY_FIELDS_LEGACY)
+            .eq('id', entryId)
+            .eq('user_id', userId);
+        if (currentUserProfile?.space_id) retryQuery = retryQuery.eq('space_id', currentUserProfile.space_id);
+        const retryResult = await retryQuery.maybeSingle();
+        data = retryResult.data;
+        error = retryResult.error;
+    }
+
     if (!isCurrentAuthSnapshot(epoch, userId) || error || !data) return null;
     const entries = moodEntriesByDate[data.date] || [];
     if (!entries.some(entry => String(entry.id) === String(data.id))) {
@@ -259,8 +302,9 @@ async function submitMood() {
         return;
     }
 
-    const note = document.getElementById('moodNote').value.trim();
-    if (note.length > 300) {
+    const rawNote = document.getElementById('moodNote').value.trim();
+    const isSpecial = Boolean(document.getElementById('moodIsSpecial')?.checked);
+    if (rawNote.length > 300) {
         messageElement.textContent = '心情记录不能超过 300 个字符';
         return;
     }
@@ -278,25 +322,90 @@ async function submitMood() {
 
     try {
         let result;
-        if (entryBeingEdited) {
-            result = await supabaseClient
-                .from('moods')
-                .update({ score: selectedMoodScore, note: note || null })
-                .eq('id', entryBeingEdited.id)
-                .eq('user_id', userId)
-                .select(MOOD_ENTRY_FIELDS)
-                .single();
-        } else {
-            result = await supabaseClient
-                .from('moods')
-                .insert([{
-                    date: getAppDateKey(),
+        const selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
+
+        if (moodSupportsSpecialColumn) {
+            const payload = {
+                score: selectedMoodScore,
+                note: rawNote || null,
+                is_special: isSpecial
+            };
+            if (entryBeingEdited) {
+                result = await supabaseClient
+                    .from('moods')
+                    .update(payload)
+                    .eq('id', entryBeingEdited.id)
+                    .eq('user_id', userId)
+                    .select(selectFields)
+                    .single();
+            } else {
+                result = await supabaseClient
+                    .from('moods')
+                    .insert([{
+                        date: getAppDateKey(),
+                        ...payload
+                    }])
+                    .select(selectFields)
+                    .single();
+            }
+
+            // 若数据库尚未添加 is_special 列，自动捕获并无缝降级重试
+            if (result.error && (result.error.code === '42703' || String(result.error.message).includes('is_special'))) {
+                moodSupportsSpecialColumn = false;
+                const fallbackNote = isSpecial
+                    ? (rawNote ? `✨[特别日子] ${rawNote}` : '✨[特别日子]')
+                    : rawNote;
+                const fallbackPayload = {
                     score: selectedMoodScore,
-                    note: note || null
-                }])
-                .select(MOOD_ENTRY_FIELDS)
-                .single();
+                    note: fallbackNote || null
+                };
+                if (entryBeingEdited) {
+                    result = await supabaseClient
+                        .from('moods')
+                        .update(fallbackPayload)
+                        .eq('id', entryBeingEdited.id)
+                        .eq('user_id', userId)
+                        .select(MOOD_ENTRY_FIELDS_LEGACY)
+                        .single();
+                } else {
+                    result = await supabaseClient
+                        .from('moods')
+                        .insert([{
+                            date: getAppDateKey(),
+                            ...fallbackPayload
+                        }])
+                        .select(MOOD_ENTRY_FIELDS_LEGACY)
+                        .single();
+                }
+            }
+        } else {
+            const fallbackNote = isSpecial
+                ? (rawNote ? `✨[特别日子] ${rawNote}` : '✨[特别日子]')
+                : rawNote;
+            const fallbackPayload = {
+                score: selectedMoodScore,
+                note: fallbackNote || null
+            };
+            if (entryBeingEdited) {
+                result = await supabaseClient
+                    .from('moods')
+                    .update(fallbackPayload)
+                    .eq('id', entryBeingEdited.id)
+                    .eq('user_id', userId)
+                    .select(MOOD_ENTRY_FIELDS_LEGACY)
+                    .single();
+            } else {
+                result = await supabaseClient
+                    .from('moods')
+                    .insert([{
+                        date: getAppDateKey(),
+                        ...fallbackPayload
+                    }])
+                    .select(MOOD_ENTRY_FIELDS_LEGACY)
+                    .single();
+            }
         }
+
         if (result.error) throw result.error;
         if (!isCurrentAuthSnapshot(epoch, userId)) return;
 
@@ -343,6 +452,16 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
     if (dateKey === today) cell.classList.add('today');
     if (entries.length) cell.classList.add('has-entries');
 
+    const isSpecialDay = entries.some(entry => isMoodEntrySpecial(entry));
+    if (isSpecialDay) {
+        cell.classList.add('is-special');
+        const star = document.createElement('span');
+        star.className = 'mood-special-star';
+        star.setAttribute('aria-hidden', 'true');
+        star.textContent = '✨';
+        cell.appendChild(star);
+    }
+
     const day = document.createElement('span');
     day.className = 'mood-calendar-day-number';
     day.textContent = String(dayNumber);
@@ -381,7 +500,8 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
         const noteLabel = notePreview
             ? `；最新内容，${notePreview.entry.author || '成员'}：${notePreview.note}`
             : '';
-        cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}，${entries.length} 条心情记录：${labels}${noteLabel}，点击查看完整记录`);
+        const specialLabel = isSpecialDay ? '，✨ 特别纪念日' : '';
+        cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}${specialLabel}，${entries.length} 条心情记录：${labels}${noteLabel}，点击查看完整记录`);
         cell.addEventListener('click', () => openMoodDayModal(dateKey));
     } else if (dateKey === today) {
         cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}，尚未打卡，点击记录`);
@@ -443,15 +563,31 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
     const userId = currentAuthUser.id;
     if (status) status.textContent = '正在加载本月心情…';
 
+    const selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
     let query = supabaseClient
         .from('moods')
-        .select(MOOD_ENTRY_FIELDS)
+        .select(selectFields)
         .gte('date', bounds.firstDate)
         .lte('date', bounds.lastDate)
         .order('date', { ascending: true })
         .order('created_at', { ascending: true });
     if (currentUserProfile?.space_id) query = query.eq('space_id', currentUserProfile.space_id);
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    if (error && moodSupportsSpecialColumn && (error.code === '42703' || String(error.message).includes('is_special'))) {
+        moodSupportsSpecialColumn = false;
+        let retryQuery = supabaseClient
+            .from('moods')
+            .select(MOOD_ENTRY_FIELDS_LEGACY)
+            .gte('date', bounds.firstDate)
+            .lte('date', bounds.lastDate)
+            .order('date', { ascending: true })
+            .order('created_at', { ascending: true });
+        if (currentUserProfile?.space_id) retryQuery = retryQuery.eq('space_id', currentUserProfile.space_id);
+        const retryResult = await retryQuery;
+        data = retryResult.data;
+        error = retryResult.error;
+    }
 
     if (requestId !== moodLoadRequestId || !isCurrentAuthSnapshot(epoch, userId)) return;
     if (error) {
@@ -514,22 +650,33 @@ function formatMoodEntryTime(entry) {
 }
 
 function createMoodDayEntry(entry) {
+    const isSpecial = isMoodEntrySpecial(entry);
     const card = document.createElement('article');
-    card.className = `mood-day-entry${entry.user_id === currentAuthUser?.id ? ' own' : ''}`;
+    card.className = `mood-day-entry${entry.user_id === currentAuthUser?.id ? ' own' : ''}${isSpecial ? ' is-special' : ''}`;
 
     const header = document.createElement('div');
     header.className = 'mood-day-entry-header';
     const identity = document.createElement('strong');
     identity.textContent = `${entry.author || '成员'} ${MOOD_EMOJIS[Number(entry.score)] || ''}`;
+
+    if (isSpecial) {
+        const specialBadge = document.createElement('span');
+        specialBadge.className = 'mood-day-special-tag';
+        specialBadge.textContent = '✨ 特别纪念';
+        identity.appendChild(document.createTextNode(' '));
+        identity.appendChild(specialBadge);
+    }
+
     const time = document.createElement('time');
     time.dateTime = entry.created_at || '';
     time.textContent = formatMoodEntryTime(entry);
     header.append(identity, time);
     card.appendChild(header);
 
+    const cleanNote = getDisplayMoodNote(entry.note);
     const note = document.createElement('p');
-    note.className = `mood-day-entry-note${entry.note ? '' : ' empty'}`;
-    note.textContent = entry.note || '没有留下文字';
+    note.className = `mood-day-entry-note${cleanNote ? '' : ' empty'}`;
+    note.textContent = cleanNote || '没有留下文字';
     card.appendChild(note);
 
     if (entry.user_id === currentAuthUser?.id) {
@@ -577,7 +724,8 @@ async function enterMoodDayPage(route) {
     const title = document.getElementById('mood-day-modal-title');
     const list = document.getElementById('mood-day-list');
     if (!title || !list) return;
-    title.textContent = `${formatMoodDateTitle(dateKey)} · ${entries.length} 条`;
+    const hasSpecialInDay = entries.some(entry => isMoodEntrySpecial(entry));
+    title.textContent = `${formatMoodDateTitle(dateKey)}${hasSpecialInDay ? ' ✨' : ''} · ${entries.length} 条`;
     const fragment = document.createDocumentFragment();
     entries.forEach(entry => fragment.appendChild(createMoodDayEntry(entry)));
     list.replaceChildren(fragment);
@@ -648,3 +796,4 @@ function resetMoodState() {
     isMoodSaving = false;
     todayOwnMoodCount = 0;
 }
+
