@@ -664,3 +664,48 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             background: rgba(245, 166, 35, 0.15);
         }
 
+        /* ── 智能新动态浮动提示胶囊 ── */
+        .new-moments-pill-wrap {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+
+        .new-moments-pill {
+            margin: 0 auto;
+            padding: 8px 20px;
+            font-size: 0.9em;
+            font-weight: 700;
+            color: var(--on-primary);
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border-radius: 999px;
+            border: 1.5px solid rgba(255, 255, 255, 0.85);
+            box-shadow: 0 4px 18px var(--primary-glow);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            animation: newMomentsBounce 2.4s infinite ease-in-out;
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+        }
+
+        .new-moments-pill:hover {
+            transform: translateY(-2px) scale(1.04);
+            box-shadow: 0 8px 24px var(--primary-glow);
+        }
+
+        .new-moments-pill:active {
+            transform: scale(0.96);
+        }
+
+        @keyframes newMomentsBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+
+        [data-theme='dark'] .new-moments-pill {
+            border-color: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+

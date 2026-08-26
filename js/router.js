@@ -46,7 +46,12 @@
     let currentHistoryHash = '';
     let currentHistoryState = null;
     let lastProcessedHref = '';
+    const HOME_SCROLL_STORAGE_KEY = 'sweet_diary_home_scroll_y';
     let homeScrollY = 0;
+    try {
+        const savedScroll = Number(global.sessionStorage?.getItem(HOME_SCROLL_STORAGE_KEY));
+        if (Number.isFinite(savedScroll) && savedScroll > 0) homeScrollY = savedScroll;
+    } catch (_e) {}
     let transitionToken = 0;
     let chromeSnapshot = null;
     const routeFocusMemory = new Map();
@@ -356,9 +361,22 @@
         }
     }
 
-    function rememberHomeScroll() {
-        if (currentRoute?.id !== 'home') return;
+    function rememberHomeScroll(forceSync = false) {
+        if (currentRoute?.id !== 'home' && !forceSync) return;
         homeScrollY = Math.max(0, global.scrollY || global.pageYOffset || 0);
+        try {
+            global.sessionStorage?.setItem(HOME_SCROLL_STORAGE_KEY, String(homeScrollY));
+        } catch (_e) {}
+    }
+
+    function setRouterHomeScroll(top) {
+        const value = Number(top);
+        if (Number.isFinite(value) && value >= 0) {
+            homeScrollY = value;
+            try {
+                global.sessionStorage?.setItem(HOME_SCROLL_STORAGE_KEY, String(homeScrollY));
+            } catch (_e) {}
+        }
     }
 
     function runOnNextFrame(callback) {
@@ -399,6 +417,10 @@
 
     function focusRoute(route) {
         const remembered = routeFocusMemory.get(route.fullPath);
+        // 防跳顶保护：主页已处于下滚浏览状态且无具体记忆元素时，不强行将焦点转至顶部标题
+        if (route.id === 'home' && homeScrollY > 100 && !remembered) {
+            return;
+        }
         const target = remembered?.isConnected && !remembered.inert
             ? remembered
             : findFocusTarget(route);
@@ -598,6 +620,30 @@
         global.addEventListener('hashchange', () => handleLocationChange('hashchange'));
         global.addEventListener('keydown', handleRouteEscape, true);
 
+        let scrollSyncRaf = null;
+        global.addEventListener('scroll', () => {
+            if (currentRoute?.id !== 'home') return;
+            if (scrollSyncRaf !== null) return;
+            scrollSyncRaf = runOnNextFrame(() => {
+                scrollSyncRaf = null;
+                if (currentRoute?.id === 'home') {
+                    rememberHomeScroll();
+                }
+            });
+        }, { passive: true });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && currentRoute?.id === 'home') {
+                rememberHomeScroll();
+            }
+        });
+
+        global.addEventListener('pagehide', () => {
+            if (currentRoute?.id === 'home') {
+                rememberHomeScroll();
+            }
+        });
+
         const locationInfo = readLocation();
         const existingMetadata = readRouterState();
         const depth = existingMetadata && existingMetadata.hash === global.location.hash
@@ -774,4 +820,6 @@
     global.getLoginReturnRoute = getLoginReturnRoute;
     global.completeLoginNavigation = completeLoginNavigation;
     global.forcePublicHomeRoute = forcePublicHomeRoute;
+    global.setRouterHomeScroll = setRouterHomeScroll;
+    global.rememberHomeScroll = rememberHomeScroll;
 }(window));
