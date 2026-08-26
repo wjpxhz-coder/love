@@ -656,8 +656,11 @@ function sizeAnimationCanvas(canvas, context, width, height) {
         ctxFg.clearRect(0, 0, canvasWidth, canvasHeight);
     }
 
+    let isSuspended = false;
+
     function shouldRunAnimation() {
         return routeActive
+            && !isSuspended
             && !document.hidden
             && animationsReducedMotionQuery?.matches !== true;
     }
@@ -770,6 +773,12 @@ function sizeAnimationCanvas(canvas, context, width, height) {
             const nextActive = Boolean(isHome);
             if (routeActive === nextActive) return;
             routeActive = nextActive;
+            reconcileAnimationState();
+        },
+        setSuspended(suspended) {
+            const nextSuspended = Boolean(suspended);
+            if (isSuspended === nextSuspended) return;
+            isSuspended = nextSuspended;
             reconcileAnimationState();
         },
         setAppearance(nextAppearance = {}) {
