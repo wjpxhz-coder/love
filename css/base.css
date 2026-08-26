@@ -114,8 +114,8 @@ body {
 }
 
 /* 昼夜主题平滑过渡 */
-body, #bg-layer, .moment-card, .btn-mood, #btn-moment, #btn-audio, #btn-blindbox, .modal-box, .comment-bubble, .resonance-ui, .ai-tab, .ai-content-area, .profile-card, .edit-profile-page, .edit-input, .comment-textarea {
-    transition: background 0.3s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.3s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.3s ease, color 0.5s ease, box-shadow 0.5s ease;
+body, #bg-layer {
+    transition: background 0.3s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.3s cubic-bezier(0.25, 1, 0.5, 1), color 0.3s ease;
 }
 
 /* ── 樱花粒子 canvas ── */
@@ -125,6 +125,8 @@ body, #bg-layer, .moment-card, .btn-mood, #btn-moment, #btn-audio, #btn-blindbox
     width: 100%; height: 100%;
     pointer-events: none;
     z-index: 0;
+    transform: translateZ(0);
+    will-change: transform;
 }
 
 #sakura-canvas-foreground {
@@ -133,6 +135,8 @@ body, #bg-layer, .moment-card, .btn-mood, #btn-moment, #btn-audio, #btn-blindbox
     width: 100%; height: 100%;
     pointer-events: none;
     z-index: 2; /* 浮于 container 容器 (z-index: 1) 之上，但低于弹窗和悬浮球 */
+    transform: translateZ(0);
+    will-change: transform;
 }
 
 .container {
@@ -140,6 +144,7 @@ body, #bg-layer, .moment-card, .btn-mood, #btn-moment, #btn-audio, #btn-blindbox
     z-index: 1;
     max-width: 620px;
     width: 100%;
+    contain: layout style;
 }
 
 

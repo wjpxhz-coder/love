@@ -79,7 +79,8 @@ function createHeartRain() {
         window.homeSakuraEffect.triggerMissYouFlutter();
     }
 
-    const heartCount = 14;
+    const isMobile = window.innerWidth < 768;
+    const heartCount = isMobile ? 18 : 32;
     const container = document.createElement('div');
     container.style.cssText = `
         position: fixed;
@@ -93,7 +94,7 @@ function createHeartRain() {
     `;
     document.body.appendChild(container);
     
-    const elements = ['🌸', '💖', '✨', '🎀', '🍬', '🍓', '💕', '🧁', '💗', '❀', '💫'];
+    const elements = ['🌸', '💖', '✨', '🎀', '🍬', '🍓', '💕', '🧁', '💗', '❀', '💫', '🌷', '💝'];
     
     for (let i = 0; i < heartCount; i++) {
         const item = document.createElement('div');
@@ -101,11 +102,11 @@ function createHeartRain() {
         item.innerText = icon;
         
         const startLeft = Math.random() * 100;
-        const size = 16 + Math.random() * 16;
-        const duration = 2.0 + Math.random() * 1.8;
-        const delay = Math.random() * 0.8;
-        const swayX = (Math.random() - 0.5) * 80;
-        const rotEnd = (Math.random() > 0.5 ? 1 : -1) * (180 + Math.random() * 240);
+        const size = 16 + Math.random() * 18;
+        const duration = 2.2 + Math.random() * 1.8;
+        const delay = Math.random() * 0.9;
+        const swayX = (Math.random() - 0.5) * 90;
+        const rotEnd = (Math.random() > 0.5 ? 1 : -1) * (180 + Math.random() * 260);
         
         item.style.cssText = `
             position: fixed;
@@ -119,14 +120,14 @@ function createHeartRain() {
             will-change: transform, opacity;
             animation: fallAndSway ${duration}s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${delay}s forwards;
             user-select: none;
-            text-shadow: 0 2px 8px rgba(255, 105, 135, 0.35);
+            text-shadow: 0 2px 10px rgba(255, 105, 135, 0.4);
         `;
         container.appendChild(item);
     }
     
     setTimeout(() => {
         container.remove();
-    }, 4500);
+    }, 5000);
 }
 
 let isSendingMissYou = false;
@@ -212,24 +213,10 @@ function createStarField() {
     }
 }
 
-// --- 滚动入场观察器 ---
+// --- 滚动入场快速就绪 ---
 function initScrollReveal() {
-    if (prefersReducedMotion()) {
-        document.querySelectorAll('.moment-card:not(.visible)').forEach(card => card.classList.add('visible'));
-        return;
-    }
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry, index) => {
-            if (entry.isIntersecting) {
-                setTimeout(() => {
-                    entry.target.classList.add('visible');
-                }, index * 80);
-                observer.unobserve(entry.target);
-            }
-        });
-    }, { rootMargin: '0px 0px -30px 0px', threshold: 0.05 });
     document.querySelectorAll('.moment-card:not(.visible)').forEach(card => {
-        observer.observe(card);
+        card.classList.add('visible');
     });
 }
 
@@ -265,18 +252,25 @@ function spawnHearts(x, y) {
         setTimeout(() => particle.remove(), 1100);
     }
 }
-// --- 纪念日卡片光晕 ---
+// --- 纪念日卡片光晕 (被动节流缓存) ---
 function initCardGlow() {
     document.querySelectorAll('.anniv-card').forEach(card => {
         if (card.querySelector('.glow')) return;
         const glow = document.createElement('div');
         glow.className = 'glow';
         card.appendChild(glow);
+        let rect = null;
+        card.addEventListener('mouseenter', () => {
+            rect = card.getBoundingClientRect();
+        }, { passive: true });
         card.addEventListener('mousemove', (e) => {
-            const rect = card.getBoundingClientRect();
+            if (!rect) rect = card.getBoundingClientRect();
             glow.style.left = (e.clientX - rect.left) + 'px';
             glow.style.top = (e.clientY - rect.top) + 'px';
-        });
+        }, { passive: true });
+        card.addEventListener('mouseleave', () => {
+            rect = null;
+        }, { passive: true });
     });
 }
 document.addEventListener('click', (e) => {
@@ -289,7 +283,7 @@ document.addEventListener('click', (e) => {
     if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, .fab-container, .notification-panel, [role="button"]')) return;
     spawnHearts(e.clientX, e.clientY);
     if (typeof window.homeSakuraEffect?.createBurst === 'function') {
-        window.homeSakuraEffect.createBurst(e.clientX, e.clientY, 8);
+        window.homeSakuraEffect.createBurst(e.clientX, e.clientY, 14);
     }
 });
 

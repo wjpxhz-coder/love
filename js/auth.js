@@ -553,63 +553,102 @@ document.addEventListener('click', event => {
     }
 });
 
-// ── 登录弹窗粒子 ──
+// ── 登录弹窗粒子 (预渲染雪碧图 + 丝滑高刷) ──
 let loginCanvasAnim = null;
+const loginEmojis = ['💖', '💗', '💕', '✨', '🌸', '💝', '🌹', '🎀'];
+const loginEmojiSpriteMap = {};
+
+function getLoginEmojiSprite(emoji, size = 32) {
+    const key = `${emoji}_${size}`;
+    if (loginEmojiSpriteMap[key]) return loginEmojiSpriteMap[key];
+    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+    const canvas = document.createElement('canvas');
+    const dim = Math.round((size + 8) * dpr);
+    canvas.width = dim;
+    canvas.height = dim;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = `${size}px "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, (size + 8) / 2, (size + 8) / 2);
+    loginEmojiSpriteMap[key] = { canvas, size: size + 8 };
+    return loginEmojiSpriteMap[key];
+}
 
 function startLoginCanvas() {
     stopLoginCanvas();
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 
     const canvas = document.getElementById('login-canvas');
-    const context = canvas?.getContext('2d');
+    const context = canvas?.getContext('2d', { alpha: true });
     if (!canvas || !context) return;
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
+    canvas.width = Math.round(window.innerWidth * dpr);
+    canvas.height = Math.round(window.innerHeight * dpr);
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     const petals = [];
-    const hearts = ['💖', '💗', '💕', '✨', '🌸', '💝', '🌹'];
-    for (let index = 0; index < (window.innerWidth < 768 ? 10 : 20); index += 1) {
+    const count = window.innerWidth < 768 ? 16 : 28;
+    for (let index = 0; index < count; index += 1) {
         petals.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            size: 12 + Math.random() * 20,
-            speedY: 0.6 + Math.random() * 1.5,
+            x: Math.random() * window.innerWidth,
+            y: Math.random() * (window.innerHeight + 100) - 50,
+            size: 14 + Math.random() * 18,
+            speedY: 0.8 + Math.random() * 1.5,
             speedX: (Math.random() - 0.5) * 0.8,
             rot: Math.random() * Math.PI * 2,
-            rotSpeed: (Math.random() - 0.5) * 0.04,
+            rotSpeed: (Math.random() - 0.5) * 0.035,
             sway: Math.random() * Math.PI * 2,
-            swaySpeed: 0.01 + Math.random() * 0.02,
-            alpha: 0.4 + Math.random() * 0.6,
-            emoji: hearts[Math.floor(Math.random() * hearts.length)]
+            swaySpeed: 0.015 + Math.random() * 0.025,
+            alpha: 0.55 + Math.random() * 0.4,
+            emoji: loginEmojis[Math.floor(Math.random() * loginEmojis.length)]
         });
     }
 
-    loginCanvasAnim = { running: true, requestId: null };
-    const animate = () => {
+    loginCanvasAnim = { running: true, requestId: null, lastTime: 0 };
+    const animate = (timestamp) => {
         if (!loginCanvasAnim?.running) return;
-        context.clearRect(0, 0, canvas.width, canvas.height);
+        const dtSec = loginCanvasAnim.lastTime > 0
+            ? Math.min((timestamp - loginCanvasAnim.lastTime) / 1000, 0.05)
+            : 0.016;
+        loginCanvasAnim.lastTime = timestamp;
+        const step = dtSec * 60;
+
+        context.clearRect(0, 0, window.innerWidth, window.innerHeight);
         petals.forEach(petal => {
-            petal.sway += petal.swaySpeed;
-            petal.x += petal.speedX + Math.sin(petal.sway) * 0.8;
-            petal.y += petal.speedY;
-            petal.rot += petal.rotSpeed;
-            if (petal.y > canvas.height + 30) {
-                petal.y = -30;
-                petal.x = Math.random() * canvas.width;
+            petal.sway += petal.swaySpeed * step;
+            petal.x += (petal.speedX + Math.sin(petal.sway) * 0.7) * step;
+            petal.y += petal.speedY * step;
+            petal.rot += petal.rotSpeed * step;
+            if (petal.y > window.innerHeight + 35) {
+                petal.y = -35;
+                petal.x = Math.random() * window.innerWidth;
             }
-            context.save();
-            context.translate(petal.x, petal.y);
-            context.rotate(petal.rot);
-            context.globalAlpha = petal.alpha;
-            context.font = `${petal.size}px serif`;
-            context.textAlign = 'center';
-            context.textBaseline = 'middle';
-            context.fillText(petal.emoji, 0, 0);
-            context.restore();
+            const spriteObj = getLoginEmojiSprite(petal.emoji, 28);
+            if (spriteObj) {
+                context.save();
+                context.translate(petal.x, petal.y);
+                context.rotate(petal.rot);
+                context.globalAlpha = petal.alpha;
+                const drawScale = petal.size / spriteObj.size;
+                const half = spriteObj.size / 2;
+                context.drawImage(
+                    spriteObj.canvas,
+                    -half * drawScale,
+                    -half * drawScale,
+                    spriteObj.size * drawScale,
+                    spriteObj.size * drawScale
+                );
+                context.restore();
+            }
         });
         if (loginCanvasAnim) loginCanvasAnim.requestId = requestAnimationFrame(animate);
     };
-    animate();
+    loginCanvasAnim.requestId = requestAnimationFrame(animate);
 }
 
 function stopLoginCanvas() {

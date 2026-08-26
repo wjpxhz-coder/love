@@ -71,7 +71,7 @@
 }
 
 html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
 }
 
 [hidden] {
@@ -109,6 +109,9 @@ body {
 #sakura-canvas,
 #sakura-canvas-foreground {
     opacity: 1;
+    pointer-events: none;
+    transform: translateZ(0);
+    will-change: transform;
 }
 
 #star-field {
@@ -391,17 +394,15 @@ body[data-auth-state='locked'] #notification-bell {
 .timer-card,
 .anniv-card {
     border: 1.5px solid rgba(255, 185, 205, 0.55);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 242, 248, 0.94) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(255, 242, 248, 0.94) 100%);
     box-shadow: 0 8px 24px rgba(255, 105, 140, 0.14), inset 0 2px 1px #ffffff;
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease, border-color 0.3s ease;
+    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease, border-color 0.25s ease;
 }
 
 [data-theme='dark'] .timer-card,
 [data-theme='dark'] .anniv-card {
     border-color: rgba(255, 143, 171, 0.28);
-    background: linear-gradient(180deg, rgba(46, 28, 66, 0.85) 0%, rgba(36, 20, 52, 0.85) 100%);
+    background: linear-gradient(180deg, rgba(46, 28, 66, 0.95) 0%, rgba(36, 20, 52, 0.95) 100%);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1.5px 1px rgba(255, 255, 255, 0.1);
 }
 
@@ -503,9 +504,8 @@ body[data-auth-state='locked'] #notification-bell {
     padding: clamp(24px, 4vw, 38px);
     border: 2px solid rgba(255, 255, 255, 0.9);
     border-radius: 28px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 242, 248, 0.88));
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 242, 248, 0.92));
     box-shadow: var(--soft-shadow);
-    backdrop-filter: blur(18px);
 }
 
 .home-auth-skeleton {
@@ -602,10 +602,8 @@ body[data-auth-state='locked'] #notification-bell {
     padding: 12px;
     border: 1.5px solid var(--border);
     border-radius: 28px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 240, 246, 0.88) 100%);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 240, 246, 0.92) 100%);
     box-shadow: 0 12px 36px rgba(255, 105, 140, 0.16), inset 0 2px 2px #fff;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
 }
 
 .home-quick-actions button {
@@ -650,16 +648,14 @@ body[data-auth-state='locked'] #notification-bell {
     margin: 0;
     border: 2px solid rgba(255, 255, 255, 0.95);
     border-radius: 30px;
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 242, 248, 0.9) 100%);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 242, 248, 0.93) 100%);
     box-shadow: 0 18px 48px rgba(255, 105, 140, 0.16), inset 0 2px 4px #ffffff;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
 }
 
 [data-theme='dark'] .mood-section,
 [data-theme='dark'] .timeline-section {
     border-color: rgba(255, 143, 171, 0.3);
-    background: linear-gradient(145deg, rgba(42, 26, 60, 0.88) 0%, rgba(32, 18, 48, 0.92) 100%);
+    background: linear-gradient(145deg, rgba(42, 26, 60, 0.95) 0%, rgba(32, 18, 48, 0.95) 100%);
     box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45), inset 0 1.5px 1px rgba(255, 255, 255, 0.1);
 }
 
@@ -822,16 +818,14 @@ body[data-auth-state='locked'] #notification-bell {
     padding: 20px;
     border: 1.5px solid rgba(255, 185, 205, 0.55);
     border-radius: var(--jelly-radius-md, 22px);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 242, 248, 0.92) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(255, 242, 248, 0.94) 100%);
     box-shadow: 0 8px 24px rgba(255, 105, 140, 0.12), inset 0 2px 1px #ffffff;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease, border-color 0.3s ease;
+    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease, border-color 0.25s ease;
 }
 
 [data-theme='dark'] .moment-card {
     border-color: rgba(255, 143, 171, 0.28);
-    background: linear-gradient(180deg, rgba(46, 28, 66, 0.88) 0%, rgba(36, 20, 52, 0.88) 100%);
+    background: linear-gradient(180deg, rgba(46, 28, 66, 0.96) 0%, rgba(36, 20, 52, 0.96) 100%);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1.5px 1px rgba(255, 255, 255, 0.1);
 }
 
