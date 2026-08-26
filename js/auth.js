@@ -533,25 +533,14 @@ async function doLogout() {
 
 function toggleUserDropdown() {
     if (!isAuthenticated()) return;
-    const dropdown = document.getElementById('user-dropdown');
-    if (!dropdown) return;
-    const showing = dropdown.classList.toggle('show');
-    document.getElementById('user-avatar-btn')?.setAttribute('aria-expanded', String(showing));
+    if (typeof openProfilePage === 'function') {
+        openProfilePage();
+    }
 }
 
 function hideUserDropdown() {
-    document.getElementById('user-dropdown')?.classList.remove('show');
-    document.getElementById('user-avatar-btn')?.setAttribute('aria-expanded', 'false');
+    // 保留向后兼容空实现
 }
-
-document.addEventListener('click', event => {
-    const dropdown = document.getElementById('user-dropdown');
-    const avatarButton = document.getElementById('user-avatar-btn');
-    if (dropdown?.classList.contains('show') && avatarButton
-        && !dropdown.contains(event.target) && !avatarButton.contains(event.target)) {
-        hideUserDropdown();
-    }
-});
 
 // ── 登录弹窗粒子 (预渲染雪碧图 + 丝滑高刷) ──
 let loginCanvasAnim = null;
