@@ -908,7 +908,8 @@ async function submitMomentPost() {
         if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
         
         closeMomentModal(true);
-        fetchMoments();
+        clearTimelineSnapshot();
+        fetchMoments(false, { forceRefresh: true });
         if (typeof renderMilestonesContent === 'function') {
             renderMilestonesContent();
         }
@@ -1067,15 +1068,192 @@ function deleteRecordedAudio() {
     if (previewEl) previewEl.style.display = 'none';
     if (btn) btn.style.display = 'flex';
 }
-// --- 时光轴（无限滚动） ---
+// --- 时光轴（无限滚动与智能会话快照） ---
+const MOMENTS_SNAPSHOT_KEY = 'sweet_diary_timeline_snapshot';
+const MOMENTS_SCROLL_KEY = 'sweet_diary_home_scroll_y';
+const MAX_SNAPSHOT_MOMENTS = 45;
+const SNAPSHOT_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 小时有效
+
 let scrollObserver = null;
 let momentTimelineCursor = null;
 const renderedMomentIds = new Set();
+let currentRenderedMomentsList = [];
 const managedMomentVideos = new Set();
 let momentVideoObserver = null;
 const momentVideoMotionPreference = typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-reduced-motion: reduce)')
     : null;
+
+function isDefaultFilter() {
+    return !currentFilters.year
+        && !currentFilters.month
+        && (!Array.isArray(currentFilters.authors) || currentFilters.authors.length === 0)
+        && (!Array.isArray(currentFilters.types) || currentFilters.types.length === 0)
+        && !currentFilters.keyword;
+}
+
+function saveTimelineSnapshot() {
+    if (!isDefaultFilter() || !hasMomentAuthContext() || !currentRenderedMomentsList.length) return;
+    try {
+        const scrollY = Math.max(0, window.scrollY || window.pageYOffset || 0);
+        const snapshot = {
+            userId: currentAuthUser?.id,
+            author: currentAuthor,
+            timestamp: Date.now(),
+            scrollY,
+            currentPage,
+            hasMore,
+            momentTimelineCursor,
+            moments: currentRenderedMomentsList.slice(0, MAX_SNAPSHOT_MOMENTS)
+        };
+        sessionStorage.setItem(MOMENTS_SNAPSHOT_KEY, JSON.stringify(snapshot));
+        sessionStorage.setItem(MOMENTS_SCROLL_KEY, String(scrollY));
+        if (typeof setRouterHomeScroll === 'function') setRouterHomeScroll(scrollY);
+    } catch (e) {
+        console.warn('保存时光轴本地快照失败:', e);
+    }
+}
+
+function clearTimelineSnapshot() {
+    try {
+        sessionStorage.removeItem(MOMENTS_SNAPSHOT_KEY);
+        sessionStorage.removeItem(MOMENTS_SCROLL_KEY);
+    } catch (_e) {}
+}
+
+function readTimelineSnapshot() {
+    if (!isDefaultFilter() || !hasMomentAuthContext()) return null;
+    try {
+        const raw = sessionStorage.getItem(MOMENTS_SNAPSHOT_KEY);
+        if (!raw) return null;
+        const snapshot = JSON.parse(raw);
+        if (!snapshot || typeof snapshot !== 'object') return null;
+        if (snapshot.userId !== currentAuthUser?.id) return null;
+        if (!Array.isArray(snapshot.moments) || snapshot.moments.length === 0) return null;
+        if (Date.now() - snapshot.timestamp > SNAPSHOT_MAX_AGE_MS) return null;
+        return snapshot;
+    } catch (_e) {
+        return null;
+    }
+}
+
+function showNewMomentsPill() {
+    const pill = document.getElementById('new-moments-pill');
+    if (pill) {
+        pill.hidden = false;
+        pill.classList.add('show');
+    }
+}
+
+function hideNewMomentsPill() {
+    const pill = document.getElementById('new-moments-pill');
+    if (pill) {
+        pill.hidden = true;
+        pill.classList.remove('show');
+    }
+}
+
+window.refreshLatestMoments = async function() {
+    hideNewMomentsPill();
+    clearTimelineSnapshot();
+    if (typeof setRouterHomeScroll === 'function') setRouterHomeScroll(0);
+    try {
+        window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    } catch (_e) {
+        window.scrollTo(0, 0);
+    }
+    await fetchMoments(false, { forceRefresh: true });
+};
+
+async function checkNewMomentsInBackground(topmostRenderedId) {
+    if (!topmostRenderedId || !hasMomentAuthContext() || !supabaseClient) return;
+    try {
+        const { data, error } = await supabaseClient
+            .from('moments')
+            .select('id, created_at')
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(1);
+
+        if (error || !data || data.length === 0) return;
+        const latestId = normalizeMomentId(data[0]?.id);
+        const topId = normalizeMomentId(topmostRenderedId);
+        if (latestId && topId && latestId !== topId && !renderedMomentIds.has(latestId)) {
+            showNewMomentsPill();
+        } else {
+            hideNewMomentsPill();
+        }
+    } catch (e) {
+        console.warn('静默检测最新动态失败:', e);
+    }
+}
+
+function renderTimelineFromSnapshot(snapshot) {
+    const contentDiv = document.getElementById('timeline-content');
+    if (!contentDiv) return false;
+
+    if (scrollObserver) scrollObserver.disconnect();
+    if (typeof clearAllCommentImageSelections === 'function') clearAllCommentImageSelections();
+    releaseMomentVideosWithin(contentDiv, true);
+    contentDiv.replaceChildren();
+
+    renderedMomentIds.clear();
+    currentRenderedMomentsList = [...snapshot.moments];
+    currentPage = typeof snapshot.currentPage === 'number' ? snapshot.currentPage : 1;
+    hasMore = Boolean(snapshot.hasMore);
+    momentTimelineCursor = snapshot.momentTimelineCursor || null;
+
+    const fragment = document.createDocumentFragment();
+    currentRenderedMomentsList.forEach((item, cardIndex) => {
+        const itemId = normalizeMomentId(item?.id);
+        if (itemId) renderedMomentIds.add(itemId);
+        const card = createMomentCardElement(item, { cardIndex, isInitialBatch: cardIndex < 3 });
+        if (card) fragment.appendChild(card);
+    });
+
+    contentDiv.appendChild(fragment);
+
+    // 重新添加加载更多提示
+    if (hasMore) {
+        const loader = createMomentNode('div', 'load-more-indicator');
+        loader.append(
+            createMomentNode('span', 'load-more-spinner'),
+            document.createTextNode('下滑加载更多回忆…')
+        );
+        contentDiv.appendChild(loader);
+    }
+
+    const newVideos = Array.from(contentDiv.querySelectorAll('video'));
+    newVideos.forEach(video => refreshMomentVideoPlayback(video));
+
+    // 恢复滚动高度（立即生效 + 下一帧校准）
+    const targetScrollY = Math.max(0, snapshot.scrollY || 0);
+    if (targetScrollY > 0) {
+        if (typeof setRouterHomeScroll === 'function') setRouterHomeScroll(targetScrollY);
+        try {
+            window.scrollTo({ top: targetScrollY, left: 0, behavior: 'instant' });
+        } catch (_e) {
+            window.scrollTo(0, targetScrollY);
+        }
+        requestAnimationFrame(() => {
+            try {
+                window.scrollTo({ top: targetScrollY, left: 0, behavior: 'instant' });
+            } catch (_e) {
+                window.scrollTo(0, targetScrollY);
+            }
+        });
+    }
+
+    setTimeout(() => initScrollReveal(), 50);
+
+    // 批量加载评论和点赞
+    const ids = currentRenderedMomentsList.map(item => item.id).filter(Boolean);
+    if (typeof loadCommentCounts === 'function') loadCommentCounts(ids);
+    if (typeof loadMomentLikes === 'function') loadMomentLikes(ids);
+    setupScrollObserver();
+
+    return true;
+}
 
 function isMomentVideoDisplayed(video) {
     if (!video?.isConnected || video.hidden) return false;
@@ -1175,6 +1353,30 @@ document.addEventListener('visibilitychange', () => {
             refreshMomentVideoPlayback(video);
         }
     });
+
+    if (document.hidden) {
+        saveTimelineSnapshot();
+    } else {
+        // 切回应用时，若在主页且处于下滚位置但被浏览器置0，立即补偿恢复
+        if (isDefaultFilter() && hasMomentAuthContext()) {
+            const savedY = Number(sessionStorage.getItem(MOMENTS_SCROLL_KEY));
+            const currentY = window.scrollY || window.pageYOffset || 0;
+            if (Number.isFinite(savedY) && savedY > 100 && currentY < 50) {
+                const content = document.getElementById('timeline-content');
+                if (content && content.children.length > 1) {
+                    try {
+                        window.scrollTo({ top: savedY, behavior: 'instant' });
+                    } catch (_e) {
+                        window.scrollTo(0, savedY);
+                    }
+                }
+            }
+        }
+    }
+});
+
+window.addEventListener('pagehide', () => {
+    saveTimelineSnapshot();
 });
 
 if (momentVideoMotionPreference) {
@@ -1689,7 +1891,10 @@ function locateMomentOnTimeline(moment, options = {}) {
     const backWrap = createMomentNode('div', 'blind-box-back moment-locate-back');
     const backButton = createMomentNode('button', '', options.backLabel || '🔙 返回动态列表');
     backButton.type = 'button';
-    backButton.addEventListener('click', () => fetchMoments(false));
+    backButton.addEventListener('click', () => {
+        clearTimelineSnapshot();
+        fetchMoments(false, { forceRefresh: true });
+    });
     backWrap.appendChild(backButton);
     content.replaceChildren(backWrap, card);
 
@@ -1908,7 +2113,8 @@ function applyFilters() {
 
     closeFilterModal();
     updateFilterIndicator();
-    fetchMoments(false); // 重置并根据新条件拉取
+    clearTimelineSnapshot();
+    fetchMoments(false, { forceRefresh: true }); // 重置并根据新条件拉取
 }
 
 function updateFilterIndicator() {
@@ -1955,7 +2161,7 @@ function updateFilterIndicator() {
 let activeMomentFetchRequest = 0;
 let momentLoadingAuthEpoch = null;
 
-async function fetchMoments(append = false) {
+async function fetchMoments(append = false, options = {}) {
     const contentDiv = document.getElementById('timeline-content');
     if (!hasMomentAuthContext()) {
         if (scrollObserver) scrollObserver.disconnect();
@@ -1966,6 +2172,20 @@ async function fetchMoments(append = false) {
         }
         return;
     }
+
+    // ── 智能零延迟秒开恢复：无筛选、非追加、非强刷时优先读取本地快照 ──
+    if (!append && !options.forceRefresh && isDefaultFilter()) {
+        const snapshot = readTimelineSnapshot();
+        if (snapshot) {
+            const restored = renderTimelineFromSnapshot(snapshot);
+            if (restored) {
+                const topId = snapshot.moments[0]?.id;
+                checkNewMomentsInBackground(topId);
+                return;
+            }
+        }
+    }
+
     const requestAuthEpoch = getMomentAuthEpoch();
     if (append && isLoading && momentLoadingAuthEpoch === requestAuthEpoch) return;
     if (append && !hasMore) return;
@@ -1987,11 +2207,13 @@ async function fetchMoments(append = false) {
     };
 
     if (!append) {
+        hideNewMomentsPill();
         if (typeof clearAllCommentImageSelections === 'function') clearAllCommentImageSelections();
         currentPage = 0;
         hasMore = true;
         momentTimelineCursor = null;
         renderedMomentIds.clear();
+        currentRenderedMomentsList = [];
         releaseMomentVideosWithin(contentDiv, true);
         contentDiv.replaceChildren(createMomentNode('div', 'empty-state', '正在加载甜蜜回忆…'));
     }
@@ -2169,6 +2391,13 @@ async function fetchMoments(append = false) {
 
     currentPage++;
 
+    if (!append) {
+        currentRenderedMomentsList = [...renderData];
+    } else {
+        currentRenderedMomentsList = currentRenderedMomentsList.concat(renderData).slice(0, MAX_SNAPSHOT_MOMENTS);
+    }
+    saveTimelineSnapshot();
+
     // 批量加载评论计数
     loadCommentCounts(renderData.map(item => item.id));
 
@@ -2223,7 +2452,11 @@ async function deleteMoment(id) {
             card.style.transition = 'opacity 0.3s, transform 0.3s';
             card.style.opacity = '0';
             card.style.transform = 'translateX(-16px)';
-            setTimeout(() => fetchMoments(), 300);
-        } else fetchMoments();
+            clearTimelineSnapshot();
+            setTimeout(() => fetchMoments(false, { forceRefresh: true }), 300);
+        } else {
+            clearTimelineSnapshot();
+            fetchMoments(false, { forceRefresh: true });
+        }
     }
 }

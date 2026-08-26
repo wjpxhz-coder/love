@@ -342,6 +342,10 @@ function clearUserLocalState() {
         }
     }
     keysToRemove.forEach(key => localStorage.removeItem(key));
+    try {
+        sessionStorage.removeItem('sweet_diary_timeline_snapshot');
+        sessionStorage.removeItem('sweet_diary_home_scroll_y');
+    } catch (_e) {}
 }
 
 function scrubPrivateDom() {

@@ -292,15 +292,15 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.46';
+const APP_VERSION = 'v3.9.50';
 const CONFIG = {
-    version: 'v3.9.46',
+    version: 'v3.9.50',
     date: '2026-08-26',
-    title: 'AI 体验极简升级，默认即享智能对话 🤖✨',
+    title: '智能时光轴快照与滚动位置秒级复原 📱✨',
     features: [
-        'Agnes 2.0 AI 服务调整为默认启用，无需繁琐设置，开箱即用 💬',
-        '系统设置全面精简 AI 隐私文案，界面清爽易懂，随时自由控制 ⚙️',
-        '优化 AI 交互提示语与状态反馈体验 🌸'
+        '新增会话级时光轴智能快照，切应用或后台挂起切回时 0 毫秒瞬间恢复阅读位置，无需重新下拉 🚀',
+        '极省流后台静默探针，切回网页 0 额外网络消耗，有新动态时温和胶囊提示 🌸',
+        '优化路由与焦点控制，杜绝切回页面时的跳顶问题 💡'
     ]
 };
 const UPDATE_LOG = CONFIG;
