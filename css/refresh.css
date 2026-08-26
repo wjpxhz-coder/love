@@ -1650,7 +1650,7 @@ body[data-auth-state='locked'] #notification-bell {
 }
 
 #lightbox {
-    background: rgba(18, 13, 15, 0.92);
+    background: rgba(14, 10, 13, 0.95);
     transition:
         opacity 0.22s ease,
         visibility 0s linear 0.22s;

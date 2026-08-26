@@ -9,16 +9,26 @@ function setLightboxBackgroundInert(active) {
 
     if (active) {
         lightboxInertState = Array.from(document.body.children)
-            .filter(element => element !== lightbox && element.tagName !== 'SCRIPT')
-            .map(element => ({ element, wasInert: element.inert }));
+            .filter(element => {
+                if (element === lightbox) return false;
+                const tag = element.tagName;
+                if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'CANVAS' || tag === 'NOSCRIPT') return false;
+                return true;
+            })
+            .map(element => ({ element, wasInert: Boolean(element.inert) }));
+
         lightboxInertState.forEach(({ element }) => {
-            element.inert = true;
+            try {
+                element.inert = true;
+            } catch (_) {}
         });
         return;
     }
 
     lightboxInertState.forEach(({ element, wasInert }) => {
-        if (element.isConnected) element.inert = wasInert;
+        try {
+            if (element.isConnected) element.inert = wasInert;
+        } catch (_) {}
     });
     lightboxInertState = [];
 }
@@ -50,6 +60,14 @@ function openLightbox(src) {
     const downloadBtn = document.getElementById('lightbox-download-btn');
     const openBtn = document.getElementById('lightbox-open-btn');
     if (!safeSrc || !lightbox || !img || !video) return;
+
+    // 暂停后台樱花及粒子 Canvas 动画，彻底消除移动端 GPU/显存叠加开销
+    if (window.homeSakuraEffect?.setSuspended) {
+        window.homeSakuraEffect.setSuspended(true);
+    }
+    if (typeof pauseProfileParticles === 'function') {
+        pauseProfileParticles();
+    }
 
     if (!lightbox.classList.contains('show')) {
         lightboxPreviousFocus = document.activeElement;
@@ -98,6 +116,8 @@ function openLightbox(src) {
             playPromise.catch(() => {});
         }
     } else {
+        img.decoding = 'async';
+        img.loading = 'eager';
         img.src = safeSrc;
         img.style.display = 'block';
     }
@@ -130,12 +150,23 @@ function closeLightbox(event) {
         video.style.display = 'none';
     }
     if (img) {
+        // 释放图片解码占用的 GPU 纹理与 RAM 位图
+        img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
         img.removeAttribute('src');
         img.style.display = 'none';
     }
     setLightboxBackgroundInert(false);
     document.body.style.overflow = lightboxPreviousBodyOverflow;
     lightboxPreviousBodyOverflow = '';
+
+    // 恢复后台樱花及粒子 Canvas 动画
+    if (window.homeSakuraEffect?.setSuspended) {
+        window.homeSakuraEffect.setSuspended(false);
+    }
+    if (typeof profileParticlesRequested !== 'undefined' && profileParticlesRequested && typeof startProfileParticles === 'function') {
+        startProfileParticles();
+    }
+
     if (lightboxPreviousFocus && typeof lightboxPreviousFocus.focus === 'function') {
         lightboxPreviousFocus.focus({ preventScroll: true });
     }

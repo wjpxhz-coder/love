@@ -2,28 +2,34 @@
 #lightbox {
     position: fixed;
     inset: 0;
-    background: rgba(28, 14, 24, 0.88);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    background: rgba(14, 10, 13, 0.94);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 2000;
     opacity: 0;
     visibility: hidden;
-    transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+    transition: opacity 0.25s ease, visibility 0.25s ease;
     cursor: zoom-out;
+    touch-action: none;
+    overscroll-behavior: contain;
 }
 
 #lightbox.show { opacity: 1; visibility: visible; }
 
 #lightbox img {
-    max-width: 90vw;
+    max-width: 92vw;
     max-height: 88vh;
-    border-radius: 20px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    max-height: 88dvh;
+    border-radius: 16px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
     object-fit: contain;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    touch-action: pinch-zoom;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    transform: translateZ(0);
 }
 
 /* ── 弹窗 ── */
