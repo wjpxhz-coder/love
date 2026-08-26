@@ -1665,6 +1665,67 @@ body[data-auth-state='locked'] #notification-bell {
     border-radius: 14px;
 }
 
+.lightbox-fallback {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30, 20, 25, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 182, 193, 0.35);
+    border-radius: 16px;
+    padding: 14px 20px;
+    color: #fff;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    z-index: 100;
+    max-width: 90%;
+    width: 460px;
+    animation: fadeInUp 0.3s ease;
+}
+.lightbox-fallback-msg {
+    font-size: 0.9rem;
+    line-height: 1.4;
+    margin-bottom: 10px;
+    color: #ffd6de;
+}
+.lightbox-fallback-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.lightbox-fallback-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(255, 117, 140, 0.4);
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.lightbox-fallback-btn:hover {
+    transform: translateY(-1px);
+    opacity: 0.95;
+    color: #fff;
+}
+.lightbox-fallback-btn.secondary {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffd6de;
+    box-shadow: none;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.lightbox-fallback-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+}
+
 /* ── 平板与手机 ───────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {

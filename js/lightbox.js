@@ -46,6 +46,9 @@ function openLightbox(src) {
     const lightbox = document.getElementById('lightbox');
     const img = document.getElementById('lightbox-img');
     const video = document.getElementById('lightbox-video');
+    const fallback = document.getElementById('lightbox-fallback');
+    const downloadBtn = document.getElementById('lightbox-download-btn');
+    const openBtn = document.getElementById('lightbox-open-btn');
     if (!safeSrc || !lightbox || !img || !video) return;
 
     if (!lightbox.classList.contains('show')) {
@@ -57,6 +60,7 @@ function openLightbox(src) {
     lightbox.inert = false;
     img.style.display = 'none';
     img.removeAttribute('src');
+    if (fallback) fallback.style.display = 'none';
     video.pause();
     video.style.display = 'none';
     video.removeAttribute('src');
@@ -74,8 +78,18 @@ function openLightbox(src) {
 
         video.onerror = () => {
             console.warn('[Lightbox] 视频加载失败，可能是当前浏览器不支持该视频编码 (如苹果 MOV/HEVC):', cleanVideoSrc);
+            if (fallback) {
+                if (downloadBtn) {
+                    downloadBtn.href = cleanVideoSrc;
+                    downloadBtn.setAttribute('download', cleanVideoSrc.split('/').pop() || 'video.mp4');
+                }
+                if (openBtn) {
+                    openBtn.href = cleanVideoSrc;
+                }
+                fallback.style.display = 'block';
+            }
             if (typeof showToast === 'function') {
-                showToast('该视频格式在当前浏览器无法直接播放，可在手机端查看或长按/右键保存', 4500);
+                showToast('该视频格式在当前浏览器无法直接播放，已提供下载/原片查看通道', 4500);
             }
         };
 
@@ -94,16 +108,20 @@ function openLightbox(src) {
 }
 
 function closeLightbox(event) {
-    if (event && event.target && event.target.id === 'lightbox-video') return;
+    if (event && event.target && (event.target.id === 'lightbox-video' || event.target.closest('#lightbox-fallback'))) return;
     if (event?.target?.id === 'lightbox-close') event.stopPropagation();
     const lightbox = document.getElementById('lightbox');
     const img = document.getElementById('lightbox-img');
     const video = document.getElementById('lightbox-video');
+    const fallback = document.getElementById('lightbox-fallback');
     if (!lightbox || !lightbox.classList.contains('show')) return;
 
     lightbox.classList.remove('show');
     lightbox.setAttribute('aria-hidden', 'true');
     lightbox.inert = true;
+    if (fallback) {
+        fallback.style.display = 'none';
+    }
     if (video) {
         video.onerror = null;
         video.pause();

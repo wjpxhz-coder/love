@@ -680,8 +680,8 @@ async function compressVideoFile(file, onProgress) {
     const ext = getMomentFileExtension(file) || '';
     const isAppleFormat = ['mov', 'quicktime', 'm4v', 'hevc'].includes(ext) || (file.type && (file.type.includes('quicktime') || file.type.includes('hevc')));
 
-    // 仅当是标准 mp4 且体积 <= 3MB 时才跳过转码；若是苹果格式或大体积视频，一律强制转码为全平台通用的 H.264 MP4
-    if (!isAppleFormat && file.size <= 3 * 1024 * 1024 && file.type === 'video/mp4') {
+    // 仅当明确是标准 mp4 (video/mp4 且不是苹果封装/编码) 且体积 <= 2MB 时才跳过转码；否则一律强制转码为全平台通用的 H.264 MP4
+    if (!isAppleFormat && file.size <= 2 * 1024 * 1024 && file.type === 'video/mp4') {
         return file;
     }
 
@@ -788,14 +788,21 @@ async function submitMomentPost() {
             const totalFiles = momentSelectedFiles.length;
             const processedFiles = [];
 
-            // 第一阶段：客户端智能优化（超清压缩图片，智能优化 3MB+ 视频）
+            // 第一阶段：客户端智能优化（超清压缩图片，全平台兼容性转码视频）
             for (let i = 0; i < totalFiles; i++) {
                 let file = momentSelectedFiles[i];
-                if (isMomentVideoFile(file) && file.size > 3 * 1024 * 1024) {
-                    btn.textContent = `⏳ 准备优化视频 (${i + 1}/${totalFiles})...`;
-                    file = await compressVideoFile(file, (progress) => {
-                        btn.textContent = `⏳ 视频优化中 ${progress}% (${i + 1}/${totalFiles})...`;
-                    });
+                if (isMomentVideoFile(file)) {
+                    const ext = getMomentFileExtension(file) || '';
+                    const isAppleFormat = ['mov', 'quicktime', 'm4v', 'hevc'].includes(ext)
+                        || (file.type && (file.type.includes('quicktime') || file.type.includes('hevc')));
+                    const needCompress = isAppleFormat || file.size > 2 * 1024 * 1024 || file.type !== 'video/mp4';
+
+                    if (needCompress) {
+                        btn.textContent = `⏳ 准备优化视频 (${i + 1}/${totalFiles})...`;
+                        file = await compressVideoFile(file, (progress) => {
+                            btn.textContent = `⏳ 视频兼容性转码 ${progress}% (${i + 1}/${totalFiles})...`;
+                        });
+                    }
                 } else if (file.type.startsWith('image/')) {
                     btn.textContent = `⏳ 正在优化画质 (${i + 1}/${totalFiles})...`;
                     file = await compressImageFile(file);
@@ -1262,7 +1269,12 @@ function createMomentMedia(rawUrl, className, options = {}) {
         if (media.readyState >= 1) {
             handleVideoLoaded();
         } else {
-            media.addEventListener('loadedmetadata', handleVideoLoaded, { once: true });
+            media.addEventListener('loadedmetadata', () => {
+                handleVideoLoaded();
+                if (!options.controls && media.currentTime === 0) {
+                    try { media.currentTime = 0.001; } catch (_) {}
+                }
+            }, { once: true });
             media.addEventListener('loadeddata', handleVideoLoaded, { once: true });
             media.addEventListener('canplay', handleVideoLoaded, { once: true });
             media.addEventListener('error', handleVideoLoaded, { once: true });
@@ -1453,7 +1465,12 @@ function createMomentCardElement(item, options = {}) {
                 priority: isPriorityCard
             });
             if (single) {
-                if (single.tagName === 'VIDEO') Object.assign(single.style, { width: '100%', borderRadius: '12px', marginTop: '10px' });
+                if (single.tagName === 'VIDEO') {
+                    Object.assign(single.style, { width: '100%', borderRadius: '12px', marginTop: '10px' });
+                    single.addEventListener('error', () => {
+                        single.title = '若此视频在当前浏览器无法直接播放，可点击视频打开灯箱查看下载/原片选项';
+                    }, { once: true });
+                }
                 card.appendChild(single);
             }
         } else if (images.length > 1) {

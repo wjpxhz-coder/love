@@ -557,6 +557,13 @@
     <button id="lightbox-close" class="lightbox-close" type="button" onclick="closeLightbox(event)" aria-label="关闭媒体预览">×</button>
     <img id="lightbox-img" src="" alt="回忆放大" style="display:none;">
     <video id="lightbox-video" src="" controls style="display:none; max-width:90%; max-height:90%; border-radius:12px; margin: auto; position: absolute; top: 0; bottom: 0; left: 0; right: 0;"></video>
+    <div id="lightbox-fallback" class="lightbox-fallback" style="display:none;" onclick="event.stopPropagation()">
+        <div class="lightbox-fallback-msg">⚠️ 该视频可能为苹果专有格式 (HEVC/MOV)，电脑浏览器暂无法直接解码画面</div>
+        <div class="lightbox-fallback-actions">
+            <a id="lightbox-download-btn" class="lightbox-fallback-btn" href="#" download target="_blank" rel="noopener noreferrer">📥 下载原视频到电脑播放</a>
+            <a id="lightbox-open-btn" class="lightbox-fallback-btn secondary" href="#" target="_blank" rel="noopener noreferrer">🔗 新标签页打开</a>
+        </div>
+    </div>
 </div>
 
 <!-- 浪漫登录页面 -->
