@@ -45,7 +45,7 @@ function getAIServiceConsentKey() {
 
 function hasAIServiceConsent() {
     const key = getAIServiceConsentKey();
-    return Boolean(key && localStorage.getItem(key) === 'granted');
+    return Boolean(key && localStorage.getItem(key) !== 'disabled');
 }
 
 function syncAIPrivacySetting() {
@@ -59,9 +59,10 @@ function setAIServiceConsent(enabled) {
 
     aiInteractionGeneration += 1;
     activeChatRequestId += 1;
-    if (enabled) localStorage.setItem(key, 'granted');
-    else {
-        localStorage.removeItem(key);
+    if (enabled) {
+        localStorage.setItem(key, 'granted');
+    } else {
+        localStorage.setItem(key, 'disabled');
         chatHistory = [];
         isChatSending = false;
         clearPendingChatAttachments();
@@ -72,7 +73,7 @@ function setAIServiceConsent(enabled) {
     }
     syncAIPrivacySetting();
     if (typeof showToast === 'function') {
-        showToast(enabled ? 'Agnes 2.0 服务已开启，可随时在设置中关闭。' : 'Agnes 2.0 服务已关闭，不会再发送文字或图片。');
+        showToast(enabled ? 'Agnes 2.0 服务已开启。' : 'Agnes 2.0 服务已关闭。');
     }
 }
 
@@ -166,8 +167,8 @@ function normalizeAIErrorCode(error) {
 function getFriendlyAIError(error) {
     const code = normalizeAIErrorCode(error);
     const messages = {
-        AI_CONSENT_REQUIRED: '请先在“头像 → 设置 → AI 隐私”中开启 Agnes 2.0。',
-        AGNES_CONSENT_VERSION_REQUIRED: '请刷新或重新打开网站，阅读新版 Agnes 2.0 隐私说明后再开启服务。',
+        AI_CONSENT_REQUIRED: '请先在“头像 → 设置 → AI 助手”中开启 Agnes 2.0。',
+        AGNES_CONSENT_VERSION_REQUIRED: '请刷新或重新打开网站后再试。',
         AUTH_REQUIRED: '登录状态已失效，请重新登录后再试。',
         AUTH_INVALID: '登录状态已失效，请重新登录后再试。',
         INVALID_TOKEN: '登录状态已失效，请重新登录后再试。',
@@ -444,7 +445,7 @@ async function switchAITab(tabName, forceRefresh = false) {
         }
 
         if (!hasAIServiceConsent()) {
-            setAIContent('AI 服务默认关闭。请先在“头像 → 设置 → AI 隐私”中阅读说明并主动开启。');
+            setAIContent('AI 服务已关闭。如需使用，请在“头像 → 设置 → AI 助手”中开启。');
             return;
         }
 
@@ -486,7 +487,7 @@ async function switchAITab(tabName, forceRefresh = false) {
     } catch (error) {
         if (error.message === 'AUTH_REQUIRED' || !stillCurrent()) return;
         if (error.message === 'AI_CONSENT_REQUIRED') {
-            setAIContent('AI 服务默认关闭。请先在“头像 → 设置 → AI 隐私”中阅读说明并主动开启。');
+            setAIContent('AI 服务已关闭。如需使用，请在“头像 → 设置 → AI 助手”中开启。');
             return;
         }
         console.error('Agnes 2.0 模块出错:', normalizeAIErrorCode(error));
@@ -701,7 +702,7 @@ function openAILocalImagePicker() {
         return;
     }
     if (!hasAIServiceConsent()) {
-        notifyAIImageSelection('请先在“头像 → 设置 → AI 隐私”中开启 Agnes 2.0。');
+        notifyAIImageSelection('请先在“头像 → 设置 → AI 助手”中开启 Agnes 2.0。');
         return;
     }
     document.getElementById('aiLocalImageInput')?.click();
@@ -717,7 +718,7 @@ function handleAILocalImageSelect(event) {
         return;
     }
     if (!hasAIServiceConsent()) {
-        notifyAIImageSelection('请先在“头像 → 设置 → AI 隐私”中开启 Agnes 2.0。');
+        notifyAIImageSelection('请先在“头像 → 设置 → AI 助手”中开启 Agnes 2.0。');
         return;
     }
 
@@ -1026,7 +1027,7 @@ function openAIDiaryPicker() {
         return;
     }
     if (!hasAIServiceConsent()) {
-        notifyAIImageSelection('请先在“头像 → 设置 → AI 隐私”中开启 Agnes 2.0。');
+        notifyAIImageSelection('请先在“头像 → 设置 → AI 助手”中开启 Agnes 2.0。');
         return;
     }
     const picker = document.getElementById('aiDiaryPicker');
@@ -1229,7 +1230,7 @@ async function sendChatMessage() {
         return;
     }
     if (!hasAIServiceConsent()) {
-        notifyAIImageSelection('请先在“头像 → 设置 → AI 隐私”中阅读说明并开启 Agnes 2.0。');
+        notifyAIImageSelection('请先在“头像 → 设置 → AI 助手”中开启 Agnes 2.0。');
         return;
     }
 
