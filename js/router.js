@@ -33,7 +33,6 @@
         'fab-container',
         'login-trigger-btn',
         'user-avatar-btn',
-        'user-dropdown',
         'notification-bell',
         'notification-panel',
         'theme-toggle'

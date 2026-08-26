@@ -61,24 +61,24 @@
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
-    <link rel="stylesheet" href="css/refresh.css?v=3.9.48">
-    <link rel="stylesheet" href="css/variables.css?v=3.9.48">
-    <link rel="stylesheet" href="css/base.css?v=3.9.48">
-    <link rel="stylesheet" href="css/header.css?v=3.9.48">
-    <link rel="stylesheet" href="css/timer.css?v=3.9.48">
-    <link rel="stylesheet" href="css/timeline.css?v=3.9.48">
-    <link rel="stylesheet" href="css/dialogs.css?v=3.9.48">
-    <link rel="stylesheet" href="css/comments.css?v=3.9.48">
-    <link rel="stylesheet" href="css/ai-panel.css?v=3.9.48">
-    <link rel="stylesheet" href="css/fab.css?v=3.9.48">
-    <link rel="stylesheet" href="css/auth.css?v=3.9.48">
-    <link rel="stylesheet" href="css/profile.css?v=3.9.48">
-    <link rel="stylesheet" href="css/notifications.css?v=3.9.48">
-    <link rel="stylesheet" href="css/mood.css?v=3.9.48">
-    <link rel="stylesheet" href="css/anniversary.css?v=3.9.48">
-    <link rel="stylesheet" href="css/effects.css?v=3.9.48">
-    <link rel="stylesheet" href="css/responsive.css?v=3.9.48">
-    <link rel="stylesheet" href="css/pages.css?v=3.9.48">
+    <link rel="stylesheet" href="css/refresh.css?v=3.9.49">
+    <link rel="stylesheet" href="css/variables.css?v=3.9.49">
+    <link rel="stylesheet" href="css/base.css?v=3.9.49">
+    <link rel="stylesheet" href="css/header.css?v=3.9.49">
+    <link rel="stylesheet" href="css/timer.css?v=3.9.49">
+    <link rel="stylesheet" href="css/timeline.css?v=3.9.49">
+    <link rel="stylesheet" href="css/dialogs.css?v=3.9.49">
+    <link rel="stylesheet" href="css/comments.css?v=3.9.49">
+    <link rel="stylesheet" href="css/ai-panel.css?v=3.9.49">
+    <link rel="stylesheet" href="css/fab.css?v=3.9.49">
+    <link rel="stylesheet" href="css/auth.css?v=3.9.49">
+    <link rel="stylesheet" href="css/profile.css?v=3.9.49">
+    <link rel="stylesheet" href="css/notifications.css?v=3.9.49">
+    <link rel="stylesheet" href="css/mood.css?v=3.9.49">
+    <link rel="stylesheet" href="css/anniversary.css?v=3.9.49">
+    <link rel="stylesheet" href="css/effects.css?v=3.9.49">
+    <link rel="stylesheet" href="css/responsive.css?v=3.9.49">
+    <link rel="stylesheet" href="css/pages.css?v=3.9.49">
 </head>
 <body class="auth-pending">
 <a class="skip-link" id="skip-link" href="#main-content">跳到主要内容</a>
@@ -97,8 +97,8 @@
 <button id="login-trigger-btn" class="login-trigger-btn" type="button" onclick="openLoginModal()" aria-label="登录">👤</button>
 
 <!-- 登录后头像按钮 -->
-<button id="user-avatar-btn" class="user-avatar-btn" type="button" onclick="toggleUserDropdown()"
-        aria-label="打开用户菜单" aria-controls="user-dropdown" aria-expanded="false">
+<button id="user-avatar-btn" class="user-avatar-btn" type="button" onclick="openProfilePage()"
+        aria-label="个人主页">
     <span class="avatar-placeholder" aria-hidden="true">🌸</span>
 </button>
 
@@ -111,13 +111,6 @@
 
 <button id="theme-toggle" class="theme-toggle" type="button" onclick="toggleTheme()"
         aria-label="切换到深色主题" aria-pressed="false">🌙</button>
-
-<!-- 用户下拉菜单 -->
-<div id="user-dropdown" class="user-dropdown" aria-hidden="true">
-    <div id="user-name-label" class="user-name-label">已登录</div>
-    <button type="button" class="user-dropdown-item" onclick="openProfilePage(); hideUserDropdown();">🌸 个人主页</button>
-    <button type="button" class="user-dropdown-item logout" onclick="doLogout()">🚪 退出登录</button>
-</div>
 
 <!-- 通知面板 -->
 <aside id="notification-panel" class="notification-panel" aria-labelledby="notification-title" aria-hidden="true">
@@ -838,27 +831,27 @@
     </div>
 </section>
 
-<script src="js/config.js?v=3.9.48"></script>
-<script src="js/animations.js?v=3.9.48"></script>
-<script src="js/timer.js?v=3.9.48"></script>
-<script src="js/auth.js?v=3.9.48"></script>
-<script src="js/profile.js?v=3.9.48"></script>
-<script src="js/moments.js?v=3.9.48"></script>
-<script src="js/milestones.js?v=3.9.48"></script>
-<script src="js/comments.js?v=3.9.48"></script>
-<script src="js/likes.js?v=3.9.48"></script>
-<script src="js/mood.js?v=3.9.48"></script>
-<script src="js/anniversary.js?v=3.9.48"></script>
-<script src="js/lightbox.js?v=3.9.48"></script>
-<script src="js/ai.js?v=3.9.48"></script>
-<script src="js/blindbox.js?v=3.9.48"></script>
-<script src="js/presence.js?v=3.9.48"></script>
-<script src="js/theme.js?v=3.9.48"></script>
-<script src="js/notifications.js?v=3.9.48"></script>
-<script src="js/effects.js?v=3.9.48"></script>
-<script src="js/settings.js?v=3.9.48"></script>
-<script src="js/router.js?v=3.9.48"></script>
-<script src="js/app.js?v=3.9.48"></script>
+<script src="js/config.js?v=3.9.49"></script>
+<script src="js/animations.js?v=3.9.49"></script>
+<script src="js/timer.js?v=3.9.49"></script>
+<script src="js/auth.js?v=3.9.49"></script>
+<script src="js/profile.js?v=3.9.49"></script>
+<script src="js/moments.js?v=3.9.49"></script>
+<script src="js/milestones.js?v=3.9.49"></script>
+<script src="js/comments.js?v=3.9.49"></script>
+<script src="js/likes.js?v=3.9.49"></script>
+<script src="js/mood.js?v=3.9.49"></script>
+<script src="js/anniversary.js?v=3.9.49"></script>
+<script src="js/lightbox.js?v=3.9.49"></script>
+<script src="js/ai.js?v=3.9.49"></script>
+<script src="js/blindbox.js?v=3.9.49"></script>
+<script src="js/presence.js?v=3.9.49"></script>
+<script src="js/theme.js?v=3.9.49"></script>
+<script src="js/notifications.js?v=3.9.49"></script>
+<script src="js/effects.js?v=3.9.49"></script>
+<script src="js/settings.js?v=3.9.49"></script>
+<script src="js/router.js?v=3.9.49"></script>
+<script src="js/app.js?v=3.9.49"></script>
 
 </body>
 </html>

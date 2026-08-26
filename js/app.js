@@ -62,7 +62,6 @@ if ('serviceWorker' in navigator) {
 
 function initAccessibleUiState() {
     const classBindings = [
-        { target: 'user-dropdown', control: 'user-avatar-btn', activeClass: 'show' },
         { target: 'notification-panel', control: 'notification-bell', activeClass: 'show' },
         { target: 'fab-menu', control: 'fab-main', activeClass: 'show' },
         { target: 'profile-page', activeClass: 'is-active' },
