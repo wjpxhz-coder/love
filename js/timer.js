@@ -4,11 +4,12 @@
 function flipUpdate(id, newVal) {
     const el = document.getElementById(id);
     if (!el) return;
-    if (el.innerText !== newVal) {
-        el.innerText = newVal;
+    if (el.textContent !== newVal) {
+        el.textContent = newVal;
         el.classList.remove('flip');
-        void el.offsetWidth;
-        el.classList.add('flip');
+        requestAnimationFrame(() => {
+            el.classList.add('flip');
+        });
     }
 }
 

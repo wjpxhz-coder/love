@@ -6,7 +6,7 @@ const animationsReducedMotionQuery = typeof window.matchMedia === 'function'
     : null;
 
 function getAnimationDevicePixelRatio() {
-    return Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+    return Math.min(Math.max(window.devicePixelRatio || 1, 1), 1.25);
 }
 
 function sizeAnimationCanvas(canvas, context, width, height) {
@@ -56,7 +56,7 @@ function sizeAnimationCanvas(canvas, context, width, height) {
             || hash.startsWith('#/?');
     }
 
-    // 鼠标微风交互状态与平滑衰减
+    // 鼠标微风交互状态与平滑衰减 (节流处理，防止高采样率鼠标消耗过多性能)
     const mouse = {
         x: -2000,
         y: -2000,
@@ -68,8 +68,11 @@ function sizeAnimationCanvas(canvas, context, width, height) {
         active: false
     };
 
+    let lastMouseMoveTime = 0;
     window.addEventListener('mousemove', (e) => {
         const now = performance.now();
+        if (now - lastMouseMoveTime < 24) return; // ~40Hz 采样节流
+        lastMouseMoveTime = now;
         const dt = Math.max(1, now - (mouse.lastTime || now - 16));
         mouse.vx = Math.max(-15, Math.min(15, (e.clientX - mouse.lastX) / dt * 10));
         mouse.vy = Math.max(-15, Math.min(15, (e.clientY - mouse.lastY) / dt * 10));
@@ -580,17 +583,17 @@ function sizeAnimationCanvas(canvas, context, width, height) {
         }
     }
 
-    // ── 粒子目标数量配置（丰盈饱满） ──
+    // ── 粒子目标数量配置（高性能丝滑平衡） ──
     function getTargetCounts() {
         if (isMobile) {
             return {
-                bg: 28,
-                fg: 14
+                bg: 14,
+                fg: 6
             };
         }
         return {
-            bg: 56,
-            fg: 28
+            bg: 24,
+            fg: 10
         };
     }
 
@@ -642,8 +645,8 @@ function sizeAnimationCanvas(canvas, context, width, height) {
             });
         }
 
-        const maxDpr = isMobile ? 1.5 : 2;
-        sizeHomeCanvas(canvasBg, ctxBg, canvasWidth, canvasHeight, isMobile ? 1.2 : 1.5);
+        const maxDpr = isMobile ? 1.0 : 1.25;
+        sizeHomeCanvas(canvasBg, ctxBg, canvasWidth, canvasHeight, isMobile ? 1.0 : 1.15);
         sizeHomeCanvas(canvasFg, ctxFg, canvasWidth, canvasHeight, maxDpr);
         syncPetalsPopulation();
     }
@@ -706,11 +709,17 @@ function sizeAnimationCanvas(canvas, context, width, height) {
         }
     }
 
-    // ── 高刷新率原生帧率动画主循环 (无蓄水池抖动，60~120+ FPS 丝滑物理更新) ──
+    // ── 高刷新率原生帧率动画主循环 (智能帧率预算控制，平衡画质与 GPU 能效) ──
     function animate(timestamp) {
         animationFrameId = null;
         if (!shouldRunAnimation()) {
             stopAnimation();
+            return;
+        }
+
+        // 帧率节流：在高刷屏 (120Hz/144Hz) 上平滑限频至约 60 FPS，防止多余 GPU 填充开销
+        if (lastRafTimestamp > 0 && timestamp - lastRafTimestamp < 14) {
+            animationFrameId = requestAnimationFrame(animate);
             return;
         }
 
@@ -864,23 +873,23 @@ function startProfileParticles() {
     }
 
     const isMobile = window.innerWidth < 768;
-    const particleCount = isMobile ? 18 : 34;
+    const particleCount = isMobile ? 12 : 20;
     profileParticles = [];
 
     for (let i = 0; i < particleCount; i++) {
         const emoji = profileEmojis[Math.floor(Math.random() * profileEmojis.length)];
-        const size = Math.floor(Math.random() * 12 + 18);
+        const size = Math.floor(Math.random() * 10 + 16);
         profileParticles.push({
             x: Math.random() * canvasWidth,
             y: Math.random() * (canvasHeight + 100) - 50,
             size,
-            speedY: Math.random() * 1.8 + 1.1,
-            speedX: (Math.random() - 0.5) * 0.9,
+            speedY: Math.random() * 1.6 + 0.9,
+            speedX: (Math.random() - 0.5) * 0.8,
             sway: Math.random() * Math.PI * 2,
             swaySpeed: 0.02 + Math.random() * 0.03,
             emoji,
             rotation: Math.random() * 360,
-            rotationSpeed: (Math.random() - 0.5) * 1.8,
+            rotationSpeed: (Math.random() - 0.5) * 1.5,
             alpha: 0.65 + Math.random() * 0.3
         });
     }
@@ -889,6 +898,12 @@ function startProfileParticles() {
         profileParticlesReq = null;
         if (!profileParticlesRequested || animationsReducedMotionQuery?.matches === true || document.hidden) {
             ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            return;
+        }
+
+        // 帧率节流：限频至约 60 FPS
+        if (profileLastRafTimestamp > 0 && timestamp - profileLastRafTimestamp < 14) {
+            profileParticlesReq = requestAnimationFrame(render);
             return;
         }
 

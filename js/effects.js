@@ -198,15 +198,15 @@ function createStarField() {
     if (!field) return;
     field.replaceChildren();
     if (prefersReducedMotion()) return;
-    const count = window.innerWidth < 768 ? 12 : 25;
+    const count = window.innerWidth < 768 ? 8 : 14;
     for (let i = 0; i < count; i++) {
         const star = document.createElement('div');
         star.className = 'star';
         star.style.left = Math.random() * 100 + '%';
         star.style.top = Math.random() * 100 + '%';
-        star.style.setProperty('--duration', (2 + Math.random() * 4) + 's');
-        star.style.animationDelay = Math.random() * 4 + 's';
-        const size = (1 + Math.random() * 2) + 'px';
+        star.style.setProperty('--duration', (2.5 + Math.random() * 3.5) + 's');
+        star.style.animationDelay = Math.random() * 3 + 's';
+        const size = (1 + Math.random() * 1.8) + 'px';
         star.style.width = size;
         star.style.height = size;
         field.appendChild(star);
@@ -222,12 +222,12 @@ function initScrollReveal() {
 
 // --- 爱心与甜美粒子 ---
 let lastSpawnHeartTime = 0;
-const MAX_ACTIVE_LOVE_PARTICLES = 8;
+const MAX_ACTIVE_LOVE_PARTICLES = 6;
 
 function spawnHearts(x, y) {
     if (prefersReducedMotion()) return;
     const now = Date.now();
-    if (now - lastSpawnHeartTime < 100) return;
+    if (now - lastSpawnHeartTime < 120) return;
     lastSpawnHeartTime = now;
 
     const currentParticles = document.querySelectorAll('.love-particle');
@@ -252,7 +252,7 @@ function spawnHearts(x, y) {
         setTimeout(() => particle.remove(), 1100);
     }
 }
-// --- 纪念日卡片光晕 (被动节流缓存) ---
+// --- 纪念日卡片光晕 (RAF 节流 + GPU 合成层 translate3d) ---
 function initCardGlow() {
     document.querySelectorAll('.anniv-card').forEach(card => {
         if (card.querySelector('.glow')) return;
@@ -260,16 +260,24 @@ function initCardGlow() {
         glow.className = 'glow';
         card.appendChild(glow);
         let rect = null;
+        let rafId = null;
         card.addEventListener('mouseenter', () => {
             rect = card.getBoundingClientRect();
         }, { passive: true });
         card.addEventListener('mousemove', (e) => {
-            if (!rect) rect = card.getBoundingClientRect();
-            glow.style.left = (e.clientX - rect.left) + 'px';
-            glow.style.top = (e.clientY - rect.top) + 'px';
+            if (rafId) return;
+            rafId = requestAnimationFrame(() => {
+                rafId = null;
+                if (!rect) rect = card.getBoundingClientRect();
+                glow.style.transform = `translate3d(${e.clientX - rect.left}px, ${e.clientY - rect.top}px, 0) translate(-50%, -50%)`;
+            });
         }, { passive: true });
         card.addEventListener('mouseleave', () => {
             rect = null;
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
         }, { passive: true });
     });
 }
