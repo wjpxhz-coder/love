@@ -398,7 +398,7 @@ function scrubPrivateDom() {
     const milestoneCheckbox = document.getElementById('momentIsMilestone');
     if (milestoneCheckbox) milestoneCheckbox.checked = false;
     const aiConsent = document.getElementById('ai-service-consent');
-    if (aiConsent) aiConsent.checked = false;
+    if (aiConsent) aiConsent.checked = true;
     const moodReminderEnabled = document.getElementById('mood-reminder-enabled');
     if (moodReminderEnabled) moodReminderEnabled.checked = true;
     const moodReminderTime = document.getElementById('mood-reminder-time');

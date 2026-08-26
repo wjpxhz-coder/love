@@ -292,16 +292,15 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.45';
+const APP_VERSION = 'v3.9.46';
 const CONFIG = {
-    version: 'v3.9.45',
+    version: 'v3.9.46',
     date: '2026-08-26',
-    title: '全站深度性能重构与丝滑极速体验 🚀🌸',
+    title: 'AI 体验极简升级，默认即享智能对话 🤖✨',
     features: [
-        '彻底消除 GPU 高斯模糊风暴，重构高性能超质感拟态玻璃，解决掉帧发热 ⚡',
-        '全面升级樱花粒子动画引擎：DPR 智能平衡、粒子负载减半、60 FPS 帧率预算控制 🌸',
-        '时光轴引入 content-visibility 视口虚拟化渲染，海量日记丝滑滚动无卡顿 ⏳',
-        '消除定时器每秒强制重排布局抖动，对齐硬件加速与交互节流 🛠️'
+        'Agnes 2.0 AI 服务调整为默认启用，无需繁琐设置，开箱即用 💬',
+        '系统设置全面精简 AI 隐私文案，界面清爽易懂，随时自由控制 ⚙️',
+        '优化 AI 交互提示语与状态反馈体验 🌸'
     ]
 };
 const UPDATE_LOG = CONFIG;
