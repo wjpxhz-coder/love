@@ -292,15 +292,15 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.50';
+const APP_VERSION = 'v3.9.51';
 const CONFIG = {
-    version: 'v3.9.50',
-    date: '2026-08-26',
-    title: '智能时光轴快照与滚动位置秒级复原 📱✨',
+    version: 'v3.9.51',
+    date: '2026-08-27',
+    title: '个人主页顶栏视觉与居中优化 💖✨',
     features: [
-        '新增会话级时光轴智能快照，切应用或后台挂起切回时 0 毫秒瞬间恢复阅读位置，无需重新下拉 🚀',
-        '极省流后台静默探针，切回网页 0 额外网络消耗，有新动态时温和胶囊提示 🌸',
-        '优化路由与焦点控制，杜绝切回页面时的跳顶问题 💡'
+        '“我的主页”标题严格物理水平居中对齐，多端界面更美观 🎯',
+        '左侧返回按钮简化为极简圆润图标，更加轻巧干净 🌸',
+        '右侧设置按钮调整为正圆形设计，精致和谐 ✨'
     ]
 };
 const UPDATE_LOG = CONFIG;

@@ -594,7 +594,7 @@
 <section id="profile-page" class="app-page profile-page" data-page-id="profile" aria-labelledby="profile-topbar-title" aria-hidden="true" hidden inert>
     <canvas id="profile-particles-canvas" class="profile-particles-canvas" aria-hidden="true"></canvas>
     <div class="profile-topbar">
-        <button class="profile-back-btn" onclick="closeProfilePage()">← 返回</button>
+        <button class="profile-back-btn" onclick="closeProfilePage()" aria-label="返回" title="返回">←</button>
         <h1 class="profile-topbar-title" id="profile-topbar-title" data-page-focus tabindex="-1">💖 我的主页 💖</h1>
         <div class="profile-topbar-right">
             <button class="profile-settings-btn" id="profile-settings-btn" type="button" onclick="openSettingsModal()" aria-label="设置">⚙️</button>
@@ -723,10 +723,10 @@
 <dialog class="native-dialog version-dialog" id="versionModal" aria-labelledby="versionTitle">
     <div class="modal-box version-modal-box">
         <div class="version-decor-heart">💝</div>
-        <h2 class="modal-title" id="versionTitle">架构重构与代码质量飞跃 🛠️✨</h2>
-        <div class="version-tag" id="versionNumber">v3.9.46</div>
+        <h2 class="modal-title" id="versionTitle">个人主页顶栏视觉与居中优化 💖✨</h2>
+        <div class="version-tag" id="versionNumber">v3.9.51</div>
         <div class="version-body">
-            <div class="version-date" id="versionDate">更新时间：2026-08-25</div>
+            <div class="version-date" id="versionDate">更新时间：2026-08-27</div>
 
             <ul class="version-changelog" id="versionChangelogList">
                 <!-- 动态插入更新特性 -->
@@ -802,7 +802,7 @@
         </div>
         
         <div class="settings-footer">
-            <span id="settingsVersion">当前版本：v3.9.46</span>
+            <span id="settingsVersion">当前版本：v3.9.51</span>
         </div>
 
         

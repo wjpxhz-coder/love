@@ -1522,18 +1522,31 @@ body[data-auth-state='locked'] #notification-bell {
 }
 
 .profile-back-btn,
-.profile-settings-btn,
+.profile-settings-btn {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    min-height: 42px;
+    max-width: 42px;
+    max-height: 42px;
+    padding: 0;
+    border-radius: 50%;
+    border-color: var(--border);
+    color: var(--text);
+    background: var(--surface);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
 .edit-cancel-btn {
     min-height: 42px;
     border-color: var(--border);
     border-radius: 11px;
     color: var(--text);
     background: var(--surface);
-}
-
-.profile-settings-btn {
-    width: 42px;
-    height: 42px;
 }
 
 .profile-back-btn:hover,
@@ -2163,7 +2176,7 @@ body[data-auth-state='locked'] #notification-bell {
 
     .profile-page.app-page .profile-topbar {
         display: grid;
-        grid-template-columns: auto 1fr auto;
+        grid-template-columns: minmax(42px, 1fr) auto minmax(42px, 1fr);
         gap: 8px;
         padding-right: max(12px, env(safe-area-inset-right));
         padding-left: max(12px, env(safe-area-inset-left));
@@ -2204,10 +2217,6 @@ body[data-auth-state='locked'] #notification-bell {
     .profile-edit-btn {
         display: none;
     }
-
-    .profile-back-btn {
-        padding: 0 10px;
-    }
 }
 
 @media (max-width: 390px) {
@@ -2237,9 +2246,15 @@ body[data-auth-state='locked'] #notification-bell {
         max-width: 120px;
     }
 
+    .profile-back-btn,
     .profile-settings-btn {
         width: 40px;
         height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+        max-width: 40px;
+        max-height: 40px;
+        border-radius: 50%;
     }
 }
 

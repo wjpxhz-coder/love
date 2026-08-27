@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'love-diary-';
-const CACHE_NAME = 'love-diary-v3.9.50';
+const CACHE_NAME = 'love-diary-v3.9.51';
 const MEDIA_CACHE_NAME = 'love-diary-media-v1';
 const MAX_MEDIA_CACHE_ENTRIES = 250;
 
