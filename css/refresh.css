@@ -1117,6 +1117,23 @@ body[data-auth-state='locked'] #notification-bell {
     border: 1.5px solid var(--border);
     border-radius: 20px;
     background: var(--surface-elevated);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.moment-page-card.is-drag-over,
+.app-page #momentModal .modal-box.is-drag-over {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 4px var(--primary-glow), 0 16px 40px var(--shadow-hover, rgba(255, 77, 143, 0.2)) !important;
+}
+
+.moment-image-preview-container.is-drag-over {
+    border-color: var(--primary) !important;
+    background: rgba(255, 240, 246, 0.75) !important;
+    box-shadow: 0 0 0 3px var(--primary-glow) !important;
+}
+
+[data-theme='dark'] .moment-image-preview-container.is-drag-over {
+    background: rgba(255, 77, 143, 0.14) !important;
 }
 
 .moment-image-add-btn {
