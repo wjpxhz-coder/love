@@ -31,37 +31,58 @@ async function loadMomentLikes(momentIds) {
     });
 
     uniqueIds.forEach(momentId => {
-        const button = document.getElementById(`moment-like-btn-${momentId}`);
-        const countElement = document.getElementById(`moment-like-count-${momentId}`);
-        const namesElement = document.getElementById(`moment-like-likers-${momentId}`);
-        const heart = button?.querySelector('.ml-heart');
         const count = countByMoment[momentId] || 0;
         const liked = Boolean(likedByCurrentUser[momentId]);
+        const names = [...new Set(namesByMoment[momentId] || [])];
+        const likersText = names.length ? `${names.join('、')} 觉得很赞 ❤` : '';
 
-        button?.classList.toggle('liked', liked);
-        button?.setAttribute('aria-pressed', String(liked));
-        if (heart) heart.textContent = liked ? '❤️' : '🤍';
-        if (countElement) countElement.textContent = count ? String(count) : '喜欢';
-        if (namesElement) {
-            const names = [...new Set(namesByMoment[momentId] || [])];
-            namesElement.textContent = names.length ? `${names.join('、')} 觉得很赞 ❤` : '';
+        // 更新页面上所有展示该动态的卡片（支持时间轴、大事记、筛选等多个容器）
+        const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
+        if (cards.length > 0) {
+            cards.forEach(card => {
+                const button = card.querySelector('.moment-like-btn');
+                const countElement = card.querySelector('.ml-count');
+                const namesElement = card.querySelector('.moment-like-likers');
+                const heart = button?.querySelector('.ml-heart');
+
+                button?.classList.toggle('liked', liked);
+                button?.setAttribute('aria-pressed', String(liked));
+                if (heart) heart.textContent = liked ? '❤️' : '🤍';
+                if (countElement) countElement.textContent = count ? String(count) : '喜欢';
+                if (namesElement) namesElement.textContent = likersText;
+            });
+        } else {
+            const buttons = document.querySelectorAll(`[id="moment-like-btn-${momentId}"]`);
+            const countElements = document.querySelectorAll(`[id="moment-like-count-${momentId}"]`);
+            const namesElements = document.querySelectorAll(`[id="moment-like-likers-${momentId}"]`);
+            buttons.forEach(button => {
+                const heart = button.querySelector('.ml-heart');
+                button.classList.toggle('liked', liked);
+                button.setAttribute('aria-pressed', String(liked));
+                if (heart) heart.textContent = liked ? '❤️' : '🤍';
+            });
+            countElements.forEach(el => { el.textContent = count ? String(count) : '喜欢'; });
+            namesElements.forEach(el => { el.textContent = likersText; });
         }
     });
 }
 
-async function toggleMomentLike(momentId) {
+async function toggleMomentLike(momentId, triggerElement = null) {
     if (!isAuthenticated()) {
         openLoginModal();
         return;
     }
     if (!momentId || pendingMomentLikes.has(momentId)) return;
 
-    const button = document.getElementById(`moment-like-btn-${momentId}`);
+    const currentCard = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
+    const button = currentCard ? currentCard.querySelector('.moment-like-btn') : document.getElementById(`moment-like-btn-${momentId}`);
     const currentlyLiked = button?.classList.contains('liked') || false;
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
     pendingMomentLikes.add(momentId);
-    if (button) button.disabled = true;
+
+    const allButtons = document.querySelectorAll(`[id="card-${momentId}"] .moment-like-btn, [id="moment-like-btn-${momentId}"]`);
+    allButtons.forEach(btn => { btn.disabled = true; });
 
     try {
         const result = currentlyLiked
@@ -77,8 +98,9 @@ async function toggleMomentLike(momentId) {
         if (result.error) throw result.error;
         if (!isCurrentAuthSnapshot(epoch, userId)) return;
 
-        if (!currentlyLiked && button && typeof spawnHearts === 'function') {
-            const rect = button.getBoundingClientRect();
+        const targetBtn = triggerElement || button;
+        if (!currentlyLiked && targetBtn && typeof spawnHearts === 'function') {
+            const rect = targetBtn.getBoundingClientRect();
             spawnHearts(rect.left + rect.width / 2, rect.top);
         }
         await loadMomentLikes([momentId]);
@@ -87,6 +109,6 @@ async function toggleMomentLike(momentId) {
         if (typeof showToast === 'function') showToast('点赞失败，请稍后重试');
     } finally {
         pendingMomentLikes.delete(momentId);
-        if (button) button.disabled = false;
+        allButtons.forEach(btn => { btn.disabled = false; });
     }
 }

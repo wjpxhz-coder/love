@@ -1911,9 +1911,11 @@ function locateMomentOnTimeline(moment, options = {}) {
     return true;
 }
 
-function toggleMomentActionMenu(momentId) {
-    const dropdown = document.getElementById(`moment-dropdown-${momentId}`);
-    const trigger = document.querySelector(`[data-moment-action="toggle-menu"][data-moment-id="${momentId}"]`);
+function toggleMomentActionMenu(momentId, triggerElement = null) {
+    const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
+    const menu = card ? card.querySelector('.moment-actions-menu') : document.getElementById(`moment-menu-${momentId}`);
+    const dropdown = menu ? menu.querySelector('.moment-menu-dropdown') : document.getElementById(`moment-dropdown-${momentId}`);
+    const trigger = menu ? menu.querySelector('.moment-menu-trigger') : document.querySelector(`[data-moment-action="toggle-menu"][data-moment-id="${momentId}"]`);
     if (!dropdown) return;
     const isOpen = dropdown.classList.contains('is-open');
     closeAllMomentActionMenus();
@@ -1937,7 +1939,7 @@ function runMomentAction(actionElement) {
     const action = actionElement.dataset.momentAction;
     if (action !== 'open-profile' && action !== 'open-lightbox' && !momentId) return;
     if (action === 'toggle-menu') {
-        toggleMomentActionMenu(momentId);
+        toggleMomentActionMenu(momentId, actionElement);
     } else if (action === 'edit') {
         closeAllMomentActionMenus();
         openMomentEditModal(momentId);
@@ -1954,15 +1956,19 @@ function runMomentAction(actionElement) {
             || actionElement.querySelector('img, video')?.src;
         if (targetSrc) openLightbox(targetSrc);
     }
-    else if (action === 'show-images') showAllImages(momentId);
-    else if (action === 'toggle-text') toggleTextCollapse(momentId);
-    else if (action === 'toggle-like' && typeof toggleMomentLike === 'function') toggleMomentLike(momentId);
-    else if (action === 'toggle-star' && typeof toggleMomentStar === 'function') toggleMomentStar(momentId);
-    else if (action === 'toggle-comments' && typeof toggleComments === 'function') toggleComments(momentId);
-    else if (action === 'write-comment' && typeof checkPasswordForComment === 'function') checkPasswordForComment(momentId);
-    else if (action === 'cancel-comment' && typeof cancelCommentInput === 'function') cancelCommentInput(momentId);
-    else if (action === 'choose-comment-images') document.getElementById(`comment-img-input-${momentId}`)?.click();
-    else if (action === 'submit-comment' && typeof submitComment === 'function') submitComment(momentId);
+    else if (action === 'show-images') showAllImages(momentId, actionElement);
+    else if (action === 'toggle-text') toggleTextCollapse(momentId, actionElement);
+    else if (action === 'toggle-like' && typeof toggleMomentLike === 'function') toggleMomentLike(momentId, actionElement);
+    else if (action === 'toggle-star' && typeof toggleMomentStar === 'function') toggleMomentStar(momentId, actionElement);
+    else if (action === 'toggle-comments' && typeof toggleComments === 'function') toggleComments(momentId, actionElement);
+    else if (action === 'write-comment' && typeof checkPasswordForComment === 'function') checkPasswordForComment(momentId, actionElement);
+    else if (action === 'cancel-comment' && typeof cancelCommentInput === 'function') cancelCommentInput(momentId, actionElement);
+    else if (action === 'choose-comment-images') {
+        const card = actionElement.closest('.moment-card');
+        const fileInput = card ? card.querySelector('input[type="file"]') : document.getElementById(`comment-img-input-${momentId}`);
+        fileInput?.click();
+    }
+    else if (action === 'submit-comment' && typeof submitComment === 'function') submitComment(momentId, actionElement);
 }
 
 document.addEventListener('click', event => {
@@ -1988,9 +1994,10 @@ document.addEventListener('change', event => {
     if (momentId) handleCommentImgSelect(event, momentId);
 });
 
-window.showAllImages = function(id) {
-    const grid = document.getElementById(`moment-grid-${id}`);
-    const btn = document.getElementById(`show-images-btn-${id}`);
+window.showAllImages = function(id, triggerElement = null) {
+    const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${id}`);
+    const grid = card ? card.querySelector('.moment-grid') : document.getElementById(`moment-grid-${id}`);
+    const btn = triggerElement?.closest('.show-all-images-btn') || (card ? card.querySelector('.show-all-images-btn') : document.getElementById(`show-images-btn-${id}`));
     if (!grid) return;
     const hiddenImgs = grid.querySelectorAll('.hidden-image');
     const isExpanded = btn && btn.dataset.expanded === 'true';
@@ -2016,14 +2023,15 @@ window.showAllImages = function(id) {
     }
 };
 
-window.toggleTextCollapse = function(id) {
-    const container = document.getElementById(`text-container-${id}`);
+window.toggleTextCollapse = function(id, triggerElement = null) {
+    const container = triggerElement?.closest('.card-text-container') || document.getElementById(`text-container-${id}`);
     if (!container) return;
     const collapsedEl = container.querySelector('.text-collapsed');
     const expandedEl = container.querySelector('.text-expanded');
     const btn = container.querySelector('.toggle-text-btn');
+    if (!collapsedEl || !expandedEl || !btn) return;
     
-    if (collapsedEl.style.display === 'block') {
+    if (collapsedEl.style.display !== 'none') {
         collapsedEl.style.display = 'none';
         expandedEl.style.display = 'block';
         btn.innerText = '收起';
@@ -2446,17 +2454,33 @@ async function deleteMoment(id) {
         console.error('撤回动态失败:', error);
         alert('撤回失败。仅支持撤回 24 小时内由当前账号发布的动态。');
     } else {
-        const card = document.getElementById('card-' + momentId);
-        if (card) {
-            releaseMomentVideosWithin(card, true);
-            card.style.transition = 'opacity 0.3s, transform 0.3s';
-            card.style.opacity = '0';
-            card.style.transform = 'translateX(-16px)';
+        const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
+        if (cards.length > 0) {
+            cards.forEach(card => {
+                releaseMomentVideosWithin(card, true);
+                card.style.transition = 'opacity 0.3s, transform 0.3s';
+                card.style.opacity = '0';
+                card.style.transform = 'translateX(-16px)';
+            });
             clearTimelineSnapshot();
-            setTimeout(() => fetchMoments(false, { forceRefresh: true }), 300);
+            setTimeout(() => {
+                fetchMoments(false, { forceRefresh: true });
+                const milestonesActive = typeof isAppRouteActive === 'function'
+                    ? isAppRouteActive('milestones')
+                    : document.getElementById('milestonesModal')?.classList.contains('is-active');
+                if (milestonesActive && typeof renderMilestonesContent === 'function') {
+                    renderMilestonesContent();
+                }
+            }, 300);
         } else {
             clearTimelineSnapshot();
             fetchMoments(false, { forceRefresh: true });
+            const milestonesActive = typeof isAppRouteActive === 'function'
+                ? isAppRouteActive('milestones')
+                : document.getElementById('milestonesModal')?.classList.contains('is-active');
+            if (milestonesActive && typeof renderMilestonesContent === 'function') {
+                renderMilestonesContent();
+            }
         }
     }
 }
