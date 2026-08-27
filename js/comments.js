@@ -86,35 +86,38 @@ function setCommentStatus(container, text) {
     container.replaceChildren(status);
 }
 
-function clearCommentImageSelection(momentId) {
+function clearCommentImageSelection(momentId, targetCard = null) {
     (commentImgFiles[momentId] || []).forEach(entry => URL.revokeObjectURL(entry.objectUrl));
     delete commentImgFiles[momentId];
-    const previewEl = document.getElementById(`comment-img-previews-${momentId}`);
-    if (previewEl) previewEl.replaceChildren();
+    const previewEls = targetCard
+        ? targetCard.querySelectorAll('.comment-img-previews')
+        : document.querySelectorAll(`[id="card-${momentId}"] .comment-img-previews, [id="comment-img-previews-${momentId}"]`);
+    previewEls.forEach(el => el.replaceChildren());
 }
 
 function clearAllCommentImageSelections() {
     Object.keys(commentImgFiles).forEach(momentId => clearCommentImageSelection(momentId));
 }
 
-function checkPasswordForComment(momentId) {
+function checkPasswordForComment(momentId, triggerElement = null) {
     pendingCommentMomentId = momentId;
     if (hasCommentAuthContext()) {
-        showCommentInput(momentId);
+        showCommentInput(momentId, triggerElement);
         return;
     }
     if (typeof openLoginModal === 'function') openLoginModal();
 }
 
-function showCommentInput(momentId) {
+function showCommentInput(momentId, triggerElement = null) {
     if (!hasCommentAuthContext()) return;
-    const writeBtn = document.getElementById(`comment-write-btn-${momentId}`);
-    const inputArea = document.getElementById(`comment-input-area-${momentId}`);
+    const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
+    const writeBtn = card ? card.querySelector('.comment-write-btn') : document.getElementById(`comment-write-btn-${momentId}`);
+    const inputArea = card ? card.querySelector('.comment-input-area') : document.getElementById(`comment-input-area-${momentId}`);
     if (writeBtn) writeBtn.style.display = 'none';
     if (inputArea) {
         inputArea.style.display = 'block';
         
-        const avatarContainer = document.getElementById(`comment-input-avatar-${momentId}`);
+        const avatarContainer = inputArea.querySelector('[id^="comment-input-avatar-"]') || inputArea.querySelector('div:first-child');
         if (avatarContainer) {
             const p = allProfilesCache[currentAuthor] || {};
             const emoji = currentAuthor === '小蛇' ? '🐍' : '🐟';
@@ -138,50 +141,68 @@ function showCommentInput(momentId) {
             avatarContainer.replaceChildren(badge);
         }
 
-        const ta = document.getElementById(`comment-text-${momentId}`);
+        const ta = inputArea.querySelector('.comment-textarea');
         if (ta) setTimeout(() => ta.focus(), 100);
     }
 }
 
-function cancelCommentInput(momentId) {
+function cancelCommentInput(momentId, triggerElement = null) {
     if (commentSubmitRequests.has(momentId)) {
         if (typeof showToast === 'function') showToast('评论正在发送，请稍候…');
         return;
     }
-    const writeBtn = document.getElementById(`comment-write-btn-${momentId}`);
-    const inputArea = document.getElementById(`comment-input-area-${momentId}`);
-    const ta = document.getElementById(`comment-text-${momentId}`);
+    const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
+    const writeBtn = card ? card.querySelector('.comment-write-btn') : document.getElementById(`comment-write-btn-${momentId}`);
+    const inputArea = card ? card.querySelector('.comment-input-area') : document.getElementById(`comment-input-area-${momentId}`);
+    const ta = inputArea ? inputArea.querySelector('.comment-textarea') : document.getElementById(`comment-text-${momentId}`);
     if (ta) ta.value = '';
     if (inputArea) inputArea.style.display = 'none';
     if (writeBtn) writeBtn.style.display = 'inline-flex';
     // 清除图片选择
-    clearCommentImageSelection(momentId);
-    const fileInput = document.getElementById(`comment-img-input-${momentId}`);
+    clearCommentImageSelection(momentId, card);
+    const fileInput = card ? card.querySelector('input[type="file"]') : document.getElementById(`comment-img-input-${momentId}`);
     if (fileInput) fileInput.value = '';
 }
 
-function toggleComments(momentId) {
+function toggleComments(momentId, triggerElement = null) {
     if (!hasCommentAuthContext()) {
         if (typeof openLoginModal === 'function') openLoginModal();
         return;
     }
-    const section = document.getElementById(`comments-${momentId}`);
+    const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
+    const section = card ? card.querySelector('.comment-section') : document.getElementById(`comments-${momentId}`);
     if (!section) return;
     const isHidden = section.style.display === 'none';
     section.style.display = isHidden ? 'block' : 'none';
     section.setAttribute('aria-hidden', String(!isHidden));
-    document.getElementById(`comment-toggle-${momentId}`)?.setAttribute('aria-expanded', String(isHidden));
-    if (isHidden) loadComments(momentId);
+    
+    const toggleBtn = card ? card.querySelector('.comment-toggle-btn') : document.getElementById(`comment-toggle-${momentId}`);
+    toggleBtn?.setAttribute('aria-expanded', String(isHidden));
+    
+    if (isHidden) loadComments(momentId, card);
 }
 
-async function loadComments(momentId) {
+async function loadComments(momentId, targetCard = null) {
     if (!hasCommentAuthContext()) return;
     const requestAuthEpoch = getCommentAuthEpoch();
     const requestId = (commentLoadRequests.get(momentId) || 0) + 1;
     commentLoadRequests.set(momentId, requestId);
-    const listEl = document.getElementById(`comment-list-${momentId}`);
-    if (!listEl) return;
-    setCommentStatus(listEl, '加载中…');
+
+    const getListElements = () => {
+        if (targetCard) {
+            const el = targetCard.querySelector('.comment-list');
+            return el ? [el] : [];
+        }
+        const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
+        if (cards.length > 0) {
+            return Array.from(cards).map(c => c.querySelector('.comment-list')).filter(Boolean);
+        }
+        return Array.from(document.querySelectorAll(`[id="comment-list-${momentId}"]`));
+    };
+
+    const listEls = getListElements();
+    if (!listEls.length) return;
+    listEls.forEach(listEl => setCommentStatus(listEl, '加载中…'));
 
     const { data, error } = await supabaseClient.from('comments')
         .select('id, moment_id, user_id, author, content, created_at')
@@ -189,10 +210,14 @@ async function loadComments(momentId) {
         .order('created_at', { ascending: true });
 
     if (!isCommentAuthEpochCurrent(requestAuthEpoch) || commentLoadRequests.get(momentId) !== requestId) return;
-    if (error) { setCommentStatus(listEl, '加载失败 😢'); return; }
+    const currentListEls = getListElements();
+    if (error) {
+        currentListEls.forEach(listEl => setCommentStatus(listEl, '加载失败 😢'));
+        return;
+    }
 
     if (!data || !data.length) {
-        setCommentStatus(listEl, '还没有评论，来说点什么吧 ✨');
+        currentListEls.forEach(listEl => setCommentStatus(listEl, '还没有评论，来说点什么吧 ✨'));
         return;
     }
 
@@ -215,117 +240,119 @@ async function loadComments(momentId) {
     const resolvedContents = await Promise.all(data.map(comment => resolveCommentContent(comment.content)));
     if (!isCommentAuthEpochCurrent(requestAuthEpoch) || commentLoadRequests.get(momentId) !== requestId) return;
 
-    const fragment = document.createDocumentFragment();
-    data.forEach((c, commentIndex) => {
-        const commentId = Number(c.id);
-        if (!Number.isSafeInteger(commentId) || commentId <= 0) return;
-        const dateStr = new Date(c.created_at).toLocaleString('zh-CN', { hour12: false });
-        const badgeClass = c.author === '小蛇' ? 'author-snake' : 'author-xi';
-        const emoji = c.author === '小蛇' ? '🐍' : '🐟';
-        
-        const p = allProfilesCache[c.author] || {};
-        const displayName = p.nickname || c.author;
-        
-        const likeCount = likesMap[c.id] || 0;
-        const isLiked = userLikedMap[c.id] || false;
+    currentListEls.forEach(listEl => {
+        const fragment = document.createDocumentFragment();
+        data.forEach((c, commentIndex) => {
+            const commentId = Number(c.id);
+            if (!Number.isSafeInteger(commentId) || commentId <= 0) return;
+            const dateStr = new Date(c.created_at).toLocaleString('zh-CN', { hour12: false });
+            const badgeClass = c.author === '小蛇' ? 'author-snake' : 'author-xi';
+            const emoji = c.author === '小蛇' ? '🐍' : '🐟';
+            
+            const p = allProfilesCache[c.author] || {};
+            const displayName = p.nickname || c.author;
+            
+            const likeCount = likesMap[c.id] || 0;
+            const isLiked = userLikedMap[c.id] || false;
 
-        const textContent = resolvedContents[commentIndex].text;
-        const imageUrls = resolvedContents[commentIndex].images;
+            const textContent = resolvedContents[commentIndex].text;
+            const imageUrls = resolvedContents[commentIndex].images;
 
-        const item = document.createElement('div');
-        item.className = 'comment-item';
-        item.id = `comment-${commentId}`;
-        const authorBadge = document.createElement('span');
-        authorBadge.className = `comment-author-badge author-badge ${badgeClass}`;
-        authorBadge.style.cursor = 'pointer';
-        authorBadge.title = '点击查看主页';
-        authorBadge.tabIndex = 0;
-        authorBadge.setAttribute('role', 'button');
-        const avatarUrl = getCommentProfileAvatarUrl(p);
-        if (avatarUrl) {
-            const avatar = document.createElement('img');
-            avatar.src = avatarUrl;
-            avatar.alt = '';
-            Object.assign(avatar.style, {
-                width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover',
-                verticalAlign: 'middle', marginRight: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-            });
-            authorBadge.appendChild(avatar);
-        } else {
-            authorBadge.appendChild(document.createTextNode(`${emoji} `));
-        }
-        authorBadge.appendChild(document.createTextNode(String(displayName || '')));
-        const openProfile = () => {
-            if (typeof openProfilePage === 'function') openProfilePage(String(c.author || ''));
-        };
-        authorBadge.addEventListener('click', openProfile);
-        authorBadge.addEventListener('keydown', event => {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                openProfile();
+            const item = document.createElement('div');
+            item.className = 'comment-item';
+            item.id = `comment-${commentId}`;
+            const authorBadge = document.createElement('span');
+            authorBadge.className = `comment-author-badge author-badge ${badgeClass}`;
+            authorBadge.style.cursor = 'pointer';
+            authorBadge.title = '点击查看主页';
+            authorBadge.tabIndex = 0;
+            authorBadge.setAttribute('role', 'button');
+            const avatarUrl = getCommentProfileAvatarUrl(p);
+            if (avatarUrl) {
+                const avatar = document.createElement('img');
+                avatar.src = avatarUrl;
+                avatar.alt = '';
+                Object.assign(avatar.style, {
+                    width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover',
+                    verticalAlign: 'middle', marginRight: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                });
+                authorBadge.appendChild(avatar);
+            } else {
+                authorBadge.appendChild(document.createTextNode(`${emoji} `));
             }
-        });
-
-        const body = document.createElement('div');
-        body.style.flex = '1';
-        const bubble = document.createElement('div');
-        bubble.className = 'comment-bubble';
-        if (textContent) bubble.appendChild(document.createTextNode(textContent));
-        imageUrls.forEach(url => {
-            const image = document.createElement('img');
-            image.src = url;
-            image.alt = '评论图片';
-            image.loading = 'lazy';
-            image.decoding = 'async';
-            image.classList.add('media-loading');
-            const onImgLoad = () => {
-                image.classList.remove('media-loading');
-                image.classList.add('media-loaded');
+            authorBadge.appendChild(document.createTextNode(String(displayName || '')));
+            const openProfile = () => {
+                if (typeof openProfilePage === 'function') openProfilePage(String(c.author || ''));
             };
-            if (image.complete) onImgLoad();
-            else {
-                image.addEventListener('load', onImgLoad, { once: true });
-                image.addEventListener('error', onImgLoad, { once: true });
-            }
-            image.addEventListener('click', () => {
-                if (typeof openLightbox === 'function') openLightbox(url);
+            authorBadge.addEventListener('click', openProfile);
+            authorBadge.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openProfile();
+                }
             });
-            bubble.appendChild(image);
-        });
 
-        const time = document.createElement('div');
-        time.className = 'comment-time';
-        time.appendChild(document.createTextNode(`${dateStr} `));
-        const likeButton = document.createElement('button');
-        likeButton.type = 'button';
-        likeButton.className = `comment-like-btn${isLiked ? ' liked' : ''}`;
-        likeButton.id = `like-btn-${commentId}`;
-        const heart = document.createElement('span');
-        heart.className = 'like-heart';
-        heart.textContent = isLiked ? '❤️' : '🤍';
-        const count = document.createElement('span');
-        count.className = 'like-count';
-        count.id = `like-count-${commentId}`;
-        count.textContent = likeCount > 0 ? String(likeCount) : '赞';
-        likeButton.append(heart, count);
-        likeButton.addEventListener('click', () => toggleCommentLike(commentId, momentId));
-        time.appendChild(likeButton);
-        if (currentAuthUser && c.user_id === currentAuthUser.id) {
-            const recall = document.createElement('button');
-            recall.type = 'button';
-            recall.textContent = '撤回';
-            Object.assign(recall.style, {
-                color: 'var(--primary)', cursor: 'pointer', marginLeft: '12px',
-                border: '0', background: 'transparent', padding: '0'
+            const body = document.createElement('div');
+            body.style.flex = '1';
+            const bubble = document.createElement('div');
+            bubble.className = 'comment-bubble';
+            if (textContent) bubble.appendChild(document.createTextNode(textContent));
+            imageUrls.forEach(url => {
+                const image = document.createElement('img');
+                image.src = url;
+                image.alt = '评论图片';
+                image.loading = 'lazy';
+                image.decoding = 'async';
+                image.classList.add('media-loading');
+                const onImgLoad = () => {
+                    image.classList.remove('media-loading');
+                    image.classList.add('media-loaded');
+                };
+                if (image.complete) onImgLoad();
+                else {
+                    image.addEventListener('load', onImgLoad, { once: true });
+                    image.addEventListener('error', onImgLoad, { once: true });
+                }
+                image.addEventListener('click', () => {
+                    if (typeof openLightbox === 'function') openLightbox(url);
+                });
+                bubble.appendChild(image);
             });
-            recall.addEventListener('click', () => confirmDeleteComment(commentId, momentId));
-            time.appendChild(recall);
-        }
-        body.append(bubble, time);
-        item.append(authorBadge, body);
-        fragment.appendChild(item);
+
+            const time = document.createElement('div');
+            time.className = 'comment-time';
+            time.appendChild(document.createTextNode(`${dateStr} `));
+            const likeButton = document.createElement('button');
+            likeButton.type = 'button';
+            likeButton.className = `comment-like-btn${isLiked ? ' liked' : ''}`;
+            likeButton.id = `like-btn-${commentId}`;
+            const heart = document.createElement('span');
+            heart.className = 'like-heart';
+            heart.textContent = isLiked ? '❤️' : '🤍';
+            const count = document.createElement('span');
+            count.className = 'like-count';
+            count.id = `like-count-${commentId}`;
+            count.textContent = likeCount > 0 ? String(likeCount) : '赞';
+            likeButton.append(heart, count);
+            likeButton.addEventListener('click', () => toggleCommentLike(commentId, momentId));
+            time.appendChild(likeButton);
+            if (currentAuthUser && c.user_id === currentAuthUser.id) {
+                const recall = document.createElement('button');
+                recall.type = 'button';
+                recall.textContent = '撤回';
+                Object.assign(recall.style, {
+                    color: 'var(--primary)', cursor: 'pointer', marginLeft: '12px',
+                    border: '0', background: 'transparent', padding: '0'
+                });
+                recall.addEventListener('click', () => confirmDeleteComment(commentId, momentId));
+                time.appendChild(recall);
+            }
+            body.append(bubble, time);
+            item.append(authorBadge, body);
+            fragment.appendChild(item);
+        });
+        listEl.replaceChildren(fragment);
     });
-    listEl.replaceChildren(fragment);
 }
 
 function confirmDeleteComment(commentId, momentId) {
@@ -349,8 +376,8 @@ async function toggleCommentLike(commentId, momentId) {
     }
     const requestAuthEpoch = getCommentAuthEpoch();
 
-    const btn = document.getElementById(`like-btn-${commentId}`);
-    const isLiked = btn && btn.classList.contains('liked');
+    const btns = document.querySelectorAll(`[id="like-btn-${commentId}"]`);
+    const isLiked = btns.length ? btns[0].classList.contains('liked') : false;
 
     let error = null;
     if (isLiked) {
@@ -391,8 +418,8 @@ async function toggleCommentLike(commentId, momentId) {
 async function updateSingleLike(commentId) {
     if (!hasCommentAuthContext()) return;
     const requestAuthEpoch = getCommentAuthEpoch();
-    const btn = document.getElementById(`like-btn-${commentId}`);
-    if (!btn) return;
+    const btns = document.querySelectorAll(`[id="like-btn-${commentId}"]`);
+    if (!btns.length) return;
 
     const { data, error } = await supabaseClient.from('comment_likes')
         .select('user_id')
@@ -403,11 +430,13 @@ async function updateSingleLike(commentId) {
     const count = data ? data.length : 0;
     const userLiked = (data && currentAuthUser) ? data.some(l => l.user_id === currentAuthUser.id) : false;
 
-    const heart = btn.querySelector('.like-heart');
-    const countEl = btn.querySelector('.like-count');
-    if (heart) heart.textContent = userLiked ? '❤️' : '🤍';
-    if (countEl) countEl.textContent = count > 0 ? count : '赞';
-    btn.classList.toggle('liked', userLiked);
+    btns.forEach(btn => {
+        const heart = btn.querySelector('.like-heart');
+        const countEl = btn.querySelector('.like-count');
+        if (heart) heart.textContent = userLiked ? '❤️' : '🤍';
+        if (countEl) countEl.textContent = count > 0 ? count : '赞';
+        btn.classList.toggle('liked', userLiked);
+    });
 }
 
 async function deleteComment(commentId, momentId) {
@@ -423,16 +452,16 @@ async function deleteComment(commentId, momentId) {
         console.error('撤回评论失败:', error);
         alert('撤回失败，请稍后重试。');
     } else {
-        const item = document.getElementById('comment-' + normalizedCommentId);
-        if (item) {
+        const items = document.querySelectorAll(`[id="comment-${normalizedCommentId}"]`);
+        items.forEach(item => {
             item.style.transition = 'opacity 0.3s, transform 0.3s';
             item.style.opacity = '0';
             item.style.transform = 'translateX(-10px)';
-            setTimeout(() => {
-                loadComments(momentId);
-                loadCommentCounts([momentId]);
-            }, 300);
-        }
+        });
+        setTimeout(() => {
+            loadComments(momentId);
+            loadCommentCounts([momentId]);
+        }, 300);
     }
 }
 
@@ -449,18 +478,27 @@ async function loadCommentCounts(momentIds) {
     data.forEach(c => { counts[c.moment_id] = (counts[c.moment_id] || 0) + 1; });
 
     momentIds.forEach(id => {
-        const countEl = document.getElementById(`comment-count-${id}`);
-        if (countEl) {
-            const count = counts[id] || 0;
-            countEl.innerText = count > 0 ? `${count} 条评论` : '评论';
+        const count = counts[id] || 0;
+        const text = count > 0 ? `${count} 条评论` : '评论';
+        const cards = document.querySelectorAll(`[id="card-${id}"]`);
+        if (cards.length > 0) {
+            cards.forEach(card => {
+                const countEl = card.querySelector('.comment-toggle-btn span:last-child') || card.querySelector(`[id="comment-count-${id}"]`);
+                if (countEl) countEl.innerText = text;
+            });
+        } else {
+            const countEls = document.querySelectorAll(`[id="comment-count-${id}"]`);
+            countEls.forEach(el => { el.innerText = text; });
         }
     });
 }
 
-async function submitComment(momentId) {
+async function submitComment(momentId, triggerElement = null) {
     if (!hasCommentAuthContext() || commentSubmitRequests.has(momentId)) return;
     const requestAuthEpoch = getCommentAuthEpoch();
-    const ta = document.getElementById(`comment-text-${momentId}`);
+    const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
+    const inputArea = card ? card.querySelector('.comment-input-area') : document.getElementById(`comment-input-area-${momentId}`);
+    const ta = inputArea ? inputArea.querySelector('.comment-textarea') : document.getElementById(`comment-text-${momentId}`);
     const textVal = ta ? ta.value.trim() : '';
     const imageEntries = commentImgFiles[momentId] || [];
     
@@ -485,7 +523,7 @@ async function submitComment(momentId) {
         return;
     }
 
-    const submitBtn = document.querySelector(`#comment-input-area-${momentId} .comment-submit-btn`);
+    const submitBtn = inputArea ? inputArea.querySelector('.comment-submit-btn') : document.querySelector(`#comment-input-area-${momentId} .comment-submit-btn`);
     const origText = submitBtn ? submitBtn.textContent : '';
     commentSubmitRequests.add(momentId);
     if (submitBtn) { submitBtn.textContent = '发送中…'; submitBtn.disabled = true; }
@@ -532,7 +570,7 @@ async function submitComment(momentId) {
         if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
 
         commentSubmitRequests.delete(momentId);
-        cancelCommentInput(momentId);
+        cancelCommentInput(momentId, triggerElement);
         loadComments(momentId);
         loadCommentCounts([momentId]);
     } catch(err) {
@@ -550,7 +588,8 @@ window.handleCommentImgSelect = function(event, momentId) {
     const files = Array.from(event.target.files);
     if (!files.length) return;
     if (!commentImgFiles[momentId]) commentImgFiles[momentId] = [];
-    const previewEl = document.getElementById(`comment-img-previews-${momentId}`);
+    const card = event.target.closest('.moment-card');
+    const previewEl = card ? card.querySelector('.comment-img-previews') : document.getElementById(`comment-img-previews-${momentId}`);
     if (!previewEl) return;
     const availableSlots = Math.max(0, MAX_COMMENT_IMAGE_COUNT - commentImgFiles[momentId].length);
     const validFiles = files.filter(file => ALLOWED_COMMENT_IMAGE_TYPES.has(file.type)

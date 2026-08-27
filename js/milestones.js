@@ -127,7 +127,7 @@ function showMomentStarError() {
     }
 }
 
-async function toggleMomentStar(momentId) {
+async function toggleMomentStar(momentId, triggerElement = null) {
     if (!hasMilestoneAuthContext()) {
         openLoginModal();
         return;
@@ -141,11 +141,13 @@ async function toggleMomentStar(momentId) {
     const pendingOperation = Symbol(`moment-star-${momentId}`);
     pendingMomentStarIds.set(momentId, pendingOperation);
     const hasStarred = starredMomentIds.has(momentId);
-    const btn = document.getElementById(`moment-star-btn-${momentId}`);
+    const allBtns = document.querySelectorAll(`[id="card-${momentId}"] .moment-star-btn, [id="moment-star-btn-${momentId}"]`);
     if (hasStarred) starredMomentIds.delete(momentId);
     else starredMomentIds.add(momentId);
-    setMomentStarButtonState(btn, !hasStarred);
-    setMomentStarButtonPending(btn, true);
+    allBtns.forEach(btn => {
+        setMomentStarButtonState(btn, !hasStarred);
+        setMomentStarButtonPending(btn, true);
+    });
     let didChange = false;
 
     try {
@@ -176,8 +178,9 @@ async function toggleMomentStar(momentId) {
 
         didChange = true;
 
-        if (!hasStarred && btn && typeof spawnHearts === 'function') {
-            const rect = btn.getBoundingClientRect();
+        const targetBtn = triggerElement || allBtns[0];
+        if (!hasStarred && targetBtn && typeof spawnHearts === 'function') {
+            const rect = targetBtn.getBoundingClientRect();
             spawnHearts(rect.left + rect.width / 2, rect.top);
         }
     } catch (error) {
@@ -185,13 +188,13 @@ async function toggleMomentStar(momentId) {
             || String(currentAuthUser.id || '') !== requestUserId) return;
         if (hasStarred) starredMomentIds.add(momentId);
         else starredMomentIds.delete(momentId);
-        setMomentStarButtonState(document.getElementById(`moment-star-btn-${momentId}`), hasStarred);
+        allBtns.forEach(btn => setMomentStarButtonState(btn, hasStarred));
         console.error('收藏操作失败:', error);
         showMomentStarError();
     } finally {
         if (pendingMomentStarIds.get(momentId) === pendingOperation) {
             pendingMomentStarIds.delete(momentId);
-            setMomentStarButtonPending(document.getElementById(`moment-star-btn-${momentId}`), false);
+            allBtns.forEach(btn => setMomentStarButtonPending(btn, false));
         }
     }
     
