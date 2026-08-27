@@ -15,7 +15,17 @@ let editingMomentId = null;
 let editingExistingMedia = []; // Array of { ref: string, url: string, isVideo: boolean }
 let editingAudioRef = null;
 let editingAudioUrl = null;
+let momentDragDepth = 0;
 const MAX_MOMENT_MEDIA_BYTES = 100 * 1024 * 1024;
+
+function setMomentDragOverState(isOver) {
+    const page = document.getElementById('momentModal');
+    const pageCard = page ? page.querySelector('.moment-page-card') : null;
+    const previewContainer = document.getElementById('momentImagePreviewContainer');
+    if (pageCard) pageCard.classList.toggle('is-drag-over', !!isOver);
+    if (previewContainer) previewContainer.classList.toggle('is-drag-over', !!isOver);
+}
+
 function isAllowedMomentMedia(file) {
     if (file.type.startsWith('image/') || file.type.startsWith('video/')) return true;
     const ext = String(file.name).split('.').pop().toLowerCase();
@@ -130,6 +140,8 @@ function resetMomentComposer(options = {}) {
     editingExistingMedia = [];
     editingAudioRef = null;
     editingAudioUrl = null;
+    momentDragDepth = 0;
+    setMomentDragOverState(false);
 
     if (clearPhotos) clearMomentPhotoPreviews();
     if (clearAudio) {
@@ -163,6 +175,65 @@ function bindMomentModalLifecycle() {
     if (!page || page.dataset.lifecycleBound === 'true') return;
     page.dataset.lifecycleBound = 'true';
     window.addEventListener('pagehide', () => resetMomentComposer());
+
+    const pageCard = page.querySelector('.moment-page-card') || page;
+
+    // 防止在发布动态页面范围内误拖放导致浏览器直接跳页打开文件
+    page.addEventListener('dragover', (e) => {
+        if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
+            e.preventDefault();
+        }
+    });
+    page.addEventListener('drop', (e) => {
+        if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
+            e.preventDefault();
+        }
+    });
+
+    // 拖拽多媒体文件监听（支持拖拽多张图片与视频）
+    pageCard.addEventListener('dragenter', (e) => {
+        if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        e.preventDefault();
+        momentDragDepth += 1;
+        if (momentDragDepth === 1) {
+            setMomentDragOverState(true);
+        }
+    });
+
+    pageCard.addEventListener('dragover', (e) => {
+        if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    });
+
+    pageCard.addEventListener('dragleave', (e) => {
+        if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        e.preventDefault();
+        momentDragDepth = Math.max(0, momentDragDepth - 1);
+        if (momentDragDepth === 0) {
+            setMomentDragOverState(false);
+        }
+    });
+
+    pageCard.addEventListener('drop', (e) => {
+        if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        momentDragDepth = 0;
+        setMomentDragOverState(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length) {
+            appendMomentFiles(e.dataTransfer.files);
+        }
+    });
+
+    // 剪贴板粘贴监听（支持在发布页通过 Ctrl+V 直接粘贴截图或图片）
+    page.addEventListener('paste', (e) => {
+        if (!e.clipboardData || !e.clipboardData.files || !e.clipboardData.files.length) return;
+        const mediaFiles = Array.from(e.clipboardData.files).filter(file => isAllowedMomentMedia(file));
+        if (mediaFiles.length > 0) {
+            appendMomentFiles(mediaFiles);
+        }
+    });
 }
 
 function openMomentModal(options = {}) {
@@ -434,15 +505,15 @@ function leaveMomentPage() {
     resetMomentComposer();
 }
 
-function handleMomentPhotoSelect(event) {
-    const files = Array.from(event.target.files);
-    if (!files.length) return;
+function appendMomentFiles(files) {
+    const fileList = Array.from(files || []);
+    if (!fileList.length) return;
     
     const previewContainer = document.getElementById('momentImagePreviewContainer');
     if (!previewContainer) return;
     const addBtn = previewContainer.querySelector('.moment-image-add-btn');
-    const validFiles = files.filter(file => isAllowedMomentMedia(file) && file.size <= MAX_MOMENT_MEDIA_BYTES);
-    if (validFiles.length !== files.length) {
+    const validFiles = fileList.filter(file => isAllowedMomentMedia(file) && file.size <= MAX_MOMENT_MEDIA_BYTES);
+    if (validFiles.length !== fileList.length) {
         const msgEl = document.getElementById('momentModalMsg');
         if (msgEl) msgEl.textContent = '单个文件不超过 100MB，仅支持常见图文或视频。';
     }
@@ -470,7 +541,7 @@ function handleMomentPhotoSelect(event) {
         removeBtn.type = 'button';
         removeBtn.className = 'remove-btn';
         removeBtn.textContent = '×';
-        removeBtn.setAttribute('aria-label', `移除 ${file.name}`);
+        removeBtn.setAttribute('aria-label', `移除 ${file.name || '媒体'}`);
         Object.assign(removeBtn.style, { border: '0', padding: '0' });
         removeBtn.addEventListener('click', () => {
             const fileIndex = momentSelectedFiles.indexOf(file);
@@ -483,10 +554,13 @@ function handleMomentPhotoSelect(event) {
         previewContainer.insertBefore(previewItem, addBtn);
         if (media.tagName === 'VIDEO') refreshMomentVideoPlayback(media);
     });
-    
+}
+
+function handleMomentPhotoSelect(event) {
+    if (!event || !event.target || !event.target.files) return;
+    appendMomentFiles(event.target.files);
     // 清空 input 使得重复选择相同文件能触发 change
-    const photoInput = document.getElementById('momentPhotoInput');
-    if (photoInput) photoInput.value = '';
+    event.target.value = '';
 }
 
 // --- 图像与视频压缩功能 ---
