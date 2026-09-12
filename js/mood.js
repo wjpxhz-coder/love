@@ -112,7 +112,7 @@ async function renderMoodPhotoPreviews() {
                 img.src = directUrl || cachedUrl;
             } else if (typeof resolveMediaUrl === 'function') {
                 resolveMediaUrl(photoRef).then(resolved => {
-                    if (resolved && img.isConnected) img.src = resolved;
+                    if (resolved) img.src = resolved;
                 });
             }
 
@@ -444,7 +444,7 @@ async function loadMoodEntryForRoute(entryId) {
     if (!isAuthenticated()) return null;
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
-    let selectFields = getMoodSelectFields();
+    let selectFields = MOOD_ENTRY_FIELDS_WITH_PHOTOS;
     let query = supabaseClient
         .from('moods')
         .select(selectFields)
@@ -453,9 +453,9 @@ async function loadMoodEntryForRoute(entryId) {
     if (currentUserProfile?.space_id) query = query.eq('space_id', currentUserProfile.space_id);
     let { data, error } = await query.maybeSingle();
 
-    if (error && moodSupportsPhotosColumn && (error.code === '42703' || String(error.message).includes('photos'))) {
+    if (error && (error.code === '42703' || String(error.message).includes('photos'))) {
         moodSupportsPhotosColumn = false;
-        selectFields = getMoodSelectFields();
+        selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
         let retryQuery = supabaseClient
             .from('moods')
             .select(selectFields)
@@ -465,6 +465,8 @@ async function loadMoodEntryForRoute(entryId) {
         const retryResult = await retryQuery.maybeSingle();
         data = retryResult.data;
         error = retryResult.error;
+    } else if (!error && data) {
+        moodSupportsPhotosColumn = true;
     }
 
     if (error && moodSupportsSpecialColumn && (error.code === '42703' || String(error.message).includes('is_special'))) {
@@ -615,19 +617,46 @@ async function submitMood() {
         if (submitButton) submitButton.textContent = entryBeingEdited ? '保存中…' : '记录中…';
 
         let result;
-        let selectFields = getMoodSelectFields();
+        let selectFields = MOOD_ENTRY_FIELDS_WITH_PHOTOS;
+        const fullPayload = {
+            score: selectedMoodScore,
+            note: rawNote || null,
+            is_special: isSpecial,
+            photos: finalPhotos
+        };
 
-        if (moodSupportsPhotosColumn) {
-            const payload = {
+        if (entryBeingEdited) {
+            result = await supabaseClient
+                .from('moods')
+                .update(fullPayload)
+                .eq('id', entryBeingEdited.id)
+                .eq('user_id', userId)
+                .select(selectFields)
+                .single();
+        } else {
+            result = await supabaseClient
+                .from('moods')
+                .insert([{
+                    date: targetDate,
+                    ...fullPayload
+                }])
+                .select(selectFields)
+                .single();
+        }
+
+        // 若数据库尚未添加 photos 列（42703），捕获并降级重试
+        if (result.error && (result.error.code === '42703' || String(result.error.message).includes('photos'))) {
+            moodSupportsPhotosColumn = false;
+            selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
+            const fallbackPayload = {
                 score: selectedMoodScore,
                 note: rawNote || null,
-                is_special: isSpecial,
-                photos: finalPhotos
+                ...(moodSupportsSpecialColumn ? { is_special: isSpecial } : {})
             };
             if (entryBeingEdited) {
                 result = await supabaseClient
                     .from('moods')
-                    .update(payload)
+                    .update(fallbackPayload)
                     .eq('id', entryBeingEdited.id)
                     .eq('user_id', userId)
                     .select(selectFields)
@@ -637,78 +666,42 @@ async function submitMood() {
                     .from('moods')
                     .insert([{
                         date: targetDate,
-                        ...payload
+                        ...fallbackPayload
                     }])
                     .select(selectFields)
                     .single();
             }
-
-            if (result.error && (result.error.code === '42703' || String(result.error.message).includes('photos'))) {
-                moodSupportsPhotosColumn = false;
-                selectFields = getMoodSelectFields();
-            }
+        } else if (!result.error) {
+            moodSupportsPhotosColumn = true;
         }
 
-        // 若降级（无 photos 字段）
-        if (!moodSupportsPhotosColumn) {
-            if (moodSupportsSpecialColumn) {
-                const payload = {
-                    score: selectedMoodScore,
-                    note: rawNote || null,
-                    is_special: isSpecial
-                };
-                if (entryBeingEdited) {
-                    result = await supabaseClient
-                        .from('moods')
-                        .update(payload)
-                        .eq('id', entryBeingEdited.id)
-                        .eq('user_id', userId)
-                        .select(selectFields)
-                        .single();
-                } else {
-                    result = await supabaseClient
-                        .from('moods')
-                        .insert([{
-                            date: targetDate,
-                            ...payload
-                        }])
-                        .select(selectFields)
-                        .single();
-                }
-
-                if (result.error && (result.error.code === '42703' || String(result.error.message).includes('is_special'))) {
-                    moodSupportsSpecialColumn = false;
-                    selectFields = MOOD_ENTRY_FIELDS_LEGACY;
-                }
-            }
-
-            // 若 special 列也没有
-            if (!moodSupportsSpecialColumn) {
-                const fallbackNote = isSpecial
-                    ? (rawNote ? `✨[特别日子] ${rawNote}` : '✨[特别日子]')
-                    : rawNote;
-                const fallbackPayload = {
-                    score: selectedMoodScore,
-                    note: fallbackNote || null
-                };
-                if (entryBeingEdited) {
-                    result = await supabaseClient
-                        .from('moods')
-                        .update(fallbackPayload)
-                        .eq('id', entryBeingEdited.id)
-                        .eq('user_id', userId)
-                        .select(MOOD_ENTRY_FIELDS_LEGACY)
-                        .single();
-                } else {
-                    result = await supabaseClient
-                        .from('moods')
-                        .insert([{
-                            date: targetDate,
-                            ...fallbackPayload
-                        }])
-                        .select(MOOD_ENTRY_FIELDS_LEGACY)
-                        .single();
-                }
+        // 若 special 列也没有（极端二次降级）
+        if (result.error && (result.error.code === '42703' || String(result.error.message).includes('is_special'))) {
+            moodSupportsSpecialColumn = false;
+            const fallbackNote = isSpecial
+                ? (rawNote ? `✨[特别日子] ${rawNote}` : '✨[特别日子]')
+                : rawNote;
+            const fallbackPayload = {
+                score: selectedMoodScore,
+                note: fallbackNote || null
+            };
+            if (entryBeingEdited) {
+                result = await supabaseClient
+                    .from('moods')
+                    .update(fallbackPayload)
+                    .eq('id', entryBeingEdited.id)
+                    .eq('user_id', userId)
+                    .select(MOOD_ENTRY_FIELDS_LEGACY)
+                    .single();
+            } else {
+                result = await supabaseClient
+                    .from('moods')
+                    .insert([{
+                        date: targetDate,
+                        ...fallbackPayload
+                    }])
+                    .select(MOOD_ENTRY_FIELDS_LEGACY)
+                    .single();
             }
         }
 
@@ -904,7 +897,7 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
     const userId = currentAuthUser.id;
     if (status) status.textContent = '正在加载本月心情…';
 
-    let selectFields = getMoodSelectFields();
+    let selectFields = MOOD_ENTRY_FIELDS_WITH_PHOTOS;
     let query = supabaseClient
         .from('moods')
         .select(selectFields)
@@ -915,9 +908,9 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
     if (currentUserProfile?.space_id) query = query.eq('space_id', currentUserProfile.space_id);
     let { data, error } = await query;
 
-    if (error && moodSupportsPhotosColumn && (error.code === '42703' || String(error.message).includes('photos'))) {
+    if (error && (error.code === '42703' || String(error.message).includes('photos'))) {
         moodSupportsPhotosColumn = false;
-        selectFields = getMoodSelectFields();
+        selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
         let retryQuery = supabaseClient
             .from('moods')
             .select(selectFields)
@@ -929,6 +922,8 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
         const retryResult = await retryQuery;
         data = retryResult.data;
         error = retryResult.error;
+    } else if (!error) {
+        moodSupportsPhotosColumn = true;
     }
 
     if (error && moodSupportsSpecialColumn && (error.code === '42703' || String(error.message).includes('is_special'))) {
@@ -1085,7 +1080,7 @@ function createMoodDayEntry(entry) {
                 applyImgSrc(directUrl || cachedUrl);
             } else if (typeof resolveMediaUrl === 'function') {
                 resolveMediaUrl(photoRef).then(resolved => {
-                    if (resolved && photoItem.isConnected) applyImgSrc(resolved);
+                    if (resolved) applyImgSrc(resolved);
                 });
             }
 
