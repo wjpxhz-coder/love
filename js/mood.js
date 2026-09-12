@@ -299,6 +299,13 @@ function isMoodEntrySpecial(entry) {
     return false;
 }
 
+function isMoodRetroactive(entry) {
+    if (!entry || !entry.date || !entry.created_at) return false;
+    const createdAtDateKey = getAppDateKey(new Date(entry.created_at));
+    if (!createdAtDateKey) return false;
+    return createdAtDateKey > entry.date;
+}
+
 function getDisplayMoodNote(note) {
     if (typeof note !== 'string') return '';
     return note.replace(/✨\[特别日子\]\s*/g, '').trim();
@@ -485,7 +492,13 @@ function openMoodModal(entryId = null, targetDate = null) {
 }
 
 function openMoodModalForDate(dateKey = activeMoodDetailDate) {
-    openMoodModal(null, dateKey || getAppDateKey());
+    const targetDate = dateKey || activeMoodDetailDate || getAppDateKey();
+    const today = getAppDateKey();
+    if (targetDate > today) {
+        if (typeof showToast === 'function') showToast('不能预支未来的心情哦～ 🌱');
+        return;
+    }
+    openMoodModal(null, targetDate);
 }
 
 async function loadMoodEntryForRoute(entryId) {
@@ -549,17 +562,35 @@ async function enterMoodPage(route) {
     editingMoodId = entry ? entry.id : null;
     const title = document.getElementById('mood-modal-title');
     const submitButton = document.getElementById('mood-submit-button');
-    const checkinDate = entry ? entry.date : (targetMoodCheckinDate || getAppDateKey());
+    const today = getAppDateKey();
+    const checkinDate = entry ? entry.date : (targetMoodCheckinDate || today);
+
+    if (!entry && checkinDate > today) {
+        if (typeof showToast === 'function') showToast('不能预支未来的心情哦～ 🌱');
+        if (typeof appBack === 'function') appBack('/');
+        return;
+    }
+
     if (title) {
         if (entry) {
             title.textContent = `编辑 ${formatMoodDateTitle(entry.date)} 的心情`;
-        } else if (checkinDate !== getAppDateKey()) {
+        } else if (checkinDate < today) {
+            title.textContent = `补记 ${formatMoodDateTitle(checkinDate)} 的心情 📝`;
+        } else if (checkinDate !== today) {
             title.textContent = `记录 ${formatMoodDateTitle(checkinDate)} 的心情 🌈`;
         } else {
             title.textContent = '今日心情打卡 🌈';
         }
     }
-    if (submitButton) submitButton.textContent = entry ? '保存修改' : '记录';
+    if (submitButton) {
+        if (entry) {
+            submitButton.textContent = '保存修改';
+        } else if (checkinDate < today) {
+            submitButton.textContent = '补记心情';
+        } else {
+            submitButton.textContent = '记录';
+        }
+    }
     resetMoodComposer(entry);
 }
 
@@ -618,6 +649,14 @@ async function submitMood() {
     const entryBeingEdited = editingMoodId === null ? null : getMoodEntryById(editingMoodId);
     const targetDate = entryBeingEdited ? entryBeingEdited.date : (targetMoodCheckinDate || getAppDateKey());
     const returnDate = targetDate;
+    const today = getAppDateKey();
+
+    if (!entryBeingEdited && targetDate > today) {
+        messageElement.textContent = '不能预支未来的心情哦～ 🌱';
+        if (typeof showToast === 'function') showToast('不能预支未来的心情哦～ 🌱');
+        return;
+    }
+
     isMoodSaving = true;
     if (submitButton) {
         submitButton.disabled = true;
@@ -723,7 +762,12 @@ async function submitMood() {
         await loadMoods(currentMoodMonthKey || getCurrentMoodMonthKey());
         if (!isCurrentAuthSnapshot(epoch, userId)) return;
         if (typeof showToast === 'function') {
-            showToast(finalPhotos.length > 0 ? '心情与照片已成功保存 📷✨' : '心情已成功保存 ✨');
+            const isRetroactiveSave = !entryBeingEdited && targetDate < getAppDateKey();
+            if (isRetroactiveSave) {
+                showToast(finalPhotos.length > 0 ? '往日心情与照片已补记保存 📷✨' : '往日心情已补记保存 📝✨');
+            } else {
+                showToast(finalPhotos.length > 0 ? '心情与照片已成功保存 📷✨' : '心情已成功保存 ✨');
+            }
         }
         if (typeof appBack === 'function') {
             const fallback = returnDate
@@ -1018,6 +1062,16 @@ function createMoodDayEntry(entry) {
         identity.appendChild(specialBadge);
     }
 
+    if (isMoodRetroactive(entry)) {
+        const retroBadge = document.createElement('span');
+        retroBadge.className = 'mood-day-retro-tag';
+        retroBadge.textContent = '📝 补记';
+        const createdDateKey = getAppDateKey(new Date(entry.created_at));
+        retroBadge.title = createdDateKey ? `于 ${formatMoodDateTitle(createdDateKey)} 弥补记录` : '事后弥补记录';
+        identity.appendChild(document.createTextNode(' '));
+        identity.appendChild(retroBadge);
+    }
+
     const time = document.createElement('time');
     time.dateTime = entry.created_at || '';
     time.textContent = formatMoodEntryTime(entry);
@@ -1164,14 +1218,47 @@ async function enterMoodDayPage(route) {
     const title = document.getElementById('mood-day-modal-title');
     const list = document.getElementById('mood-day-list');
     const emptyActions = document.getElementById('mood-day-empty-actions');
+    const appendBox = document.getElementById('mood-day-append-box');
+    const appendText = document.getElementById('mood-day-append-text');
+    const emptyDecor = document.getElementById('mood-day-empty-decor');
+    const emptyTip = document.getElementById('mood-day-empty-tip');
+    const emptyBtnGroup = document.getElementById('mood-day-empty-btn-group');
+    const emptyAddBtn = document.getElementById('mood-day-empty-add-btn');
+    const markButton = document.getElementById('mood-day-mark-button');
     if (!title || !list) return;
 
+    const todayKey = getAppDateKey();
+    const isFuture = dateKey > todayKey;
+    const isToday = dateKey === todayKey;
     const hasSpecialInDay = entries.some(entry => isMoodEntrySpecial(entry));
-    title.textContent = `${formatMoodDateTitle(dateKey)}${hasSpecialInDay ? ' ✨' : ''} · ${entries.length} 条`;
+
+    if (markButton) {
+        markButton.hidden = isFuture;
+    }
+
+    if (isFuture) {
+        title.textContent = `${formatMoodDateTitle(dateKey)} · 未至`;
+    } else {
+        title.textContent = `${formatMoodDateTitle(dateKey)}${hasSpecialInDay ? ' ✨' : ''} · ${entries.length} 条`;
+    }
 
     if (!entries.length) {
         list.replaceChildren();
         if (emptyActions) emptyActions.hidden = false;
+        if (appendBox) appendBox.hidden = true;
+
+        if (isFuture) {
+            if (emptyDecor) emptyDecor.textContent = '🌱';
+            if (emptyTip) emptyTip.textContent = '这是未来的日子，不能预支未来的心情哦～';
+            if (emptyBtnGroup) emptyBtnGroup.hidden = true;
+        } else {
+            if (emptyDecor) emptyDecor.textContent = '✨';
+            if (emptyTip) emptyTip.textContent = '这一天还没有心情记录～';
+            if (emptyBtnGroup) emptyBtnGroup.hidden = false;
+            if (emptyAddBtn) {
+                emptyAddBtn.textContent = isToday ? '✨ 记录今天的心情' : '🌈 补记这天的心情';
+            }
+        }
         updateMoodDayMarkButton(hasSpecialInDay);
         return;
     }
@@ -1182,6 +1269,17 @@ async function enterMoodDayPage(route) {
     const fragment = document.createDocumentFragment();
     entries.forEach(entry => fragment.appendChild(createMoodDayEntry(entry)));
     list.replaceChildren(fragment);
+
+    if (appendBox) {
+        if (isFuture) {
+            appendBox.hidden = true;
+        } else {
+            appendBox.hidden = false;
+            if (appendText) {
+                appendText.textContent = isToday ? '再记一条今天的心情' : '补记一条心情';
+            }
+        }
+    }
 }
 
 async function toggleMoodDaySpecial(targetDateKey = activeMoodDetailDate) {
@@ -1191,6 +1289,12 @@ async function toggleMoodDaySpecial(targetDateKey = activeMoodDetailDate) {
     }
     const dateKey = targetDateKey || activeMoodDetailDate;
     if (!dateKey || isMoodSaving) return;
+
+    const today = getAppDateKey();
+    if (dateKey > today) {
+        if (typeof showToast === 'function') showToast('未来日期的金光标记还没到来哦～ 🌱');
+        return;
+    }
 
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
