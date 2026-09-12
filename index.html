@@ -74,7 +74,7 @@
     <link rel="stylesheet" href="css/auth.css?v=3.9.53">
     <link rel="stylesheet" href="css/profile.css?v=3.9.53">
     <link rel="stylesheet" href="css/notifications.css?v=3.9.53">
-    <link rel="stylesheet" href="css/mood.css?v=3.9.53">
+    <link rel="stylesheet" href="css/mood.css?v=3.9.54">
     <link rel="stylesheet" href="css/anniversary.css?v=3.9.53">
     <link rel="stylesheet" href="css/effects.css?v=3.9.53">
     <link rel="stylesheet" href="css/responsive.css?v=3.9.53">
@@ -359,12 +359,18 @@
             <div class="app-page-content app-page-content--medium">
     <div class="modal-box app-page-card mood-day-modal-box">
         <div class="mood-day-list" id="mood-day-list"></div>
+        <div class="mood-day-append-box" id="mood-day-append-box" hidden>
+            <button class="btn-mood-append" id="mood-day-append-btn" type="button" onclick="openMoodModalForDate()">
+                <span class="mood-day-append-icon">＋</span>
+                <span class="mood-day-append-text" id="mood-day-append-text">补记一条心情</span>
+            </button>
+        </div>
         <div class="mood-day-empty-actions" id="mood-day-empty-actions" hidden>
-            <div class="mood-day-empty-decor">✨</div>
-            <p class="mood-day-empty-tip">这一天还没有心情记录～</p>
-            <div class="mood-day-btn-group">
+            <div class="mood-day-empty-decor" id="mood-day-empty-decor">✨</div>
+            <p class="mood-day-empty-tip" id="mood-day-empty-tip">这一天还没有心情记录～</p>
+            <div class="mood-day-btn-group" id="mood-day-empty-btn-group">
                 <button class="btn-mood-action btn-mood-mark-direct" id="mood-day-empty-mark-btn" type="button" onclick="toggleMoodDaySpecial()">✨ 点亮金光</button>
-                <button class="btn-mood-action btn-mood-add-direct" type="button" onclick="openMoodModalForDate()">🌈 补记这天的心情</button>
+                <button class="btn-mood-action btn-mood-add-direct" id="mood-day-empty-add-btn" type="button" onclick="openMoodModalForDate()">🌈 补记这天的心情</button>
             </div>
         </div>
     </div>
@@ -858,7 +864,7 @@
 <script src="js/milestones.js?v=3.9.53"></script>
 <script src="js/comments.js?v=3.9.53"></script>
 <script src="js/likes.js?v=3.9.53"></script>
-<script src="js/mood.js?v=3.9.53"></script>
+<script src="js/mood.js?v=3.9.54"></script>
 <script src="js/anniversary.js?v=3.9.53"></script>
 <script src="js/lightbox.js?v=3.9.53"></script>
 <script src="js/ai.js?v=3.9.53"></script>
