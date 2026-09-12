@@ -39,6 +39,38 @@ let moodExistingPhotos = [];
 let moodPhotosToDeleteOnSave = [];
 const moodPhotoPreviewUrls = new Map();
 
+/**
+ * 强健解析并规范化照片列表，兼容原生 Array、JSON 字符串以及 PostgreSQL text[] 数组字面量
+ */
+function normalizeMoodPhotos(val) {
+    if (!val) return [];
+    if (Array.isArray(val)) {
+        return val.map(item => String(item || '').trim()).filter(Boolean);
+    }
+    if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (!trimmed || trimmed === '{}' || trimmed === '[]') return [];
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) {
+                    return parsed.map(item => String(item || '').trim()).filter(Boolean);
+                }
+            } catch (_e) {}
+        }
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+            const inner = trimmed.slice(1, -1);
+            if (!inner) return [];
+            const matches = inner.match(/(".*?"|[^",\s]+)/g) || [];
+            return matches.map(s => s.replace(/^"|"$/g, '').trim()).filter(Boolean);
+        }
+        if (trimmed.startsWith('storage://') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+            return [trimmed];
+        }
+    }
+    return [];
+}
+
 function getMoodStorageDirectory() {
     const spaceId = currentUserProfile && String(currentUserProfile.space_id || '');
     const userId = currentAuthUser && String(currentAuthUser.id || '');
@@ -418,8 +450,9 @@ function resetMoodComposer(entry = null) {
 
     // 初始化并渲染照片预览
     clearMoodPhotoPreviews();
-    if (entry && Array.isArray(entry.photos) && entry.photos.length > 0) {
-        moodExistingPhotos = [...entry.photos];
+    const entryPhotos = entry ? normalizeMoodPhotos(entry.photos) : [];
+    if (entryPhotos.length > 0) {
+        moodExistingPhotos = [...entryPhotos];
     }
     renderMoodPhotoPreviews();
 }
@@ -483,6 +516,7 @@ async function loadMoodEntryForRoute(entryId) {
     }
 
     if (!isCurrentAuthSnapshot(epoch, userId) || error || !data) return null;
+    data.photos = normalizeMoodPhotos(data.photos);
     const entries = moodEntriesByDate[data.date] || [];
     if (!entries.some(entry => String(entry.id) === String(data.id))) {
         moodEntriesByDate[data.date] = [...entries, data].sort(compareMoodEntries);
@@ -644,8 +678,12 @@ async function submitMood() {
                 .single();
         }
 
-        // 若数据库尚未添加 photos 列（42703），捕获并降级重试
-        if (result.error && (result.error.code === '42703' || String(result.error.message).includes('photos'))) {
+        // 若数据库尚未识别 photos 列（42703 或 PGRST204 等）
+        if (result.error && (result.error.code === '42703' || result.error.code === 'PGRST204' || String(result.error.message).includes('photos'))) {
+            if (finalPhotos.length > 0) {
+                console.error('数据库尚未识别 photos 字段，拒绝静默丢弃用户照片:', result.error);
+                throw new Error(result.error.message || '数据库尚未识别照片字段，请稍候重试');
+            }
             moodSupportsPhotosColumn = false;
             selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
             const fallbackPayload = {
@@ -720,6 +758,9 @@ async function submitMood() {
         targetMoodCheckinDate = null;
         await loadMoods(currentMoodMonthKey || getCurrentMoodMonthKey());
         if (!isCurrentAuthSnapshot(epoch, userId)) return;
+        if (typeof showToast === 'function') {
+            showToast(finalPhotos.length > 0 ? '心情与照片已成功保存 📷✨' : '心情已成功保存 ✨');
+        }
         if (typeof appBack === 'function') {
             const fallback = returnDate
                 ? `/mood/day/${encodeURIComponent(returnDate)}`
@@ -741,8 +782,10 @@ async function submitMood() {
             messageElement.textContent = '数据库仍限制每天一条记录，请先执行最新迁移。';
         } else if (error?.code === '23514') {
             messageElement.textContent = '数据库表情编号或照片数量受限，请检查最新迁移。';
+        } else if (String(error?.message || '').includes('photos') || error?.code === '42703' || error?.code === 'PGRST204') {
+            messageElement.textContent = '照片保存失败：Supabase 正在同步字段缓存，请稍候重试。';
         } else {
-            messageElement.textContent = '保存失败，请稍后重试。';
+            messageElement.textContent = `保存失败：${error?.message || '请稍后重试。'}`;
         }
     } finally {
         isMoodSaving = false;
@@ -767,7 +810,7 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
     }
 
     const isSpecialDay = entries.some(entry => isMoodEntrySpecial(entry));
-    const hasPhotosDay = entries.some(entry => Array.isArray(entry.photos) && entry.photos.length > 0);
+    const hasPhotosDay = entries.some(entry => normalizeMoodPhotos(entry.photos).length > 0);
 
     if (isSpecialDay || hasPhotosDay) {
         const badges = document.createElement('span');
@@ -952,6 +995,7 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
 
     const entriesByDate = {};
     (data || []).forEach(entry => {
+        entry.photos = normalizeMoodPhotos(entry.photos);
         if (!entriesByDate[entry.date]) entriesByDate[entry.date] = [];
         entriesByDate[entry.date].push(entry);
     });
@@ -1034,18 +1078,19 @@ function createMoodDayEntry(entry) {
     note.textContent = cleanNote || '没有留下文字';
     card.appendChild(note);
 
-    if (Array.isArray(entry.photos) && entry.photos.length > 0) {
+    const entryPhotos = normalizeMoodPhotos(entry.photos);
+    if (entryPhotos.length > 0) {
         const photosGrid = document.createElement('div');
         photosGrid.className = 'mood-day-photos-grid';
-        if (entry.photos.length === 1) {
+        if (entryPhotos.length === 1) {
             photosGrid.classList.add('single-photo');
-        } else if (entry.photos.length === 2) {
+        } else if (entryPhotos.length === 2) {
             photosGrid.classList.add('double-photo');
-        } else if (entry.photos.length === 4) {
+        } else if (entryPhotos.length === 4) {
             photosGrid.classList.add('quad-photo');
         }
 
-        entry.photos.forEach((photoRef, photoIdx) => {
+        entryPhotos.forEach((photoRef, photoIdx) => {
             const photoItem = document.createElement('div');
             photoItem.className = 'mood-day-photo-item';
             photoItem.setAttribute('role', 'button');
@@ -1065,6 +1110,10 @@ function createMoodDayEntry(entry) {
                 if (!src) return;
                 img.src = src;
                 img.onload = () => photoItem.classList.add('is-loaded');
+                img.onerror = () => {
+                    photoItem.classList.add('is-loaded');
+                    photoItem.title = '图片加载失败';
+                };
                 photoItem.onclick = () => {
                     if (typeof openLightbox === 'function') openLightbox(src);
                 };
@@ -1150,8 +1199,9 @@ async function enterMoodDayPage(route) {
     // 预热并批量解析当日心情中的所有照片地址
     const dayPhotoPaths = [];
     entries.forEach(entry => {
-        if (Array.isArray(entry.photos)) {
-            dayPhotoPaths.push(...entry.photos);
+        const photos = normalizeMoodPhotos(entry.photos);
+        if (photos.length > 0) {
+            dayPhotoPaths.push(...photos);
         }
     });
     if (dayPhotoPaths.length > 0 && typeof batchResolveMediaUrls === 'function') {
@@ -1367,7 +1417,7 @@ async function deleteMoodEntry(entryId) {
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
     const dateKey = entry.date;
-    const photosToDelete = Array.isArray(entry.photos) ? [...entry.photos] : [];
+    const photosToDelete = normalizeMoodPhotos(entry.photos);
 
     const { error } = await supabaseClient
         .from('moods')
