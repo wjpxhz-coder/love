@@ -22,16 +22,31 @@ const MOOD_DESCRIPTIONS = {
 };
 const MOOD_TIME_ZONE = 'Asia/Shanghai';
 const MAX_MOOD_PHOTOS = 9;
-const MOOD_ENTRY_FIELDS_WITH_PHOTOS = 'id, user_id, date, score, author, note, is_special, photos, created_at, updated_at';
-const MOOD_ENTRY_FIELDS_PRIMARY = 'id, user_id, date, score, author, note, is_special, created_at, updated_at';
-const MOOD_ENTRY_FIELDS_LEGACY = 'id, user_id, date, score, author, note, created_at, updated_at';
 let moodSupportsPhotosColumn = true;
 let moodSupportsSpecialColumn = true;
 
 function getMoodSelectFields() {
-    if (moodSupportsPhotosColumn) return MOOD_ENTRY_FIELDS_WITH_PHOTOS;
-    if (moodSupportsSpecialColumn) return MOOD_ENTRY_FIELDS_PRIMARY;
-    return MOOD_ENTRY_FIELDS_LEGACY;
+    const fields = ['id', 'user_id', 'date', 'score', 'author', 'note', 'created_at', 'updated_at'];
+    if (moodSupportsSpecialColumn) fields.push('is_special');
+    if (moodSupportsPhotosColumn) fields.push('photos');
+    return fields.join(', ');
+}
+
+function buildMoodPayload(score, rawNote, isSpecial, finalPhotos) {
+    const payload = { score: Number(score) };
+    const cleanNote = String(rawNote || '').trim();
+    if (moodSupportsSpecialColumn) {
+        payload.is_special = Boolean(isSpecial);
+        payload.note = cleanNote || null;
+    } else {
+        payload.note = isSpecial
+            ? (cleanNote ? `✨[特别日子] ${cleanNote}` : '✨[特别日子]')
+            : (cleanNote || null);
+    }
+    if (moodSupportsPhotosColumn) {
+        payload.photos = Array.isArray(finalPhotos) ? finalPhotos : [];
+    }
+    return payload;
 }
 
 let moodSelectedFiles = [];
@@ -477,42 +492,34 @@ async function loadMoodEntryForRoute(entryId) {
     if (!isAuthenticated()) return null;
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
-    let selectFields = MOOD_ENTRY_FIELDS_WITH_PHOTOS;
-    let query = supabaseClient
-        .from('moods')
-        .select(selectFields)
-        .eq('id', entryId)
-        .eq('user_id', userId);
-    if (currentUserProfile?.space_id) query = query.eq('space_id', currentUserProfile.space_id);
-    let { data, error } = await query.maybeSingle();
+    let data = null;
+    let error = null;
 
-    if (error && (error.code === '42703' || String(error.message).includes('photos'))) {
-        moodSupportsPhotosColumn = false;
-        selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
-        let retryQuery = supabaseClient
+    for (let attempt = 0; attempt < 3; attempt++) {
+        let selectFields = getMoodSelectFields();
+        let query = supabaseClient
             .from('moods')
             .select(selectFields)
             .eq('id', entryId)
             .eq('user_id', userId);
-        if (currentUserProfile?.space_id) retryQuery = retryQuery.eq('space_id', currentUserProfile.space_id);
-        const retryResult = await retryQuery.maybeSingle();
-        data = retryResult.data;
-        error = retryResult.error;
-    } else if (!error && data) {
-        moodSupportsPhotosColumn = true;
-    }
+        if (currentUserProfile?.space_id) query = query.eq('space_id', currentUserProfile.space_id);
+        const res = await query.maybeSingle();
+        data = res.data;
+        error = res.error;
+        if (!error) break;
 
-    if (error && moodSupportsSpecialColumn && (error.code === '42703' || String(error.message).includes('is_special'))) {
-        moodSupportsSpecialColumn = false;
-        let retryQuery = supabaseClient
-            .from('moods')
-            .select(MOOD_ENTRY_FIELDS_LEGACY)
-            .eq('id', entryId)
-            .eq('user_id', userId);
-        if (currentUserProfile?.space_id) retryQuery = retryQuery.eq('space_id', currentUserProfile.space_id);
-        const retryResult = await retryQuery.maybeSingle();
-        data = retryResult.data;
-        error = retryResult.error;
+        const errCode = String(error.code || '');
+        const errMsg = String(error.message || '').toLowerCase();
+        let stateChanged = false;
+        if (moodSupportsSpecialColumn && (errCode === '42703' || errCode === 'PGRST204' || errMsg.includes('is_special'))) {
+            moodSupportsSpecialColumn = false;
+            stateChanged = true;
+        }
+        if (moodSupportsPhotosColumn && (errCode === '42703' || errCode === 'PGRST204' || errMsg.includes('photos'))) {
+            moodSupportsPhotosColumn = false;
+            stateChanged = true;
+        }
+        if (!stateChanged) break;
     }
 
     if (!isCurrentAuthSnapshot(epoch, userId) || error || !data) return null;
@@ -650,100 +657,57 @@ async function submitMood() {
         const finalPhotos = [...moodExistingPhotos, ...uploadedUrls];
         if (submitButton) submitButton.textContent = entryBeingEdited ? '保存中…' : '记录中…';
 
-        let result;
-        let selectFields = MOOD_ENTRY_FIELDS_WITH_PHOTOS;
-        const fullPayload = {
-            score: selectedMoodScore,
-            note: rawNote || null,
-            is_special: isSpecial,
-            photos: finalPhotos
-        };
+        let result = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const currentPayload = buildMoodPayload(selectedMoodScore, rawNote, isSpecial, finalPhotos);
+            const currentSelectFields = getMoodSelectFields();
 
-        if (entryBeingEdited) {
-            result = await supabaseClient
-                .from('moods')
-                .update(fullPayload)
-                .eq('id', entryBeingEdited.id)
-                .eq('user_id', userId)
-                .select(selectFields)
-                .single();
-        } else {
-            result = await supabaseClient
-                .from('moods')
-                .insert([{
-                    date: targetDate,
-                    ...fullPayload
-                }])
-                .select(selectFields)
-                .single();
-        }
-
-        // 若数据库尚未识别 photos 列（42703 或 PGRST204 等）
-        if (result.error && (result.error.code === '42703' || result.error.code === 'PGRST204' || String(result.error.message).includes('photos'))) {
-            if (finalPhotos.length > 0) {
-                console.error('数据库尚未识别 photos 字段，拒绝静默丢弃用户照片:', result.error);
-                throw new Error(result.error.message || '数据库尚未识别照片字段，请稍候重试');
-            }
-            moodSupportsPhotosColumn = false;
-            selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
-            const fallbackPayload = {
-                score: selectedMoodScore,
-                note: rawNote || null,
-                ...(moodSupportsSpecialColumn ? { is_special: isSpecial } : {})
-            };
             if (entryBeingEdited) {
                 result = await supabaseClient
                     .from('moods')
-                    .update(fallbackPayload)
+                    .update(currentPayload)
                     .eq('id', entryBeingEdited.id)
                     .eq('user_id', userId)
-                    .select(selectFields)
+                    .select(currentSelectFields)
                     .single();
             } else {
                 result = await supabaseClient
                     .from('moods')
                     .insert([{
                         date: targetDate,
-                        ...fallbackPayload
+                        ...currentPayload
                     }])
-                    .select(selectFields)
+                    .select(currentSelectFields)
                     .single();
             }
-        } else if (!result.error) {
-            moodSupportsPhotosColumn = true;
-        }
 
-        // 若 special 列也没有（极端二次降级）
-        if (result.error && (result.error.code === '42703' || String(result.error.message).includes('is_special'))) {
-            moodSupportsSpecialColumn = false;
-            const fallbackNote = isSpecial
-                ? (rawNote ? `✨[特别日子] ${rawNote}` : '✨[特别日子]')
-                : rawNote;
-            const fallbackPayload = {
-                score: selectedMoodScore,
-                note: fallbackNote || null
-            };
-            if (entryBeingEdited) {
-                result = await supabaseClient
-                    .from('moods')
-                    .update(fallbackPayload)
-                    .eq('id', entryBeingEdited.id)
-                    .eq('user_id', userId)
-                    .select(MOOD_ENTRY_FIELDS_LEGACY)
-                    .single();
-            } else {
-                result = await supabaseClient
-                    .from('moods')
-                    .insert([{
-                        date: targetDate,
-                        ...fallbackPayload
-                    }])
-                    .select(MOOD_ENTRY_FIELDS_LEGACY)
-                    .single();
+            if (!result.error) break;
+
+            const errCode = String(result.error.code || '');
+            const errMsg = String(result.error.message || '').toLowerCase();
+            let stateChanged = false;
+
+            // 1. 若报错指出缺少 is_special
+            if (moodSupportsSpecialColumn && (errCode === '42703' || errCode === 'PGRST204' || errMsg.includes('is_special'))) {
+                console.warn('检测到数据库缺少 is_special 列，自动降级为备注模式重试:', result.error);
+                moodSupportsSpecialColumn = false;
+                stateChanged = true;
             }
+
+            // 2. 若报错指出缺少 photos
+            if (moodSupportsPhotosColumn && (errCode === '42703' || errCode === 'PGRST204' || errMsg.includes('photos'))) {
+                if (finalPhotos.length > 0) {
+                    console.error('数据库缺少 photos 字段，拒绝静默丢弃用户照片:', result.error);
+                    throw new Error('数据库尚未识别 photos 字段，请先在 Supabase 执行迁移脚本');
+                }
+                moodSupportsPhotosColumn = false;
+                stateChanged = true;
+            }
+
+            if (!stateChanged) break;
         }
 
-        if (result.error) throw result.error;
+        if (result && result.error) throw result.error;
         if (!isCurrentAuthSnapshot(epoch, userId)) return;
 
         // 清理编辑时被用户移除的已有照片
@@ -940,48 +904,36 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
     const userId = currentAuthUser.id;
     if (status) status.textContent = '正在加载本月心情…';
 
-    let selectFields = MOOD_ENTRY_FIELDS_WITH_PHOTOS;
-    let query = supabaseClient
-        .from('moods')
-        .select(selectFields)
-        .gte('date', bounds.firstDate)
-        .lte('date', bounds.lastDate)
-        .order('date', { ascending: true })
-        .order('created_at', { ascending: true });
-    if (currentUserProfile?.space_id) query = query.eq('space_id', currentUserProfile.space_id);
-    let { data, error } = await query;
+    let data = null;
+    let error = null;
 
-    if (error && (error.code === '42703' || String(error.message).includes('photos'))) {
-        moodSupportsPhotosColumn = false;
-        selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
-        let retryQuery = supabaseClient
+    for (let attempt = 0; attempt < 3; attempt++) {
+        let selectFields = getMoodSelectFields();
+        let query = supabaseClient
             .from('moods')
             .select(selectFields)
             .gte('date', bounds.firstDate)
             .lte('date', bounds.lastDate)
             .order('date', { ascending: true })
             .order('created_at', { ascending: true });
-        if (currentUserProfile?.space_id) retryQuery = retryQuery.eq('space_id', currentUserProfile.space_id);
-        const retryResult = await retryQuery;
-        data = retryResult.data;
-        error = retryResult.error;
-    } else if (!error) {
-        moodSupportsPhotosColumn = true;
-    }
+        if (currentUserProfile?.space_id) query = query.eq('space_id', currentUserProfile.space_id);
+        const res = await query;
+        data = res.data;
+        error = res.error;
+        if (!error) break;
 
-    if (error && moodSupportsSpecialColumn && (error.code === '42703' || String(error.message).includes('is_special'))) {
-        moodSupportsSpecialColumn = false;
-        let retryQuery = supabaseClient
-            .from('moods')
-            .select(MOOD_ENTRY_FIELDS_LEGACY)
-            .gte('date', bounds.firstDate)
-            .lte('date', bounds.lastDate)
-            .order('date', { ascending: true })
-            .order('created_at', { ascending: true });
-        if (currentUserProfile?.space_id) retryQuery = retryQuery.eq('space_id', currentUserProfile.space_id);
-        const retryResult = await retryQuery;
-        data = retryResult.data;
-        error = retryResult.error;
+        const errCode = String(error.code || '');
+        const errMsg = String(error.message || '').toLowerCase();
+        let stateChanged = false;
+        if (moodSupportsSpecialColumn && (errCode === '42703' || errCode === 'PGRST204' || errMsg.includes('is_special'))) {
+            moodSupportsSpecialColumn = false;
+            stateChanged = true;
+        }
+        if (moodSupportsPhotosColumn && (errCode === '42703' || errCode === 'PGRST204' || errMsg.includes('photos'))) {
+            moodSupportsPhotosColumn = false;
+            stateChanged = true;
+        }
+        if (!stateChanged) break;
     }
 
     if (requestId !== moodLoadRequestId || !isCurrentAuthSnapshot(epoch, userId)) return;
@@ -1265,7 +1217,7 @@ async function toggleMoodDaySpecial(targetDateKey = activeMoodDetailDate) {
                         .eq('user_id', userId)
                         .select(selectFields)
                         .single();
-                    if (res.error && moodSupportsPhotosColumn && (res.error.code === '42703' || String(res.error.message).includes('photos'))) {
+                    if (res.error && moodSupportsPhotosColumn && (res.error.code === '42703' || res.error.code === 'PGRST204' || String(res.error.message).includes('photos'))) {
                         moodSupportsPhotosColumn = false;
                         selectFields = getMoodSelectFields();
                         res = await supabaseClient
@@ -1276,7 +1228,7 @@ async function toggleMoodDaySpecial(targetDateKey = activeMoodDetailDate) {
                             .select(selectFields)
                             .single();
                     }
-                    if (res.error && (res.error.code === '42703' || String(res.error.message).includes('is_special'))) {
+                    if (res.error && (res.error.code === '42703' || res.error.code === 'PGRST204' || String(res.error.message).includes('is_special'))) {
                         moodSupportsSpecialColumn = false;
                         const fallbackNote = ownEntry.note ? `✨[特别日子] ${getDisplayMoodNote(ownEntry.note)}` : '✨[特别日子]';
                         await supabaseClient
@@ -1307,7 +1259,7 @@ async function toggleMoodDaySpecial(targetDateKey = activeMoodDetailDate) {
                         }])
                         .select(selectFields)
                         .single();
-                    if (res.error && moodSupportsPhotosColumn && (res.error.code === '42703' || String(res.error.message).includes('photos'))) {
+                    if (res.error && moodSupportsPhotosColumn && (res.error.code === '42703' || res.error.code === 'PGRST204' || String(res.error.message).includes('photos'))) {
                         moodSupportsPhotosColumn = false;
                         selectFields = getMoodSelectFields();
                         res = await supabaseClient
@@ -1321,7 +1273,7 @@ async function toggleMoodDaySpecial(targetDateKey = activeMoodDetailDate) {
                             .select(selectFields)
                             .single();
                     }
-                    if (res.error && (res.error.code === '42703' || String(res.error.message).includes('is_special'))) {
+                    if (res.error && (res.error.code === '42703' || res.error.code === 'PGRST204' || String(res.error.message).includes('is_special'))) {
                         moodSupportsSpecialColumn = false;
                         await supabaseClient
                             .from('moods')
@@ -1354,7 +1306,7 @@ async function toggleMoodDaySpecial(targetDateKey = activeMoodDetailDate) {
                         .update({ is_special: false, note: cleanNote || null })
                         .eq('id', entry.id)
                         .eq('user_id', userId);
-                    if (res.error && (res.error.code === '42703' || String(res.error.message).includes('is_special'))) {
+                    if (res.error && (res.error.code === '42703' || res.error.code === 'PGRST204' || String(res.error.message).includes('is_special'))) {
                         moodSupportsSpecialColumn = false;
                         await supabaseClient
                             .from('moods')
