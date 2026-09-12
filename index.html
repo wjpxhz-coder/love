@@ -308,6 +308,21 @@
         <label class="visually-hidden" for="moodNote">今天发生的事情</label>
         <textarea class="modal-input mood-note-input" id="moodNote" maxlength="300" placeholder="说说今天发生了什么…（可选）" rows="3"></textarea>
         
+        <!-- 心情照片选择与预览 -->
+        <div class="mood-photos-section">
+            <div class="mood-photos-header">
+                <span class="mood-photos-title">📷 记录照片</span>
+                <span class="mood-photos-counter" id="moodPhotoCounter">0/9</span>
+            </div>
+            <div id="moodPhotoPreviewContainer" class="mood-photo-preview-container">
+                <button class="mood-photo-add-btn" id="moodPhotoAddBtn" type="button" onclick="document.getElementById('moodPhotoInput').click()" aria-label="添加照片">
+                    <span class="mood-photo-add-icon" aria-hidden="true">+</span>
+                    <span class="mood-photo-add-text">添加照片</span>
+                </button>
+            </div>
+            <input type="file" id="moodPhotoInput" accept="image/*" multiple style="display:none;" onchange="handleMoodPhotoSelect(event)">
+        </div>
+        
         <!-- 标记这一天开关 -->
         <div class="mood-special-toggle-row">
             <label class="mood-special-toggle" for="moodIsSpecial">

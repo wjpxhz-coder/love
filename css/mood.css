@@ -873,5 +873,227 @@
     .mood-special-toggle input:checked + .mood-special-toggle-switch .mood-special-toggle-knob { transform: translateX(16px); }
     .mood-special-toggle-title { font-size: 0.85em; }
     .mood-special-toggle-desc { font-size: 0.7em; }
+    .mood-photo-preview-container { grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px; }
+    .mood-photo-preview-item, .mood-photo-add-btn { height: 74px; }
+    .mood-day-photos-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .mood-day-photos-grid.single-photo { grid-template-columns: 1fr; }
+    .mood-day-photos-grid.single-photo .mood-day-photo-item { max-height: 200px; }
 }
+
+/* ── 心情日记照片上传区 ── */
+.mood-photos-section {
+    margin-top: 14px;
+    margin-bottom: 8px;
+}
+
+.mood-photos-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 0 4px;
+}
+
+.mood-photos-title {
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.mood-photos-counter {
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+.mood-photo-preview-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+    padding: 10px;
+    border: 1.5px dashed var(--border);
+    border-radius: 16px;
+    background: var(--surface-elevated, rgba(255, 255, 255, 0.4));
+    transition: border-color 0.25s ease;
+}
+
+[data-theme='dark'] .mood-photo-preview-container {
+    background: rgba(44, 26, 62, 0.5);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.mood-photo-preview-item {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.mood-photo-preview-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.mood-photo-remove-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.65);
+    color: #ffffff;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+    z-index: 2;
+}
+
+.mood-photo-remove-btn:hover {
+    background: rgba(230, 40, 40, 0.9);
+    transform: scale(1.15);
+}
+
+.mood-photo-add-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1.5px dashed var(--primary-light, rgba(255, 185, 205, 0.8));
+    border-radius: 12px;
+    background: rgba(255, 240, 246, 0.5);
+    color: var(--primary);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    padding: 0;
+}
+
+[data-theme='dark'] .mood-photo-add-btn {
+    background: rgba(255, 143, 171, 0.1);
+    border-color: rgba(255, 143, 171, 0.35);
+}
+
+.mood-photo-add-btn:hover {
+    background: rgba(255, 220, 235, 0.8);
+    transform: scale(1.04);
+    border-color: var(--primary);
+}
+
+[data-theme='dark'] .mood-photo-add-btn:hover {
+    background: rgba(255, 143, 171, 0.2);
+}
+
+.mood-photo-add-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+    font-weight: 400;
+}
+
+.mood-photo-add-text {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* ── 日历格子的标识容器（支持星星与相机） ── */
+.mood-calendar-badges {
+    position: absolute;
+    top: 2px;
+    right: 3px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.mood-calendar-badges .mood-special-star {
+    position: static;
+    top: auto;
+    right: auto;
+}
+
+.mood-camera-badge {
+    font-size: 0.68em;
+    line-height: 1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+    animation: cameraBadgeFadeIn 0.3s ease-out;
+}
+
+@keyframes cameraBadgeFadeIn {
+    from { opacity: 0; transform: scale(0.6); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* ── 单日心情详情卡片内的照片九宫格 ── */
+.mood-day-photos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.mood-day-photos-grid.single-photo {
+    grid-template-columns: 1fr;
+    max-width: 260px;
+}
+
+.mood-day-photos-grid.double-photo {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 320px;
+}
+
+.mood-day-photos-grid.quad-photo {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 260px;
+}
+
+.mood-day-photo-item {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: zoom-in;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    background-color: rgba(220, 200, 205, 0.2);
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0) 100%);
+    background-size: 200% 100%;
+    animation: mediaShimmer 1.8s ease-in-out infinite;
+    transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1), transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mood-day-photo-item:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.mood-day-photo-item.is-loaded {
+    background-image: none;
+    animation: none;
+}
+
+.mood-day-photo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: opacity 0.3s ease;
+}
+
 

@@ -21,9 +21,229 @@ const MOOD_DESCRIPTIONS = {
     16: '发呆想事 🤔'
 };
 const MOOD_TIME_ZONE = 'Asia/Shanghai';
+const MAX_MOOD_PHOTOS = 9;
+const MOOD_ENTRY_FIELDS_WITH_PHOTOS = 'id, user_id, date, score, author, note, is_special, photos, created_at, updated_at';
 const MOOD_ENTRY_FIELDS_PRIMARY = 'id, user_id, date, score, author, note, is_special, created_at, updated_at';
 const MOOD_ENTRY_FIELDS_LEGACY = 'id, user_id, date, score, author, note, created_at, updated_at';
+let moodSupportsPhotosColumn = true;
 let moodSupportsSpecialColumn = true;
+
+function getMoodSelectFields() {
+    if (moodSupportsPhotosColumn) return MOOD_ENTRY_FIELDS_WITH_PHOTOS;
+    if (moodSupportsSpecialColumn) return MOOD_ENTRY_FIELDS_PRIMARY;
+    return MOOD_ENTRY_FIELDS_LEGACY;
+}
+
+let moodSelectedFiles = [];
+let moodExistingPhotos = [];
+let moodPhotosToDeleteOnSave = [];
+const moodPhotoPreviewUrls = new Map();
+
+function getMoodStorageDirectory() {
+    const spaceId = currentUserProfile && String(currentUserProfile.space_id || '');
+    const userId = currentAuthUser && String(currentAuthUser.id || '');
+    const isSafeSegment = value => /^[A-Za-z0-9_-]+$/.test(value);
+    if (!isSafeSegment(spaceId) || !isSafeSegment(userId)) return '';
+    return `${spaceId}/${userId}/moods`;
+}
+
+function getMoodFileExtension(file) {
+    const nameExtension = String(file && file.name || '').split('.').pop().toLowerCase();
+    if (/^[a-z0-9]{1,8}$/.test(nameExtension)) return nameExtension;
+    const typeExtension = String(file && file.type || '').split('/').pop().split(';')[0].toLowerCase();
+    return /^[a-z0-9]{1,8}$/.test(typeExtension) ? typeExtension : 'bin';
+}
+
+async function removeUploadedMoodObjects(pathsOrRefs) {
+    if (!Array.isArray(pathsOrRefs) || !pathsOrRefs.length || !supabaseClient) return;
+    const paths = pathsOrRefs.map(val => {
+        if (typeof val === 'string' && typeof STORAGE_REFERENCE_PREFIX === 'string' && val.startsWith(STORAGE_REFERENCE_PREFIX)) {
+            return typeof getStorageObjectPath === 'function' ? getStorageObjectPath(val) : '';
+        }
+        return val;
+    }).filter(Boolean);
+    if (!paths.length) return;
+    try {
+        const { error } = await supabaseClient.storage.from('photos').remove(paths);
+        if (error) console.error('清理心情照片失败:', error);
+    } catch (err) {
+        console.error('清理心情照片异常:', err);
+    }
+}
+
+function clearMoodPhotoPreviews() {
+    moodPhotoPreviewUrls.forEach((url) => {
+        try { URL.revokeObjectURL(url); } catch (_e) {}
+    });
+    moodPhotoPreviewUrls.clear();
+    moodSelectedFiles = [];
+    moodExistingPhotos = [];
+    moodPhotosToDeleteOnSave = [];
+    const input = document.getElementById('moodPhotoInput');
+    if (input) input.value = '';
+}
+
+async function renderMoodPhotoPreviews() {
+    const container = document.getElementById('moodPhotoPreviewContainer');
+    const counter = document.getElementById('moodPhotoCounter');
+    if (!container) return;
+
+    const totalCount = moodExistingPhotos.length + moodSelectedFiles.length;
+    if (counter) counter.textContent = `${totalCount}/${MAX_MOOD_PHOTOS}`;
+
+    const fragment = document.createDocumentFragment();
+
+    // 1. 渲染编辑时已存在的照片
+    if (moodExistingPhotos.length > 0) {
+        for (let i = 0; i < moodExistingPhotos.length; i++) {
+            const photoRef = moodExistingPhotos[i];
+            const item = document.createElement('div');
+            item.className = 'mood-photo-preview-item';
+            
+            const img = document.createElement('img');
+            img.className = 'mood-photo-preview-img';
+            img.alt = `已选照片 ${i + 1}`;
+            
+            const directUrl = typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(photoRef) : '';
+            const objPath = typeof getStorageObjectPath === 'function' ? getStorageObjectPath(photoRef) : '';
+            const cachedUrl = objPath && typeof getCachedSignedMediaUrl === 'function' ? getCachedSignedMediaUrl(objPath) : '';
+            
+            if (directUrl || cachedUrl) {
+                img.src = directUrl || cachedUrl;
+            } else if (typeof resolveMediaUrl === 'function') {
+                resolveMediaUrl(photoRef).then(resolved => {
+                    if (resolved && img.isConnected) img.src = resolved;
+                });
+            }
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'mood-photo-remove-btn';
+            removeBtn.textContent = '×';
+            removeBtn.title = '删除此照片';
+            removeBtn.setAttribute('aria-label', `删除已选照片 ${i + 1}`);
+            removeBtn.onclick = (e) => {
+                e.stopPropagation();
+                removeMoodExistingPhoto(i);
+            };
+
+            item.append(img, removeBtn);
+            fragment.appendChild(item);
+        }
+    }
+
+    // 2. 渲染新选中的待上传照片
+    moodSelectedFiles.forEach((file, index) => {
+        let blobUrl = moodPhotoPreviewUrls.get(file);
+        if (!blobUrl) {
+            blobUrl = URL.createObjectURL(file);
+            moodPhotoPreviewUrls.set(file, blobUrl);
+        }
+
+        const item = document.createElement('div');
+        item.className = 'mood-photo-preview-item';
+
+        const img = document.createElement('img');
+        img.className = 'mood-photo-preview-img';
+        img.src = blobUrl;
+        img.alt = `新选照片 ${index + 1}`;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'mood-photo-remove-btn';
+        removeBtn.textContent = '×';
+        removeBtn.title = '删除此照片';
+        removeBtn.setAttribute('aria-label', `删除新选照片 ${index + 1}`);
+        removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            removeMoodSelectedFile(index);
+        };
+
+        item.append(img, removeBtn);
+        fragment.appendChild(item);
+    });
+
+    // 3. 如果未达上限，追加添加按钮
+    if (totalCount < MAX_MOOD_PHOTOS) {
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'mood-photo-add-btn';
+        addBtn.id = 'moodPhotoAddBtn';
+        addBtn.setAttribute('aria-label', '添加照片');
+        addBtn.onclick = () => {
+            const input = document.getElementById('moodPhotoInput');
+            if (input) input.click();
+        };
+
+        const icon = document.createElement('span');
+        icon.className = 'mood-photo-add-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = '+';
+
+        const text = document.createElement('span');
+        text.className = 'mood-photo-add-text';
+        text.textContent = totalCount === 0 ? '添加照片' : '继续添加';
+
+        addBtn.append(icon, text);
+        fragment.appendChild(addBtn);
+    }
+
+    container.replaceChildren(fragment);
+}
+
+function removeMoodExistingPhoto(index) {
+    if (index >= 0 && index < moodExistingPhotos.length) {
+        const removed = moodExistingPhotos.splice(index, 1)[0];
+        if (removed) moodPhotosToDeleteOnSave.push(removed);
+        renderMoodPhotoPreviews();
+    }
+}
+
+function removeMoodSelectedFile(index) {
+    if (index >= 0 && index < moodSelectedFiles.length) {
+        const [file] = moodSelectedFiles.splice(index, 1);
+        if (file && moodPhotoPreviewUrls.has(file)) {
+            try { URL.revokeObjectURL(moodPhotoPreviewUrls.get(file)); } catch (_e) {}
+            moodPhotoPreviewUrls.delete(file);
+        }
+        renderMoodPhotoPreviews();
+    }
+}
+
+function handleMoodPhotoSelect(event) {
+    const files = Array.from(event?.target?.files || []);
+    if (!files.length) return;
+
+    const currentTotal = moodExistingPhotos.length + moodSelectedFiles.length;
+    const remainingSlots = MAX_MOOD_PHOTOS - currentTotal;
+    if (remainingSlots <= 0) {
+        if (typeof showToast === 'function') showToast(`最多只能添加 ${MAX_MOOD_PHOTOS} 张照片哦`);
+        if (event.target) event.target.value = '';
+        return;
+    }
+
+    let filesToAdd = files;
+    if (files.length > remainingSlots) {
+        filesToAdd = files.slice(0, remainingSlots);
+        if (typeof showToast === 'function') showToast(`最多只能添加 ${MAX_MOOD_PHOTOS} 张照片，已选取前 ${remainingSlots} 张`);
+    }
+
+    for (const file of filesToAdd) {
+        if (!file.type.startsWith('image/')) {
+            if (typeof showToast === 'function') showToast('请选择图片格式文件');
+            continue;
+        }
+        if (file.size > 20 * 1024 * 1024) {
+            if (typeof showToast === 'function') showToast('单张图片大小不能超过 20MB');
+            continue;
+        }
+        moodSelectedFiles.push(file);
+    }
+
+    renderMoodPhotoPreviews();
+    if (event.target) event.target.value = '';
+}
+
 
 function isMoodEntrySpecial(entry) {
     if (!entry) return false;
@@ -195,6 +415,13 @@ function resetMoodComposer(entry = null) {
         handleMoodSpecialToggle(isSpecial);
     }
     document.getElementById('moodModalMsg').textContent = '';
+
+    // 初始化并渲染照片预览
+    clearMoodPhotoPreviews();
+    if (entry && Array.isArray(entry.photos) && entry.photos.length > 0) {
+        moodExistingPhotos = [...entry.photos];
+    }
+    renderMoodPhotoPreviews();
 }
 
 function openMoodModal(entryId = null, targetDate = null) {
@@ -217,7 +444,7 @@ async function loadMoodEntryForRoute(entryId) {
     if (!isAuthenticated()) return null;
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
-    const selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
+    let selectFields = getMoodSelectFields();
     let query = supabaseClient
         .from('moods')
         .select(selectFields)
@@ -225,6 +452,20 @@ async function loadMoodEntryForRoute(entryId) {
         .eq('user_id', userId);
     if (currentUserProfile?.space_id) query = query.eq('space_id', currentUserProfile.space_id);
     let { data, error } = await query.maybeSingle();
+
+    if (error && moodSupportsPhotosColumn && (error.code === '42703' || String(error.message).includes('photos'))) {
+        moodSupportsPhotosColumn = false;
+        selectFields = getMoodSelectFields();
+        let retryQuery = supabaseClient
+            .from('moods')
+            .select(selectFields)
+            .eq('id', entryId)
+            .eq('user_id', userId);
+        if (currentUserProfile?.space_id) retryQuery = retryQuery.eq('space_id', currentUserProfile.space_id);
+        const retryResult = await retryQuery.maybeSingle();
+        data = retryResult.data;
+        error = retryResult.error;
+    }
 
     if (error && moodSupportsSpecialColumn && (error.code === '42703' || String(error.message).includes('is_special'))) {
         moodSupportsSpecialColumn = false;
@@ -292,6 +533,7 @@ function leaveMoodPage() {
     editingMoodId = null;
     moodDetailReturnDate = '';
     targetMoodCheckinDate = null;
+    clearMoodPhotoPreviews();
 }
 
 function selectMood(score) {
@@ -339,15 +581,48 @@ async function submitMood() {
         submitButton.textContent = entryBeingEdited ? '保存中…' : '记录中…';
     }
 
+    const uploadedObjectPaths = [];
     try {
-        let result;
-        const selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
+        let uploadedUrls = [];
+        if (moodSelectedFiles.length > 0) {
+            const storageDirectory = getMoodStorageDirectory();
+            if (!storageDirectory || typeof createStorageReference !== 'function') {
+                messageElement.textContent = '当前会话缺少空间信息，请重新登录后再试。';
+                return;
+            }
 
-        if (moodSupportsSpecialColumn) {
+            const totalFiles = moodSelectedFiles.length;
+            for (let i = 0; i < totalFiles; i++) {
+                let file = moodSelectedFiles[i];
+                if (submitButton) submitButton.textContent = `⏳ 优化画质 (${i + 1}/${totalFiles})…`;
+                if (typeof compressImageFile === 'function') {
+                    file = await compressImageFile(file);
+                }
+
+                if (submitButton) submitButton.textContent = `⏳ 上传照片 (${i + 1}/${totalFiles})…`;
+                const ext = getMoodFileExtension(file);
+                const fileName = `${storageDirectory}/${Date.now()}_${i}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
+                const { error: upErr } = await supabaseClient.storage
+                    .from('photos')
+                    .upload(fileName, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+                if (upErr) throw upErr;
+                uploadedObjectPaths.push(fileName);
+                uploadedUrls.push(createStorageReference(fileName));
+            }
+        }
+
+        const finalPhotos = [...moodExistingPhotos, ...uploadedUrls];
+        if (submitButton) submitButton.textContent = entryBeingEdited ? '保存中…' : '记录中…';
+
+        let result;
+        let selectFields = getMoodSelectFields();
+
+        if (moodSupportsPhotosColumn) {
             const payload = {
                 score: selectedMoodScore,
                 note: rawNote || null,
-                is_special: isSpecial
+                is_special: isSpecial,
+                photos: finalPhotos
             };
             if (entryBeingEdited) {
                 result = await supabaseClient
@@ -368,9 +643,47 @@ async function submitMood() {
                     .single();
             }
 
-            // 若数据库尚未添加 is_special 列，自动捕获并无缝降级重试
-            if (result.error && (result.error.code === '42703' || String(result.error.message).includes('is_special'))) {
-                moodSupportsSpecialColumn = false;
+            if (result.error && (result.error.code === '42703' || String(result.error.message).includes('photos'))) {
+                moodSupportsPhotosColumn = false;
+                selectFields = getMoodSelectFields();
+            }
+        }
+
+        // 若降级（无 photos 字段）
+        if (!moodSupportsPhotosColumn) {
+            if (moodSupportsSpecialColumn) {
+                const payload = {
+                    score: selectedMoodScore,
+                    note: rawNote || null,
+                    is_special: isSpecial
+                };
+                if (entryBeingEdited) {
+                    result = await supabaseClient
+                        .from('moods')
+                        .update(payload)
+                        .eq('id', entryBeingEdited.id)
+                        .eq('user_id', userId)
+                        .select(selectFields)
+                        .single();
+                } else {
+                    result = await supabaseClient
+                        .from('moods')
+                        .insert([{
+                            date: targetDate,
+                            ...payload
+                        }])
+                        .select(selectFields)
+                        .single();
+                }
+
+                if (result.error && (result.error.code === '42703' || String(result.error.message).includes('is_special'))) {
+                    moodSupportsSpecialColumn = false;
+                    selectFields = MOOD_ENTRY_FIELDS_LEGACY;
+                }
+            }
+
+            // 若 special 列也没有
+            if (!moodSupportsSpecialColumn) {
                 const fallbackNote = isSpecial
                     ? (rawNote ? `✨[特别日子] ${rawNote}` : '✨[特别日子]')
                     : rawNote;
@@ -397,36 +710,16 @@ async function submitMood() {
                         .single();
                 }
             }
-        } else {
-            const fallbackNote = isSpecial
-                ? (rawNote ? `✨[特别日子] ${rawNote}` : '✨[特别日子]')
-                : rawNote;
-            const fallbackPayload = {
-                score: selectedMoodScore,
-                note: fallbackNote || null
-            };
-            if (entryBeingEdited) {
-                result = await supabaseClient
-                    .from('moods')
-                    .update(fallbackPayload)
-                    .eq('id', entryBeingEdited.id)
-                    .eq('user_id', userId)
-                    .select(MOOD_ENTRY_FIELDS_LEGACY)
-                    .single();
-            } else {
-                result = await supabaseClient
-                    .from('moods')
-                    .insert([{
-                        date: targetDate,
-                        ...fallbackPayload
-                    }])
-                    .select(MOOD_ENTRY_FIELDS_LEGACY)
-                    .single();
-            }
         }
 
         if (result.error) throw result.error;
         if (!isCurrentAuthSnapshot(epoch, userId)) return;
+
+        // 清理编辑时被用户移除的已有照片
+        if (moodPhotosToDeleteOnSave.length > 0) {
+            removeUploadedMoodObjects(moodPhotosToDeleteOnSave);
+        }
+        clearMoodPhotoPreviews();
 
         if (!entryBeingEdited && targetDate === getAppDateKey()) todayOwnMoodCount += 1;
 
@@ -447,10 +740,14 @@ async function submitMood() {
         if (typeof refreshMoodReminderState === 'function') await refreshMoodReminderState();
     } catch (error) {
         console.error('保存心情失败:', error);
+        // 如果已上传但保存失败，回滚清理新上传的照片
+        if (uploadedObjectPaths.length > 0) {
+            removeUploadedMoodObjects(uploadedObjectPaths);
+        }
         if (error?.code === '23505') {
             messageElement.textContent = '数据库仍限制每天一条记录，请先执行最新迁移。';
         } else if (error?.code === '23514') {
-            messageElement.textContent = '数据库表情编号受限，请先执行最新数据库迁移。';
+            messageElement.textContent = '数据库表情编号或照片数量受限，请检查最新迁移。';
         } else {
             messageElement.textContent = '保存失败，请稍后重试。';
         }
@@ -477,13 +774,30 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
     }
 
     const isSpecialDay = entries.some(entry => isMoodEntrySpecial(entry));
-    if (isSpecialDay) {
-        cell.classList.add('is-special');
-        const star = document.createElement('span');
-        star.className = 'mood-special-star';
-        star.setAttribute('aria-hidden', 'true');
-        star.textContent = '✨';
-        cell.appendChild(star);
+    const hasPhotosDay = entries.some(entry => Array.isArray(entry.photos) && entry.photos.length > 0);
+
+    if (isSpecialDay || hasPhotosDay) {
+        const badges = document.createElement('span');
+        badges.className = 'mood-calendar-badges';
+        badges.setAttribute('aria-hidden', 'true');
+
+        if (isSpecialDay) {
+            cell.classList.add('is-special');
+            const star = document.createElement('span');
+            star.className = 'mood-special-star';
+            star.textContent = '✨';
+            badges.appendChild(star);
+        }
+
+        if (hasPhotosDay) {
+            cell.classList.add('has-photos');
+            const cam = document.createElement('span');
+            cam.className = 'mood-camera-badge';
+            cam.textContent = '📷';
+            badges.appendChild(cam);
+        }
+
+        cell.appendChild(badges);
     }
 
     const day = document.createElement('span');
@@ -525,7 +839,8 @@ function createMoodCalendarCell(dateKey, dayNumber, entries) {
             ? `；最新内容，${notePreview.entry.author || '成员'}：${notePreview.note}`
             : '';
         const specialLabel = isSpecialDay ? '，✨ 特别纪念日' : '';
-        cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}${specialLabel}，${entries.length} 条心情记录：${labels}${noteLabel}，点击查看完整记录`);
+        const photoLabel = hasPhotosDay ? '，📷 包含照片' : '';
+        cell.setAttribute('aria-label', `${formatMoodDateTitle(dateKey)}${specialLabel}${photoLabel}，${entries.length} 条心情记录：${labels}${noteLabel}，点击查看完整记录`);
         cell.addEventListener('click', () => openMoodDayModal(dateKey));
     } else {
         const specialLabel = isSpecialDay ? '，✨ 特别纪念日' : '';
@@ -589,7 +904,7 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
     const userId = currentAuthUser.id;
     if (status) status.textContent = '正在加载本月心情…';
 
-    const selectFields = moodSupportsSpecialColumn ? MOOD_ENTRY_FIELDS_PRIMARY : MOOD_ENTRY_FIELDS_LEGACY;
+    let selectFields = getMoodSelectFields();
     let query = supabaseClient
         .from('moods')
         .select(selectFields)
@@ -599,6 +914,22 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
         .order('created_at', { ascending: true });
     if (currentUserProfile?.space_id) query = query.eq('space_id', currentUserProfile.space_id);
     let { data, error } = await query;
+
+    if (error && moodSupportsPhotosColumn && (error.code === '42703' || String(error.message).includes('photos'))) {
+        moodSupportsPhotosColumn = false;
+        selectFields = getMoodSelectFields();
+        let retryQuery = supabaseClient
+            .from('moods')
+            .select(selectFields)
+            .gte('date', bounds.firstDate)
+            .lte('date', bounds.lastDate)
+            .order('date', { ascending: true })
+            .order('created_at', { ascending: true });
+        if (currentUserProfile?.space_id) retryQuery = retryQuery.eq('space_id', currentUserProfile.space_id);
+        const retryResult = await retryQuery;
+        data = retryResult.data;
+        error = retryResult.error;
+    }
 
     if (error && moodSupportsSpecialColumn && (error.code === '42703' || String(error.message).includes('is_special'))) {
         moodSupportsSpecialColumn = false;
@@ -708,6 +1039,63 @@ function createMoodDayEntry(entry) {
     note.textContent = cleanNote || '没有留下文字';
     card.appendChild(note);
 
+    if (Array.isArray(entry.photos) && entry.photos.length > 0) {
+        const photosGrid = document.createElement('div');
+        photosGrid.className = 'mood-day-photos-grid';
+        if (entry.photos.length === 1) {
+            photosGrid.classList.add('single-photo');
+        } else if (entry.photos.length === 2) {
+            photosGrid.classList.add('double-photo');
+        } else if (entry.photos.length === 4) {
+            photosGrid.classList.add('quad-photo');
+        }
+
+        entry.photos.forEach((photoRef, photoIdx) => {
+            const photoItem = document.createElement('div');
+            photoItem.className = 'mood-day-photo-item';
+            photoItem.setAttribute('role', 'button');
+            photoItem.setAttribute('tabindex', '0');
+            photoItem.setAttribute('aria-label', `查看第 ${photoIdx + 1} 张照片大图`);
+
+            const img = document.createElement('img');
+            img.className = 'mood-day-photo-img';
+            img.alt = `${entry.author || '成员'}的心情照片 ${photoIdx + 1}`;
+            img.loading = 'lazy';
+
+            const directUrl = typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(photoRef) : '';
+            const objPath = typeof getStorageObjectPath === 'function' ? getStorageObjectPath(photoRef) : '';
+            const cachedUrl = objPath && typeof getCachedSignedMediaUrl === 'function' ? getCachedSignedMediaUrl(objPath) : '';
+
+            const applyImgSrc = (src) => {
+                if (!src) return;
+                img.src = src;
+                img.onload = () => photoItem.classList.add('is-loaded');
+                photoItem.onclick = () => {
+                    if (typeof openLightbox === 'function') openLightbox(src);
+                };
+                photoItem.onkeydown = (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (typeof openLightbox === 'function') openLightbox(src);
+                    }
+                };
+            };
+
+            if (directUrl || cachedUrl) {
+                applyImgSrc(directUrl || cachedUrl);
+            } else if (typeof resolveMediaUrl === 'function') {
+                resolveMediaUrl(photoRef).then(resolved => {
+                    if (resolved && photoItem.isConnected) applyImgSrc(resolved);
+                });
+            }
+
+            photoItem.appendChild(img);
+            photosGrid.appendChild(photoItem);
+        });
+
+        card.appendChild(photosGrid);
+    }
+
     if (entry.user_id === currentAuthUser?.id) {
         const actions = document.createElement('div');
         actions.className = 'mood-day-entry-actions';
@@ -764,6 +1152,17 @@ async function enterMoodDayPage(route) {
         entries = moodEntriesByDate[dateKey] || [];
     }
 
+    // 预热并批量解析当日心情中的所有照片地址
+    const dayPhotoPaths = [];
+    entries.forEach(entry => {
+        if (Array.isArray(entry.photos)) {
+            dayPhotoPaths.push(...entry.photos);
+        }
+    });
+    if (dayPhotoPaths.length > 0 && typeof batchResolveMediaUrls === 'function') {
+        await batchResolveMediaUrls(dayPhotoPaths);
+    }
+
     activeMoodDetailDate = dateKey;
     const title = document.getElementById('mood-day-modal-title');
     const list = document.getElementById('mood-day-list');
@@ -813,13 +1212,25 @@ async function toggleMoodDaySpecial(targetDateKey = activeMoodDetailDate) {
             const ownEntry = entries.find(entry => entry.user_id === userId);
             if (ownEntry) {
                 if (moodSupportsSpecialColumn) {
+                    let selectFields = getMoodSelectFields();
                     let res = await supabaseClient
                         .from('moods')
                         .update({ is_special: true })
                         .eq('id', ownEntry.id)
                         .eq('user_id', userId)
-                        .select(MOOD_ENTRY_FIELDS_PRIMARY)
+                        .select(selectFields)
                         .single();
+                    if (res.error && moodSupportsPhotosColumn && (res.error.code === '42703' || String(res.error.message).includes('photos'))) {
+                        moodSupportsPhotosColumn = false;
+                        selectFields = getMoodSelectFields();
+                        res = await supabaseClient
+                            .from('moods')
+                            .update({ is_special: true })
+                            .eq('id', ownEntry.id)
+                            .eq('user_id', userId)
+                            .select(selectFields)
+                            .single();
+                    }
                     if (res.error && (res.error.code === '42703' || String(res.error.message).includes('is_special'))) {
                         moodSupportsSpecialColumn = false;
                         const fallbackNote = ownEntry.note ? `✨[特别日子] ${getDisplayMoodNote(ownEntry.note)}` : '✨[特别日子]';
@@ -840,6 +1251,7 @@ async function toggleMoodDaySpecial(targetDateKey = activeMoodDetailDate) {
             } else {
                 // 当前用户没有记录，创建一条专属标记（默认 score 5 幸福满满）
                 if (moodSupportsSpecialColumn) {
+                    let selectFields = getMoodSelectFields();
                     let res = await supabaseClient
                         .from('moods')
                         .insert([{
@@ -848,8 +1260,22 @@ async function toggleMoodDaySpecial(targetDateKey = activeMoodDetailDate) {
                             note: null,
                             is_special: true
                         }])
-                        .select(MOOD_ENTRY_FIELDS_PRIMARY)
+                        .select(selectFields)
                         .single();
+                    if (res.error && moodSupportsPhotosColumn && (res.error.code === '42703' || String(res.error.message).includes('photos'))) {
+                        moodSupportsPhotosColumn = false;
+                        selectFields = getMoodSelectFields();
+                        res = await supabaseClient
+                            .from('moods')
+                            .insert([{
+                                date: dateKey,
+                                score: 5,
+                                note: null,
+                                is_special: true
+                            }])
+                            .select(selectFields)
+                            .single();
+                    }
                     if (res.error && (res.error.code === '42703' || String(res.error.message).includes('is_special'))) {
                         moodSupportsSpecialColumn = false;
                         await supabaseClient
@@ -946,6 +1372,8 @@ async function deleteMoodEntry(entryId) {
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
     const dateKey = entry.date;
+    const photosToDelete = Array.isArray(entry.photos) ? [...entry.photos] : [];
+
     const { error } = await supabaseClient
         .from('moods')
         .delete()
@@ -957,6 +1385,10 @@ async function deleteMoodEntry(entryId) {
         console.error('删除心情失败:', error);
         if (typeof showToast === 'function') showToast('删除失败，请稍后重试。');
         return;
+    }
+
+    if (photosToDelete.length > 0) {
+        removeUploadedMoodObjects(photosToDelete);
     }
 
     if (dateKey === getAppDateKey()) todayOwnMoodCount = Math.max(0, todayOwnMoodCount - 1);
@@ -984,6 +1416,7 @@ function resetMoodState() {
     editingMoodId = null;
     isMoodSaving = false;
     todayOwnMoodCount = 0;
+    clearMoodPhotoPreviews();
 }
 
 
