@@ -6,7 +6,8 @@ const NOTIFICATION_ACTIONS = {
     comment: '发表了评论',
     like: '点赞了评论',
     miss: '给你发来了心电感应',
-    recalled: '撤回了该互动'
+    recalled: '撤回了该互动',
+    mood: '记录了心情'
 };
 let processedMissIds = new Set();
 let missEffectTimer = null;
@@ -238,6 +239,21 @@ function notificationPreview(content) {
     if (!trimmed.startsWith('{')) return trimmed.slice(0, 160);
     try {
         const parsed = JSON.parse(trimmed);
+        if (parsed.type === 'mood' || typeof parsed.score === 'number') {
+            const score = Number(parsed.score);
+            let moodDesc = '';
+            if (typeof MOOD_DESCRIPTIONS !== 'undefined' && MOOD_DESCRIPTIONS[score]) {
+                moodDesc = MOOD_DESCRIPTIONS[score];
+            } else if (typeof MOOD_EMOJIS !== 'undefined' && MOOD_EMOJIS[score]) {
+                moodDesc = MOOD_EMOJIS[score];
+            }
+            const noteText = typeof parsed.note === 'string' && parsed.note.trim() ? ` · ${parsed.note.trim()}` : '';
+            const specialPrefix = parsed.is_special ? '✨ ' : '';
+            const hasPhotos = Boolean(parsed.has_photos || (Array.isArray(parsed.photos) && parsed.photos.length));
+            const photoHint = hasPhotos ? ' [🖼️图片]' : '';
+            const mainText = moodDesc ? `${moodDesc}${noteText}` : (noteText.replace(/^ · /, '') || '记录了心情');
+            return `${specialPrefix}${mainText}${photoHint}`.slice(0, 160);
+        }
         const text = typeof parsed.text === 'string' ? parsed.text.trim() : '';
         const mediaHint = Array.isArray(parsed.images) && parsed.images.length ? ' [🖼️图片]' : '';
         return `${text}${mediaHint}`.slice(0, 160);
@@ -465,6 +481,19 @@ async function handleNotificationClick(notificationId, type, relatedId) {
     document.getElementById('notification-bell')?.setAttribute('aria-expanded', 'false');
     await markSingleNotificationRead(notificationId);
     if (!isCurrentAuthSnapshot(epoch, userId)) return;
+
+    if (type === 'mood') {
+        const targetDate = relatedId;
+        const moodSection = document.querySelector('.mood-section');
+        if (moodSection) {
+            moodSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        if (typeof openMoodDayModal === 'function' && targetDate) {
+            openMoodDayModal(targetDate);
+        }
+        loadNotifications();
+        return;
+    }
 
     if (type === 'miss' || type === 'recalled' || !relatedId) {
         loadNotifications();
