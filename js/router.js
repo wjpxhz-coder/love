@@ -31,6 +31,7 @@
         'skip-link',
         'main-content',
         'fab-container',
+        'app-utility-bar',
         'login-trigger-btn',
         'user-avatar-btn',
         'notification-bell',
