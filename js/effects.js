@@ -15,27 +15,35 @@ function showToast(message, duration = 3000) {
         container.setAttribute('aria-atomic', 'false');
         container.style.cssText = `
             position: fixed;
-            top: 24px;
+            top: calc(max(24px, env(safe-area-inset-top, 0px)) + 28px);
             left: 50%;
-            transform: translateX(-50%) translateY(-20px);
-            z-index: 9999;
+            transform: translateX(-50%);
+            z-index: 99999;
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 10px;
             pointer-events: none;
-            transition: all 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+            width: max-content;
+            max-width: calc(100vw - 32px);
+            box-sizing: border-box;
+            transition: top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
         `;
         document.body.appendChild(container);
     }
     
     const toast = document.createElement('div');
+    toast.className = 'toast-item';
+
+    const theme = document.documentElement.getAttribute('data-theme');
+    const isDark = theme === 'dark';
+
     toast.style.cssText = `
-        background: rgba(255, 255, 255, 0.85);
+        background: ${isDark ? 'rgba(38, 22, 54, 0.88)' : 'rgba(255, 255, 255, 0.88)'};
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
-        color: var(--primary);
-        padding: 11px 24px;
+        color: ${isDark ? '#ff8fab' : 'var(--primary)'};
+        padding: 11px 22px;
         border-radius: 24px;
         box-shadow: 0 8px 30px var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
         font-weight: 600;
@@ -43,28 +51,30 @@ function showToast(message, duration = 3000) {
         letter-spacing: 0.5px;
         opacity: 0;
         transform: translateY(-12px) scale(0.92);
-        transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-        border: 1.5px solid var(--border);
+        transition: opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        border: 1.5px solid ${isDark ? 'rgba(255, 143, 171, 0.3)' : 'var(--border)'};
+        max-width: min(90vw, 420px);
+        text-align: center;
+        line-height: 1.45;
+        word-break: break-word;
+        box-sizing: border-box;
+        pointer-events: auto;
     `;
-    
-    const theme = document.documentElement.getAttribute('data-theme');
-    if (theme === 'dark') {
-        toast.style.background = 'rgba(38, 22, 54, 0.85)';
-        toast.style.color = '#ff8fab';
-        toast.style.borderColor = 'rgba(255, 143, 171, 0.3)';
-    }
 
     toast.innerText = message;
     container.appendChild(toast);
     
-    setTimeout(() => {
+    requestAnimationFrame(() => {
+        toast.classList.add('show');
         toast.style.opacity = '1';
         toast.style.transform = 'translateY(0) scale(1)';
-    }, 10);
+    });
     
     setTimeout(() => {
+        toast.classList.remove('show');
+        toast.classList.add('hide');
         toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-20px) scale(0.92)';
+        toast.style.transform = 'translateY(-16px) scale(0.92)';
         setTimeout(() => {
             toast.remove();
         }, 350);
