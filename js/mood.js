@@ -341,6 +341,8 @@ let moodLoadRequestId = 0;
 let activeMoodDetailDate = '';
 let moodDetailReturnDate = '';
 let todayOwnMoodCount = 0;
+const MIN_MOOD_MONTH_KEY = '2025-01';
+const MAX_MOOD_MONTH_KEY = '2035-12';
 
 function getAppDateKey(date = new Date()) {
     const parts = new Intl.DateTimeFormat('en-US', {
@@ -394,7 +396,7 @@ function updateMoodMonthPicker(monthKey) {
     const [selectedYear, selectedMonth] = normalizeMoodMonthKey(monthKey).split('-');
     const currentYear = Number(getCurrentMoodMonthKey().slice(0, 4));
     const firstYear = 2025;
-    const latestYear = Math.max(currentYear, Number(selectedYear) || 2025, firstYear);
+    const latestYear = Math.max(currentYear + 3, Number(selectedYear) || 2025, 2030);
     const expectedOptionCount = latestYear - firstYear + 1;
     if (yearPicker.options.length !== expectedOptionCount || yearPicker.options[0]?.value !== String(latestYear)) {
         const options = document.createDocumentFragment();
@@ -493,11 +495,6 @@ function openMoodModal(entryId = null, targetDate = null) {
 
 function openMoodModalForDate(dateKey = activeMoodDetailDate) {
     const targetDate = dateKey || activeMoodDetailDate || getAppDateKey();
-    const today = getAppDateKey();
-    if (targetDate > today) {
-        if (typeof showToast === 'function') showToast('不能预支未来的心情哦～ 🌱');
-        return;
-    }
     openMoodModal(null, targetDate);
 }
 
@@ -565,19 +562,13 @@ async function enterMoodPage(route) {
     const today = getAppDateKey();
     const checkinDate = entry ? entry.date : (targetMoodCheckinDate || today);
 
-    if (!entry && checkinDate > today) {
-        if (typeof showToast === 'function') showToast('不能预支未来的心情哦～ 🌱');
-        if (typeof appBack === 'function') appBack('/');
-        return;
-    }
-
     if (title) {
         if (entry) {
             title.textContent = `编辑 ${formatMoodDateTitle(entry.date)} 的心情`;
         } else if (checkinDate < today) {
             title.textContent = `补记 ${formatMoodDateTitle(checkinDate)} 的心情 📝`;
-        } else if (checkinDate !== today) {
-            title.textContent = `记录 ${formatMoodDateTitle(checkinDate)} 的心情 🌈`;
+        } else if (checkinDate > today) {
+            title.textContent = `预支 ${formatMoodDateTitle(checkinDate)} 的心情 🌱`;
         } else {
             title.textContent = '今日心情打卡 🌈';
         }
@@ -587,6 +578,8 @@ async function enterMoodPage(route) {
             submitButton.textContent = '保存修改';
         } else if (checkinDate < today) {
             submitButton.textContent = '补记心情';
+        } else if (checkinDate > today) {
+            submitButton.textContent = '预支心情';
         } else {
             submitButton.textContent = '记录';
         }
@@ -650,12 +643,6 @@ async function submitMood() {
     const targetDate = entryBeingEdited ? entryBeingEdited.date : (targetMoodCheckinDate || getAppDateKey());
     const returnDate = targetDate;
     const today = getAppDateKey();
-
-    if (!entryBeingEdited && targetDate > today) {
-        messageElement.textContent = '不能预支未来的心情哦～ 🌱';
-        if (typeof showToast === 'function') showToast('不能预支未来的心情哦～ 🌱');
-        return;
-    }
 
     isMoodSaving = true;
     if (submitButton) {
@@ -763,8 +750,11 @@ async function submitMood() {
         if (!isCurrentAuthSnapshot(epoch, userId)) return;
         if (typeof showToast === 'function') {
             const isRetroactiveSave = !entryBeingEdited && targetDate < getAppDateKey();
+            const isFutureSave = !entryBeingEdited && targetDate > getAppDateKey();
             if (isRetroactiveSave) {
                 showToast(finalPhotos.length > 0 ? '往日心情与照片已补记保存 📷✨' : '往日心情已补记保存 📝✨');
+            } else if (isFutureSave) {
+                showToast(finalPhotos.length > 0 ? '未来的心情与照片已预支保存 🌱✨' : '未来的心情已预支保存 🌱✨');
             } else {
                 showToast(finalPhotos.length > 0 ? '心情与照片已成功保存 📷✨' : '心情已成功保存 ✨');
             }
@@ -902,8 +892,8 @@ function renderMoodCalendar(monthKey, entriesByDate) {
 
     const bounds = getMoodMonthBounds(monthKey);
     const currentMonth = getCurrentMoodMonthKey();
-    if (prevButton) prevButton.disabled = monthKey <= '2025-01';
-    if (nextButton) nextButton.disabled = monthKey >= currentMonth;
+    if (prevButton) prevButton.disabled = monthKey <= MIN_MOOD_MONTH_KEY;
+    if (nextButton) nextButton.disabled = monthKey >= MAX_MOOD_MONTH_KEY;
 
     const fragment = document.createDocumentFragment();
     for (let index = 0; index < bounds.mondayOffset; index += 1) {
@@ -938,9 +928,9 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
     }
 
     const requestedMonth = normalizeMoodMonthKey(monthKey);
-    const currentMonth = getCurrentMoodMonthKey();
-    let boundedMonth = requestedMonth > currentMonth ? currentMonth : requestedMonth;
-    if (boundedMonth < '2025-01') boundedMonth = '2025-01';
+    let boundedMonth = requestedMonth;
+    if (boundedMonth > MAX_MOOD_MONTH_KEY) boundedMonth = MAX_MOOD_MONTH_KEY;
+    if (boundedMonth < MIN_MOOD_MONTH_KEY) boundedMonth = MIN_MOOD_MONTH_KEY;
     currentMoodMonthKey = boundedMonth;
     const bounds = getMoodMonthBounds(currentMoodMonthKey);
     const requestId = ++moodLoadRequestId;
@@ -1007,18 +997,17 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
 
 function changeMoodMonth(offset) {
     const nextMonth = shiftMoodMonth(currentMoodMonthKey || getCurrentMoodMonthKey(), Number(offset) || 0);
-    if (nextMonth > getCurrentMoodMonthKey() || nextMonth < '2025-01') return;
+    if (nextMonth > MAX_MOOD_MONTH_KEY || nextMonth < MIN_MOOD_MONTH_KEY) return;
     loadMoods(nextMonth);
 }
 
 function selectMoodMonth(monthKey) {
     let selectedMonth = normalizeMoodMonthKey(monthKey);
-    if (selectedMonth > getCurrentMoodMonthKey()) {
-        goToCurrentMoodMonth();
-        return;
+    if (selectedMonth > MAX_MOOD_MONTH_KEY) {
+        selectedMonth = MAX_MOOD_MONTH_KEY;
     }
-    if (selectedMonth < '2025-01') {
-        selectedMonth = '2025-01';
+    if (selectedMonth < MIN_MOOD_MONTH_KEY) {
+        selectedMonth = MIN_MOOD_MONTH_KEY;
     }
     loadMoods(selectedMonth);
 }
@@ -1233,11 +1222,13 @@ async function enterMoodDayPage(route) {
     const hasSpecialInDay = entries.some(entry => isMoodEntrySpecial(entry));
 
     if (markButton) {
-        markButton.hidden = isFuture;
+        markButton.hidden = false;
     }
 
     if (isFuture) {
-        title.textContent = `${formatMoodDateTitle(dateKey)} · 未至`;
+        title.textContent = entries.length
+            ? `${formatMoodDateTitle(dateKey)}${hasSpecialInDay ? ' ✨' : ''} · 预支 ${entries.length} 条`
+            : `${formatMoodDateTitle(dateKey)} · 未至`;
     } else {
         title.textContent = `${formatMoodDateTitle(dateKey)}${hasSpecialInDay ? ' ✨' : ''} · ${entries.length} 条`;
     }
@@ -1249,8 +1240,11 @@ async function enterMoodDayPage(route) {
 
         if (isFuture) {
             if (emptyDecor) emptyDecor.textContent = '🌱';
-            if (emptyTip) emptyTip.textContent = '这是未来的日子，不能预支未来的心情哦～';
-            if (emptyBtnGroup) emptyBtnGroup.hidden = true;
+            if (emptyTip) emptyTip.textContent = '这是未来的日子，提前预支一份好心情吧～';
+            if (emptyBtnGroup) emptyBtnGroup.hidden = false;
+            if (emptyAddBtn) {
+                emptyAddBtn.textContent = '🌱 预支这天的心情';
+            }
         } else {
             if (emptyDecor) emptyDecor.textContent = '✨';
             if (emptyTip) emptyTip.textContent = '这一天还没有心情记录～';
@@ -1271,13 +1265,11 @@ async function enterMoodDayPage(route) {
     list.replaceChildren(fragment);
 
     if (appendBox) {
-        if (isFuture) {
-            appendBox.hidden = true;
-        } else {
-            appendBox.hidden = false;
-            if (appendText) {
-                appendText.textContent = isToday ? '再记一条今天的心情' : '补记一条心情';
-            }
+        appendBox.hidden = false;
+        if (appendText) {
+            appendText.textContent = isToday
+                ? '再记一条今天的心情'
+                : (isFuture ? '再预支一条心情' : '补记一条心情');
         }
     }
 }
@@ -1289,12 +1281,6 @@ async function toggleMoodDaySpecial(targetDateKey = activeMoodDetailDate) {
     }
     const dateKey = targetDateKey || activeMoodDetailDate;
     if (!dateKey || isMoodSaving) return;
-
-    const today = getAppDateKey();
-    if (dateKey > today) {
-        if (typeof showToast === 'function') showToast('未来日期的金光标记还没到来哦～ 🌱');
-        return;
-    }
 
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
