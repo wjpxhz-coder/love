@@ -28,6 +28,7 @@
         ROUTE_DEFINITIONS.map(route => route.elementId).filter(Boolean)
     ));
     const GLOBAL_CHROME_IDS = [
+        'status-bar-shield',
         'skip-link',
         'main-content',
         'fab-container',

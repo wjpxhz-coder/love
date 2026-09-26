@@ -145,6 +145,24 @@ button:active {
     box-shadow: none !important;
 }
 
+/* ── 手机端状态栏防穿透固定遮罩 ── */
+
+.status-bar-shield {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top, 0px);
+    background: var(--bg);
+    z-index: 1250;
+    pointer-events: none;
+    transition: background 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+body.app-page-active .status-bar-shield {
+    display: none !important;
+}
+
 /* ── 顶部工具栏 ───────────────────────────────────────────────────── */
 
 .app-utility-bar {
@@ -1866,8 +1884,12 @@ body.app-page-active .app-utility-bar {
         opacity: 0.12;
     }
 
+    .status-bar-shield {
+        height: calc(env(safe-area-inset-top, 0px) + 6px);
+    }
+
     .app-utility-bar {
-        top: calc(8px + env(safe-area-inset-top, 0px));
+        top: calc(env(safe-area-inset-top, 0px) + 6px);
         right: max(12px, env(safe-area-inset-right, 0px));
         min-height: 40px;
         padding: 3px 6px;
@@ -1898,7 +1920,7 @@ body.app-page-active .app-utility-bar {
 
     .user-dropdown,
     .notification-panel {
-        top: calc(56px + env(safe-area-inset-top, 0px));
+        top: calc(52px + env(safe-area-inset-top, 0px));
         right: max(12px, env(safe-area-inset-right, 0px));
     }
 
