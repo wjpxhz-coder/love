@@ -150,17 +150,23 @@ button:active {
 .app-utility-bar {
     position: fixed;
     z-index: 1300;
-    top: calc(16px + env(safe-area-inset-top));
-    right: max(20px, calc((100vw - 1120px) / 2));
-    display: flex;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    right: max(16px, calc((100vw - 1120px) / 2));
+    display: inline-flex;
     align-items: center;
-    gap: 6px;
-    min-height: 52px;
-    padding: 6px 8px;
+    gap: 5px;
+    min-height: 44px;
+    padding: 4px 8px;
     border: 1.5px solid var(--border);
-    border-radius: 24px;
+    border-radius: 9999px;
     background: var(--surface-elevated);
-    box-shadow: var(--soft-shadow), inset 0 1.5px 1px #fff;
+    box-shadow: 0 4px 18px var(--shadow), 0 1px 3px rgba(0, 0, 0, 0.05);
+    opacity: 1;
+    isolation: isolate;
+}
+
+[data-theme='dark'] .app-utility-bar {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .app-utility-bar :is(
@@ -172,21 +178,56 @@ button:active {
     position: relative !important;
     inset: auto !important;
     z-index: auto;
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
     padding: 0;
     border: 0;
-    border-radius: 16px;
+    border-radius: 50%;
     color: var(--text);
     background: transparent;
     box-shadow: none;
     transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.1em;
+    line-height: 1;
 }
 
 .app-utility-bar .user-avatar-btn {
     border: 1.5px solid var(--primary-light);
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.app-utility-bar .user-avatar-btn img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
+.app-utility-bar .user-avatar-btn .avatar-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1em;
+}
+
+.app-utility-bar .notification-bell {
+    position: relative !important;
+}
+
+.app-utility-bar .notification-badge {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 8px;
+    height: 8px;
 }
 
 .app-utility-bar :is(
@@ -197,23 +238,35 @@ button:active {
 ):hover {
     color: var(--primary);
     background: var(--surface-subtle);
-    transform: scale(1.1);
-    box-shadow: 0 4px 12px var(--shadow);
+    transform: scale(1.08);
+    box-shadow: 0 2px 8px var(--shadow);
+}
+
+.app-utility-bar :is(
+    .theme-toggle,
+    .notification-bell,
+    .login-trigger-btn,
+    .user-avatar-btn
+):active {
+    transform: scale(0.95);
 }
 
 body.auth-pending #login-trigger-btn,
-body.auth-pending #notification-bell,
-body[data-auth-state='locked'] #notification-bell {
+body.auth-pending #notification-bell {
+    display: none !important;
+}
+
+body.app-page-active .app-utility-bar {
     display: none !important;
 }
 
 .user-dropdown,
 .notification-panel {
-    top: calc(78px + env(safe-area-inset-top));
+    top: calc(64px + env(safe-area-inset-top, 0px));
     border: 1.5px solid var(--border);
-    border-radius: 22px;
+    border-radius: 20px;
     background: var(--surface-elevated);
-    box-shadow: var(--strong-shadow), inset 0 1.5px 1px #fff;
+    box-shadow: var(--strong-shadow), 0 4px 20px var(--shadow);
 }
 
 .user-dropdown {
@@ -221,7 +274,7 @@ body[data-auth-state='locked'] #notification-bell {
 }
 
 .notification-panel {
-    right: max(20px, calc((100vw - 1120px) / 2));
+    right: max(16px, calc((100vw - 1120px) / 2));
 }
 
 /* ── 首页骨架 ─────────────────────────────────────────────────────── */
@@ -1814,11 +1867,12 @@ body[data-auth-state='locked'] #notification-bell {
     }
 
     .app-utility-bar {
-        top: calc(10px + env(safe-area-inset-top));
-        right: max(12px, env(safe-area-inset-right));
-        min-height: 48px;
-        padding: 4px;
-        border-radius: 15px;
+        top: calc(8px + env(safe-area-inset-top, 0px));
+        right: max(12px, env(safe-area-inset-right, 0px));
+        min-height: 40px;
+        padding: 3px 6px;
+        gap: 3px;
+        border-radius: 9999px;
     }
 
     .app-utility-bar :is(
@@ -1827,18 +1881,25 @@ body[data-auth-state='locked'] #notification-bell {
         .login-trigger-btn,
         .user-avatar-btn
     ) {
-        width: 38px;
-        height: 38px;
-        min-width: 38px;
-        min-height: 38px;
-        border-radius: 10px;
-        font-size: 1rem;
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        min-height: 34px;
+        border-radius: 50%;
+        font-size: 0.95rem;
+    }
+
+    .app-utility-bar .user-avatar-btn {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
     }
 
     .user-dropdown,
     .notification-panel {
-        top: calc(66px + env(safe-area-inset-top));
-        right: max(12px, env(safe-area-inset-right));
+        top: calc(56px + env(safe-area-inset-top, 0px));
+        right: max(12px, env(safe-area-inset-right, 0px));
     }
 
     .home-shell {
