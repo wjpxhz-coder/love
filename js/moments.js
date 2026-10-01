@@ -672,18 +672,83 @@ function isMomentVideoFile(file) {
     if (!file) return false;
     if (file.type && file.type.startsWith('video/')) return true;
     const ext = String(file.name || '').split('.').pop().toLowerCase();
-    return ['mp4', 'webm', 'mov', 'm4v', 'quicktime', 'ogg'].includes(ext);
+    return ['mp4', 'webm', 'mov', 'm4v', 'quicktime', 'ogg', 'avi', 'mkv'].includes(ext);
+}
+
+/**
+ * 极速深度探测视频文件的底层编码格式（扫描前 512KB MP4 Box / Atom）
+ * 返回检测到的编码标识: 'hevc' | 'h264' | 'unknown'
+ */
+async function inspectVideoCodec(file) {
+    if (!file) return 'unknown';
+    try {
+        const sliceSize = Math.min(file.size, 512 * 1024);
+        const buffer = await file.slice(0, sliceSize).arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let foundH264 = false;
+
+        for (let i = 0; i <= bytes.length - 4; i++) {
+            // HEVC / H.265 特征 FourCC: 'hvc1' 或 'hev1'
+            if ((bytes[i] === 0x68 && bytes[i+1] === 0x76 && bytes[i+2] === 0x63 && bytes[i+3] === 0x31) ||
+                (bytes[i] === 0x68 && bytes[i+1] === 0x65 && bytes[i+2] === 0x76 && bytes[i+3] === 0x31)) {
+                return 'hevc';
+            }
+            // H.264 / AVC 特征 FourCC: 'avc1' 或 'avc3'
+            if (bytes[i] === 0x61 && bytes[i+1] === 0x76 && bytes[i+2] === 0x63 && (bytes[i+3] === 0x31 || bytes[i+3] === 0x33)) {
+                foundH264 = true;
+            }
+        }
+        return foundH264 ? 'h264' : 'unknown';
+    } catch (_e) {
+        return 'unknown';
+    }
+}
+
+/**
+ * 严谨判断视频是否需要全端兼容性转码
+ */
+async function isMomentVideoNeedsTranscode(file) {
+    if (!file || !isMomentVideoFile(file)) return false;
+    const ext = getMomentFileExtension(file) || '';
+
+    // 1. 显式非通用容器格式（苹果 MOV/QuickTime、M4V 等）必须强制转码
+    const isExplicitNonH264 = ['mov', 'quicktime', 'm4v', 'hevc', 'avi', 'mkv', 'flv'].includes(ext)
+        || (file.type && (file.type.includes('quicktime') || file.type.includes('hevc')));
+    if (isExplicitNonH264) return true;
+
+    // 2. 二进制探测真实视频编码
+    const codec = await inspectVideoCodec(file);
+    if (codec === 'hevc') {
+        console.log('[VideoOptimize] 探测到视频底层为苹果 HEVC(H.265) 编码，强制执行 H.264 兼容性转码');
+        return true;
+    }
+
+    // 3. 文件体积大于 2MB 时，强制轻量压缩以节省服务器与流量
+    if (file.size > 2 * 1024 * 1024) {
+        return true;
+    }
+
+    // 4. 仅当明确确认为 H.264 标准 MP4 且体积 <= 2MB 时才安全跳过
+    if (codec === 'h264' && file.type === 'video/mp4') {
+        return false;
+    }
+
+    // 5. 其余格式（如未知编码的 mp4）默认转码，确保全平台 100% 播放
+    return true;
 }
 
 async function compressVideoFile(file, onProgress) {
     if (!file || !isMomentVideoFile(file)) return file;
-    const ext = getMomentFileExtension(file) || '';
-    const isAppleFormat = ['mov', 'quicktime', 'm4v', 'hevc'].includes(ext) || (file.type && (file.type.includes('quicktime') || file.type.includes('hevc')));
-
-    // 仅当明确是标准 mp4 (video/mp4 且不是苹果封装/编码) 且体积 <= 2MB 时才跳过转码；否则一律强制转码为全平台通用的 H.264 MP4
-    if (!isAppleFormat && file.size <= 2 * 1024 * 1024 && file.type === 'video/mp4') {
+    const needTranscode = await isMomentVideoNeedsTranscode(file);
+    if (!needTranscode) {
         return file;
     }
+
+    const ext = getMomentFileExtension(file) || '';
+    const isExplicitApple = ['mov', 'quicktime', 'm4v', 'hevc'].includes(ext)
+        || (file.type && (file.type.includes('quicktime') || file.type.includes('hevc')));
+    const codec = await inspectVideoCodec(file);
+    const isHevcOrApple = isExplicitApple || codec === 'hevc';
 
     try {
         const ffmpeg = await getFFmpeg();
@@ -725,12 +790,13 @@ async function compressVideoFile(file, onProgress) {
         await ffmpeg.deleteFile(outputName).catch(() => {});
         ffmpeg.off('progress');
 
-        if (!isAppleFormat && newBlob.size >= file.size) {
-            console.log(`[VideoOptimize] 压缩后体积未减小，使用原文件`);
+        // 注意：如果是 HEVC 视频，转码为 H.264 的核心目的是全平台跨端兼容，即使体积未显著变小也绝不能退回原 HEVC 文件！
+        if (!isHevcOrApple && newBlob.size >= file.size) {
+            console.log(`[VideoOptimize] 压缩后体积未减小，使用原标准文件`);
             return file;
         }
 
-        console.log(`[VideoOptimize] 视频优化完成: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(newBlob.size / 1024 / 1024).toFixed(2)}MB (节省 ${Math.round((1 - newBlob.size / file.size) * 100)}%)`);
+        console.log(`[VideoOptimize] 视频优化完成: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(newBlob.size / 1024 / 1024).toFixed(2)}MB`);
 
         return new File([newBlob], file.name.replace(/\.[^/.]+$/, "") + "_optimized.mp4", {
             type: 'video/mp4'
@@ -739,6 +805,9 @@ async function compressVideoFile(file, onProgress) {
         console.error("Video compression failed, fallback to original file", e);
         if (ffmpegInstance) {
             try { ffmpegInstance.off('progress'); } catch (_) {}
+        }
+        if (isHevcOrApple && typeof showToast === 'function') {
+            showToast('转码组件加载失败，已使用原片上传。该视频在电脑浏览器可能需要对应解码器支持', 5000);
         }
         return file;
     }
@@ -792,11 +861,7 @@ async function submitMomentPost() {
             for (let i = 0; i < totalFiles; i++) {
                 let file = momentSelectedFiles[i];
                 if (isMomentVideoFile(file)) {
-                    const ext = getMomentFileExtension(file) || '';
-                    const isAppleFormat = ['mov', 'quicktime', 'm4v', 'hevc'].includes(ext)
-                        || (file.type && (file.type.includes('quicktime') || file.type.includes('hevc')));
-                    const needCompress = isAppleFormat || file.size > 2 * 1024 * 1024 || file.type !== 'video/mp4';
-
+                    const needCompress = await isMomentVideoNeedsTranscode(file);
                     if (needCompress) {
                         btn.textContent = `⏳ 准备优化视频 (${i + 1}/${totalFiles})...`;
                         file = await compressVideoFile(file, (progress) => {
