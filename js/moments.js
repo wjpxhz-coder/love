@@ -611,6 +611,7 @@ async function getFFmpeg() {
 
     await loadScriptWithFallback(
         [
+            'https://registry.npmmirror.com/@ffmpeg/ffmpeg/0.12.10/files/dist/umd/ffmpeg.js',
             'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js',
             'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd/ffmpeg.js',
             'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js'
@@ -622,6 +623,7 @@ async function getFFmpeg() {
 
     await loadScriptWithFallback(
         [
+            'https://registry.npmmirror.com/@ffmpeg/util/0.12.1/files/dist/umd/index.js',
             'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js',
             'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-util/0.12.1/umd/index.js',
             'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js'
@@ -635,6 +637,10 @@ async function getFFmpeg() {
     const ffmpeg = new FFmpeg();
 
     const coreSources = [
+        {
+            coreURL: 'https://registry.npmmirror.com/@ffmpeg/core/0.12.6/files/dist/umd/ffmpeg-core.js',
+            wasmURL: 'https://registry.npmmirror.com/@ffmpeg/core/0.12.6/files/dist/umd/ffmpeg-core.wasm'
+        },
         {
             coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
             wasmURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm'
@@ -651,7 +657,7 @@ async function getFFmpeg() {
         try {
             await Promise.race([
                 ffmpeg.load(src),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('FFmpeg-Core 加载超时')), 25000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error('FFmpeg-Core 加载超时')), 35000))
             ]);
             loaded = true;
             break;
