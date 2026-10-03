@@ -1438,36 +1438,58 @@ async function analyzeMomentWithAI(momentId) {
 
         const author = momentRow.author || '我们';
         const momentText = (parsed.text || '').trim();
-        const images = Array.isArray(parsed.images) ? parsed.images : [];
-        const hasImages = images.length > 0;
+        const rawImages = Array.isArray(parsed.images)
+            ? parsed.images
+            : (momentRow.type === 'photo' && momentRow.content ? [momentRow.content] : []);
 
         const attachments = [];
-        if (hasImages) {
-            const count = Math.min(images.length, AI_MAX_ATTACHMENTS);
-            for (let i = 0; i < count; i++) {
-                attachments.push({
-                    source: 'moment',
-                    moment_id: String(normalizedId),
-                    image_index: Number(i)
-                });
+        let skippedNonImageCount = 0;
+
+        for (let i = 0; i < rawImages.length; i++) {
+            const item = rawImages[i];
+            if (isSupportedAIDiaryImage(item)) {
+                if (attachments.length < AI_MAX_ATTACHMENTS) {
+                    attachments.push({
+                        source: 'moment',
+                        moment_id: String(normalizedId),
+                        image_index: Number(i)
+                    });
+                }
+            } else {
+                skippedNonImageCount++;
             }
+        }
+
+        const validImageCount = attachments.length;
+        const hasValidImages = validImageCount > 0;
+
+        let displayMomentText = momentText;
+        if (!displayMomentText && !hasValidImages && (skippedNonImageCount > 0 || parsed.audio)) {
+            displayMomentText = '记录了一段美好的视频/日常时光';
+        }
+
+        let mediaDescription = '【动态类型】纯文字日常记录。';
+        if (hasValidImages) {
+            mediaDescription = `【动态照片】共附带了 ${validImageCount} 张照片（已随本轮请求上传，非图片文件如视频已自动跳过）。请结合照片画面中的生动细节、场景与人物互动，感受两人的爱意与默契。`;
+        } else if (skippedNonImageCount > 0 || parsed.audio) {
+            mediaDescription = `【动态类型】生活随拍记录（动态附带了视频或音频记录，本轮已自动跳过非图片文件，专注于日常场景与文字进行感情点评）。`;
         }
 
         console.log('[感情助手] 准备分析动态图文:', {
             momentId: normalizedId,
             author,
-            hasImages,
-            attachmentCount: attachments.length
+            totalMediaCount: rawImages.length,
+            validImageCount,
+            skippedNonImageCount,
+            hasValidImages
         });
 
         const promptLines = [
             `你是“我们的感情助手”，小蛇与小奚的专属恋爱助手、闺蜜红娘和感情见证官。`,
             `请对他们发布的这条动态进行细腻温暖、浪漫共鸣的感情分析点评：`,
             `【动态作者】${author}`,
-            `【动态文字】${momentText || '(未配文字)'}`,
-            hasImages
-                ? `【动态照片】共附带了 ${attachments.length} 张照片（已随本轮请求上传），请结合照片画面中的生动场景、细节与表情，感受两人的爱意与默契。`
-                : `【动态类型】纯文字日常记录。`,
+            `【动态文字】${displayMomentText || '(未配文字)'}`,
+            mediaDescription,
             `【点评要求】`,
             `1. 语气必须温暖甜蜜、灵动俏皮，像深知他们日常的贴心红娘；`,
             `2. 捕捉图文里的恋爱闪光点与默契瞬间，送上走心甜蜜的祝福或幽默调侃；`,
