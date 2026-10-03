@@ -488,7 +488,7 @@ async function callAgnes(
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: AGNES_MODEL,
+        model: input.model || AGNES_MODEL,
         messages: providerMessages,
         max_tokens: AGNES_MAX_TOKENS,
         temperature: AGNES_TEMPERATURE,
@@ -612,6 +612,70 @@ async function callAgnes(
   );
 }
 
+async function handleListModels(
+  requestId: string,
+  origin: string,
+  userId: string,
+  startedAt: number,
+): Promise<Response> {
+  let rawProviderKey: string;
+  try {
+    rawProviderKey = env("AGNES_API_KEY");
+  } catch {
+    safeLog(requestId, userId, "missing_provider_key", startedAt);
+    return jsonResponse(503, "SERVICE_MISCONFIGURED", requestId, origin);
+  }
+  const providerKey = normalizeAgnesKey(rawProviderKey);
+  if (!providerKey) {
+    safeLog(requestId, userId, "invalid_provider_key_shape", startedAt);
+    return jsonResponse(
+      503,
+      "PROVIDER_KEY_INVALID_FORMAT",
+      requestId,
+      origin,
+    );
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    const providerResponse = await fetch("https://apihub.agnes-ai.com/v1/models", {
+      method: "GET",
+      headers: {
+        "authorization": `Bearer ${providerKey}`,
+      },
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
+
+    if (!providerResponse.ok) {
+      safeLog(requestId, userId, `models_http_${providerResponse.status}`, startedAt);
+      return jsonResponse(502, "PROVIDER_UNAVAILABLE", requestId, origin);
+    }
+
+    const data = await providerResponse.json();
+    const modelList = Array.isArray(data?.data)
+      ? data.data
+          .map((item: unknown) => isRecord(item) && typeof item.id === "string" ? item.id : "")
+          .filter(Boolean)
+      : [];
+
+    safeLog(requestId, userId, "list_models_ok", startedAt);
+    return new Response(
+      JSON.stringify({
+        models: modelList,
+        request_id: requestId,
+      }),
+      {
+        status: 200,
+        headers: responseHeaders(origin),
+      },
+    );
+  } catch (error) {
+    safeLog(requestId, userId, "list_models_error", startedAt);
+    return jsonResponse(502, "PROVIDER_UNAVAILABLE", requestId, origin);
+  }
+}
+
 async function cleanupTemporaryObjects(
   context: AuthenticatedContext,
   paths: Set<string>,
@@ -692,6 +756,15 @@ export async function handleRequest(request: Request): Promise<Response> {
       try {
         const parsedBody = await readRequestJson(request, requestId, origin);
         if (parsedBody instanceof Response) return parsedBody;
+
+        if (isRecord(parsedBody) && parsedBody.action === "list_models") {
+          return await handleListModels(
+            requestId,
+            origin,
+            context.userId,
+            startedAt,
+          );
+        }
 
         if (isRecord(parsedBody)) {
           for (

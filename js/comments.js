@@ -56,16 +56,22 @@ async function removeUploadedCommentObjects(paths) {
 async function resolveCommentContent(rawContent) {
     let text = '';
     let imageValues = [];
+    let isAI = false;
     try {
         const parsed = JSON.parse(rawContent);
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
             text = typeof parsed.text === 'string' ? parsed.text : '';
             imageValues = Array.isArray(parsed.images) ? parsed.images : [];
+            isAI = Boolean(parsed.is_ai || parsed.ai_helper);
         } else {
             text = String(rawContent || '');
         }
     } catch (_error) {
         text = String(rawContent || '');
+    }
+
+    if (!isAI && text.startsWith('🤖【我们的感情助手】')) {
+        isAI = true;
     }
 
     const images = (await Promise.all(imageValues.map(async value => {
@@ -76,7 +82,7 @@ async function resolveCommentContent(rawContent) {
             return '';
         }
     }))).filter(Boolean);
-    return { text, images };
+    return { text, images, isAI };
 }
 
 function setCommentStatus(container, text) {
@@ -258,44 +264,60 @@ async function loadComments(momentId, targetCard = null) {
             const textContent = resolvedContents[commentIndex].text;
             const imageUrls = resolvedContents[commentIndex].images;
 
+            const isAIComment = Boolean(resolvedContents[commentIndex].isAI);
+
             const item = document.createElement('div');
-            item.className = 'comment-item';
+            item.className = `comment-item${isAIComment ? ' comment-item--ai' : ''}`;
             item.id = `comment-${commentId}`;
             const authorBadge = document.createElement('span');
-            authorBadge.className = `comment-author-badge author-badge ${badgeClass}`;
-            authorBadge.style.cursor = 'pointer';
-            authorBadge.title = '点击查看主页';
-            authorBadge.tabIndex = 0;
-            authorBadge.setAttribute('role', 'button');
-            const avatarUrl = getCommentProfileAvatarUrl(p);
-            if (avatarUrl) {
-                const avatar = document.createElement('img');
-                avatar.src = avatarUrl;
-                avatar.alt = '';
-                Object.assign(avatar.style, {
-                    width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover',
-                    verticalAlign: 'middle', marginRight: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                });
-                authorBadge.appendChild(avatar);
+
+            if (isAIComment) {
+                authorBadge.className = 'comment-author-badge author-badge author-ai';
+                authorBadge.title = `${displayName} 请求感情助手智能点评 ✨`;
+                authorBadge.tabIndex = 0;
+                authorBadge.appendChild(document.createTextNode('🤖 我们的感情助手'));
             } else {
-                authorBadge.appendChild(document.createTextNode(`${emoji} `));
-            }
-            authorBadge.appendChild(document.createTextNode(String(displayName || '')));
-            const openProfile = () => {
-                if (typeof openProfilePage === 'function') openProfilePage(String(c.author || ''));
-            };
-            authorBadge.addEventListener('click', openProfile);
-            authorBadge.addEventListener('keydown', event => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    openProfile();
+                authorBadge.className = `comment-author-badge author-badge ${badgeClass}`;
+                authorBadge.style.cursor = 'pointer';
+                authorBadge.title = '点击查看主页';
+                authorBadge.tabIndex = 0;
+                authorBadge.setAttribute('role', 'button');
+                const avatarUrl = getCommentProfileAvatarUrl(p);
+                if (avatarUrl) {
+                    const avatar = document.createElement('img');
+                    avatar.src = avatarUrl;
+                    avatar.alt = '';
+                    Object.assign(avatar.style, {
+                        width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover',
+                        verticalAlign: 'middle', marginRight: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                    });
+                    authorBadge.appendChild(avatar);
+                } else {
+                    authorBadge.appendChild(document.createTextNode(`${emoji} `));
                 }
-            });
+                authorBadge.appendChild(document.createTextNode(String(displayName || '')));
+                const openProfile = () => {
+                    if (typeof openProfilePage === 'function') openProfilePage(String(c.author || ''));
+                };
+                authorBadge.addEventListener('click', openProfile);
+                authorBadge.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openProfile();
+                    }
+                });
+            }
 
             const body = document.createElement('div');
             body.style.flex = '1';
             const bubble = document.createElement('div');
-            bubble.className = 'comment-bubble';
+            bubble.className = `comment-bubble${isAIComment ? ' comment-bubble--ai' : ''}`;
+            if (isAIComment) {
+                const aiHeader = document.createElement('div');
+                aiHeader.className = 'ai-comment-tag';
+                aiHeader.textContent = '✨ 动态智能分析点评';
+                bubble.appendChild(aiHeader);
+            }
             if (textContent) bubble.appendChild(document.createTextNode(textContent));
             imageUrls.forEach(url => {
                 const image = document.createElement('img');
@@ -633,3 +655,41 @@ window.removeCommentImg = function(momentId, entryId, itemEl) {
 window.addEventListener('pagehide', () => {
     clearAllCommentImageSelections();
 });
+
+async function submitAIAnalysisComment(momentId, commentText) {
+    if (!hasCommentAuthContext()) {
+        throw new Error('AUTH_REQUIRED');
+    }
+    const cleanText = String(commentText || '').trim();
+    if (!cleanText) {
+        throw new Error('COMMENT_EMPTY');
+    }
+
+    const payload = JSON.stringify({
+        text: cleanText,
+        is_ai: true,
+        ai_helper: 'love_assistant'
+    });
+
+    const { error } = await supabaseClient.from('comments').insert([{
+        moment_id: momentId,
+        content: payload
+    }]);
+
+    if (error) throw error;
+
+    // 成功后自动展开评论列表，并刷新评论数据和计数
+    const card = document.getElementById(`card-${momentId}`);
+    const section = card ? card.querySelector('.comment-section') : document.getElementById(`comments-${momentId}`);
+    if (section) {
+        section.style.display = 'block';
+        section.setAttribute('aria-hidden', 'false');
+        const toggleBtn = card ? card.querySelector('.comment-toggle-btn') : document.getElementById(`comment-toggle-${momentId}`);
+        toggleBtn?.setAttribute('aria-expanded', 'true');
+    }
+
+    await loadComments(momentId, card);
+    await loadCommentCounts([momentId]);
+}
+
+window.submitAIAnalysisComment = submitAIAnalysisComment;

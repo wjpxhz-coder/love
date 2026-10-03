@@ -292,15 +292,16 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.51';
+const APP_VERSION = 'v3.9.61';
 const CONFIG = {
-    version: 'v3.9.51',
-    date: '2026-08-27',
-    title: '个人主页顶栏视觉与居中优化 💖✨',
+    version: 'v3.9.61',
+    date: '2026-10-03',
+    title: '我们的感情助手全新升级 🤖💖✨',
     features: [
-        '“我的主页”标题严格物理水平居中对齐，多端界面更美观 🎯',
-        '左侧返回按钮简化为极简圆润图标，更加轻巧干净 🌸',
-        '右侧设置按钮调整为正圆形设计，精致和谐 ✨'
+        '全站统一更名为“我们的感情助手”，浪漫交互更贴心 🌸',
+        '动态右上角新增“AI分析”，图文智能点评一键发布到评论区 💖',
+        '评论区新增感情助手专属浪漫气泡与高光徽章 ✨',
+        '系统设置支持自动获取服务商模型列表与自定义切换 🧠'
     ]
 };
 const UPDATE_LOG = CONFIG;

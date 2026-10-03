@@ -306,3 +306,61 @@
         }
         .comment-bubble img:hover { opacity: 0.92; }
 
+        /* ── 感情助手专属评论样式 ── */
+        .comment-item--ai {
+            background: linear-gradient(135deg, rgba(255, 240, 245, 0.45) 0%, rgba(255, 230, 240, 0.25) 100%);
+            border-radius: 12px;
+            padding: 8px 10px;
+            margin: 6px 0;
+            border: 1px solid rgba(255, 182, 193, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        [data-theme='dark'] .comment-item--ai {
+            background: linear-gradient(135deg, rgba(65, 35, 48, 0.35) 0%, rgba(50, 30, 42, 0.2) 100%);
+            border-color: rgba(255, 105, 180, 0.2);
+        }
+
+        .author-badge.author-ai {
+            background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.78em;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            box-shadow: 0 2px 6px rgba(255, 117, 140, 0.35);
+        }
+
+        .comment-bubble--ai {
+            background: rgba(255, 255, 255, 0.9) !important;
+            border: 1px solid rgba(255, 182, 193, 0.5) !important;
+            box-shadow: 0 2px 10px rgba(255, 117, 140, 0.08);
+            position: relative;
+            line-height: 1.6;
+        }
+
+        [data-theme='dark'] .comment-bubble--ai {
+            background: rgba(45, 30, 38, 0.85) !important;
+            border-color: rgba(255, 105, 180, 0.25) !important;
+            color: #fce4ec;
+        }
+
+        .ai-comment-tag {
+            display: inline-block;
+            font-size: 0.74em;
+            color: #d81b60;
+            background: rgba(255, 228, 235, 0.8);
+            border-radius: 6px;
+            padding: 1px 6px;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        [data-theme='dark'] .ai-comment-tag {
+            color: #ff80ab;
+            background: rgba(255, 64, 129, 0.15);
+        }
+

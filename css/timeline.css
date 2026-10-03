@@ -294,6 +294,54 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             color: #bd2d3e;
         }
 
+        .moment-menu-item--ai {
+            color: #e84360;
+            font-weight: 500;
+        }
+
+        .moment-menu-item--ai:hover,
+        .moment-menu-item--ai:focus-visible {
+            background: rgba(232, 67, 96, 0.12);
+            color: #c92a49;
+        }
+
+        .moment-ai-analyzing-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin: 6px 0 10px 0;
+            padding: 5px 12px;
+            font-size: 0.82em;
+            color: #d6336c;
+            background: linear-gradient(135deg, rgba(255, 225, 235, 0.7) 0%, rgba(255, 240, 245, 0.9) 100%);
+            border: 1px solid rgba(255, 140, 170, 0.35);
+            border-radius: 16px;
+            animation: pulseSubtle 1.8s infinite ease-in-out;
+            font-weight: 500;
+            width: fit-content;
+        }
+
+        [data-theme='dark'] .moment-ai-analyzing-badge {
+            color: #ff85a1;
+            background: rgba(255, 105, 180, 0.12);
+            border-color: rgba(255, 105, 180, 0.25);
+        }
+
+        .moment-ai-analyzing-badge .ai-spin {
+            display: inline-block;
+            animation: rotateSpin 2s linear infinite;
+        }
+
+        @keyframes rotateSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulseSubtle {
+            0%, 100% { opacity: 0.92; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.02); }
+        }
+
         .moment-edited-badge {
             font-size: 0.7em;
             color: var(--text-muted);

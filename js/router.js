@@ -15,8 +15,8 @@
         { id: 'mood-day', pattern: '/mood/day/:date', label: '心情记录', elementId: 'moodDayModal', protected: true },
         { id: 'filter', pattern: '/memories/filter', label: '检索回忆', elementId: 'filterModal', protected: true },
         { id: 'blindbox', pattern: '/memories/blind-box', label: '回忆盲盒', elementId: 'blindBoxModal', protected: true },
-        { id: 'ai', pattern: '/agnes', label: 'Agnes 2.0 情感助理', elementId: 'aiModal', protected: true },
-        { id: 'ai-chat', pattern: '/agnes/chat', label: '和 Agnes 2.0 聊聊', elementId: 'aiChatOverlay', protected: true },
+        { id: 'ai', pattern: '/agnes', label: '我们的感情助手', elementId: 'aiModal', protected: true },
+        { id: 'ai-chat', pattern: '/agnes/chat', label: '感情助手聊天', elementId: 'aiChatOverlay', protected: true },
         { id: 'settings', pattern: '/settings', label: '系统设置', elementId: 'settingsModal', protected: true },
         { id: 'milestones', pattern: '/milestones', label: '大事记', elementId: 'milestonesModal', protected: true },
         // The static edit route must precede the dynamic author route.

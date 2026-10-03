@@ -474,12 +474,12 @@
             <button class="fab-item fab-item-miss" type="button" onclick="sendMissYou(); toggleFabMenu();" aria-label="一键想你">💓</button>
         </div>
         <div class="fab-item-wrapper">
-            <span class="fab-label">Agnes 2.0 聊天</span>
-            <button class="fab-item fab-item-chat" type="button" onclick="openAIChatModal(); toggleFabMenu();" aria-label="Agnes 2.0 聊天">💬</button>
+            <span class="fab-label">感情助手聊天</span>
+            <button class="fab-item fab-item-chat" type="button" onclick="openAIChatModal(); toggleFabMenu();" aria-label="感情助手聊天">💬</button>
         </div>
         <div class="fab-item-wrapper">
-            <span class="fab-label">情感助理</span>
-            <button class="fab-item fab-item-ai" type="button" onclick="openAIModal(); toggleFabMenu();" aria-label="情感助理">🤖</button>
+            <span class="fab-label">我们的感情助手</span>
+            <button class="fab-item fab-item-ai" type="button" onclick="openAIModal(); toggleFabMenu();" aria-label="我们的感情助手">🤖</button>
         </div>
         <div class="fab-item-wrapper">
             <span class="fab-label">检索回忆</span>
@@ -494,12 +494,12 @@
             aria-controls="fab-menu" aria-expanded="false">✨</button>
 </div>
 
-<!-- Agnes 2.0 情感助理页面 -->
+<!-- 我们的感情助手页面 -->
 <section class="app-page feature-page" id="aiModal" data-page-id="ai" aria-labelledby="ai-modal-title" aria-hidden="true" hidden inert>
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeAIModal()">← 返回</button>
-            <h1 class="app-page-topbar-title" id="ai-modal-title" data-page-focus tabindex="-1">Agnes 2.0</h1>
+            <h1 class="app-page-topbar-title" id="ai-modal-title" data-page-focus tabindex="-1">我们的感情助手</h1>
             <span class="app-page-topbar-spacer" aria-hidden="true"></span>
         </header>
         <div class="app-page-scroll">
@@ -510,7 +510,7 @@
                 <button class="ai-refresh-btn" id="aiRefreshBtn" type="button" onclick="refreshAIContent()" aria-label="刷新内容">🔄</button>
             </div>
         </div>
-        <div class="ai-tabs" role="tablist" aria-label="情感助理内容">
+        <div class="ai-tabs" role="tablist" aria-label="感情助手内容">
             <button class="ai-tab active" id="ai-tab-topic" type="button" role="tab" aria-selected="true" aria-controls="aiContentArea" onclick="switchAITab('topic')">今日话题</button>
             <button class="ai-tab" id="ai-tab-anniversary" type="button" role="tab" aria-selected="false" aria-controls="aiContentArea" onclick="switchAITab('anniversary')">纪念日</button>
             <button class="ai-tab" id="ai-tab-summary" type="button" role="tab" aria-selected="false" aria-controls="aiContentArea" onclick="switchAITab('summary')">回忆总结</button>
@@ -524,12 +524,12 @@
     </div>
 </section>
 
-<!-- Agnes 2.0 聊天页面 -->
+<!-- 感情助手聊天页面 -->
 <section class="app-page feature-page ai-chat-dialog" id="aiChatOverlay" data-page-id="ai-chat" aria-labelledby="ai-chat-title" aria-hidden="true" hidden inert>
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeAIChatModal()">← 返回</button>
-            <h1 class="app-page-topbar-title" id="ai-chat-title" data-page-focus tabindex="-1">Agnes 2.0 聊天</h1>
+            <h1 class="app-page-topbar-title" id="ai-chat-title" data-page-focus tabindex="-1">感情助手聊天</h1>
             <span class="app-page-topbar-spacer" aria-hidden="true"></span>
         </header>
         <div class="app-page-scroll app-page-scroll--chat">
@@ -537,7 +537,7 @@
     <div class="ai-chat-box">
         <div class="ai-chat-messages" id="aiChatMessages" role="log" aria-live="polite" aria-relevant="additions text">
             <div class="ai-chat-welcome">
-                🌸 嗨~ 我是 Agnes 2.0，你们的专属情感小助理！<br>
+                🌸 嗨~ 我是我们的感情助手，你们的专属恋爱小助理！<br>
                 可以聊日常，也可以选择图片让我帮你分析。<br>
                 图片只用于当前这一轮，继续追问时需要重新选择。<br>
                 💕 随时为你们服务！
@@ -748,10 +748,10 @@
 <dialog class="native-dialog version-dialog" id="versionModal" aria-labelledby="versionTitle">
     <div class="modal-box version-modal-box">
         <div class="version-decor-heart">💝</div>
-        <h2 class="modal-title" id="versionTitle">个人主页顶栏视觉与居中优化 💖✨</h2>
-        <div class="version-tag" id="versionNumber">v3.9.51</div>
+        <h2 class="modal-title" id="versionTitle">我们的感情助手全新升级 🤖💖✨</h2>
+        <div class="version-tag" id="versionNumber">v3.9.61</div>
         <div class="version-body">
-            <div class="version-date" id="versionDate">更新时间：2026-08-27</div>
+            <div class="version-date" id="versionDate">更新时间：2026-10-03</div>
 
             <ul class="version-changelog" id="versionChangelogList">
                 <!-- 动态插入更新特性 -->
@@ -783,12 +783,25 @@
         </div>
 
         <div class="settings-group">
-            <div class="settings-label">🤖 AI 助手</div>
+            <div class="settings-label">🤖 我们的感情助手</div>
             <label class="ai-privacy-toggle" for="ai-service-consent">
                 <input type="checkbox" id="ai-service-consent" onchange="setAIServiceConsent(this.checked)" aria-describedby="ai-privacy-tip">
-                <span>启用 Agnes 2.0 AI 服务</span>
+                <span>启用感情助手 AI 服务</span>
             </label>
-            <div class="settings-tip" id="ai-privacy-tip">默认开启。用于智能聊天互动与回忆生成，可随时在此关闭。</div>
+            <div class="settings-tip" id="ai-privacy-tip">默认开启。用于动态智能分析、聊天互动与回忆生成，可随时在此关闭。</div>
+            <div class="settings-subgroup model-settings-group" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(255, 107, 129, 0.2);">
+                <div class="settings-sublabel" style="font-weight: 600; font-size: 0.92rem; color: var(--text, #333); margin-bottom: 6px;">🧠 AI 分析与对话模型</div>
+                <div class="model-select-row" style="display: flex; gap: 8px; align-items: center;">
+                    <select id="ai-model-select" class="settings-select" onchange="handleAIModelSelectChange(this.value)" style="flex: 1; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color, #ffd1dc); background: var(--bg-card, #fff); color: var(--text, #333); font-size: 0.88rem;">
+                        <option value="agnes-2.0-flash">agnes-2.0-flash (极速默认)</option>
+                    </select>
+                    <button class="btn-settings-action btn-model-refresh" id="btn-refresh-models" type="button" onclick="loadSupportedModelsList(true)" title="重新拉取支持的模型列表" style="padding: 7px 12px; white-space: nowrap; font-size: 0.82rem; margin: 0;">🔄 刷新</button>
+                </div>
+                <div class="model-custom-wrapper" id="model-custom-wrapper" style="display: none; margin-top: 8px;">
+                    <input type="text" id="ai-model-custom-input" class="settings-input" placeholder="输入自定义模型代号 (例如 gpt-4o)" oninput="handleCustomModelInputChange(this.value)" style="width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color, #ffd1dc); font-size: 0.88rem;">
+                </div>
+                <div class="settings-tip" id="ai-model-tip">自动拉取服务商可用模型列表，也可手动输入自定义代号。</div>
+            </div>
         </div>
 
         <div class="settings-group">
