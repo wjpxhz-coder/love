@@ -611,66 +611,51 @@ async function getFFmpeg() {
 
     await loadScriptWithFallback(
         [
-            'https://registry.npmmirror.com/@ffmpeg/ffmpeg/0.12.10/files/dist/umd/ffmpeg.js',
-            'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js',
-            'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd/ffmpeg.js',
-            'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js'
+            'https://registry.npmmirror.com/@ffmpeg/ffmpeg/0.11.6/files/dist/ffmpeg.min.js',
+            'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.11.6/ffmpeg.min.js',
+            'https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js'
         ],
-        () => Boolean(window.FFmpegWASM && window.FFmpegWASM.FFmpeg),
+        () => Boolean(window.FFmpeg && window.FFmpeg.createFFmpeg),
         15000,
-        'FFmpeg-WASM-JS'
+        'FFmpeg-JS'
     );
 
-    await loadScriptWithFallback(
-        [
-            'https://registry.npmmirror.com/@ffmpeg/util/0.12.1/files/dist/umd/index.js',
-            'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js',
-            'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-util/0.12.1/umd/index.js',
-            'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js'
-        ],
-        () => Boolean(window.FFmpegUtil && window.FFmpegUtil.fetchFile),
-        15000,
-        'FFmpeg-Util-JS'
-    );
-
-    const { FFmpeg } = window.FFmpegWASM;
-    const ffmpeg = new FFmpeg();
+    const { createFFmpeg } = window.FFmpeg;
 
     const coreSources = [
-        {
-            coreURL: 'https://registry.npmmirror.com/@ffmpeg/core/0.12.6/files/dist/umd/ffmpeg-core.js',
-            wasmURL: 'https://registry.npmmirror.com/@ffmpeg/core/0.12.6/files/dist/umd/ffmpeg-core.wasm'
-        },
-        {
-            coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
-            wasmURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm'
-        },
-        {
-            coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
-            wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm'
-        }
+        'https://registry.npmmirror.com/@ffmpeg/core-st/0.11.1/files/dist/ffmpeg-core.js',
+        'https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
+        'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js'
     ];
 
-    let loaded = false;
+    let loadedInstance = null;
     let lastCoreErr = null;
-    for (const src of coreSources) {
+    for (const corePath of coreSources) {
         try {
+            console.log(`[VideoOptimize] 尝试加载单线程全端转码核心: ${corePath}`);
+            const ffmpeg = createFFmpeg({
+                log: false,
+                mainName: 'main',
+                corePath: corePath
+            });
             await Promise.race([
-                ffmpeg.load(src),
+                ffmpeg.load(),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('FFmpeg-Core 加载超时')), 35000))
             ]);
-            loaded = true;
+            loadedInstance = ffmpeg;
+            console.log('[VideoOptimize] FFmpeg 单线程核心加载成功 ✨');
             break;
         } catch (e) {
-            console.warn('[VideoOptimize] FFmpeg core 加载失败，尝试备用源:', e);
+            console.warn(`[VideoOptimize] 核心源 ${corePath} 加载未成功，尝试备用源:`, e);
             lastCoreErr = e;
         }
     }
 
-    if (!loaded) throw lastCoreErr || new Error('FFmpeg Core 核心加载失败');
+    if (!loadedInstance) throw lastCoreErr || new Error('FFmpeg Core 核心加载失败');
 
-    ffmpegInstance = ffmpeg;
-    return ffmpeg;
+    ffmpegInstance = loadedInstance;
+    return ffmpegInstance;
 }
 
 
@@ -758,17 +743,19 @@ async function compressVideoFile(file, onProgress) {
 
     try {
         const ffmpeg = await getFFmpeg();
-        const { fetchFile } = window.FFmpegUtil;
 
-        ffmpeg.on('progress', ({ progress }) => {
-            if (onProgress) onProgress(Math.min(99, Math.max(1, Math.round(progress * 100))));
+        ffmpeg.setProgress(({ ratio }) => {
+            if (onProgress && typeof ratio === 'number' && !isNaN(ratio)) {
+                onProgress(Math.min(99, Math.max(1, Math.round(ratio * 100))));
+            }
         });
 
         const inputExt = getMomentFileExtension(file) || 'mp4';
         const inputName = 'input.' + (inputExt === 'bin' ? 'mp4' : inputExt);
         const outputName = 'output.mp4';
 
-        await ffmpeg.writeFile(inputName, await fetchFile(file));
+        const fileBuffer = new Uint8Array(await file.arrayBuffer());
+        ffmpeg.FS('writeFile', inputName, fileBuffer);
 
         // 转码优化参数：
         // 1. scale='min(1280,iw)':-2 限制最大宽度 1280px 并保持宽高比与偶数尺寸
@@ -776,7 +763,7 @@ async function compressVideoFile(file, onProgress) {
         // 3. -preset ultrafast 极速编码
         // 4. -movflags +faststart 把元数据移至文件头部，实现边下边播秒开
         // 5. -c:a aac -b:a 128k 高保真音频压缩
-        await ffmpeg.exec([
+        await ffmpeg.run(
             '-i', inputName,
             '-vf', "scale='min(1280,iw)':-2",
             '-vcodec', 'libx264',
@@ -787,14 +774,14 @@ async function compressVideoFile(file, onProgress) {
             '-c:a', 'aac',
             '-b:a', '128k',
             outputName
-        ]);
+        );
 
-        const data = await ffmpeg.readFile(outputName);
+        const data = ffmpeg.FS('readFile', outputName);
         const newBlob = new Blob([data.buffer], { type: 'video/mp4' });
 
-        await ffmpeg.deleteFile(inputName).catch(() => {});
-        await ffmpeg.deleteFile(outputName).catch(() => {});
-        ffmpeg.off('progress');
+        try { ffmpeg.FS('unlink', inputName); } catch (_) {}
+        try { ffmpeg.FS('unlink', outputName); } catch (_) {}
+        try { ffmpeg.setProgress(() => {}); } catch (_) {}
 
         // 注意：如果是 HEVC 视频，转码为 H.264 的核心目的是全平台跨端兼容，即使体积未显著变小也绝不能退回原 HEVC 文件！
         if (!isHevcOrApple && newBlob.size >= file.size) {
@@ -810,12 +797,29 @@ async function compressVideoFile(file, onProgress) {
     } catch (e) {
         console.error("Video compression failed, fallback to original file", e);
         if (ffmpegInstance) {
-            try { ffmpegInstance.off('progress'); } catch (_) {}
+            try { ffmpegInstance.setProgress(() => {}); } catch (_) {}
         }
         if (isHevcOrApple && typeof showToast === 'function') {
             showToast('转码组件加载失败，已使用原片上传。该视频在电脑浏览器可能需要对应解码器支持', 5000);
         }
         return file;
+    }
+}
+
+const MOMENT_UPLOAD_TIMEOUT_MS = 60000;
+
+async function uploadStorageFileWithTimeout(bucket, path, file, options = {}) {
+    let timer;
+    const timeoutPromise = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('上传超时，请检查网络连接后重试')), MOMENT_UPLOAD_TIMEOUT_MS);
+    });
+    try {
+        const uploadPromise = supabaseClient.storage.from(bucket).upload(path, file, options);
+        const { data, error } = await Promise.race([uploadPromise, timeoutPromise]);
+        if (error) throw error;
+        return data;
+    } finally {
+        clearTimeout(timer);
     }
 }
 
@@ -882,14 +886,18 @@ async function submitMomentPost() {
             }
 
             // 第二阶段：并行极速上传
-            btn.textContent = '⏳ 正在极速上传…';
+            let finishedUploads = 0;
+            btn.textContent = totalFiles > 1 ? `⏳ 正在极速上传 (0/${totalFiles})…` : '⏳ 正在极速上传…';
             const uploadTasks = processedFiles.map(async (file, index) => {
                 const fileExt = getMomentFileExtension(file);
                 const fileName = `${storageDirectory}/${Date.now()}_${index}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-                const { error } = await supabaseClient.storage
-                    .from('photos')
-                    .upload(fileName, file, { contentType: file.type || 'application/octet-stream', upsert: false });
-                if (error) throw error;
+                await uploadStorageFileWithTimeout('photos', fileName, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+                finishedUploads++;
+                if (btn) {
+                    btn.textContent = totalFiles > 1
+                        ? `⏳ 正在极速上传 (${finishedUploads}/${totalFiles})…`
+                        : '⏳ 正在极速上传…';
+                }
                 return {
                     path: fileName,
                     ref: createStorageReference(fileName)
@@ -906,12 +914,12 @@ async function submitMomentPost() {
         btn.textContent = isEditing ? '⏳ 正在保存修改…' : '⏳ 正在保存记录…';
         let audioUrl = null;
         if (momentAudioBlob) {
+            btn.textContent = '⏳ 正在上传语音…';
             const audioType = momentAudioBlob.type || 'audio/webm';
             const audioMime = audioType.split(';', 1)[0].trim().toLowerCase() || 'audio/webm';
             const audioExtension = audioMime.includes('ogg') ? 'ogg' : (audioMime.includes('mp4') ? 'm4a' : 'webm');
             const fileName = `${storageDirectory}/audio_${Date.now()}_${Math.random().toString(36).substring(2,9)}.${audioExtension}`;
-            const { error: audioUploadError } = await supabaseClient.storage.from('photos').upload(fileName, momentAudioBlob, { contentType: audioMime, upsert: false });
-            if (audioUploadError) throw audioUploadError;
+            await uploadStorageFileWithTimeout('photos', fileName, momentAudioBlob, { contentType: audioMime, upsert: false });
             uploadedObjectPaths.push(fileName);
             audioUrl = createStorageReference(fileName);
         }
@@ -994,6 +1002,10 @@ async function submitMomentPost() {
             const errorMsg = String(err?.message || err || '');
             if (isEditing && (err?.code === '42501' || errorMsg.includes('policy') || errorMsg.includes('permission'))) {
                 if (msgEl) msgEl.textContent = '保存失败：缺少空间操作权限，请检查网络或重新登录。';
+            } else if (errorMsg.includes('413') || errorMsg.toLowerCase().includes('payload too large')) {
+                if (msgEl) msgEl.textContent = '上传失败：单个媒体超出存储上限 (50MB)，请压缩后重试。';
+            } else if (errorMsg.includes('超时')) {
+                if (msgEl) msgEl.textContent = errorMsg;
             } else {
                 if (msgEl) msgEl.textContent = isEditing ? '保存修改失败，请检查网络或稍后重试。' : '发布失败，请检查网络或稍后重试。';
             }
