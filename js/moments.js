@@ -1983,11 +1983,26 @@ function locateMomentOnTimeline(moment, options = {}) {
     const backButton = createMomentNode('button', '', options.backLabel || '🔙 返回动态列表');
     backButton.type = 'button';
     backButton.addEventListener('click', () => {
-        clearTimelineSnapshot();
+        if (typeof isDefaultFilter === 'function' && !isDefaultFilter()) {
+            if (typeof resetAllMomentsFilters === 'function') {
+                resetAllMomentsFilters();
+            } else if (typeof clearFilters === 'function') {
+                clearFilters();
+            }
+        } else {
+            clearTimelineSnapshot();
+        }
         fetchMoments(false, { forceRefresh: true });
     });
     backWrap.appendChild(backButton);
     content.replaceChildren(backWrap, card);
+
+    const newVideos = Array.from(card.querySelectorAll('video'));
+    newVideos.forEach(video => {
+        if (typeof refreshMomentVideoPlayback === 'function') {
+            refreshMomentVideoPlayback(video);
+        }
+    });
 
     currentPage = 0;
     hasMore = false;
@@ -2000,6 +2015,70 @@ function locateMomentOnTimeline(moment, options = {}) {
     if (typeof loadMomentLikes === 'function') loadMomentLikes([momentId]);
     focusLocatedMomentCard(card);
     return true;
+}
+
+async function locateMomentById(momentId, options = {}) {
+    const id = normalizeMomentId(momentId);
+    const content = document.getElementById('timeline-content');
+    if (!id || !content || !hasMomentAuthContext()) return false;
+
+    // 1. 确保先切回首页时间轴视图（如果当前处于其它路由页面中）
+    let navigationSucceeded = true;
+    if (typeof appReplace === 'function') {
+        navigationSucceeded = appReplace('/', {
+            force: true,
+            focus: false,
+            scroll: false,
+            reason: 'locate-moment'
+        });
+    } else {
+        window.location.hash = '#/';
+    }
+    if (navigationSucceeded === false) return false;
+
+    // 2. 检查当前 DOM 是否已存在目标卡片
+    const existingCard = document.getElementById(`card-${id}`);
+    if (existingCard) {
+        focusLocatedMomentCard(existingCard);
+        return true;
+    }
+
+    // 3. 当前 DOM 不存在时（因分页未加载或被筛选条件过滤），从 Supabase 拉取完整动态数据进行单条直达渲染
+    try {
+        const { data: momentData, error } = await supabaseClient
+            .from('moments')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (error || !momentData) {
+            if (typeof showToast === 'function') {
+                showToast(options.notFoundMessage || '该动态或互动已不存在。');
+            }
+            return false;
+        }
+
+        const hydrated = typeof hydrateMomentMediaRecord === 'function'
+            ? await hydrateMomentMediaRecord(momentData)
+            : momentData;
+
+        const success = locateMomentOnTimeline(hydrated, {
+            backLabel: options.backLabel || '🔙 返回全部回忆'
+        });
+
+        if (success && options.showToastHint !== false) {
+            if (typeof showToast === 'function') {
+                showToast('已为你直达该条回忆 💖');
+            }
+        }
+        return success;
+    } catch (e) {
+        console.error('根据 ID 定位动态失败:', e);
+        if (typeof showToast === 'function') {
+            showToast('定位动态失败，请稍后重试。');
+        }
+        return false;
+    }
 }
 
 function toggleMomentActionMenu(momentId, triggerElement = null) {
@@ -2259,6 +2338,19 @@ function clearFilters() {
     document.getElementById('chkTypePhoto').checked = false;
     document.getElementById('chkTypeAudio').checked = false;
     document.getElementById('filterKeyword').value = '';
+}
+
+function resetAllMomentsFilters() {
+    clearFilters();
+    currentFilters = {
+        year: '',
+        month: '',
+        authors: [],
+        types: [],
+        keyword: ''
+    };
+    updateFilterIndicator();
+    clearTimelineSnapshot();
 }
 
 function applyFilters() {
