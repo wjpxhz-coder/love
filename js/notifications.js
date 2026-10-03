@@ -274,17 +274,43 @@ function formatNotificationTime(value) {
     }).format(date);
 }
 
+function isAICommentContent(content) {
+    if (typeof content !== 'string') return false;
+    const trimmed = content.trim();
+    if (!trimmed.startsWith('{')) return false;
+    try {
+        const parsed = JSON.parse(trimmed);
+        return Boolean(parsed && (parsed.is_ai || parsed.ai_helper === 'love_assistant'));
+    } catch (_e) {
+        return false;
+    }
+}
+
 function createNotificationItem(notification) {
     const isRead = isNotificationRead(notification);
+    const isAIComment = notification.type === 'comment' && isAICommentContent(notification.content);
+    const isLikeAIComment = notification.type === 'like' && isAICommentContent(notification.content);
+
     const item = document.createElement('li');
-    item.className = `notification-item${isRead ? '' : ' unread'}`;
+    item.className = `notification-item${isRead ? '' : ' unread'}${isAIComment ? ' ai-notification-item' : ''}`;
     item.tabIndex = 0;
     item.setAttribute('role', 'button');
 
     const headline = document.createElement('div');
-    const actor = document.createElement('strong');
-    actor.textContent = notification.actor || '成员';
-    headline.append(actor, document.createTextNode(` ${NOTIFICATION_ACTIONS[notification.type] || '发来了一条通知'}`));
+    if (isAIComment) {
+        const aiActor = document.createElement('strong');
+        aiActor.className = 'ai-notification-actor';
+        aiActor.textContent = '🤖 我们的感情助手';
+        headline.append(aiActor, document.createTextNode(' 发表了评论'));
+    } else if (isLikeAIComment) {
+        const actor = document.createElement('strong');
+        actor.textContent = notification.actor || '成员';
+        headline.append(actor, document.createTextNode(' 点赞了感情助手的评论'));
+    } else {
+        const actor = document.createElement('strong');
+        actor.textContent = notification.actor || '成员';
+        headline.append(actor, document.createTextNode(` ${NOTIFICATION_ACTIONS[notification.type] || '发来了一条通知'}`));
+    }
     item.appendChild(headline);
 
     const preview = notificationPreview(notification.content);
