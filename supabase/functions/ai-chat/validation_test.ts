@@ -144,13 +144,19 @@ Deno.test("request accepts only the two attachment variants", () => {
     { source: "temporary", path: TEMP_PATH },
     { source: "moment", moment_id: "42", image_index: 0 },
   ]);
+  const modelResult = validateAIRequest({
+    messages: [{ role: "user", content: "x" }],
+    model: "agnes-2.5-pro",
+  });
+  assertEquals(modelResult.model, "agnes-2.5-pro");
+
   assertThrowsCode(
     () =>
       validateAIRequest({
         messages: [{ role: "user", content: "x" }],
-        model: "agnes-2.5-pro",
+        model: "bad model space",
       }),
-    "INVALID_REQUEST_FIELDS",
+    "INVALID_MODEL",
   );
   assertThrowsCode(
     () =>

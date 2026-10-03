@@ -21,6 +21,7 @@ export type Attachment = TemporaryAttachment | MomentAttachment;
 export type AIRequest = {
   messages: ChatMessage[];
   attachments: Attachment[];
+  model?: string;
 };
 
 export type ValidatedImageInfo = {
@@ -228,7 +229,7 @@ export function validateAIRequest(value: unknown): AIRequest {
     !isRecord(value) ||
     !("messages" in value) ||
     !Object.keys(value).every((key) =>
-      key === "messages" || key === "attachments"
+      key === "messages" || key === "attachments" || key === "model"
     )
   ) {
     throw new InputValidationError("INVALID_REQUEST_FIELDS");
@@ -251,7 +252,15 @@ export function validateAIRequest(value: unknown): AIRequest {
     throw new InputValidationError("ATTACHMENTS_REQUIRE_USER_MESSAGE");
   }
 
-  return { messages, attachments };
+  let model: string | undefined = undefined;
+  if ("model" in value && value.model !== undefined && value.model !== null) {
+    if (typeof value.model !== "string" || !/^[a-zA-Z0-9_.:-]{2,80}$/.test(value.model.trim())) {
+      throw new InputValidationError("INVALID_MODEL");
+    }
+    model = value.model.trim();
+  }
+
+  return { messages, attachments, ...(model ? { model } : {}) };
 }
 
 export function validateTemporaryPath(

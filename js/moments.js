@@ -1711,6 +1711,14 @@ function createMomentCardElement(item, options = {}) {
     editItem.appendChild(document.createTextNode('✏️ 编辑'));
     dropdown.appendChild(editItem);
 
+    const aiItem = createMomentNode('button', 'moment-menu-item moment-menu-item--ai');
+    aiItem.type = 'button';
+    aiItem.setAttribute('role', 'menuitem');
+    aiItem.dataset.momentAction = 'ai-analyze';
+    aiItem.dataset.momentId = String(momentId);
+    aiItem.appendChild(document.createTextNode('🤖 AI分析'));
+    dropdown.appendChild(aiItem);
+
     if (canDelete) {
         const deleteItem = createMomentNode('button', 'moment-menu-item moment-menu-item--danger');
         deleteItem.type = 'button';
@@ -2017,6 +2025,76 @@ function closeAllMomentActionMenus() {
     });
 }
 
+async function startMomentAIAnalysis(momentId, triggerElement = null) {
+    if (!hasMomentAuthContext()) {
+        if (typeof openLoginModal === 'function') openLoginModal();
+        return;
+    }
+    if (typeof hasAIServiceConsent === 'function' && !hasAIServiceConsent()) {
+        if (typeof showToast === 'function') {
+            showToast('请先在“设置 → 我们的感情助手”中开启服务 ✨');
+        } else {
+            alert('请先在系统设置中开启感情助手 AI 服务');
+        }
+        return;
+    }
+
+    const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
+    if (!card) return;
+
+    if (card.classList.contains('is-ai-analyzing')) {
+        if (typeof showToast === 'function') showToast('感情助手正在分析这条动态，请稍候… 💖');
+        return;
+    }
+
+    card.classList.add('is-ai-analyzing');
+    let badge = card.querySelector('.moment-ai-analyzing-badge');
+    if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'moment-ai-analyzing-badge';
+        const spinSpan = document.createElement('span');
+        spinSpan.className = 'ai-spin';
+        spinSpan.textContent = '🌸';
+        badge.append(spinSpan, document.createTextNode(' 感情助手正在品读分析动态… ✨'));
+        const cardHeader = card.querySelector('.moment-header');
+        if (cardHeader && cardHeader.nextSibling) {
+            card.insertBefore(badge, cardHeader.nextSibling);
+        } else {
+            card.prepend(badge);
+        }
+    } else {
+        badge.style.display = 'flex';
+    }
+
+    if (typeof showToast === 'function') {
+        showToast('感情助手正在品读你们的动态… 💖');
+    }
+
+    try {
+        if (typeof window.analyzeMomentWithAI !== 'function') {
+            throw new Error('AI_FUNCTION_UNAVAILABLE');
+        }
+        await window.analyzeMomentWithAI(momentId);
+        if (typeof showToast === 'function') {
+            showToast('感情助手分析完成，已发布到评论区！🎉💖');
+        }
+    } catch (error) {
+        console.error('动态 AI 分析失败:', error);
+        let errorMsg = '感情助手分析失败，请稍后重试。';
+        if (typeof getFriendlyAIError === 'function') {
+            errorMsg = getFriendlyAIError(error);
+        }
+        if (typeof showToast === 'function') {
+            showToast(errorMsg);
+        } else {
+            alert(errorMsg);
+        }
+    } finally {
+        card.classList.remove('is-ai-analyzing');
+        if (badge) badge.remove();
+    }
+}
+
 function runMomentAction(actionElement) {
     const momentId = normalizeMomentId(actionElement.dataset.momentId);
     const action = actionElement.dataset.momentAction;
@@ -2026,6 +2104,9 @@ function runMomentAction(actionElement) {
     } else if (action === 'edit') {
         closeAllMomentActionMenus();
         openMomentEditModal(momentId);
+    } else if (action === 'ai-analyze') {
+        closeAllMomentActionMenus();
+        startMomentAIAnalysis(momentId, actionElement);
     } else if (action === 'delete') {
         closeAllMomentActionMenus();
         confirmDelete(momentId);

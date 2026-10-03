@@ -2,12 +2,55 @@
 // AI 专属助手
 // ==========================================
 const AI_TABS = new Set(['topic', 'anniversary', 'summary']);
-const CHAT_SYSTEM_PROMPT = '你是 Agnes 2.0，也是小蛇和小奚的专属情感小助理，语气温暖、俏皮、可爱。帮助他们聊天解闷、提供恋爱建议、推荐约会点子、化解小矛盾或分析本轮附带的图片。回答简洁温馨，每次不超过200字。图片不会在轮次之间保留；当前请求没有附图却追问图片时，请明确提醒用户重新选择图片，不要猜测。';
+const CHAT_SYSTEM_PROMPT = '你是“我们的感情助手”，也是小蛇和小奚的专属恋爱小助理，语气温暖、俏皮、可爱。帮助他们聊天解闷、提供恋爱建议、推荐约会点子、化解小矛盾或分析本轮附带的图片。回答简洁温馨，每次不超过200字。图片不会在轮次之间保留；当前请求没有附图却追问图片时，请明确提醒用户重新选择图片，不要猜测。';
 const AI_SERVICE_CONSENT_PREFIX = 'ai_service_consent_agnes_2_0_v1_';
 const AGNES_PROVIDER = 'agnes';
 const AGNES_MODEL = 'agnes-2.0-flash';
 const AGNES_PROMPT_VERSION = 2;
 const AGNES_CONSENT_VERSION = 'agnes-2.0-v1';
+const AI_MODEL_STORAGE_KEY = 'love_assistant_ai_model_pref';
+const DEFAULT_AI_MODEL = 'agnes-2.0-flash';
+const FALLBACK_AI_MODELS = [
+    { id: 'agnes-2.0-flash', name: 'agnes-2.0-flash (极速默认)' },
+    { id: 'gpt-4o-mini', name: 'gpt-4o-mini (轻量智能)' },
+    { id: 'gpt-4o', name: 'gpt-4o (全能旗舰)' },
+    { id: 'gemini-2.0-flash', name: 'gemini-2.0-flash (谷歌极速)' },
+    { id: 'claude-3-5-sonnet-20241022', name: 'claude-3-5-sonnet (思维深刻)' }
+];
+
+function getStoredAIModel() {
+    try {
+        const val = localStorage.getItem(AI_MODEL_STORAGE_KEY);
+        if (val && typeof val === 'string' && val.trim()) return val.trim();
+    } catch (_e) {}
+    return DEFAULT_AI_MODEL;
+}
+
+function setStoredAIModel(model) {
+    try {
+        if (!model || model === DEFAULT_AI_MODEL) {
+            localStorage.removeItem(AI_MODEL_STORAGE_KEY);
+        } else {
+            localStorage.setItem(AI_MODEL_STORAGE_KEY, String(model).trim());
+        }
+    } catch (_e) {}
+}
+
+async function fetchSupportedModels() {
+    assertAIAuthenticated();
+    try {
+        const { data, error } = await supabaseClient.functions.invoke('ai-chat', {
+            headers: { 'x-agnes-consent-version': AGNES_CONSENT_VERSION },
+            body: { action: 'list_models' }
+        });
+        if (!error && Array.isArray(data?.models) && data.models.length > 0) {
+            return data.models;
+        }
+    } catch (err) {
+        console.warn('获取远程模型列表失败，将使用本地推荐列表:', err);
+    }
+    return FALLBACK_AI_MODELS.map(m => m.id);
+}
 const AI_INPUT_BUCKET = 'ai-inputs';
 const AI_MAX_ATTACHMENTS = 9;
 const AI_MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -73,7 +116,7 @@ function setAIServiceConsent(enabled) {
     }
     syncAIPrivacySetting();
     if (typeof showToast === 'function') {
-        showToast(enabled ? 'Agnes 2.0 服务已开启。' : 'Agnes 2.0 服务已关闭。');
+        showToast(enabled ? '感情助手服务已开启。' : '感情助手服务已关闭。');
     }
 }
 
@@ -130,17 +173,37 @@ async function getAIInvocationErrorCode(error) {
     return /^[A-Z][A-Z0-9_]{2,80}$/.test(message) ? message : '';
 }
 
-async function invokeAI(messages, attachments = []) {
+async function invokeAI(messages, attachments = [], overrideModel = null) {
     assertAIAuthenticated();
     assertAIConsent();
+    const chosenModel = overrideModel || getStoredAIModel();
     const body = { messages };
     if (attachments.length > 0) body.attachments = attachments;
+    if (chosenModel && chosenModel !== AGNES_MODEL) {
+        body.model = chosenModel;
+    }
+
     const { data, error } = await supabaseClient.functions.invoke('ai-chat', {
         headers: { 'x-agnes-consent-version': AGNES_CONSENT_VERSION },
         body
     });
     if (error) {
         const code = await getAIInvocationErrorCode(error);
+        if ((code === 'INVALID_REQUEST_FIELDS' || code === 'INVALID_MODEL') && body.model) {
+            console.warn('当前后端服务尚未支持自定义模型参数，自动降级为默认模型重试:', code);
+            delete body.model;
+            const retryRes = await supabaseClient.functions.invoke('ai-chat', {
+                headers: { 'x-agnes-consent-version': AGNES_CONSENT_VERSION },
+                body
+            });
+            if (retryRes.error) {
+                const retryCode = await getAIInvocationErrorCode(retryRes.error);
+                throw createAIError(retryCode || 'AI_REQUEST_FAILED', retryRes.error);
+            }
+            const retryErrorCode = getAIErrorCodeFromPayload(retryRes.data);
+            if (retryErrorCode) throw createAIError(retryErrorCode);
+            return readAIResponse(retryRes.data);
+        }
         throw createAIError(code || 'AI_REQUEST_FAILED', error);
     }
     const responseErrorCode = getAIErrorCodeFromPayload(data);
@@ -167,7 +230,7 @@ function normalizeAIErrorCode(error) {
 function getFriendlyAIError(error) {
     const code = normalizeAIErrorCode(error);
     const messages = {
-        AI_CONSENT_REQUIRED: '请先在“头像 → 设置 → AI 助手”中开启 Agnes 2.0。',
+        AI_CONSENT_REQUIRED: '请先在“头像 → 设置 → 我们的感情助手”中开启服务。',
         AGNES_CONSENT_VERSION_REQUIRED: '请刷新或重新打开网站后再试。',
         AUTH_REQUIRED: '登录状态已失效，请重新登录后再试。',
         AUTH_INVALID: '登录状态已失效，请重新登录后再试。',
@@ -178,8 +241,8 @@ function getFriendlyAIError(error) {
         MEMBERSHIP_REQUIRED: '你目前无权访问这个共享空间。',
         FORBIDDEN: '你目前无权访问所选内容。',
         ORIGIN_NOT_ALLOWED: '当前页面来源未获授权，请从正式网站打开。',
-        SERVICE_MAINTENANCE: 'Agnes 2.0 正在安全维护中，请稍后再试。',
-        SERVICE_MISCONFIGURED: 'Agnes 2.0 服务尚未配置完成，请联系管理员。',
+        SERVICE_MAINTENANCE: '感情助手正在安全维护中，请稍后再试。',
+        SERVICE_MISCONFIGURED: '感情助手服务尚未配置完成，请联系管理员。',
         INVALID_REQUEST: '请求内容格式不正确，请重新选择后再试。',
         INVALID_REQUEST_FIELDS: '请求内容格式不正确，请刷新页面后重试。',
         INVALID_JSON: '请求内容格式不正确，请刷新页面后重试。',
@@ -216,31 +279,31 @@ function getFriendlyAIError(error) {
         TEMPORARY_PATH_FORBIDDEN: '临时图片不属于当前账号，请重新选择。',
         REQUEST_TOO_LARGE: '本次请求太大，请减少文字或图片后再试。',
         RATE_LIMITED: '请求有点频繁，请稍后再试。',
-        QUOTA_EXCEEDED: '今天的 Agnes 2.0 使用次数已达上限，明天再来吧。',
+        QUOTA_EXCEEDED: '今天的感情助手使用次数已达上限，明天再来吧。',
         QUOTA_CHECK_FAILED: '暂时无法检查使用次数，请稍后再试。',
-        PROVIDER_TIMEOUT: 'Agnes 2.0 响应超时，请稍后再试。',
+        PROVIDER_TIMEOUT: '感情助手响应超时，请稍后再试。',
         CLIENT_CLOSED_REQUEST: '本次请求已取消，请重新发送。',
-        PROVIDER_AUTH_FAILED: 'Agnes 2.0 密钥无效或无权调用当前模型，请在 Agnes 控制台重新生成并更新密钥。',
-        PROVIDER_KEY_INVALID_FORMAT: 'Agnes 2.0 密钥格式不正确；Secret 的值只能填写密钥本身。',
-        PROVIDER_BILLING_REQUIRED: 'Agnes 2.0 当前账号尚未开通所需套餐或额度。',
-        PROVIDER_RATE_LIMITED: 'Agnes 2.0 上游请求过于频繁，请稍后再试。',
-        PROVIDER_REQUEST_REJECTED: 'Agnes 2.0 拒绝了当前请求，请稍后重试或减少图片数量。',
-        PROVIDER_DNS_ERROR: 'Supabase 暂时无法解析 Agnes 2.0 服务地址，请稍后再试。',
-        PROVIDER_TLS_ERROR: 'Supabase 与 Agnes 2.0 的安全连接失败，请稍后再试。',
-        PROVIDER_CONNECT_ERROR: 'Supabase 暂时无法连接 Agnes 2.0，请稍后再试。',
-        PROVIDER_NETWORK_ERROR: 'Supabase 与 Agnes 2.0 之间的网络请求失败，请稍后再试。',
-        PROVIDER_UNAVAILABLE: 'Agnes 2.0 暂时不可用，请稍后再试。',
-        PROVIDER_ERROR: 'Agnes 2.0 暂时没有成功处理请求，请稍后再试。',
-        INVALID_PROVIDER_RESPONSE: 'Agnes 2.0 返回了无法读取的内容，请稍后重试。',
-        EMPTY_PROVIDER_RESPONSE: 'Agnes 2.0 没有返回有效内容，请稍后重试。',
-        PROVIDER_MISCONFIGURED: 'Agnes 2.0 服务尚未配置完成，请联系管理员。',
+        PROVIDER_AUTH_FAILED: '感情助手服务密钥无效或无权调用当前模型，请在控制台更新密钥。',
+        PROVIDER_KEY_INVALID_FORMAT: '感情助手服务密钥格式不正确。',
+        PROVIDER_BILLING_REQUIRED: '感情助手当前账号尚未开通所需额度。',
+        PROVIDER_RATE_LIMITED: '请求过于频繁，请稍后再试。',
+        PROVIDER_REQUEST_REJECTED: '感情助手拒绝了当前请求，请稍后重试或减少图片数量。',
+        PROVIDER_DNS_ERROR: '无法解析感情助手服务地址，请稍后再试。',
+        PROVIDER_TLS_ERROR: '与感情助手的安全连接失败，请稍后再试。',
+        PROVIDER_CONNECT_ERROR: '暂时无法连接感情助手服务，请稍后再试。',
+        PROVIDER_NETWORK_ERROR: '网络请求失败，请稍后再试。',
+        PROVIDER_UNAVAILABLE: '感情助手暂时不可用，请稍后再试。',
+        PROVIDER_ERROR: '感情助手暂时没有成功处理请求，请稍后再试。',
+        INVALID_PROVIDER_RESPONSE: '感情助手返回了无法读取的内容，请稍后重试。',
+        EMPTY_PROVIDER_RESPONSE: '感情助手没有返回有效内容，请稍后重试。',
+        PROVIDER_MISCONFIGURED: '感情助手服务尚未配置完成，请联系管理员。',
         SERVER_MISCONFIGURED: 'AI 服务尚未配置完成，请联系管理员。',
         INTERNAL_ERROR: 'AI 服务暂时发生内部错误，请稍后重试。',
         AI_UPLOAD_FAILED: '图片上传失败，请检查网络后重试。',
-        AI_EMPTY_RESPONSE: 'Agnes 2.0 没有返回有效内容，请稍后重试。',
-        AI_REQUEST_FAILED: '暂时无法连接 Agnes 2.0，请稍后重试。'
+        AI_EMPTY_RESPONSE: '感情助手没有返回有效内容，请稍后重试。',
+        AI_REQUEST_FAILED: '暂时无法连接感情助手，请稍后重试。'
     };
-    return messages[code] || 'Agnes 2.0 暂时开小差了，请稍后再试。';
+    return messages[code] || '我们的感情助手暂时开小差了，请稍后再试。';
 }
 
 function shouldDiscardFailedAIAttachments(error) {
@@ -502,7 +565,7 @@ function createAIChatWelcome() {
     const welcome = document.createElement('div');
     welcome.className = 'ai-chat-welcome';
     const lines = [
-        '🌸 嗨~ 我是 Agnes 2.0，你们的专属情感小助理！',
+        '🌸 嗨~ 我是我们的感情助手，你们的专属恋爱小助理！',
         '可以聊日常，也可以选择图片让我帮你分析。',
         '图片只用于当前这一轮，继续追问时需要重新选择。',
         '💕 随时为你们服务！'
@@ -1264,7 +1327,7 @@ async function sendChatMessage() {
     isChatSending = true;
     setAIChatComposerBusy(true);
     appendChatMessage('user', effectiveMessage, selectedAttachments.length);
-    const typingMessage = appendChatMessage('ai', 'Agnes 2.0 正在思考…');
+    const typingMessage = appendChatMessage('ai', '我们的感情助手正在思考… ✨');
     typingMessage?.classList.add('typing');
 
     try {
@@ -1327,3 +1390,101 @@ function clearPrivateFeatureState() {
 }
 
 window.addEventListener('pagehide', clearPendingChatAttachments, { passive: true });
+
+const activeMomentAnalysisIds = new Set();
+
+async function analyzeMomentWithAI(momentId) {
+    const normalizedId = typeof normalizeMomentId === 'function'
+        ? normalizeMomentId(momentId)
+        : String(momentId || '').trim();
+    if (!normalizedId) throw new Error('INVALID_MOMENT_ID');
+
+    if (activeMomentAnalysisIds.has(normalizedId)) {
+        if (typeof showToast === 'function') showToast('感情助手正在分析这条动态，请稍候… 💖');
+        return null;
+    }
+
+    assertAIAuthenticated();
+    assertAIConsent();
+
+    activeMomentAnalysisIds.add(normalizedId);
+    try {
+        const { data: momentRow, error: fetchErr } = await supabaseClient
+            .from('moments')
+            .select('*')
+            .eq('id', normalizedId)
+            .maybeSingle();
+
+        if (fetchErr || !momentRow) {
+            throw new Error('MOMENT_NOT_FOUND');
+        }
+
+        const parsed = typeof parseMomentPayload === 'function'
+            ? parseMomentPayload(momentRow.content, momentRow.type)
+            : { text: String(momentRow.content || ''), images: [] };
+
+        const author = momentRow.author || '我们';
+        const momentText = (parsed.text || '').trim();
+        const images = Array.isArray(parsed.images) ? parsed.images : [];
+        const hasImages = images.length > 0;
+
+        const attachments = [];
+        if (hasImages) {
+            const count = Math.min(images.length, AI_MAX_ATTACHMENTS);
+            for (let i = 0; i < count; i++) {
+                attachments.push({
+                    source: 'moment',
+                    moment_id: normalizedId,
+                    image_index: i
+                });
+            }
+        }
+
+        const promptLines = [
+            `你是“我们的感情助手”，小蛇与小奚的专属恋爱助手、闺蜜红娘和感情见证官。`,
+            `请对他们发布的这条动态进行细腻温暖、浪漫共鸣的感情分析点评：`,
+            `【动态作者】${author}`,
+            `【动态文字】${momentText || '(未配文字)'}`,
+            hasImages
+                ? `【动态照片】共附带了 ${attachments.length} 张照片（已随本轮请求上传），请结合照片画面中的生动场景、细节与表情，感受两人的爱意与默契。`
+                : `【动态类型】纯文字日常记录。`,
+            `【点评要求】`,
+            `1. 语气必须温暖甜蜜、灵动俏皮，像深知他们日常的贴心红娘；`,
+            `2. 捕捉图文里的恋爱闪光点与默契瞬间，送上走心甜蜜的祝福或幽默调侃；`,
+            `3. 字数严格控制在 60~120 字之间，精炼动人，适合直接作为评论；`,
+            `4. 请直接输出点评正文内容，不要包含“【分析】”等生硬标题或开场白客套话。`
+        ];
+
+        const messages = [
+            { role: 'user', content: promptLines.join('\n') }
+        ];
+
+        const analysisResult = await invokeAI(messages, attachments);
+
+        if (typeof submitAIAnalysisComment === 'function') {
+            await submitAIAnalysisComment(normalizedId, analysisResult);
+        } else {
+            const { error: insertErr } = await supabaseClient.from('comments').insert([{
+                moment_id: normalizedId,
+                content: JSON.stringify({
+                    text: analysisResult,
+                    is_ai: true,
+                    ai_helper: 'love_assistant'
+                })
+            }]);
+            if (insertErr) throw insertErr;
+            if (typeof loadComments === 'function') loadComments(normalizedId);
+            if (typeof loadCommentCounts === 'function') loadCommentCounts([normalizedId]);
+        }
+
+        return analysisResult;
+    } finally {
+        activeMomentAnalysisIds.delete(normalizedId);
+    }
+}
+
+window.analyzeMomentWithAI = analyzeMomentWithAI;
+window.fetchSupportedModels = fetchSupportedModels;
+window.getStoredAIModel = getStoredAIModel;
+window.setStoredAIModel = setStoredAIModel;
+window.FALLBACK_AI_MODELS = FALLBACK_AI_MODELS;
