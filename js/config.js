@@ -292,15 +292,15 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.61';
+const APP_VERSION = 'v3.9.62';
 const CONFIG = {
-    version: 'v3.9.61',
+    version: 'v3.9.62',
     date: '2026-10-03',
-    title: '我们的感情助手全新升级 🤖💖✨',
+    title: '感情助手连接与跨域支持优化 🤖💖✨',
     features: [
+        '修复感情助手独立域名跨域授权与通信链路 🚀',
         '全站统一更名为“我们的感情助手”，浪漫交互更贴心 🌸',
         '动态右上角新增“AI分析”，图文智能点评一键发布到评论区 💖',
-        '评论区新增感情助手专属浪漫气泡与高光徽章 ✨',
         '系统设置支持自动获取服务商模型列表与自定义切换 🧠'
     ]
 };
