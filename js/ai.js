@@ -1403,10 +1403,13 @@ window.addEventListener('pagehide', clearPendingChatAttachments, { passive: true
 const activeMomentAnalysisIds = new Set();
 
 async function analyzeMomentWithAI(momentId) {
-    const normalizedId = typeof normalizeMomentId === 'function'
+    const rawId = typeof normalizeMomentId === 'function'
         ? normalizeMomentId(momentId)
-        : String(momentId || '').trim();
-    if (!normalizedId) throw new Error('INVALID_MOMENT_ID');
+        : momentId;
+    const normalizedId = rawId !== null && rawId !== undefined ? String(rawId).trim() : '';
+    if (!normalizedId || !/^[1-9]\d{0,18}$/.test(normalizedId)) {
+        throw new Error('INVALID_MOMENT_ID');
+    }
 
     if (activeMomentAnalysisIds.has(normalizedId)) {
         if (typeof showToast === 'function') showToast('感情助手正在分析这条动态，请稍候… 💖');
@@ -1425,6 +1428,7 @@ async function analyzeMomentWithAI(momentId) {
             .maybeSingle();
 
         if (fetchErr || !momentRow) {
+            console.error('[感情助手] 读取动态记录失败:', fetchErr, { normalizedId });
             throw new Error('MOMENT_NOT_FOUND');
         }
 
@@ -1443,11 +1447,18 @@ async function analyzeMomentWithAI(momentId) {
             for (let i = 0; i < count; i++) {
                 attachments.push({
                     source: 'moment',
-                    moment_id: normalizedId,
-                    image_index: i
+                    moment_id: String(normalizedId),
+                    image_index: Number(i)
                 });
             }
         }
+
+        console.log('[感情助手] 准备分析动态图文:', {
+            momentId: normalizedId,
+            author,
+            hasImages,
+            attachmentCount: attachments.length
+        });
 
         const promptLines = [
             `你是“我们的感情助手”，小蛇与小奚的专属恋爱助手、闺蜜红娘和感情见证官。`,
