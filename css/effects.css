@@ -379,20 +379,32 @@ button:hover::after {
     50% { box-shadow: 0 0 0 10px rgba(245, 175, 95, 0), 0 8px 28px var(--shadow-hover); }
 }
 
-/* ── 纪念日卡片光晕 ── */
-.anniv-card .glow {
-    position: absolute;
-    top: 0; left: 0;
-    width: 140px; height: 140px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255, 163, 181, 0.38), transparent 70%);
-    pointer-events: none;
-    transform: translate3d(0, 0, 0) translate(-50%, -50%);
-    will-change: transform;
-    opacity: 0;
-    transition: opacity 0.35s ease;
+/* ── 电脑端卡片光晕 (仅在支持精密鼠标且支持 hover 设备生效) ── */
+@media (hover: hover) and (pointer: fine) {
+    .anniv-card .glow,
+    .timer-card .glow {
+        position: absolute;
+        top: 0; left: 0;
+        width: 140px; height: 140px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 163, 181, 0.38), transparent 70%);
+        pointer-events: none;
+        transform: translate3d(0, 0, 0) translate(-50%, -50%);
+        will-change: transform;
+        opacity: 0;
+        transition: opacity 0.35s ease;
+    }
+    .anniv-card:hover .glow,
+    .timer-card:hover .glow {
+        opacity: 1;
+    }
 }
-.anniv-card:hover .glow { opacity: 1; }
+
+@media (hover: none) or (pointer: coarse) {
+    .glow {
+        display: none !important;
+    }
+}
 
 /* ── 时光轴流光 ── */
 .timeline-track::after {

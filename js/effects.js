@@ -262,9 +262,12 @@ function spawnHearts(x, y) {
         setTimeout(() => particle.remove(), 1100);
     }
 }
-// --- 纪念日卡片光晕 (RAF 节流 + GPU 合成层 translate3d) ---
+// --- 卡片跟随光晕 (仅电脑端/精密指针生效，RAF 节流 + GPU 合成层 translate3d) ---
 function initCardGlow() {
-    document.querySelectorAll('.anniv-card').forEach(card => {
+    // 仅在支持精密指针（鼠标/触控板）且支持 hover 的电脑端生效，移动端/触屏端直接跳过
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+
+    document.querySelectorAll('.anniv-card, .timer-card').forEach(card => {
         if (card.querySelector('.glow')) return;
         const glow = document.createElement('div');
         glow.className = 'glow';
