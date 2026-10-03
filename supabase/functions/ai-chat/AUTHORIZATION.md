@@ -38,9 +38,9 @@ Never roll back to an older function version that had JWT verification disabled.
 - Configure the replacement only as the Edge Function secret `AGNES_API_KEY`.
 - Remove the obsolete `DEEPSEEK_API_KEY` secret after the maintenance version is
   live.
-- Set `AI_CHAT_ALLOWED_ORIGINS` to exactly `https://wjpxhz-coder.github.io`.
+- Set `AI_CHAT_ALLOWED_ORIGINS` to trusted production origins (e.g. `https://xiaoxi666.kdns.fr,http://xiaoxi666.kdns.fr,https://wjpxhz-coder.github.io`).
 - The production code calls only
-  `https://apihub.agnes-ai.com/v1/chat/completions` with `agnes-2.0-flash`,
+  `https://apihub.agnes-ai.com/v1/chat/completions` with `agnes-2.0-flash` (or user-chosen supported models),
   `stream=false`, `max_tokens=800`, `temperature=0.7`, and a 60-second timeout.
 
 ## Browser request contract

@@ -165,8 +165,15 @@ async function getAIInvocationErrorCode(error) {
             const code = getAIErrorCodeFromPayload(payload);
             if (code) return code;
         } catch (_error) {
-            // A non-JSON Functions error is mapped to the generic request failure below.
+            // A non-JSON Functions error is mapped to HTTP status inspection below
         }
+    }
+
+    if (context && typeof context.status === 'number') {
+        if (context.status === 401) return 'AUTH_REQUIRED';
+        if (context.status === 403) return 'FORBIDDEN';
+        if (context.status === 429) return 'QUOTA_EXCEEDED';
+        if (context.status === 503) return 'SERVICE_MAINTENANCE';
     }
 
     const message = typeof error?.message === 'string' ? error.message.trim() : '';
@@ -188,6 +195,7 @@ async function invokeAI(messages, attachments = [], overrideModel = null) {
         body
     });
     if (error) {
+        console.error('[感情助手] 请求出现异常:', error);
         const code = await getAIInvocationErrorCode(error);
         if ((code === 'INVALID_REQUEST_FIELDS' || code === 'INVALID_MODEL') && body.model) {
             console.warn('当前后端服务尚未支持自定义模型参数，自动降级为默认模型重试:', code);
@@ -197,6 +205,7 @@ async function invokeAI(messages, attachments = [], overrideModel = null) {
                 body
             });
             if (retryRes.error) {
+                console.error('[感情助手] 降级重试依然失败:', retryRes.error);
                 const retryCode = await getAIInvocationErrorCode(retryRes.error);
                 throw createAIError(retryCode || 'AI_REQUEST_FAILED', retryRes.error);
             }

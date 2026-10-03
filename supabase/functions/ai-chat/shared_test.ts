@@ -46,26 +46,35 @@ Deno.test("safe logger emits only the approved metadata fields", () => {
   );
 });
 
-Deno.test("allowed origins are pinned to the production Pages origin", () => {
+Deno.test("allowed origins include custom domain and configured origins", () => {
   const previous = Deno.env.get("AI_CHAT_ALLOWED_ORIGINS");
   Deno.env.delete("AI_CHAT_ALLOWED_ORIGINS");
 
   try {
-    const origins = [...allowedOrigins()];
+    const origins = allowedOrigins();
     assert(
-      JSON.stringify(origins) ===
-        JSON.stringify(["https://wjpxhz-coder.github.io"]),
-      `Unexpected origins: ${origins.join(",")}`,
+      origins.has("https://xiaoxi666.kdns.fr"),
+      "Default origins must include custom domain HTTPS",
+    );
+    assert(
+      origins.has("http://xiaoxi666.kdns.fr"),
+      "Default origins must include custom domain HTTP",
+    );
+    assert(
+      origins.has("https://wjpxhz-coder.github.io"),
+      "Default origins must include Pages origin",
     );
 
-    Deno.env.set("AI_CHAT_ALLOWED_ORIGINS", "https://example.com");
-    let rejected = false;
-    try {
-      allowedOrigins();
-    } catch {
-      rejected = true;
-    }
-    assert(rejected, "A configured alternate origin must be rejected");
+    Deno.env.set("AI_CHAT_ALLOWED_ORIGINS", "https://custom.example.com,http://localhost:3000");
+    const configuredOrigins = allowedOrigins();
+    assert(
+      configuredOrigins.has("https://custom.example.com"),
+      "Configured origin must be added",
+    );
+    assert(
+      configuredOrigins.has("http://localhost:3000"),
+      "Configured local origin must be added",
+    );
   } finally {
     if (previous === undefined) Deno.env.delete("AI_CHAT_ALLOWED_ORIGINS");
     else Deno.env.set("AI_CHAT_ALLOWED_ORIGINS", previous);

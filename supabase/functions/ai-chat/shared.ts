@@ -2,6 +2,14 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isRecord } from "./validation.ts";
 
 const PRODUCTION_ORIGIN = "https://wjpxhz-coder.github.io";
+const CUSTOM_DOMAIN_HTTPS = "https://xiaoxi666.kdns.fr";
+const CUSTOM_DOMAIN_HTTP = "http://xiaoxi666.kdns.fr";
+
+const DEFAULT_ALLOWED_ORIGINS = [
+  PRODUCTION_ORIGIN,
+  CUSTOM_DOMAIN_HTTPS,
+  CUSTOM_DOMAIN_HTTP,
+];
 export const AGNES_CONSENT_HEADER = "x-agnes-consent-version";
 export const AGNES_CONSENT_VERSION = "agnes-2.0-v1";
 
@@ -44,14 +52,16 @@ function getPublishableKey(): string {
 }
 
 export function allowedOrigins(): Set<string> {
+  const origins = new Set<string>(DEFAULT_ALLOWED_ORIGINS);
   const configuredOrigin = Deno.env.get("AI_CHAT_ALLOWED_ORIGINS")?.trim();
-  if (configuredOrigin && configuredOrigin !== PRODUCTION_ORIGIN) {
-    throw new Error(
-      `AI_CHAT_ALLOWED_ORIGINS must equal ${PRODUCTION_ORIGIN}`,
-    );
+  if (configuredOrigin) {
+    for (const item of configuredOrigin.split(",")) {
+      const trimmed = item.trim();
+      if (trimmed) origins.add(trimmed);
+    }
   }
 
-  return new Set([PRODUCTION_ORIGIN]);
+  return origins;
 }
 
 export function responseHeaders(origin: string | null): Headers {
