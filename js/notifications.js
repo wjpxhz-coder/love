@@ -509,6 +509,11 @@ async function handleNotificationClick(notificationId, type, relatedId) {
     if (!isCurrentAuthSnapshot(epoch, userId)) return;
 
     if (type === 'mood') {
+        if (typeof appReplace === 'function') {
+            appReplace('/', { force: true, focus: false, scroll: false, reason: 'locate-mood' });
+        } else {
+            window.location.hash = '#/';
+        }
         const targetDate = relatedId;
         const moodSection = document.querySelector('.mood-section');
         if (moodSection) {
@@ -545,37 +550,59 @@ async function handleNotificationClick(notificationId, type, relatedId) {
             targetMomentId = data.moment_id;
         }
 
-        const card = document.getElementById(`card-${targetMomentId}`);
-        if (!card) {
-            const { data: targetMoment, error: targetError } = await supabaseClient
-                .from('moments')
-                .select('id')
-                .eq('id', targetMomentId)
-                .maybeSingle();
-            if (targetError) throw targetError;
-            if (!isCurrentAuthSnapshot(epoch, userId)) return;
-            if (typeof showToast === 'function') {
-                showToast(targetMoment
-                    ? '该动态不在当前视图中，请清除筛选或继续加载回忆。'
-                    : '该互动已撤回或已不存在。');
+        // 智能定位动态：无论目标是在当前视图、被筛选过滤、还是在更早的历史分页中，均自动直达并高亮显示
+        let located = false;
+        if (typeof locateMomentById === 'function') {
+            located = await locateMomentById(targetMomentId, {
+                backLabel: '🔙 返回全部回忆',
+                showToastHint: !targetCommentId
+            });
+        } else {
+            if (typeof appReplace === 'function') {
+                appReplace('/', { force: true, focus: false, scroll: false, reason: 'locate-moment' });
+            } else {
+                window.location.hash = '#/';
             }
-            return;
+            const card = document.getElementById(`card-${targetMomentId}`);
+            if (card) {
+                if (typeof focusLocatedMomentCard === 'function') {
+                    focusLocatedMomentCard(card);
+                } else {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                located = true;
+            } else {
+                if (typeof showToast === 'function') showToast('动态已加载，请在时间轴查看。');
+            }
         }
 
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (!located) return;
+        if (!isCurrentAuthSnapshot(epoch, userId)) return;
+
+        // 如果是评论或评论点赞，展开评论区并平滑滚动高亮目标评论
         if (targetCommentId) {
             const commentsSection = document.getElementById(`comments-${targetMomentId}`);
-            if (commentsSection && getComputedStyle(commentsSection).display === 'none') {
-                commentsSection.style.display = 'block';
-                commentsSection.setAttribute('aria-hidden', 'false');
-                document.getElementById(`comment-toggle-${targetMomentId}`)?.setAttribute('aria-expanded', 'true');
-                await loadComments(targetMomentId);
+            let comment = document.getElementById(`comment-${targetCommentId}`);
+            if (commentsSection) {
+                const isHidden = getComputedStyle(commentsSection).display === 'none';
+                if (isHidden || !comment) {
+                    commentsSection.style.display = 'block';
+                    commentsSection.setAttribute('aria-hidden', 'false');
+                    document.getElementById(`comment-toggle-${targetMomentId}`)?.setAttribute('aria-expanded', 'true');
+                    await loadComments(targetMomentId);
+                    comment = document.getElementById(`comment-${targetCommentId}`);
+                }
             }
-            const comment = document.getElementById(`comment-${targetCommentId}`);
             if (comment) {
-                comment.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const reduceMotion = typeof window.matchMedia === 'function'
+                    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                comment.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
                 comment.classList.add('notification-target');
-                setTimeout(() => comment.classList.remove('notification-target'), 2000);
+                setTimeout(() => comment.classList.remove('notification-target'), 2500);
+            } else {
+                if (typeof showToast === 'function') {
+                    showToast('已直达该回忆，目标评论可能已被撤回。');
+                }
             }
         }
     } catch (error) {
