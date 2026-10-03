@@ -252,7 +252,7 @@ async function loadVisibleMoments(
 
   const { data, error } = await supabase
     .from("moments")
-    .select("id::text, space_id, type, content")
+    .select("id, space_id, type, content")
     .eq("space_id", spaceId)
     .in("id", momentIds);
 
@@ -262,9 +262,18 @@ async function loadVisibleMoments(
 
   const moments = new Map<string, MomentRow>();
   for (const value of data ?? []) {
-    if (!isRecord(value) || typeof value.id !== "string") continue;
-    const row = value as MomentRow;
-    if (row.space_id === spaceId) moments.set(row.id, row);
+    if (!isRecord(value)) continue;
+    const rawId = value.id ?? value["id::text"];
+    if (rawId === null || rawId === undefined) continue;
+    const idKey = String(rawId).trim();
+    if (!idKey) continue;
+    const row: MomentRow = {
+      id: idKey,
+      space_id: String(value.space_id ?? ""),
+      type: String(value.type ?? ""),
+      content: value.content,
+    };
+    if (row.space_id === spaceId) moments.set(idKey, row);
   }
   return moments;
 }
@@ -291,7 +300,7 @@ async function resolveStorageObjects(
       };
     }
 
-    const moment = moments.get(attachment.moment_id);
+    const moment = moments.get(String(attachment.moment_id).trim());
     if (!moment) {
       throw new InputValidationError("ATTACHMENT_FORBIDDEN", 403);
     }

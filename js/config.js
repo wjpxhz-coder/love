@@ -292,13 +292,13 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.62';
+const APP_VERSION = 'v3.9.63';
 const CONFIG = {
-    version: 'v3.9.62',
+    version: 'v3.9.63',
     date: '2026-10-03',
-    title: '感情助手连接与跨域支持优化 🤖💖✨',
+    title: '感情助手图文动态分析优化 🤖💖✨',
     features: [
-        '修复感情助手独立域名跨域授权与通信链路 🚀',
+        '修复动态图文分析时日记引用类型兼容与存储读取链路 🖼️',
         '全站统一更名为“我们的感情助手”，浪漫交互更贴心 🌸',
         '动态右上角新增“AI分析”，图文智能点评一键发布到评论区 💖',
         '系统设置支持自动获取服务商模型列表与自定义切换 🧠'

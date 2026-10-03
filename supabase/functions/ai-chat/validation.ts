@@ -373,14 +373,20 @@ export function resolveMomentImageReference(
     return moment.content;
   }
 
-  if (moment.type !== "moment" || typeof moment.content !== "string") {
+  if (moment.type !== "moment") {
     throw new InputValidationError("IMAGE_UNAVAILABLE", 422);
   }
 
   let parsed: unknown;
-  try {
-    parsed = JSON.parse(moment.content);
-  } catch {
+  if (typeof moment.content === "string") {
+    try {
+      parsed = JSON.parse(moment.content);
+    } catch {
+      throw new InputValidationError("IMAGE_UNAVAILABLE", 422);
+    }
+  } else if (isRecord(moment.content)) {
+    parsed = moment.content;
+  } else {
     throw new InputValidationError("IMAGE_UNAVAILABLE", 422);
   }
 
