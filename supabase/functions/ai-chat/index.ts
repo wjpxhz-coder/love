@@ -30,9 +30,7 @@ import {
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_PROVIDER_RESPONSE_BYTES = 1024 * 1024;
 const PROVIDER_TIMEOUT_MS = 60_000;
-const SIGNED_URL_TTL_SECONDS = 300;
 const IMAGE_SIGNATURE_BYTES = 12;
-const IMAGE_SIGNATURE_TIMEOUT_MS = 10_000;
 
 const AI_INPUT_BUCKET = "ai-inputs";
 const PHOTO_BUCKET = "photos";
@@ -316,102 +314,52 @@ async function resolveStorageObjects(
   });
 }
 
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i += 32768) {
+    const chunk = bytes.subarray(i, Math.min(i + 32768, len));
+    binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+  }
+  return btoa(binary);
+}
+
 async function createValidatedSignedUrls(
   supabase: SupabaseClient,
   objects: ResolvedStorageObject[],
 ): Promise<string[]> {
   let totalBytes = 0;
-  const imageInfos: ValidatedImageInfo[] = [];
+  const dataUrls: string[] = [];
 
   for (const object of objects) {
-    const { data, error } = await supabase.storage
+    const { data: fileInfo, error: infoErr } = await supabase.storage
       .from(object.bucket)
       .info(object.path);
-    if (error || !data) {
+    if (infoErr || !fileInfo) {
       throw new InputValidationError("IMAGE_UNAVAILABLE", 422);
     }
-    const imageInfo = validateImageFileInfo(data);
-    imageInfos.push(imageInfo);
+    const imageInfo = validateImageFileInfo(fileInfo);
     totalBytes = addImageBytes(totalBytes, imageInfo.size);
-  }
 
-  const signedUrls: string[] = [];
-  for (const object of objects) {
-    const { data, error } = await supabase.storage
+    const { data: blob, error: downloadErr } = await supabase.storage
       .from(object.bucket)
-      .createSignedUrl(object.path, SIGNED_URL_TTL_SECONDS);
-    if (error || typeof data?.signedUrl !== "string" || !data.signedUrl) {
+      .download(object.path);
+    if (downloadErr || !blob) {
       throw new InputValidationError("IMAGE_UNAVAILABLE", 422);
     }
-    signedUrls.push(data.signedUrl);
-  }
 
-  await Promise.all(
-    signedUrls.map((signedUrl, index) =>
-      validateSignedImageContent(signedUrl, imageInfos[index].mimeType)
-    ),
-  );
-  return signedUrls;
-}
-
-async function readResponsePrefix(
-  response: Response,
-  maximumBytes: number,
-): Promise<Uint8Array> {
-  if (!response.body) {
-    throw new InputValidationError("IMAGE_UNAVAILABLE", 422);
-  }
-
-  const reader = response.body.getReader();
-  const prefix = new Uint8Array(maximumBytes);
-  let length = 0;
-  try {
-    while (length < maximumBytes) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const copyLength = Math.min(value.byteLength, maximumBytes - length);
-      prefix.set(value.subarray(0, copyLength), length);
-      length += copyLength;
+    const arrayBuffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    if (bytes.length < IMAGE_SIGNATURE_BYTES) {
+      throw new InputValidationError("IMAGE_CONTENT_MISMATCH", 415);
     }
-    if (length >= maximumBytes) {
-      try {
-        await reader.cancel();
-      } catch {
-        // The inspected prefix is authoritative even if cancellation races
-        // with a completed short Storage response.
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  return prefix.slice(0, length);
-}
+    validateImageSignature(bytes.subarray(0, IMAGE_SIGNATURE_BYTES), imageInfo.mimeType);
 
-async function validateSignedImageContent(
-  signedUrl: string,
-  mimeType: ValidatedImageInfo["mimeType"],
-): Promise<void> {
-  const controller = new AbortController();
-  const timeout = setTimeout(
-    () => controller.abort(),
-    IMAGE_SIGNATURE_TIMEOUT_MS,
-  );
-  try {
-    const response = await fetch(signedUrl, {
-      headers: { range: `bytes=0-${IMAGE_SIGNATURE_BYTES - 1}` },
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      throw new InputValidationError("IMAGE_UNAVAILABLE", 422);
-    }
-    const prefix = await readResponsePrefix(response, IMAGE_SIGNATURE_BYTES);
-    validateImageSignature(prefix, mimeType);
-  } catch (error) {
-    if (error instanceof InputValidationError) throw error;
-    throw new InputValidationError("IMAGE_UNAVAILABLE", 422);
-  } finally {
-    clearTimeout(timeout);
+    const base64 = uint8ArrayToBase64(bytes);
+    dataUrls.push(`data:${imageInfo.mimeType};base64,${base64}`);
   }
+
+  return dataUrls;
 }
 
 export function buildProviderMessages(
@@ -529,12 +477,15 @@ async function callAgnes(
     }
 
     if (!providerResponse.ok) {
+      let errBody = "";
       try {
-        await providerResponse.body?.cancel();
+        errBody = await providerResponse.text();
       } catch {
-        // The HTTP status is authoritative; no provider body is logged or
-        // returned to the browser.
+        // ignore
       }
+      console.error(
+        `[PROVIDER_ERROR] status=${providerResponse.status} body=${errBody}`,
+      );
       safeLog(
         requestId,
         userId,
@@ -547,6 +498,10 @@ async function callAgnes(
         failure.code,
         requestId,
         origin,
+        {
+          provider_status: providerResponse.status,
+          provider_error: errBody.slice(0, 500),
+        },
       );
     }
 
