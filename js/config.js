@@ -292,12 +292,13 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.64';
+const APP_VERSION = 'v3.9.65';
 const CONFIG = {
-    version: 'v3.9.64',
+    version: 'v3.9.65',
     date: '2026-10-03',
-    title: '感情助手多媒体动态分析过滤优化 🤖💖✨',
+    title: '感情助手图文动态分析直连优化 🖼️💖✨',
     features: [
+        '修复 AI 服务商读取云端图片连接重置问题，采用 Base64 直送确保图文分析稳定可靠 🖼️⚡',
         'AI 分析动态时智能过滤非图片文件（如视频），专注于照片与文字点评 🎬➡️🖼️',
         '修复动态图文分析时日记引用类型兼容与存储读取链路 🖼️',
         '全站统一更名为“我们的感情助手”，浪漫交互更贴心 🌸',
