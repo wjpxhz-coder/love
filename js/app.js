@@ -129,6 +129,8 @@ function onAppRouteEnter(route) {
     else if (route.id === 'settings' && typeof enterSettingsPage === 'function') enterSettingsPage(route);
     else if (route.id === 'milestones' && typeof enterMilestonesPage === 'function') enterMilestonesPage(route);
     else if (route.id === 'profile' && typeof enterProfilePage === 'function') enterProfilePage(route);
+    else if (route.id === 'profile-moments' && typeof enterProfileMomentsPage === 'function') enterProfileMomentsPage(route);
+    else if (route.id === 'profile-photos' && typeof enterProfilePhotosPage === 'function') enterProfilePhotosPage(route);
     else if (route.id === 'edit-profile' && typeof enterEditProfilePage === 'function') enterEditProfilePage(route);
 }
 
@@ -149,6 +151,8 @@ function onAppRouteLeave(route) {
     else if (route.id === 'ai' && typeof leaveAIPage === 'function') leaveAIPage();
     else if (route.id === 'ai-chat' && typeof leaveAIChatPage === 'function') leaveAIChatPage();
     else if (route.id === 'profile' && typeof leaveProfilePage === 'function') leaveProfilePage();
+    else if (route.id === 'profile-moments' && typeof leaveProfileMomentsPage === 'function') leaveProfileMomentsPage();
+    else if (route.id === 'profile-photos' && typeof leaveProfilePhotosPage === 'function') leaveProfilePhotosPage();
     else if (route.id === 'edit-profile' && typeof leaveEditProfilePage === 'function') leaveEditProfilePage();
 }
 

@@ -476,8 +476,17 @@ async function loadProfileStats(targetAuthor) {
         }
     });
 
-    if (postsElement) postsElement.textContent = String(countResult.count || 0);
-    if (photosElement) photosElement.textContent = String(photoCount);
+    const finalPosts = String(countResult.count || 0);
+    const finalPhotos = String(photoCount);
+    if (postsElement) postsElement.textContent = finalPosts;
+    if (photosElement) photosElement.textContent = finalPhotos;
+
+    document.querySelectorAll('.profile-subpage-moments-count').forEach(el => {
+        el.textContent = finalPosts;
+    });
+    document.querySelectorAll('.profile-subpage-photos-count').forEach(el => {
+        el.textContent = finalPhotos;
+    });
 }
 
 function openEditProfilePage() {
@@ -703,3 +712,446 @@ async function saveProfile() {
         saveButton.disabled = false;
     }
 }
+
+// ==========================================================================
+// 个人主页子页面：发布的动态 & 上传的照片
+// ==========================================================================
+
+let profileMomentsRequestGeneration = 0;
+let profilePhotosRequestGeneration = 0;
+let profileCurrentPhotosList = [];
+
+function openProfileMomentsPage(targetAuthor = currentViewingProfileAuthor || currentAuthor) {
+    const author = String(targetAuthor || currentViewingProfileAuthor || currentAuthor || '').trim();
+    if (!author) return;
+    if (typeof appNavigate === 'function') {
+        appNavigate(`/profile/${encodeURIComponent(author)}/moments`);
+        return;
+    }
+    window.location.hash = `#/profile/${encodeURIComponent(author)}/moments`;
+}
+
+function openProfilePhotosPage(targetAuthor = currentViewingProfileAuthor || currentAuthor) {
+    const author = String(targetAuthor || currentViewingProfileAuthor || currentAuthor || '').trim();
+    if (!author) return;
+    if (typeof appNavigate === 'function') {
+        appNavigate(`/profile/${encodeURIComponent(author)}/photos`);
+        return;
+    }
+    window.location.hash = `#/profile/${encodeURIComponent(author)}/photos`;
+}
+
+function closeProfileMomentsPage() {
+    const author = currentViewingProfileAuthor || currentAuthor;
+    if (typeof appBack === 'function') {
+        appBack(author ? `/profile/${encodeURIComponent(author)}` : '/');
+        return;
+    }
+    window.location.hash = author ? `#/profile/${encodeURIComponent(author)}` : '#/';
+}
+
+function closeProfilePhotosPage() {
+    const author = currentViewingProfileAuthor || currentAuthor;
+    if (typeof appBack === 'function') {
+        appBack(author ? `/profile/${encodeURIComponent(author)}` : '/');
+        return;
+    }
+    window.location.hash = author ? `#/profile/${encodeURIComponent(author)}` : '#/';
+}
+
+function switchProfileContentTab(targetTab) {
+    const author = currentViewingProfileAuthor || currentAuthor;
+    if (!author) return;
+    const path = `/profile/${encodeURIComponent(author)}/${targetTab}`;
+    if (typeof appReplace === 'function') {
+        appReplace(path);
+        return;
+    }
+    if (typeof appNavigate === 'function') {
+        appNavigate(path);
+        return;
+    }
+    window.location.hash = `#${path}`;
+}
+
+function updateProfileSubpageHeaders(targetAuthor, activeTab) {
+    const profile = allProfilesCache[targetAuthor];
+    const isSelf = profile?.user_id === currentAuthUser?.id;
+    const displayName = profile?.nickname || profile?.username || targetAuthor;
+
+    // 动态页标题
+    const momentsTitle = document.getElementById('profile-moments-title');
+    if (momentsTitle) {
+        momentsTitle.textContent = isSelf ? '我发布的动态' : `${displayName}发布的动态`;
+    }
+
+    // 照片页标题
+    const photosTitle = document.getElementById('profile-photos-title');
+    if (photosTitle) {
+        photosTitle.textContent = isSelf ? '我上传的照片' : `${displayName}上传的照片`;
+    }
+
+    // 两个页面中的切换 Tab 状态同步
+    const momentsTabs = [
+        document.getElementById('tab-profile-moments'),
+        document.getElementById('tab-photos-moments')
+    ];
+    const photosTabs = [
+        document.getElementById('tab-profile-photos'),
+        document.getElementById('tab-photos-photos')
+    ];
+
+    momentsTabs.forEach(tab => {
+        if (!tab) return;
+        tab.classList.toggle('active', activeTab === 'moments');
+        tab.setAttribute('aria-selected', activeTab === 'moments' ? 'true' : 'false');
+    });
+
+    photosTabs.forEach(tab => {
+        if (!tab) return;
+        tab.classList.toggle('active', activeTab === 'photos');
+        tab.setAttribute('aria-selected', activeTab === 'photos' ? 'true' : 'false');
+    });
+
+    // 同步角标数字
+    const statPostsEl = document.getElementById('stat-posts');
+    const statPhotosEl = document.getElementById('stat-photos');
+    const postsCount = statPostsEl && statPostsEl.textContent !== '…' && statPostsEl.textContent !== '—'
+        ? statPostsEl.textContent
+        : '';
+    const photosCount = statPhotosEl && statPhotosEl.textContent !== '…' && statPhotosEl.textContent !== '—'
+        ? statPhotosEl.textContent
+        : '';
+
+    if (postsCount) {
+        document.querySelectorAll('.profile-subpage-moments-count').forEach(el => el.textContent = postsCount);
+    }
+    if (photosCount) {
+        document.querySelectorAll('.profile-subpage-photos-count').forEach(el => el.textContent = photosCount);
+    }
+}
+
+function enterProfileMomentsPage(route) {
+    if (!isAuthenticated()) return;
+    const targetAuthor = String(route?.params?.author || currentAuthor || '').trim();
+    const profile = allProfilesCache[targetAuthor];
+    if (!profile) {
+        if (typeof showToast === 'function') showToast('没有找到这份个人资料。');
+        if (typeof appBack === 'function') appBack('/');
+        return;
+    }
+
+    currentViewingProfileAuthor = targetAuthor;
+
+    withViewTransition(() => {
+        updateProfileSubpageHeaders(targetAuthor, 'moments');
+        loadProfileMoments(targetAuthor);
+    });
+}
+
+function leaveProfileMomentsPage() {
+    profileMomentsRequestGeneration += 1;
+    const container = document.getElementById('profile-moments-content');
+    if (container && typeof releaseMomentVideosWithin === 'function') {
+        releaseMomentVideosWithin(container, true);
+    }
+}
+
+async function loadProfileMoments(targetAuthor) {
+    const requestGeneration = ++profileMomentsRequestGeneration;
+    const contentContainer = document.getElementById('profile-moments-content');
+    if (!contentContainer) return;
+    if (!isAuthenticated()) {
+        contentContainer.replaceChildren();
+        return;
+    }
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+
+    contentContainer.replaceChildren(createMomentNode('div', 'empty-state', '正在加载甜蜜动态… ✨'));
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('moments')
+            .select('*')
+            .eq('author', targetAuthor)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(200);
+
+        if (requestGeneration !== profileMomentsRequestGeneration || !isCurrentAuthSnapshot(epoch, userId)) return;
+        if (error) throw error;
+
+        const count = String(data ? data.length : 0);
+        document.querySelectorAll('.profile-subpage-moments-count').forEach(el => el.textContent = count);
+
+        if (!data || data.length === 0) {
+            const profile = allProfilesCache[targetAuthor];
+            const name = profile?.nickname || profile?.username || targetAuthor;
+            const isSelf = profile?.user_id === currentAuthUser?.id;
+            contentContainer.replaceChildren(createMomentNode(
+                'div',
+                'empty-state',
+                isSelf ? '你还没有发布过动态哦~\n在主页发布动态，记录属于你们的专属甜蜜吧 💕' : `${name} 还没有发布过动态哦~ 🌱`
+            ));
+            return;
+        }
+
+        // 批量为所有媒体生成签名链接
+        const hydratedItems = typeof batchHydrateMomentMediaRecords === 'function'
+            ? await batchHydrateMomentMediaRecords(data)
+            : (typeof hydrateMomentMediaRecord === 'function'
+                ? await Promise.all(data.map(item => hydrateMomentMediaRecord(item)))
+                : data);
+
+        if (requestGeneration !== profileMomentsRequestGeneration || !isCurrentAuthSnapshot(epoch, userId)) return;
+
+        renderProfileMomentsTimeline(hydratedItems, contentContainer);
+    } catch (err) {
+        console.error('加载用户动态失败:', err);
+        if (requestGeneration === profileMomentsRequestGeneration && isCurrentAuthSnapshot(epoch, userId)) {
+            contentContainer.replaceChildren(createMomentNode('div', 'empty-state', '加载动态失败，请稍后重试 😢'));
+        }
+    }
+}
+
+function renderProfileMomentsTimeline(items, container) {
+    if (typeof releaseMomentVideosWithin === 'function') {
+        releaseMomentVideosWithin(container, true);
+    }
+    container.replaceChildren();
+
+    const fragment = document.createDocumentFragment();
+    items.forEach((item, cardIndex) => {
+        if (typeof createMomentCardElement === 'function') {
+            const card = createMomentCardElement(item, {
+                cardIndex,
+                isInitialBatch: true
+            });
+            if (card) fragment.appendChild(card);
+        }
+    });
+
+    const newVideos = Array.from(fragment.querySelectorAll('video'));
+    container.appendChild(fragment);
+
+    if (typeof refreshMomentVideoPlayback === 'function') {
+        newVideos.forEach(video => refreshMomentVideoPlayback(video));
+    }
+    if (typeof initScrollReveal === 'function') {
+        setTimeout(() => initScrollReveal(), 50);
+    }
+
+    const momentIds = items.map(item => item.id);
+    if (typeof loadCommentCounts === 'function') {
+        loadCommentCounts(momentIds);
+    }
+    if (typeof loadMomentLikes === 'function') {
+        loadMomentLikes(momentIds);
+    }
+    if (typeof loadMomentStars === 'function') {
+        loadMomentStars();
+    }
+}
+
+function enterProfilePhotosPage(route) {
+    if (!isAuthenticated()) return;
+    const targetAuthor = String(route?.params?.author || currentAuthor || '').trim();
+    const profile = allProfilesCache[targetAuthor];
+    if (!profile) {
+        if (typeof showToast === 'function') showToast('没有找到这份个人资料。');
+        if (typeof appBack === 'function') appBack('/');
+        return;
+    }
+
+    currentViewingProfileAuthor = targetAuthor;
+
+    withViewTransition(() => {
+        updateProfileSubpageHeaders(targetAuthor, 'photos');
+        loadProfilePhotos(targetAuthor);
+    });
+}
+
+function leaveProfilePhotosPage() {
+    profilePhotosRequestGeneration += 1;
+}
+
+async function loadProfilePhotos(targetAuthor) {
+    const requestGeneration = ++profilePhotosRequestGeneration;
+    const gridContainer = document.getElementById('profile-photos-grid');
+    if (!gridContainer) return;
+    if (!isAuthenticated()) {
+        gridContainer.replaceChildren();
+        return;
+    }
+    const epoch = authEpoch;
+    const userId = currentAuthUser.id;
+
+    gridContainer.replaceChildren(createMomentNode('div', 'empty-state', '正在加载甜蜜照片… 📷'));
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('moments')
+            .select('*')
+            .eq('author', targetAuthor)
+            .in('type', ['photo', 'moment'])
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(300);
+
+        if (requestGeneration !== profilePhotosRequestGeneration || !isCurrentAuthSnapshot(epoch, userId)) return;
+        if (error) throw error;
+
+        const hydratedItems = typeof batchHydrateMomentMediaRecords === 'function'
+            ? await batchHydrateMomentMediaRecords(data)
+            : (typeof hydrateMomentMediaRecord === 'function'
+                ? await Promise.all(data.map(item => hydrateMomentMediaRecord(item)))
+                : data);
+
+        if (requestGeneration !== profilePhotosRequestGeneration || !isCurrentAuthSnapshot(epoch, userId)) return;
+
+        const photos = [];
+        (hydratedItems || []).forEach(item => {
+            const createdAt = item.created_at;
+            const momentId = item.id;
+            if (item.type === 'photo') {
+                const url = typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(item.content) : item.content;
+                if (url) {
+                    photos.push({
+                        url,
+                        momentId,
+                        createdAt,
+                        author: item.author,
+                        isVideo: typeof isVideoMediaUrl === 'function' ? isVideoMediaUrl(url) : false
+                    });
+                }
+            } else if (item.type === 'moment') {
+                try {
+                    const parsed = JSON.parse(item.content);
+                    if (Array.isArray(parsed.images)) {
+                        parsed.images.forEach(imgUrl => {
+                            const safeUrl = typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(imgUrl) : imgUrl;
+                            if (safeUrl) {
+                                photos.push({
+                                    url: safeUrl,
+                                    momentId,
+                                    createdAt,
+                                    author: item.author,
+                                    textSnippet: parsed.text ? parsed.text.slice(0, 60) : '',
+                                    isVideo: typeof isVideoMediaUrl === 'function' ? isVideoMediaUrl(safeUrl) : false
+                                });
+                            }
+                        });
+                    }
+                } catch (_e) {}
+            }
+        });
+
+        profileCurrentPhotosList = photos;
+
+        const count = String(photos.length);
+        document.querySelectorAll('.profile-subpage-photos-count').forEach(el => el.textContent = count);
+
+        if (photos.length === 0) {
+            const profile = allProfilesCache[targetAuthor];
+            const name = profile?.nickname || profile?.username || targetAuthor;
+            const isSelf = profile?.user_id === currentAuthUser?.id;
+            gridContainer.replaceChildren(createMomentNode(
+                'div',
+                'empty-state',
+                isSelf ? '你还没有上传过照片哦~\n在发布动态时添加照片，留下甜蜜光影吧 📷' : `${name} 还没有上传过照片哦~ 🌸`
+            ));
+            return;
+        }
+
+        renderProfilePhotosGrid(photos, gridContainer);
+    } catch (err) {
+        console.error('加载用户照片失败:', err);
+        if (requestGeneration === profilePhotosRequestGeneration && isCurrentAuthSnapshot(epoch, userId)) {
+            gridContainer.replaceChildren(createMomentNode('div', 'empty-state', '加载照片失败，请稍后重试 😢'));
+        }
+    }
+}
+
+function renderProfilePhotosGrid(photos, container) {
+    container.replaceChildren();
+
+    const allPhotoUrls = photos.map(p => p.url);
+    const fragment = document.createDocumentFragment();
+
+    photos.forEach((photo, index) => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'profile-photo-item';
+        itemEl.tabIndex = 0;
+        itemEl.setAttribute('role', 'button');
+        itemEl.setAttribute('aria-label', photo.isVideo ? '查看视频' : `查看照片 ${index + 1}/${photos.length}`);
+
+        if (photo.isVideo) {
+            const video = document.createElement('video');
+            video.src = photo.url;
+            video.className = 'profile-photo-img';
+            video.preload = 'metadata';
+            video.muted = true;
+            video.playsInline = true;
+            itemEl.appendChild(video);
+
+            const playBadge = document.createElement('div');
+            playBadge.className = 'profile-photo-video-badge';
+            playBadge.textContent = '▶';
+            playBadge.setAttribute('aria-hidden', 'true');
+            itemEl.appendChild(playBadge);
+        } else {
+            const img = document.createElement('img');
+            img.src = photo.url;
+            img.alt = photo.textSnippet ? photo.textSnippet.slice(0, 30) : '照片';
+            img.className = 'profile-photo-img';
+            img.loading = index < 15 ? 'eager' : 'lazy';
+            img.decoding = 'async';
+            itemEl.appendChild(img);
+        }
+
+        // 日期角标
+        if (photo.createdAt) {
+            const date = new Date(photo.createdAt);
+            if (!isNaN(date.getTime())) {
+                const dateEl = document.createElement('div');
+                dateEl.className = 'profile-photo-date';
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                dateEl.textContent = `${m}.${d}`;
+                itemEl.appendChild(dateEl);
+            }
+        }
+
+        const openItemLightbox = () => {
+            if (typeof openLightbox === 'function') {
+                openLightbox(photo.url, {
+                    gallery: allPhotoUrls,
+                    initialIndex: index
+                });
+            }
+        };
+
+        itemEl.addEventListener('click', openItemLightbox);
+        itemEl.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openItemLightbox();
+            }
+        });
+
+        fragment.appendChild(itemEl);
+    });
+
+    container.appendChild(fragment);
+}
+
+// 键盘无障碍支持（回车或空格触发可点击卡片）
+document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const card = event.target?.closest?.('.profile-stat-interactive');
+    if (!card) return;
+    event.preventDefault();
+    card.click();
+});
+
