@@ -1525,7 +1525,162 @@ async function analyzeMomentWithAI(momentId) {
     }
 }
 
+async function continueAICommentConversation({ momentId, userCommentId, userCommentText, repliedCommentId }) {
+    if (!isAuthenticated()) {
+        throw new Error('AUTH_REQUIRED');
+    }
+    if (typeof hasAIServiceConsent === 'function' && !hasAIServiceConsent()) {
+        if (typeof showToast === 'function') {
+            showToast('感情助手服务已关闭，可在设置中开启以继续对话 ✨');
+        }
+        return null;
+    }
+
+    const normalizedMomentId = Number(momentId);
+    if (!Number.isSafeInteger(normalizedMomentId) || normalizedMomentId <= 0) {
+        throw new Error('INVALID_MOMENT_ID');
+    }
+
+    // 1. 获取动态背景信息
+    let momentAuthor = '我们';
+    let momentText = '';
+    try {
+        const { data: momentRow } = await supabaseClient
+            .from('moments')
+            .select('author, content, type')
+            .eq('id', normalizedMomentId)
+            .maybeSingle();
+        if (momentRow) {
+            momentAuthor = momentRow.author || '我们';
+            const parsed = typeof parseMomentPayload === 'function'
+                ? parseMomentPayload(momentRow.content, momentRow.type)
+                : { text: String(momentRow.content || '') };
+            momentText = (parsed.text || '').trim();
+        }
+    } catch (e) {
+        console.warn('[感情助手] 读取动态背景失败，将使用精简上下文:', e);
+    }
+
+    // 2. 读取该动态下的所有评论以回溯对话链
+    let threadHistory = [];
+    try {
+        const { data: commentsList } = await supabaseClient
+            .from('comments')
+            .select('id, author, content, created_at')
+            .eq('moment_id', normalizedMomentId)
+            .order('created_at', { ascending: true });
+
+        if (Array.isArray(commentsList) && commentsList.length > 0) {
+            const commentMap = new Map();
+            commentsList.forEach(c => {
+                let parsedText = '';
+                let isAI = false;
+                let replyToId = null;
+                try {
+                    const parsed = JSON.parse(c.content);
+                    if (parsed && typeof parsed === 'object') {
+                        parsedText = parsed.text || '';
+                        isAI = Boolean(parsed.is_ai || parsed.ai_helper);
+                        replyToId = parsed.reply_to?.id || null;
+                    } else {
+                        parsedText = String(c.content || '');
+                    }
+                } catch (_) {
+                    parsedText = String(c.content || '');
+                }
+                commentMap.set(c.id, {
+                    id: c.id,
+                    author: c.author,
+                    text: parsedText,
+                    isAI,
+                    replyToId
+                });
+            });
+
+            // 从被回复的评论向上回溯链路（最多 6 轮）
+            const chain = [];
+            let currId = repliedCommentId;
+            const visited = new Set();
+            while (currId && commentMap.has(currId) && !visited.has(currId) && chain.length < 6) {
+                visited.add(currId);
+                const item = commentMap.get(currId);
+                chain.unshift(item);
+                currId = item.replyToId;
+            }
+            threadHistory = chain;
+        }
+    } catch (err) {
+        console.warn('[感情助手] 读取评论对话链失败:', err);
+    }
+
+    // 3. 构造 Prompt 与上下文
+    const systemPromptLines = [
+        '你是“我们的感情助手”，也是小蛇和小奚的专属恋爱小助理、闺蜜红娘和感情见证官。',
+        '语气温暖甜蜜、灵动俏皮、风趣幽默，极懂情调。',
+        '你正在这条动态下方的评论区与他们进行多轮互动对话。',
+        `【动态作者】${momentAuthor}`,
+        `【动态文字】${momentText || '(生活随拍记录)'}`,
+        '【对话要求】',
+        '1. 必须针对对方最新回复展开生动、机智、贴心的回应，保持话题的连贯互动；',
+        '2. 像深知他们日常的知心密友，可以适当调侃两人的默契、出谋划策或送上温馨爱意；',
+        '3. 字数严格控制在 40~100 字之间，短小精悍，适合直接作为评论；',
+        '4. 直接输出回复正文，绝对不要包含任何前缀、问候套话或“【助手回复】”等格式标记。'
+    ];
+
+    const messages = [
+        { role: 'system', content: systemPromptLines.join('\n') }
+    ];
+
+    threadHistory.forEach(turn => {
+        const text = String(turn.text || '').trim();
+        if (!text) return;
+        if (turn.isAI) {
+            messages.push({ role: 'assistant', content: text });
+        } else {
+            const authorName = turn.author || '我们';
+            messages.push({ role: 'user', content: `${authorName}: ${text}` });
+        }
+    });
+
+    const currentAuthorName = typeof currentAuthor === 'string' && currentAuthor ? currentAuthor : '我们';
+    const cleanUserCommentText = String(userCommentText || '').trim() || '(分享了图片)';
+    messages.push({
+        role: 'user',
+        content: `${currentAuthorName}: ${cleanUserCommentText}`
+    });
+
+    // 4. 调用 AI 接口生成回复
+    const aiResult = await invokeAI(messages);
+
+    // 5. 保存 AI 回复评论到数据库
+    const replyPayload = JSON.stringify({
+        text: aiResult,
+        is_ai: true,
+        ai_helper: 'love_assistant',
+        reply_to: {
+            id: userCommentId,
+            author: currentAuthorName,
+            text: cleanUserCommentText.slice(0, 50),
+            is_ai: false
+        }
+    });
+
+    const { error: insertErr } = await supabaseClient.from('comments').insert([{
+        moment_id: normalizedMomentId,
+        content: replyPayload
+    }]);
+
+    if (insertErr) throw insertErr;
+
+    // 6. 刷新界面
+    if (typeof loadComments === 'function') await loadComments(normalizedMomentId);
+    if (typeof loadCommentCounts === 'function') await loadCommentCounts([normalizedMomentId]);
+
+    return aiResult;
+}
+
 window.analyzeMomentWithAI = analyzeMomentWithAI;
+window.continueAICommentConversation = continueAICommentConversation;
 window.fetchSupportedModels = fetchSupportedModels;
 window.getStoredAIModel = getStoredAIModel;
 window.setStoredAIModel = setStoredAIModel;

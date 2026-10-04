@@ -178,6 +178,29 @@
             100% { transform: scale(1); }
         }
 
+        /* ── 评论回复 ── */
+        .comment-reply-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 0;
+            font-size: 0.85em;
+            cursor: pointer;
+            box-shadow: none;
+            margin-left: 12px;
+            transition: color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .comment-reply-btn:hover {
+            color: var(--primary);
+            transform: none;
+            box-shadow: none;
+        }
+        .comment-reply-btn::after { display: none; }
+
         /* ── 动态点赞按钮 ── */
         .moment-like-bar {
             display: flex;
@@ -362,5 +385,165 @@
         [data-theme='dark'] .ai-comment-tag {
             color: #ff80ab;
             background: rgba(255, 64, 129, 0.15);
+        }
+
+        /* ── 评论回复引用气泡 ── */
+        .comment-reply-quote {
+            background: rgba(0, 0, 0, 0.035);
+            border-left: 3px solid var(--primary-light);
+            border-radius: 4px 8px 8px 4px;
+            padding: 4px 8px;
+            margin-bottom: 6px;
+            font-size: 0.82em;
+            color: var(--text-muted);
+            line-height: 1.45;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            overflow: hidden;
+        }
+        .comment-reply-quote:hover {
+            background: rgba(255, 101, 132, 0.08);
+            border-left-color: var(--primary);
+            color: var(--text);
+        }
+        [data-theme='dark'] .comment-reply-quote {
+            background: rgba(255, 255, 255, 0.06);
+            border-left-color: rgba(255, 138, 163, 0.6);
+        }
+        [data-theme='dark'] .comment-reply-quote:hover {
+            background: rgba(255, 105, 180, 0.12);
+            border-left-color: #ff758c;
+        }
+        .reply-quote-author {
+            font-weight: 600;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+        .reply-quote-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+
+        /* ── 输入框回复提示条 ── */
+        .comment-reply-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 101, 132, 0.08);
+            border: 1px dashed var(--primary-light);
+            border-radius: 10px;
+            padding: 6px 10px;
+            font-size: 0.8em;
+            color: var(--text);
+            margin-bottom: 6px;
+            animation: replyBannerFadeIn 0.2s ease-out;
+        }
+        [data-theme='dark'] .comment-reply-banner {
+            background: rgba(255, 105, 180, 0.1);
+            border-color: rgba(255, 105, 180, 0.3);
+        }
+        @keyframes replyBannerFadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .comment-reply-banner-content {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+        .comment-reply-banner-icon {
+            font-size: 0.95em;
+            flex-shrink: 0;
+        }
+        .comment-reply-banner-author {
+            font-weight: 600;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+        .comment-reply-banner-text {
+            color: var(--text-muted);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 0.95em;
+        }
+        .comment-reply-banner-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.15em;
+            padding: 0 4px;
+            line-height: 1;
+            margin-left: 8px;
+            flex-shrink: 0;
+            transition: color 0.2s;
+            box-shadow: none;
+        }
+        .comment-reply-banner-close:hover {
+            color: var(--primary);
+            background: none;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* ── 评论被引用时高亮闪烁效果 ── */
+        .comment-item--highlight {
+            animation: commentHighlightPulse 2s ease-out;
+        }
+        @keyframes commentHighlightPulse {
+            0% { background-color: rgba(255, 101, 132, 0.25); border-radius: 12px; }
+            50% { background-color: rgba(255, 101, 132, 0.15); border-radius: 12px; }
+            100% { background-color: transparent; }
+        }
+
+        /* ── 感情助手思考指示器 ── */
+        .comment-ai-thinking {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            margin: 6px 0;
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(255, 240, 245, 0.45) 0%, rgba(255, 230, 240, 0.25) 100%);
+            border: 1px dashed rgba(255, 182, 193, 0.6);
+            color: var(--primary);
+            font-size: 0.82em;
+            animation: replyBannerFadeIn 0.3s ease-out;
+        }
+        [data-theme='dark'] .comment-ai-thinking {
+            background: linear-gradient(135deg, rgba(65, 35, 48, 0.35) 0%, rgba(50, 30, 42, 0.2) 100%);
+            border-color: rgba(255, 105, 180, 0.4);
+            color: #ff80ab;
+        }
+        .comment-ai-thinking-dots {
+            display: inline-flex;
+            gap: 3px;
+            align-items: center;
+        }
+        .comment-ai-thinking-dots span {
+            width: 4px;
+            height: 4px;
+            background-color: var(--primary);
+            border-radius: 50%;
+            animation: thinkingDot 1.4s infinite ease-in-out both;
+        }
+        [data-theme='dark'] .comment-ai-thinking-dots span {
+            background-color: #ff80ab;
+        }
+        .comment-ai-thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .comment-ai-thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes thinkingDot {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+            40% { transform: scale(1); opacity: 1; }
         }
 

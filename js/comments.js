@@ -3,6 +3,8 @@ let commentImgFiles = {}; // momentId -> { id, file, objectUrl }[]
 let nextCommentImageId = 1;
 const commentLoadRequests = new Map();
 const commentSubmitRequests = new Set();
+const activeCommentReplies = new Map(); // momentId -> { commentId, author, snippet, isAI }
+const activeAICommentReplies = new Set(); // momentId -> awaiting AI reply
 const MAX_COMMENT_TEXT_LENGTH = 1000;
 const MAX_COMMENT_IMAGE_COUNT = 4;
 const MAX_COMMENT_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -72,12 +74,22 @@ async function resolveCommentContent(rawContent) {
     let text = '';
     let imageValues = [];
     let isAI = false;
+    let replyTo = null;
     try {
         const parsed = JSON.parse(rawContent);
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
             text = typeof parsed.text === 'string' ? parsed.text : '';
             imageValues = Array.isArray(parsed.images) ? parsed.images : [];
             isAI = Boolean(parsed.is_ai || parsed.ai_helper);
+            if (parsed.reply_to && typeof parsed.reply_to === 'object') {
+                const r = parsed.reply_to;
+                replyTo = {
+                    id: Number(r.id) || null,
+                    author: String(r.author || ''),
+                    text: String(r.text || ''),
+                    isAI: Boolean(r.is_ai)
+                };
+            }
         } else {
             text = String(rawContent || '');
         }
@@ -97,7 +109,7 @@ async function resolveCommentContent(rawContent) {
             return '';
         }
     }))).filter(Boolean);
-    return { text, images, isAI };
+    return { text, images, isAI, replyTo };
 }
 
 function setCommentStatus(container, text) {
@@ -129,9 +141,95 @@ function checkPasswordForComment(momentId, triggerElement = null) {
     if (typeof openLoginModal === 'function') openLoginModal();
 }
 
-function showCommentInput(momentId, triggerElement = null) {
+function clearCommentReplyTarget(momentId, targetCard = null) {
+    activeCommentReplies.delete(momentId);
+    const card = targetCard?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
+    const inputArea = card ? card.querySelector('.comment-input-area') : document.getElementById(`comment-input-area-${momentId}`);
+    if (inputArea) {
+        inputArea.querySelectorAll('.comment-reply-banner').forEach(el => el.remove());
+        const ta = inputArea.querySelector('.comment-textarea');
+        if (ta) ta.placeholder = '写下你的想法…';
+    }
+}
+
+function startReplyToComment(momentId, replyTarget, triggerElement = null) {
+    if (!hasCommentAuthContext()) {
+        if (typeof openLoginModal === 'function') openLoginModal();
+        return;
+    }
+    const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
+    const section = card ? card.querySelector('.comment-section') : document.getElementById(`comments-${momentId}`);
+    if (section && section.style.display === 'none') {
+        section.style.display = 'block';
+        section.setAttribute('aria-hidden', 'false');
+        const toggleBtn = card ? card.querySelector('.comment-toggle-btn') : document.getElementById(`comment-toggle-${momentId}`);
+        toggleBtn?.setAttribute('aria-expanded', 'true');
+    }
+
+    activeCommentReplies.set(momentId, replyTarget);
+    showCommentInput(momentId, triggerElement, { isReply: true });
+
+    const inputArea = card ? card.querySelector('.comment-input-area') : document.getElementById(`comment-input-area-${momentId}`);
+    if (inputArea) {
+        let banner = inputArea.querySelector('.comment-reply-banner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.className = 'comment-reply-banner';
+            const ta = inputArea.querySelector('.comment-textarea');
+            if (ta && ta.parentNode) {
+                ta.parentNode.insertBefore(banner, ta);
+            }
+        }
+        banner.replaceChildren();
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'comment-reply-banner-content';
+
+        const icon = document.createElement('span');
+        icon.className = 'comment-reply-banner-icon';
+        icon.textContent = '↩️';
+
+        const authorEl = document.createElement('span');
+        authorEl.className = 'comment-reply-banner-author';
+        authorEl.textContent = `回复 @${replyTarget.author}:`;
+
+        const textEl = document.createElement('span');
+        textEl.className = 'comment-reply-banner-text';
+        const cleanSnippet = String(replyTarget.snippet || '').trim().replace(/\s+/g, ' ');
+        textEl.textContent = cleanSnippet ? (cleanSnippet.length > 32 ? `${cleanSnippet.slice(0, 32)}…` : cleanSnippet) : '[图片]';
+
+        contentDiv.append(icon, authorEl, textEl);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'comment-reply-banner-close';
+        closeBtn.textContent = '×';
+        closeBtn.title = '取消针对回复';
+        closeBtn.setAttribute('aria-label', '取消针对回复');
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearCommentReplyTarget(momentId, card);
+        });
+
+        banner.append(contentDiv, closeBtn);
+
+        const ta = inputArea.querySelector('.comment-textarea');
+        if (ta) {
+            ta.placeholder = `回复 @${replyTarget.author}…`;
+            setTimeout(() => {
+                ta.focus();
+                banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 80);
+        }
+    }
+}
+
+function showCommentInput(momentId, triggerElement = null, { isReply = false } = {}) {
     if (!hasCommentAuthContext()) return;
     const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
+    if (!isReply) {
+        clearCommentReplyTarget(momentId, card);
+    }
     const writeBtn = card ? card.querySelector('.comment-write-btn') : document.getElementById(`comment-write-btn-${momentId}`);
     const inputArea = card ? card.querySelector('.comment-input-area') : document.getElementById(`comment-input-area-${momentId}`);
     if (writeBtn) writeBtn.style.display = 'none';
@@ -177,6 +275,7 @@ function cancelCommentInput(momentId, triggerElement = null) {
     const inputArea = card ? card.querySelector('.comment-input-area') : document.getElementById(`comment-input-area-${momentId}`);
     const ta = inputArea ? inputArea.querySelector('.comment-textarea') : document.getElementById(`comment-text-${momentId}`);
     if (ta) ta.value = '';
+    clearCommentReplyTarget(momentId, card);
     if (inputArea) inputArea.style.display = 'none';
     if (writeBtn) writeBtn.style.display = 'inline-flex';
     // 清除图片选择
@@ -327,12 +426,54 @@ async function loadComments(momentId, targetCard = null) {
             body.style.flex = '1';
             const bubble = document.createElement('div');
             bubble.className = `comment-bubble${isAIComment ? ' comment-bubble--ai' : ''}`;
+            const commentResolved = resolvedContents[commentIndex] || {};
             if (isAIComment) {
                 const aiHeader = document.createElement('div');
                 aiHeader.className = 'ai-comment-tag';
-                aiHeader.textContent = '✨ 动态智能分析点评';
+                aiHeader.textContent = commentResolved.replyTo ? '✨ 感情助手互动回复' : '✨ 动态智能分析点评';
                 bubble.appendChild(aiHeader);
             }
+
+            const replyTo = commentResolved.replyTo;
+            if (replyTo && replyTo.author) {
+                const quote = document.createElement('div');
+                quote.className = 'comment-reply-quote';
+
+                const quoteAuthor = document.createElement('span');
+                quoteAuthor.className = 'reply-quote-author';
+                quoteAuthor.textContent = `@${replyTo.author}：`;
+
+                const quoteText = document.createElement('span');
+                quoteText.className = 'reply-quote-text';
+                const cleanQuote = String(replyTo.text || '').replace(/\s+/g, ' ');
+                quoteText.textContent = cleanQuote ? (cleanQuote.length > 50 ? `${cleanQuote.slice(0, 50)}…` : cleanQuote) : '[图片]';
+
+                quote.append(quoteAuthor, quoteText);
+
+                if (replyTo.id) {
+                    quote.title = '点击跳转查看被回复的评论';
+                    quote.tabIndex = 0;
+                    const jumpToTarget = () => {
+                        const targetEl = document.getElementById(`comment-${replyTo.id}`);
+                        if (targetEl) {
+                            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            targetEl.classList.add('comment-item--highlight');
+                            setTimeout(() => targetEl.classList.remove('comment-item--highlight'), 2000);
+                        } else if (typeof showToast === 'function') {
+                            showToast('被回复的原评论已被撤回或不存在');
+                        }
+                    };
+                    quote.addEventListener('click', jumpToTarget);
+                    quote.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            jumpToTarget();
+                        }
+                    });
+                }
+                bubble.appendChild(quote);
+            }
+
             if (textContent) bubble.appendChild(document.createTextNode(textContent));
             imageUrls.forEach((url, imgIdx) => {
                 const image = document.createElement('img');
@@ -376,6 +517,21 @@ async function loadComments(momentId, targetCard = null) {
             likeButton.append(heart, count);
             likeButton.addEventListener('click', () => toggleCommentLike(commentId, momentId));
             time.appendChild(likeButton);
+
+            const replyButton = document.createElement('button');
+            replyButton.type = 'button';
+            replyButton.className = 'comment-reply-btn';
+            replyButton.textContent = '回复';
+            replyButton.setAttribute('aria-label', `回复 ${isAIComment ? '感情助手' : displayName}`);
+            replyButton.addEventListener('click', () => {
+                startReplyToComment(momentId, {
+                    commentId,
+                    author: isAIComment ? '我们的感情助手' : displayName,
+                    snippet: textContent || (imageUrls.length ? '[图片]' : ''),
+                    isAI: isAIComment
+                }, item);
+            });
+            time.appendChild(replyButton);
             if (currentAuthUser && c.user_id === currentAuthUser.id) {
                 const recall = document.createElement('button');
                 recall.type = 'button';
@@ -618,27 +774,54 @@ async function submitComment(momentId, triggerElement = null) {
         }
         if (!isCommentAuthEpochCurrent(requestAuthEpoch)) throw new Error('AUTH_CONTEXT_CHANGED');
 
-        // 如果有图片，将内容存为 JSON（兼容旧纯文本格式）
+        // 如果有图片或回复引用，将内容存为 JSON（兼容旧纯文本格式）
+        const replyTarget = activeCommentReplies.get(momentId) || null;
         let content;
-        if (uploadedImgUrls.length > 0) {
-            content = JSON.stringify({ text: textVal, images: uploadedImgUrls });
+        if (replyTarget || uploadedImgUrls.length > 0) {
+            const payload = { text: textVal };
+            if (replyTarget) {
+                payload.reply_to = {
+                    id: replyTarget.commentId,
+                    author: replyTarget.author,
+                    text: replyTarget.snippet,
+                    is_ai: Boolean(replyTarget.isAI)
+                };
+            }
+            if (uploadedImgUrls.length > 0) {
+                payload.images = uploadedImgUrls;
+            }
+            content = JSON.stringify(payload);
         } else {
             content = textVal;
         }
 
-        const { error } = await supabaseClient.from('comments').insert([{
+        const { data: insertedData, error } = await supabaseClient.from('comments').insert([{
             moment_id: momentId,
             content: content
-        }]);
+        }]).select('id');
 
         if (error) throw error;
         databaseCommitted = true;
         if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
 
+        const newCommentId = insertedData && insertedData[0] ? Number(insertedData[0].id) : null;
+        const triggerAI = Boolean(replyTarget && replyTarget.isAI);
+        const savedReplyTarget = replyTarget;
+
+        activeCommentReplies.delete(momentId);
         commentSubmitRequests.delete(momentId);
         cancelCommentInput(momentId, triggerElement);
-        loadComments(momentId);
-        loadCommentCounts([momentId]);
+        await loadComments(momentId);
+        await loadCommentCounts([momentId]);
+
+        if (triggerAI) {
+            handleAICommentContinuation({
+                momentId,
+                userCommentId: newCommentId,
+                userCommentText: textVal,
+                repliedCommentId: savedReplyTarget.commentId
+            });
+        }
     } catch(err) {
         if (!databaseCommitted) await removeUploadedCommentObjects(uploadedObjectPaths);
         console.error('评论发送失败:', err);
@@ -646,6 +829,61 @@ async function submitComment(momentId, triggerElement = null) {
     } finally {
         commentSubmitRequests.delete(momentId);
         if (submitBtn) { submitBtn.textContent = origText; submitBtn.disabled = false; }
+    }
+}
+
+async function handleAICommentContinuation({ momentId, userCommentId, userCommentText, repliedCommentId }) {
+    if (activeAICommentReplies.has(momentId)) return;
+    activeAICommentReplies.add(momentId);
+
+    const getListElements = () => {
+        const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
+        if (cards.length > 0) {
+            return Array.from(cards).map(c => c.querySelector('.comment-list')).filter(Boolean);
+        }
+        return Array.from(document.querySelectorAll(`[id="comment-list-${momentId}"]`));
+    };
+
+    const thinkingEls = [];
+    getListElements().forEach(listEl => {
+        const thinkingEl = document.createElement('div');
+        thinkingEl.className = 'comment-ai-thinking';
+        thinkingEl.id = `comment-ai-thinking-${momentId}`;
+
+        const icon = document.createElement('span');
+        icon.textContent = '🤖';
+
+        const label = document.createElement('span');
+        label.textContent = '感情助手正在思考回复…';
+
+        const dots = document.createElement('span');
+        dots.className = 'comment-ai-thinking-dots';
+        dots.innerHTML = '<span></span><span></span><span></span>';
+
+        thinkingEl.append(icon, label, dots);
+        listEl.appendChild(thinkingEl);
+        thinkingEls.push(thinkingEl);
+    });
+
+    try {
+        if (typeof continueAICommentConversation === 'function') {
+            await continueAICommentConversation({
+                momentId,
+                userCommentId,
+                userCommentText,
+                repliedCommentId
+            });
+        } else {
+            console.warn('[感情助手] continueAICommentConversation 函数未就绪');
+        }
+    } catch (err) {
+        console.error('[感情助手] 评论继续对话失败:', err);
+        if (typeof showToast === 'function') {
+            showToast('感情助手走神啦，稍后再试试回复它吧～');
+        }
+    } finally {
+        activeAICommentReplies.delete(momentId);
+        thinkingEls.forEach(el => el.remove());
     }
 }
 
@@ -737,3 +975,5 @@ async function submitAIAnalysisComment(momentId, commentText) {
 }
 
 window.submitAIAnalysisComment = submitAIAnalysisComment;
+window.startReplyToComment = startReplyToComment;
+window.clearCommentReplyTarget = clearCommentReplyTarget;
