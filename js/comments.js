@@ -422,8 +422,12 @@ async function loadComments(momentId, targetCard = null) {
                 });
             }
 
+            const header = document.createElement('div');
+            header.className = 'comment-header';
+            header.appendChild(authorBadge);
+
             const body = document.createElement('div');
-            body.style.flex = '1';
+            body.className = 'comment-body';
             const bubble = document.createElement('div');
             bubble.className = `comment-bubble${isAIComment ? ' comment-bubble--ai' : ''}`;
             const commentResolved = resolvedContents[commentIndex] || {};
@@ -535,16 +539,17 @@ async function loadComments(momentId, targetCard = null) {
             if (currentAuthUser && c.user_id === currentAuthUser.id) {
                 const recall = document.createElement('button');
                 recall.type = 'button';
+                recall.className = 'comment-recall-btn';
                 recall.textContent = '撤回';
                 Object.assign(recall.style, {
-                    color: 'var(--primary)', cursor: 'pointer', marginLeft: '12px',
+                    color: 'var(--primary)', cursor: 'pointer',
                     border: '0', background: 'transparent', padding: '0'
                 });
                 recall.addEventListener('click', () => confirmDeleteComment(commentId, momentId));
                 time.appendChild(recall);
             }
             body.append(bubble, time);
-            item.append(authorBadge, body);
+            item.append(header, body);
             fragment.appendChild(item);
         });
         listEl.replaceChildren(fragment);
