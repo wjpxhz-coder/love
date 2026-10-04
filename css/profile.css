@@ -930,3 +930,253 @@
         padding: 8px 2px;
     }
 }
+
+/* ── 个人主页统计卡片交互增强 ── */
+.profile-stat-interactive {
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.4, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.profile-stat-interactive:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 22px rgba(255, 120, 145, 0.2);
+    border-color: #ffb8c7;
+}
+
+.profile-stat-interactive:active {
+    transform: scale(0.96);
+}
+
+.profile-stat-interactive:focus-visible {
+    outline: 2px solid var(--primary, #ff6b8b);
+    outline-offset: 2px;
+}
+
+/* ── 个人主页子页面：动态与照片 ── */
+.profile-subpage {
+    background: linear-gradient(150deg, #fff2f5 0%, #fff7f9 45%, #fcecf2 100%);
+}
+
+.profile-subpage .app-page-shell {
+    max-width: 760px;
+    margin: 0 auto;
+}
+
+.profile-subpage-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 16px 8px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.profile-subpage-tabs {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 230, 238, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 4px;
+    border-radius: 999px;
+    gap: 4px;
+    border: 1px solid rgba(255, 205, 218, 0.8);
+    box-shadow: 0 2px 10px rgba(255, 130, 160, 0.08);
+}
+
+.profile-subpage-tab {
+    border: none;
+    background: transparent;
+    font-size: 0.88em;
+    font-weight: 700;
+    color: #8c7177;
+    padding: 7px 18px;
+    border-radius: 999px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.24s cubic-bezier(0.2, 0.8, 0.4, 1);
+    -webkit-tap-highlight-color: transparent;
+    font-family: inherit;
+}
+
+.profile-subpage-tab:hover:not(.active) {
+    color: #ff4772;
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.profile-subpage-tab.active {
+    background: linear-gradient(135deg, #ff6b8b, #ff8ea2);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(255, 107, 139, 0.35);
+    transform: scale(1.02);
+}
+
+.profile-subpage-badge {
+    font-size: 0.8em;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.07);
+    font-weight: 800;
+    font-family: 'Nunito', 'PingFang SC', sans-serif;
+    line-height: 1.3;
+}
+
+.profile-subpage-tab.active .profile-subpage-badge {
+    background: rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+}
+
+.profile-subpage-content {
+    max-width: 620px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 6px 16px 48px;
+    box-sizing: border-box;
+}
+
+/* 动态列表时间轴轨道 */
+.profile-moments-track {
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* 照片网格布局 */
+.profile-photos-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+@media (min-width: 520px) {
+    .profile-photos-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+    }
+}
+
+@media (min-width: 720px) {
+    .profile-photos-grid {
+        grid-template-columns: repeat(5, 1fr);
+        gap: 14px;
+    }
+}
+
+.profile-photo-item {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #ffeef2;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(255, 105, 135, 0.12);
+    border: 1px solid rgba(255, 225, 235, 0.9);
+    transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.4, 1), box-shadow 0.24s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.profile-photo-item:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 22px rgba(255, 105, 135, 0.25);
+    z-index: 2;
+}
+
+.profile-photo-item:active {
+    transform: scale(0.96);
+}
+
+.profile-photo-item:focus-visible {
+    outline: 2px solid var(--primary, #ff6b8b);
+    outline-offset: 2px;
+}
+
+.profile-photo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: opacity 0.25s ease;
+}
+
+.profile-photo-date {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    padding: 2px 7px;
+    background: rgba(0, 0, 0, 0.52);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 7px;
+    pointer-events: none;
+    line-height: 1.25;
+    font-family: 'Nunito', 'PingFang SC', sans-serif;
+}
+
+.profile-photo-video-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.58);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    pointer-events: none;
+}
+
+/* ── 暗色模式适配 ── */
+[data-theme='dark'] .profile-stat-interactive:hover {
+    border-color: #ff6b8b;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='dark'] .profile-subpage {
+    background: linear-gradient(150deg, #1d1418 0%, #251b21 45%, #1f151a 100%);
+}
+
+[data-theme='dark'] .profile-subpage-tabs {
+    background: rgba(45, 31, 38, 0.85);
+    border-color: rgba(255, 140, 160, 0.22);
+}
+
+[data-theme='dark'] .profile-subpage-tab {
+    color: #bfa6ad;
+}
+
+[data-theme='dark'] .profile-subpage-tab:hover:not(.active) {
+    color: #ff7e9e;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .profile-subpage-tab.active {
+    background: linear-gradient(135deg, #ff5c80, #e04a70);
+    box-shadow: 0 4px 14px rgba(255, 92, 128, 0.3);
+}
+
+[data-theme='dark'] .profile-photo-item {
+    background: #271a21;
+    border-color: rgba(255, 140, 160, 0.16);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .profile-photo-item:hover {
+    box-shadow: 0 8px 22px rgba(255, 105, 135, 0.25);
+}
+

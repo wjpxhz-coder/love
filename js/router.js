@@ -21,6 +21,8 @@
         { id: 'milestones', pattern: '/milestones', label: '大事记', elementId: 'milestonesModal', protected: true },
         // The static edit route must precede the dynamic author route.
         { id: 'edit-profile', pattern: '/profile/edit', label: '编辑资料', elementId: 'edit-profile-page', protected: true },
+        { id: 'profile-moments', pattern: '/profile/:author/moments', label: '发布的动态', elementId: 'profile-moments-page', protected: true },
+        { id: 'profile-photos', pattern: '/profile/:author/photos', label: '上传的照片', elementId: 'profile-photos-page', protected: true },
         { id: 'profile', pattern: '/profile/:author', label: '个人主页', elementId: 'profile-page', protected: true }
     ];
 
@@ -127,9 +129,14 @@
             params[key] = safeDecode(match[index + 1]);
         });
 
-        const label = definition.id === 'profile' && params.author
-            ? `${params.author}的主页`
-            : definition.label;
+        let label = definition.label;
+        if (definition.id === 'profile' && params.author) {
+            label = `${params.author}的主页`;
+        } else if (definition.id === 'profile-moments' && params.author) {
+            label = `${params.author}发布的动态`;
+        } else if (definition.id === 'profile-photos' && params.author) {
+            label = `${params.author}上传的照片`;
+        }
         return {
             id: definition.id,
             pattern: definition.pattern,

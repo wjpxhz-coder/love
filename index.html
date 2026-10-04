@@ -72,7 +72,7 @@
     <link rel="stylesheet" href="css/ai-panel.css?v=3.9.56">
     <link rel="stylesheet" href="css/fab.css?v=3.9.56">
     <link rel="stylesheet" href="css/auth.css?v=3.9.56">
-    <link rel="stylesheet" href="css/profile.css?v=3.9.56">
+    <link rel="stylesheet" href="css/profile.css?v=3.9.71">
     <link rel="stylesheet" href="css/notifications.css?v=3.9.56">
     <link rel="stylesheet" href="css/mood.css?v=3.9.56">
     <link rel="stylesheet" href="css/anniversary.css?v=3.9.56">
@@ -655,14 +655,14 @@
 
             <!-- 统计信息 -->
             <div class="profile-stats">
-                <div class="profile-stat-card">
+                <div class="profile-stat-card profile-stat-interactive" id="profile-stat-posts-card" role="button" tabindex="0" onclick="openProfileMomentsPage()" aria-label="查看发布动态">
                     <div class="profile-stat-icon-wrap icon-posts">📝</div>
                     <div class="profile-stat-info">
                         <div class="profile-stat-num" id="stat-posts">0</div>
                         <div class="profile-stat-label">发布动态</div>
                     </div>
                 </div>
-                <div class="profile-stat-card">
+                <div class="profile-stat-card profile-stat-interactive" id="profile-stat-photos-card" role="button" tabindex="0" onclick="openProfilePhotosPage()" aria-label="查看上传照片">
                     <div class="profile-stat-icon-wrap icon-photos">🖼️</div>
                     <div class="profile-stat-info">
                         <div class="profile-stat-num" id="stat-photos">0</div>
@@ -743,6 +743,62 @@
                 <textarea id="edit-bio" class="edit-input edit-textarea" placeholder="写下你的个性签名…" maxlength="300" rows="3"></textarea>
             </div>
             <div class="edit-msg" id="edit-msg" role="status" aria-live="polite"></div>
+        </div>
+    </div>
+</section>
+
+<!-- 个人主页 - 动态列表全屏页 -->
+<section class="app-page feature-page profile-subpage" id="profile-moments-page" data-page-id="profile-moments" aria-labelledby="profile-moments-title" aria-hidden="true" hidden inert>
+    <div class="app-page-shell">
+        <header class="app-page-topbar">
+            <button class="app-page-back" type="button" onclick="closeProfileMomentsPage()">← 返回</button>
+            <h1 class="app-page-topbar-title" id="profile-moments-title" data-page-focus tabindex="-1">发布的动态</h1>
+            <button class="app-page-action-btn" type="button" onclick="switchProfileContentTab('photos')" aria-label="切换到照片相册">🖼️ 相册</button>
+        </header>
+        <div class="app-page-scroll">
+            <div class="profile-subpage-header">
+                <div class="profile-subpage-tabs" role="tablist" aria-label="内容切换">
+                    <button class="profile-subpage-tab active" type="button" role="tab" aria-selected="true" id="tab-profile-moments" onclick="switchProfileContentTab('moments')">
+                        📝 动态 <span class="profile-subpage-badge profile-subpage-moments-count">0</span>
+                    </button>
+                    <button class="profile-subpage-tab" type="button" role="tab" aria-selected="false" id="tab-profile-photos" onclick="switchProfileContentTab('photos')">
+                        🖼️ 照片 <span class="profile-subpage-badge profile-subpage-photos-count">0</span>
+                    </button>
+                </div>
+            </div>
+            <div class="app-page-content profile-subpage-content">
+                <div class="timeline-track profile-moments-track" id="profile-moments-content">
+                    <!-- 动态渲染该用户的动态时间轴卡片 -->
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 个人主页 - 上传照片全屏页 -->
+<section class="app-page feature-page profile-subpage" id="profile-photos-page" data-page-id="profile-photos" aria-labelledby="profile-photos-title" aria-hidden="true" hidden inert>
+    <div class="app-page-shell">
+        <header class="app-page-topbar">
+            <button class="app-page-back" type="button" onclick="closeProfilePhotosPage()">← 返回</button>
+            <h1 class="app-page-topbar-title" id="profile-photos-title" data-page-focus tabindex="-1">上传的照片</h1>
+            <button class="app-page-action-btn" type="button" onclick="switchProfileContentTab('moments')" aria-label="切换到动态列表">📝 动态</button>
+        </header>
+        <div class="app-page-scroll">
+            <div class="profile-subpage-header">
+                <div class="profile-subpage-tabs" role="tablist" aria-label="内容切换">
+                    <button class="profile-subpage-tab" type="button" role="tab" aria-selected="false" id="tab-photos-moments" onclick="switchProfileContentTab('moments')">
+                        📝 动态 <span class="profile-subpage-badge profile-subpage-moments-count">0</span>
+                    </button>
+                    <button class="profile-subpage-tab active" type="button" role="tab" aria-selected="true" id="tab-photos-photos" onclick="switchProfileContentTab('photos')">
+                        🖼️ 照片 <span class="profile-subpage-badge profile-subpage-photos-count">0</span>
+                    </button>
+                </div>
+            </div>
+            <div class="app-page-content profile-subpage-content">
+                <div class="profile-photos-grid" id="profile-photos-grid">
+                    <!-- 动态渲染该用户的照片网格 -->
+                </div>
+            </div>
         </div>
     </div>
 </section>
@@ -879,7 +935,7 @@
 <script src="js/animations.js?v=3.9.53"></script>
 <script src="js/timer.js?v=3.9.53"></script>
 <script src="js/auth.js?v=3.9.53"></script>
-<script src="js/profile.js?v=3.9.53"></script>
+<script src="js/profile.js?v=3.9.71"></script>
 <script src="js/moments.js?v=3.9.55"></script>
 <script src="js/milestones.js?v=3.9.53"></script>
 <script src="js/comments.js?v=3.9.70"></script>
@@ -894,8 +950,8 @@
 <script src="js/notifications.js?v=3.9.55"></script>
 <script src="js/effects.js?v=3.9.58"></script>
 <script src="js/settings.js?v=3.9.53"></script>
-<script src="js/router.js?v=3.9.53"></script>
-<script src="js/app.js?v=3.9.53"></script>
+<script src="js/router.js?v=3.9.71"></script>
+<script src="js/app.js?v=3.9.71"></script>
 
 </body>
 </html>
