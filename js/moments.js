@@ -13,8 +13,10 @@ const momentPhotoPreviewUrls = new Set();
 let isMomentSubmitting = false;
 let editingMomentId = null;
 let editingExistingMedia = []; // Array of { ref: string, url: string, isVideo: boolean }
+let editingOriginalMediaRefs = [];
 let editingAudioRef = null;
 let editingAudioUrl = null;
+let editingOriginalAudioRef = null;
 const MAX_MOMENT_MEDIA_BYTES = 100 * 1024 * 1024;
 function isAllowedMomentMedia(file) {
     if (file.type.startsWith('image/') || file.type.startsWith('video/')) return true;
@@ -62,10 +64,25 @@ function getMomentFileExtension(file) {
     return /^[a-z0-9]{1,8}$/.test(typeExtension) ? typeExtension : 'bin';
 }
 
-async function removeUploadedMomentObjects(paths) {
+async function removeUploadedMomentObjects(pathsOrRefs) {
+    if (!Array.isArray(pathsOrRefs) || !pathsOrRefs.length || !supabaseClient) return;
+    const paths = pathsOrRefs.map(val => {
+        if (typeof extractStorageObjectPath === 'function') {
+            return extractStorageObjectPath(val);
+        }
+        if (typeof val === 'string' && typeof STORAGE_REFERENCE_PREFIX === 'string' && val.startsWith(STORAGE_REFERENCE_PREFIX)) {
+            return typeof getStorageObjectPath === 'function' ? getStorageObjectPath(val) : '';
+        }
+        return (typeof val === 'string' && !val.startsWith('http') && !val.includes('avatars')) ? val : '';
+    }).filter(Boolean);
     if (!paths.length) return;
-    const { error } = await supabaseClient.storage.from('photos').remove(paths);
-    if (error) console.error('清理未完成的动态媒体失败:', error);
+    const uniquePaths = Array.from(new Set(paths));
+    try {
+        const { error } = await supabaseClient.storage.from('photos').remove(uniquePaths);
+        if (error) console.error('清理动态媒体失败:', error);
+    } catch (err) {
+        console.error('清理动态媒体异常:', err);
+    }
 }
 
 function revokeMomentObjectUrl(url) {
@@ -128,8 +145,10 @@ function resetMomentComposer(options = {}) {
     cancelMomentRecording();
     editingMomentId = null;
     editingExistingMedia = [];
+    editingOriginalMediaRefs = [];
     editingAudioRef = null;
     editingAudioUrl = null;
+    editingOriginalAudioRef = null;
 
     if (clearPhotos) clearMomentPhotoPreviews();
     if (clearAudio) {
@@ -346,6 +365,9 @@ async function enterMomentPage(route) {
         } else if (data.type === 'audio') {
             rawAudio = data.content || null;
         }
+
+        editingOriginalMediaRefs = [...rawImages];
+        editingOriginalAudioRef = rawAudio || null;
 
         input.value = rawText;
         if (milestoneCheckbox) milestoneCheckbox.checked = isMilestone;
@@ -984,6 +1006,18 @@ async function submitMomentPost() {
         }
         
         databaseCommitted = true;
+
+        if (isEditing) {
+            // 清理编辑时被用户移除的旧媒体对象（防止产生孤儿文件）
+            const removedMediaRefs = editingOriginalMediaRefs.filter(ref => !retainedImages.includes(ref));
+            if (editingOriginalAudioRef && editingOriginalAudioRef !== finalAudio) {
+                removedMediaRefs.push(editingOriginalAudioRef);
+            }
+            if (removedMediaRefs.length > 0) {
+                removeUploadedMomentObjects(removedMediaRefs);
+            }
+        }
+
         if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
         
         closeMomentModal(true);
@@ -2724,6 +2758,54 @@ async function deleteMoment(id) {
     const momentId = normalizeMomentId(id);
     if (!momentId) return;
     const requestAuthEpoch = getMomentAuthEpoch();
+
+    // 撤回前收集动态自身媒体与级联评论的媒体图片（用于物理清理，杜绝孤儿文件）
+    const mediaToDelete = [];
+    try {
+        const cachedItem = currentRenderedMomentsList.find(item => normalizeMomentId(item?.id) === momentId);
+        let mContent = cachedItem?.content;
+        if (!mContent) {
+            const { data: mRow } = await supabaseClient
+                .from('moments')
+                .select('content')
+                .eq('id', momentId)
+                .maybeSingle();
+            if (mRow) mContent = mRow.content;
+        }
+        if (mContent) {
+            try {
+                const parsed = typeof mContent === 'string' ? JSON.parse(mContent) : mContent;
+                if (parsed && typeof parsed === 'object') {
+                    if (Array.isArray(parsed.images)) mediaToDelete.push(...parsed.images);
+                    if (parsed.audio) mediaToDelete.push(parsed.audio);
+                }
+            } catch (_) {
+                if (typeof mContent === 'string' && (mContent.startsWith('http') || mContent.startsWith('storage://'))) {
+                    mediaToDelete.push(mContent);
+                }
+            }
+        }
+
+        // 收集该动态下评论所附带的图片（动态删除时评论由数据库外键级联删除）
+        const { data: commentsRows } = await supabaseClient
+            .from('comments')
+            .select('content')
+            .eq('moment_id', momentId);
+        if (Array.isArray(commentsRows) && commentsRows.length > 0) {
+            commentsRows.forEach(c => {
+                if (!c.content) return;
+                try {
+                    const parsedC = JSON.parse(c.content);
+                    if (parsedC && Array.isArray(parsedC.images)) {
+                        mediaToDelete.push(...parsedC.images);
+                    }
+                } catch (_) {}
+            });
+        }
+    } catch (collectErr) {
+        console.warn('收集待撤回动态媒体失败:', collectErr);
+    }
+
     const { data: deleted, error } = await supabaseClient.rpc('recall_and_delete_moment', {
         p_moment_id: momentId
     });
@@ -2732,6 +2814,11 @@ async function deleteMoment(id) {
         console.error('撤回动态失败:', error);
         alert('撤回失败。仅支持撤回 24 小时内由当前账号发布的动态。');
     } else {
+        // 撤回成功后，物理清理所有关联的媒体文件
+        if (mediaToDelete.length > 0) {
+            removeUploadedMomentObjects(mediaToDelete);
+        }
+
         const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
         if (cards.length > 0) {
             cards.forEach(card => {
