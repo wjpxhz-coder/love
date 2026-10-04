@@ -97,6 +97,26 @@ function getStorageObjectPath(value) {
     return objectPath;
 }
 
+function extractStorageObjectPath(value) {
+    if (typeof value !== 'string') return '';
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    let objectPath = '';
+    if (typeof STORAGE_REFERENCE_PREFIX === 'string' && trimmed.startsWith(STORAGE_REFERENCE_PREFIX)) {
+        objectPath = trimmed.slice(STORAGE_REFERENCE_PREFIX.length);
+    } else {
+        const urlMatch = trimmed.match(/\/storage\/v1\/object\/(?:public\/)?photos\/(.+?)(?:\?.*)?$/i);
+        if (urlMatch) {
+            objectPath = decodeURIComponent(urlMatch[1]);
+        } else if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://') && !trimmed.startsWith('blob:') && !trimmed.startsWith('data:')) {
+            objectPath = trimmed.replace(/^\/+/, '');
+        }
+    }
+    if (!objectPath || objectPath.includes('..') || objectPath.includes('\\')) return '';
+    if (objectPath.startsWith('avatars/') || objectPath.includes('/avatars/')) return '';
+    return objectPath;
+}
+
 async function resolveMediaUrl(value) {
     const directUrl = sanitizeMediaUrl(value);
     if (directUrl) return directUrl;
@@ -298,22 +318,24 @@ const supabaseClient = window.supabase?.createClient
     })
     : null;
 
+window.extractStorageObjectPath = extractStorageObjectPath;
+
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.68';
+const APP_VERSION = 'v3.9.69';
 const CONFIG = {
-    version: 'v3.9.68',
+    version: 'v3.9.69',
     date: '2026-10-04',
-    title: '移动端本地图片缓存与相册灯箱体验全面升级 🖼️✨📱',
+    title: '云端存储孤儿对象彻底治理与撤回删除自动物理清理 🧹✨💖',
     features: [
-        '手机端本地图片持久化缓存优化，杜绝 iOS WebKit 配额溢出 📱⚡',
-        '音视频流媒体直连放行，彻底消除分段请求 Range 报错与视频卡顿 🎬✨',
-        '离线与弱网智能降级，本地已缓存照片在无网状态下依然秒开 0ms 闪现 💖',
-        '相册灯箱全新升级：支持手机端左右滑动手势切换与相邻大图智能预加载 👆🌸',
-        '灯箱增加优雅的张数指示器与切换导航，桌面端支持键盘左右方向键翻页 ⌨️',
-        '修复系统设置中清理照片缓存未彻底清除临时会话签名的已知问题 🧹'
+        '彻底治理云端存储历史残留，彻底物理清理 343 个已撤回未删除的孤儿媒体对象 🧹',
+        '动态撤回闭环升级：撤回动态时自动物理删除其包含的高清视频、照片与录音，杜绝空间泄漏 📸✨',
+        '关联评论级联清理：撤回动态时自动同步物理清除其下所有附图评论的媒体资源 💬🌸',
+        '动态编辑媒体同步清理：编辑修改动态并移除原有照片或录音时，被替换的旧媒体自动物理释放 🎞️',
+        '评论撤回物理清理：撤回带图评论时自动物理清除对应的评论图片，实现全站零孤儿对象闭环 💖'
     ]
 };
 const UPDATE_LOG = CONFIG;
+
 
 
 

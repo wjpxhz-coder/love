@@ -47,10 +47,25 @@ function getCommentFileExtension(file) {
     return /^[a-z0-9]{1,8}$/.test(typeExtension) ? typeExtension : 'bin';
 }
 
-async function removeUploadedCommentObjects(paths) {
+async function removeUploadedCommentObjects(pathsOrRefs) {
+    if (!Array.isArray(pathsOrRefs) || !pathsOrRefs.length || !supabaseClient) return;
+    const paths = pathsOrRefs.map(val => {
+        if (typeof extractStorageObjectPath === 'function') {
+            return extractStorageObjectPath(val);
+        }
+        if (typeof val === 'string' && typeof STORAGE_REFERENCE_PREFIX === 'string' && val.startsWith(STORAGE_REFERENCE_PREFIX)) {
+            return typeof getStorageObjectPath === 'function' ? getStorageObjectPath(val) : '';
+        }
+        return (typeof val === 'string' && !val.startsWith('http') && !val.includes('avatars')) ? val : '';
+    }).filter(Boolean);
     if (!paths.length) return;
-    const { error } = await supabaseClient.storage.from('photos').remove(paths);
-    if (error) console.error('清理未完成的评论图片失败:', error);
+    const uniquePaths = Array.from(new Set(paths));
+    try {
+        const { error } = await supabaseClient.storage.from('photos').remove(uniquePaths);
+        if (error) console.error('清理评论图片失败:', error);
+    } catch (err) {
+        console.error('清理评论图片异常:', err);
+    }
 }
 
 async function resolveCommentContent(rawContent) {
@@ -469,6 +484,27 @@ async function deleteComment(commentId, momentId) {
     const normalizedCommentId = Number(commentId);
     if (!Number.isSafeInteger(normalizedCommentId) || normalizedCommentId <= 0) return;
     const requestAuthEpoch = getCommentAuthEpoch();
+
+    // 撤回前收集该评论所包含的图片（用于物理清理，杜绝孤儿文件）
+    let mediaToDelete = [];
+    try {
+        const { data: cRow } = await supabaseClient
+            .from('comments')
+            .select('content')
+            .eq('id', normalizedCommentId)
+            .maybeSingle();
+        if (cRow && cRow.content) {
+            try {
+                const parsed = JSON.parse(cRow.content);
+                if (parsed && Array.isArray(parsed.images)) {
+                    mediaToDelete = parsed.images;
+                }
+            } catch (_) {}
+        }
+    } catch (collectErr) {
+        console.warn('收集待撤回评论媒体失败:', collectErr);
+    }
+
     const { data: deleted, error } = await supabaseClient.rpc('recall_and_delete_comment', {
         p_comment_id: normalizedCommentId
     });
@@ -477,6 +513,11 @@ async function deleteComment(commentId, momentId) {
         console.error('撤回评论失败:', error);
         alert('撤回失败，请稍后重试。');
     } else {
+        // 撤回成功后，物理清理该评论包含的图片
+        if (mediaToDelete.length > 0) {
+            removeUploadedCommentObjects(mediaToDelete);
+        }
+
         const items = document.querySelectorAll(`[id="comment-${normalizedCommentId}"]`);
         items.forEach(item => {
             item.style.transition = 'opacity 0.3s, transform 0.3s';
