@@ -883,15 +883,13 @@ body.app-page-active .app-utility-bar {
 }
 
 .timeline-track {
-    padding-left: 26px;
+    padding-left: 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .timeline-track::before {
-    left: 6px;
-    width: 2.5px;
-    background: linear-gradient(to bottom, var(--primary), var(--primary-light), rgba(255, 175, 195, 0.2));
-    border-radius: 2px;
-    animation: none;
+    display: none;
 }
 
 .moment-card {
@@ -911,17 +909,13 @@ body.app-page-active .app-utility-bar {
 }
 
 .moment-card::before {
-    content: '🌸';
-    left: -26px;
-    top: 18px;
-    font-size: 0.95rem;
-    filter: drop-shadow(0 2px 6px rgba(255, 77, 121, 0.4));
+    display: none;
 }
 
 .moment-card.visible:hover {
     border-color: rgba(255, 143, 171, 0.85);
     box-shadow: 0 14px 36px rgba(255, 77, 121, 0.22);
-    transform: translate3d(4px, -3px, 0) scale(1.015);
+    transform: translateY(-4px) scale(1.01);
 }
 
 .filter-active-indicator {
@@ -2147,11 +2141,11 @@ body.app-page-active .app-utility-bar {
     }
 
     .timeline-section {
-        padding: 20px 16px 26px;
+        padding: 18px 12px 24px;
     }
 
     .timeline-track {
-        padding-left: 20px;
+        padding-left: 0;
     }
 
     .moment-card {
