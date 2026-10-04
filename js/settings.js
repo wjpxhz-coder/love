@@ -71,7 +71,7 @@ async function getPhotoCacheSize() {
                     const contentLength = res.headers.get('content-length');
                     if (contentLength && !isNaN(parseInt(contentLength, 10))) {
                         totalBytes += parseInt(contentLength, 10);
-                    } else {
+                    } else if (res.type !== 'opaque') {
                         const blob = await res.clone().blob();
                         totalBytes += blob.size;
                     }
@@ -151,19 +151,23 @@ async function clearPhotoCache() {
     }
 
     // 清理 sessionStorage 中的媒体临时签名链接缓存
-    try {
-        const sessionKeysToRemove = [];
-        for (let i = 0; i < sessionStorage.length; i++) {
-            const k = sessionStorage.key(i);
-            if (k && k.startsWith('signed_media_url_')) {
-                sessionKeysToRemove.push(k);
+    if (typeof clearSignedMediaCache === 'function') {
+        clearSignedMediaCache();
+    } else {
+        try {
+            const sessionKeysToRemove = [];
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const k = sessionStorage.key(i);
+                if (k && (k.startsWith('love_signed_media_') || k.startsWith('signed_media_url_'))) {
+                    sessionKeysToRemove.push(k);
+                }
             }
-        }
-        sessionKeysToRemove.forEach(k => sessionStorage.removeItem(k));
-    } catch (_e) {}
+            sessionKeysToRemove.forEach(k => sessionStorage.removeItem(k));
+        } catch (_e) {}
 
-    if (typeof signedMediaUrlCache !== 'undefined' && signedMediaUrlCache.clear) {
-        signedMediaUrlCache.clear();
+        if (typeof signedMediaUrlCache !== 'undefined' && signedMediaUrlCache.clear) {
+            signedMediaUrlCache.clear();
+        }
     }
 
     await updatePhotoCacheSizeDisplay();

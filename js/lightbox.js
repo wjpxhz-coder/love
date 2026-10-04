@@ -20,6 +20,14 @@ let zoomLastTapPos = { x: 0, y: 0 };
 let zoomSingleTapTimeout = null;
 let zoomHandlersAttached = false;
 
+// 画廊与移动端滑动手势状态变量
+let lightboxGallery = [];
+let lightboxCurrentIndex = 0;
+let touchStartX = 0;
+let touchStartY = 0;
+let touchStartTime = 0;
+let isSwipeActive = false;
+
 function applyLightboxTransform(animate = false) {
     const img = document.getElementById('lightbox-img');
     if (!img) return;
@@ -113,6 +121,11 @@ function initLightboxZoomHandlers() {
             const timeDiff = now - zoomLastTapTime;
             const distDiff = Math.hypot(touch.clientX - zoomLastTapPos.x, touch.clientY - zoomLastTapPos.y);
 
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            touchStartTime = now;
+            isSwipeActive = false;
+
             if (timeDiff < 320 && distDiff < 36) {
                 // 判定为双击
                 zoomLastTapTime = 0;
@@ -150,6 +163,16 @@ function initLightboxZoomHandlers() {
             zoomTranslateX = zoomLastTranslateX + dx;
             zoomTranslateY = zoomLastTranslateY + dy;
             applyLightboxTransform(false);
+        } else if (!zoomIsPinching && e.touches.length === 1 && zoomScale <= 1.05 && Array.isArray(lightboxGallery) && lightboxGallery.length > 1) {
+            const touch = e.touches[0];
+            const dx = touch.clientX - touchStartX;
+            const dy = touch.clientY - touchStartY;
+            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+                isSwipeActive = true;
+                e.preventDefault();
+                zoomTranslateX = dx * 0.45;
+                applyLightboxTransform(false);
+            }
         }
     }, { passive: false });
 
@@ -172,6 +195,25 @@ function initLightboxZoomHandlers() {
             return;
         }
 
+        if (isSwipeActive && zoomScale <= 1.05 && Array.isArray(lightboxGallery) && lightboxGallery.length > 1) {
+            isSwipeActive = false;
+            const touch = e.changedTouches[0];
+            const dx = touch ? touch.clientX - touchStartX : 0;
+            const dy = touch ? touch.clientY - touchStartY : 0;
+            const elapsed = performance.now() - touchStartTime;
+            zoomTranslateX = 0;
+            applyLightboxTransform(true);
+
+            if (Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(dy) * 1.2 && elapsed < 650) {
+                if (dx < 0) {
+                    lightboxNext();
+                } else {
+                    lightboxPrev();
+                }
+                return;
+            }
+        }
+
         // 单指轻击检测：如果在未放大状态下单指轻击，延时确认后关闭灯箱
         if (e.changedTouches.length === 1 && zoomScale <= 1.05) {
             const touch = e.changedTouches[0];
@@ -187,6 +229,8 @@ function initLightboxZoomHandlers() {
     img.addEventListener('touchcancel', () => {
         zoomIsPinching = false;
         zoomIsDragging = false;
+        isSwipeActive = false;
+        zoomTranslateX = 0;
         clampZoomBounds();
         applyLightboxTransform(true);
     });
@@ -288,27 +332,54 @@ function isLightboxVideoUrl(url) {
     }
 }
 
-function openLightbox(src) {
-    const safeSrc = typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(src) : '';
-    const lightbox = document.getElementById('lightbox');
+function preloadAdjacentLightboxImages(currentIndex) {
+    if (!Array.isArray(lightboxGallery) || lightboxGallery.length <= 1) return;
+    const nextIdx = (currentIndex + 1) % lightboxGallery.length;
+    const prevIdx = (currentIndex - 1 + lightboxGallery.length) % lightboxGallery.length;
+    [nextIdx, prevIdx].forEach(idx => {
+        const src = lightboxGallery[idx];
+        if (src && !isLightboxVideoUrl(src)) {
+            const im = new Image();
+            im.crossOrigin = 'anonymous';
+            im.src = src;
+        }
+    });
+}
+
+function updateLightboxGalleryControls() {
+    const prevBtn = document.getElementById('lightbox-prev');
+    const nextBtn = document.getElementById('lightbox-next');
+    const counterEl = document.getElementById('lightbox-counter');
+    const hasMultiple = Array.isArray(lightboxGallery) && lightboxGallery.length > 1;
+
+    if (counterEl) {
+        if (hasMultiple) {
+            counterEl.textContent = `${lightboxCurrentIndex + 1} / ${lightboxGallery.length}`;
+            counterEl.style.display = 'block';
+        } else {
+            counterEl.style.display = 'none';
+        }
+    }
+    if (prevBtn) prevBtn.style.display = hasMultiple ? 'flex' : 'none';
+    if (nextBtn) nextBtn.style.display = hasMultiple ? 'flex' : 'none';
+}
+
+function showLightboxItem(index, animate = false) {
+    if (!Array.isArray(lightboxGallery) || lightboxGallery.length === 0) return;
+    if (index < 0 || index >= lightboxGallery.length) return;
+
+    lightboxCurrentIndex = index;
+    const safeSrc = lightboxGallery[index];
     const img = document.getElementById('lightbox-img');
     const video = document.getElementById('lightbox-video');
     const fallback = document.getElementById('lightbox-fallback');
     const downloadBtn = document.getElementById('lightbox-download-btn');
     const openBtn = document.getElementById('lightbox-open-btn');
-    if (!safeSrc || !lightbox || !img || !video) return;
+    if (!img || !video) return;
 
-    // 初始化缩放引擎事件监听
-    initLightboxZoomHandlers();
+    updateLightboxGalleryControls();
     resetLightboxZoom(false);
 
-    if (!lightbox.classList.contains('show')) {
-        lightboxPreviousFocus = document.activeElement;
-        lightboxPreviousBodyOverflow = document.body.style.overflow;
-        setLightboxBackgroundInert(true);
-        document.body.style.overflow = 'hidden';
-    }
-    lightbox.inert = false;
     img.style.display = 'none';
     img.removeAttribute('src');
     if (fallback) fallback.style.display = 'none';
@@ -351,10 +422,65 @@ function openLightbox(src) {
     } else {
         img.decoding = 'async';
         img.loading = 'eager';
+        img.crossOrigin = 'anonymous';
         img.src = safeSrc;
         img.style.display = 'block';
         resetLightboxZoom(false);
+        preloadAdjacentLightboxImages(index);
     }
+}
+
+function lightboxNext(event) {
+    if (event) event.stopPropagation();
+    if (!Array.isArray(lightboxGallery) || lightboxGallery.length <= 1) return;
+    const nextIndex = (lightboxCurrentIndex + 1) % lightboxGallery.length;
+    showLightboxItem(nextIndex, true);
+}
+
+function lightboxPrev(event) {
+    if (event) event.stopPropagation();
+    if (!Array.isArray(lightboxGallery) || lightboxGallery.length <= 1) return;
+    const prevIndex = (lightboxCurrentIndex - 1 + lightboxGallery.length) % lightboxGallery.length;
+    showLightboxItem(prevIndex, true);
+}
+
+function openLightbox(src, options = {}) {
+    const safeSrc = typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(src) : '';
+    const lightbox = document.getElementById('lightbox');
+    const img = document.getElementById('lightbox-img');
+    const video = document.getElementById('lightbox-video');
+    if (!safeSrc || !lightbox || !img || !video) return;
+
+    // 解析相册列表
+    if (options && Array.isArray(options.gallery) && options.gallery.length > 0) {
+        lightboxGallery = options.gallery
+            .map(item => (typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(item) : item))
+            .filter(Boolean);
+        let targetIdx = typeof options.initialIndex === 'number' ? options.initialIndex : -1;
+        if (targetIdx < 0 || targetIdx >= lightboxGallery.length) {
+            targetIdx = lightboxGallery.indexOf(safeSrc);
+            if (targetIdx === -1) targetIdx = 0;
+        }
+        lightboxCurrentIndex = targetIdx;
+    } else {
+        lightboxGallery = [safeSrc];
+        lightboxCurrentIndex = 0;
+    }
+
+    // 初始化缩放引擎事件监听
+    initLightboxZoomHandlers();
+    resetLightboxZoom(false);
+
+    if (!lightbox.classList.contains('show')) {
+        lightboxPreviousFocus = document.activeElement;
+        lightboxPreviousBodyOverflow = document.body.style.overflow;
+        setLightboxBackgroundInert(true);
+        document.body.style.overflow = 'hidden';
+    }
+    lightbox.inert = false;
+
+    showLightboxItem(lightboxCurrentIndex, false);
+
     lightbox.classList.add('show');
     lightbox.setAttribute('aria-hidden', 'false');
     const closeButton = document.getElementById('lightbox-close');
@@ -362,7 +488,12 @@ function openLightbox(src) {
 }
 
 function closeLightbox(event) {
-    if (event && event.target && (event.target.id === 'lightbox-video' || event.target.closest('#lightbox-fallback'))) return;
+    if (event && event.target && (
+        event.target.id === 'lightbox-video' ||
+        event.target.closest('#lightbox-fallback') ||
+        event.target.closest('.lightbox-nav-btn') ||
+        event.target.closest('.lightbox-counter')
+    )) return;
     if (event?.target?.id === 'lightbox-close') event.stopPropagation();
 
     // 如果在放大状态下点击图片本身，先恢复为原尺寸
@@ -375,14 +506,21 @@ function closeLightbox(event) {
     const img = document.getElementById('lightbox-img');
     const video = document.getElementById('lightbox-video');
     const fallback = document.getElementById('lightbox-fallback');
+    const prevBtn = document.getElementById('lightbox-prev');
+    const nextBtn = document.getElementById('lightbox-next');
+    const counterEl = document.getElementById('lightbox-counter');
     if (!lightbox || !lightbox.classList.contains('show')) return;
 
     lightbox.classList.remove('show');
     lightbox.setAttribute('aria-hidden', 'true');
     lightbox.inert = true;
-    if (fallback) {
-        fallback.style.display = 'none';
-    }
+    if (fallback) fallback.style.display = 'none';
+    if (prevBtn) prevBtn.style.display = 'none';
+    if (nextBtn) nextBtn.style.display = 'none';
+    if (counterEl) counterEl.style.display = 'none';
+    lightboxGallery = [];
+    lightboxCurrentIndex = 0;
+
     if (video) {
         video.onerror = null;
         video.pause();
@@ -414,6 +552,18 @@ document.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
         event.preventDefault();
         closeLightbox();
+        return;
+    }
+
+    if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        lightboxNext();
+        return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        lightboxPrev();
         return;
     }
 

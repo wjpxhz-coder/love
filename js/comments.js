@@ -319,10 +319,11 @@ async function loadComments(momentId, targetCard = null) {
                 bubble.appendChild(aiHeader);
             }
             if (textContent) bubble.appendChild(document.createTextNode(textContent));
-            imageUrls.forEach(url => {
+            imageUrls.forEach((url, imgIdx) => {
                 const image = document.createElement('img');
                 image.src = url;
                 image.alt = '评论图片';
+                image.crossOrigin = 'anonymous';
                 image.loading = 'lazy';
                 image.decoding = 'async';
                 image.classList.add('media-loading');
@@ -336,7 +337,9 @@ async function loadComments(momentId, targetCard = null) {
                     image.addEventListener('error', onImgLoad, { once: true });
                 }
                 image.addEventListener('click', () => {
-                    if (typeof openLightbox === 'function') openLightbox(url);
+                    if (typeof openLightbox === 'function') {
+                        openLightbox(url, { gallery: imageUrls, initialIndex: imgIdx });
+                    }
                 });
                 bubble.appendChild(image);
             });
