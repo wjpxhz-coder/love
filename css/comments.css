@@ -27,18 +27,33 @@
 
 .comment-item {
     display: flex;
-    gap: 10px;
+    flex-direction: column;
+    gap: 6px;
     margin-bottom: 12px;
-    align-items: flex-start;
+    align-items: stretch;
+}
+
+.comment-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .comment-author-badge {
-    font-size: 0.72em;
+    font-size: 0.74em;
     padding: 3px 10px;
     border-radius: 20px;
     font-weight: 600;
     flex-shrink: 0;
-    margin-top: 3px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.comment-body {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .comment-bubble {
@@ -48,9 +63,11 @@
     font-size: 0.9em;
     line-height: 1.65;
     color: var(--text);
-    flex: 1;
+    width: 100%;
+    box-sizing: border-box;
     border: 1px solid var(--border);
     box-shadow: 0 2px 8px var(--shadow);
+    word-break: break-word;
 }
 
 [data-theme='dark'] .comment-bubble {
@@ -59,10 +76,14 @@
 }
 
 .comment-time {
-    font-size: 0.7em;
+    font-size: 0.72em;
     color: var(--text-muted);
     margin-top: 4px;
     padding-left: 2px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
 }
 
 .comment-write-btn {
@@ -161,7 +182,7 @@
             font-size: 0.85em;
             cursor: pointer;
             box-shadow: none;
-            margin-left: 12px;
+            margin-left: 0;
             transition: color 0.2s;
             display: inline-flex;
             align-items: center;
@@ -188,7 +209,7 @@
             font-size: 0.85em;
             cursor: pointer;
             box-shadow: none;
-            margin-left: 12px;
+            margin-left: 0;
             transition: color 0.2s;
             display: inline-flex;
             align-items: center;
