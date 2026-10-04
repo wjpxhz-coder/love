@@ -1566,6 +1566,7 @@ function createMomentMedia(rawUrl, className, options = {}) {
         }
     } else {
         media.alt = '我们的回忆';
+        media.crossOrigin = 'anonymous';
         if (options.priority) {
             media.loading = 'eager';
             media.fetchPriority = 'high';
@@ -1769,6 +1770,9 @@ function createMomentCardElement(item, options = {}) {
         } else if (images.length > 1) {
             const grid = createMomentNode('div', 'moment-grid');
             grid.id = `moment-grid-${momentId}`;
+            try {
+                grid.dataset.momentImages = JSON.stringify(images);
+            } catch (_) {}
             const INITIAL_DISPLAY_COUNT = 9;
             images.forEach((url, index) => {
                 const isHidden = index >= INITIAL_DISPLAY_COUNT;
@@ -1780,11 +1784,13 @@ function createMomentCardElement(item, options = {}) {
                     priority: isPriorityCard && index < 4
                 });
                 if (!media) return;
+                media.dataset.mediaIndex = String(index);
                 if (isHidden) media.style.display = 'none';
                 if (isVid) {
                     const wrap = createMomentNode('div', `moment-grid-video-wrap${isHidden ? ' hidden-image' : ''}`);
                     wrap.dataset.momentAction = 'open-lightbox';
                     wrap.dataset.mediaSrc = url;
+                    wrap.dataset.mediaIndex = String(index);
                     wrap.tabIndex = 0;
                     wrap.setAttribute('role', 'button');
                     wrap.setAttribute('aria-label', '打开视频预览');
@@ -2197,7 +2203,23 @@ function runMomentAction(actionElement) {
             || actionElement.src
             || actionElement.querySelector('img, video')?.currentSrc
             || actionElement.querySelector('img, video')?.src;
-        if (targetSrc) openLightbox(targetSrc);
+        if (targetSrc) {
+            const grid = actionElement.closest('.moment-grid');
+            let gallery = null;
+            let initialIndex = 0;
+            if (grid && grid.dataset.momentImages) {
+                try {
+                    gallery = JSON.parse(grid.dataset.momentImages);
+                } catch (_) {}
+            }
+            if (actionElement.dataset.mediaIndex) {
+                initialIndex = parseInt(actionElement.dataset.mediaIndex, 10) || 0;
+            } else if (Array.isArray(gallery)) {
+                initialIndex = gallery.indexOf(targetSrc);
+                if (initialIndex === -1) initialIndex = 0;
+            }
+            openLightbox(targetSrc, { gallery, initialIndex });
+        }
     }
     else if (action === 'show-images') showAllImages(momentId, actionElement);
     else if (action === 'toggle-text') toggleTextCollapse(momentId, actionElement);

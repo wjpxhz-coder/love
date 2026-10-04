@@ -1733,6 +1733,78 @@ body.app-page-active .app-utility-bar {
     line-height: 1;
 }
 
+.lightbox-nav-btn {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    padding-bottom: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    color: #ffffff;
+    background: rgba(20, 15, 17, 0.72);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    font-size: 2rem;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+.lightbox-nav-btn:hover {
+    background: rgba(255, 107, 129, 0.85);
+    transform: translateY(-50%) scale(1.08);
+}
+
+.lightbox-nav-btn:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+.lightbox-nav-btn.prev {
+    left: max(16px, env(safe-area-inset-left));
+}
+
+.lightbox-nav-btn.next {
+    right: max(16px, env(safe-area-inset-right));
+}
+
+.lightbox-counter {
+    position: fixed;
+    top: max(22px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+    background: rgba(20, 15, 17, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    padding: 4px 14px;
+    border-radius: 20px;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+@media (max-width: 768px) {
+    .lightbox-nav-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 1.6rem;
+        background: rgba(20, 15, 17, 0.55);
+    }
+}
+
 #lightbox {
     background: rgba(14, 10, 13, 0.95);
     transition:

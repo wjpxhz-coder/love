@@ -108,23 +108,28 @@ async function resolveMediaUrl(value) {
     const cachedUrl = getCachedSignedMediaUrl(objectPath);
     if (cachedUrl) return cachedUrl;
 
-    const { data, error } = await supabaseClient.storage
-        .from('photos')
-        .createSignedUrl(objectPath, 60 * 60);
-    if (!currentAuthUser || currentAuthUser.id !== requestUserId
-        || (requestAuthEpoch !== null && authEpoch !== requestAuthEpoch)) {
-        return '';
-    }
-    if (error || !data?.signedUrl) {
-        console.error('创建媒体签名地址失败:', error);
-        return '';
+    try {
+        const { data, error } = await supabaseClient.storage
+            .from('photos')
+            .createSignedUrl(objectPath, 60 * 60);
+        if (!currentAuthUser || currentAuthUser.id !== requestUserId
+            || (requestAuthEpoch !== null && authEpoch !== requestAuthEpoch)) {
+            return '';
+        }
+        if (!error && data?.signedUrl) {
+            const signedUrl = sanitizeMediaUrl(data.signedUrl);
+            if (signedUrl) {
+                setCachedSignedMediaUrl(objectPath, signedUrl);
+                return signedUrl;
+            }
+        }
+    } catch (err) {
+        console.warn('创建媒体签名地址失败，尝试离线/本地缓存降级:', err);
     }
 
-    const signedUrl = sanitizeMediaUrl(data.signedUrl);
-    if (signedUrl) {
-        setCachedSignedMediaUrl(objectPath, signedUrl);
-    }
-    return signedUrl;
+    // 弱网或断网降级：返回规范化路径。若 Service Worker 已在本地 CacheStorage 缓存该文件，将直接离线秒开命中
+    const canonicalFallback = sanitizeMediaUrl(`${SUPABASE_URL}/storage/v1/object/photos/${objectPath}`);
+    return canonicalFallback || '';
 }
 
 /**
@@ -173,18 +178,20 @@ async function batchResolveMediaUrls(values) {
                 }
             }
         } catch (err) {
-            console.error('批量创建媒体签名地址失败:', err);
+            console.warn('批量创建媒体签名地址失败，尝试离线降级:', err);
         }
     }
 
-    // 回填解析结果
+    // 回填解析结果：优先使用有效签名，弱网或离线时回退为规范化路径以命中 Service Worker 本地缓存
     return values.map(val => {
         if (typeof val !== 'string') return '';
         const direct = sanitizeMediaUrl(val);
         if (direct) return direct;
         const objPath = getStorageObjectPath(val);
         if (!objPath) return '';
-        return getCachedSignedMediaUrl(objPath) || '';
+        const cached = getCachedSignedMediaUrl(objPath);
+        if (cached) return cached;
+        return sanitizeMediaUrl(`${SUPABASE_URL}/storage/v1/object/photos/${objPath}`) || '';
     });
 }
 
@@ -292,18 +299,18 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.66';
+const APP_VERSION = 'v3.9.68';
 const CONFIG = {
-    version: 'v3.9.66',
-    date: '2026-10-03',
-    title: '感情助手评论通知归属与展示优化 🤖💖✨',
+    version: 'v3.9.68',
+    date: '2026-10-04',
+    title: '移动端本地图片缓存与相册灯箱体验全面升级 🖼️✨📱',
     features: [
-        '通知中心精准归属 AI 评论，显示为“🤖 我们的感情助手”并附带专属高光 🤖🌸',
-        '修复 AI 服务商读取云端图片连接重置问题，采用 Base64 直送确保图文分析稳定可靠 🖼️⚡',
-        'AI 分析动态时智能过滤非图片文件（如视频），专注于照片与文字点评 🎬➡️🖼️',
-        '全站统一更名为“我们的感情助手”，浪漫交互更贴心 🌸',
-        '动态右上角新增“AI分析”，图文智能点评一键发布到评论区 💖',
-        '系统设置支持自动获取服务商模型列表与自定义切换 🧠'
+        '手机端本地图片持久化缓存优化，杜绝 iOS WebKit 配额溢出 📱⚡',
+        '音视频流媒体直连放行，彻底消除分段请求 Range 报错与视频卡顿 🎬✨',
+        '离线与弱网智能降级，本地已缓存照片在无网状态下依然秒开 0ms 闪现 💖',
+        '相册灯箱全新升级：支持手机端左右滑动手势切换与相邻大图智能预加载 👆🌸',
+        '灯箱增加优雅的张数指示器与切换导航，桌面端支持键盘左右方向键翻页 ⌨️',
+        '修复系统设置中清理照片缓存未彻底清除临时会话签名的已知问题 🧹'
     ]
 };
 const UPDATE_LOG = CONFIG;

@@ -1096,6 +1096,7 @@ function createMoodDayEntry(entry) {
             img.className = 'mood-day-photo-img';
             img.alt = `${entry.author || '成员'}的心情照片 ${photoIdx + 1}`;
             img.loading = 'lazy';
+            img.crossOrigin = 'anonymous';
 
             const directUrl = typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(photoRef) : '';
             const objPath = typeof getStorageObjectPath === 'function' ? getStorageObjectPath(photoRef) : '';
@@ -1109,13 +1110,21 @@ function createMoodDayEntry(entry) {
                     photoItem.classList.add('is-loaded');
                     photoItem.title = '图片加载失败';
                 };
-                photoItem.onclick = () => {
-                    if (typeof openLightbox === 'function') openLightbox(src);
+                const handleOpenMoodLightbox = () => {
+                    if (typeof openLightbox !== 'function') return;
+                    const gallery = entryPhotos.map(ref => {
+                        const d = typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(ref) : '';
+                        const op = typeof getStorageObjectPath === 'function' ? getStorageObjectPath(ref) : '';
+                        const cu = op && typeof getCachedSignedMediaUrl === 'function' ? getCachedSignedMediaUrl(op) : '';
+                        return d || cu || (op ? `${SUPABASE_URL}/storage/v1/object/photos/${op}` : ref);
+                    });
+                    openLightbox(img.src || src, { gallery, initialIndex: photoIdx });
                 };
+                photoItem.onclick = handleOpenMoodLightbox;
                 photoItem.onkeydown = (e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        if (typeof openLightbox === 'function') openLightbox(src);
+                        handleOpenMoodLightbox();
                     }
                 };
             };
