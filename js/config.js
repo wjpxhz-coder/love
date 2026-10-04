@@ -321,12 +321,13 @@ const supabaseClient = window.supabase?.createClient
 window.extractStorageObjectPath = extractStorageObjectPath;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.72';
+const APP_VERSION = 'v3.9.73';
 const CONFIG = {
-    version: 'v3.9.72',
+    version: 'v3.9.73',
     date: '2026-10-04',
-    title: '全站极致性能优化与流畅度全面跃升 🚀✨💖',
+    title: '可爱站酷快乐体无阻塞回归与全站极致性能飞跃 🌸🚀💖',
     features: [
+        '可爱艺术字与果冻风字体完全回归：无阻塞异步加载站酷快乐体，软萌视觉永不缺席 🌸✨',
         '首屏网络渲染链路深度优化：彻底消除阻塞脚本与外部字体挂起，首屏呈现飞速秒开 ⚡',
         '图形渲染与 GPU 能效革新：合并移动端全屏绘制图层，滚动自适应限频，彻底消除发热与掉帧 🌸',
         '重度毛玻璃与合成层解耦：移动端优化 GPU 回读多重采样开销，滑动满帧丝滑 💨',
