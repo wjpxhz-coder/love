@@ -150,3 +150,32 @@
                 padding-bottom: calc(60px + env(safe-area-inset-bottom));
             }
         }
+
+        /* ── 移动端极致性能优化：解除重度毛玻璃与 Canvas 的 GPU 冲突 ── */
+        @media (max-width: 768px) {
+            #sakura-canvas-foreground {
+                display: none !important;
+            }
+
+            .moment-card,
+            .toast-item,
+            .app-page-card,
+            .notification-panel,
+            .resonance-ui,
+            .bottom-nav {
+                -webkit-backdrop-filter: none !important;
+                backdrop-filter: none !important;
+            }
+
+            .moment-card {
+                background: var(--surface-elevated) !important;
+            }
+
+            .toast-item {
+                background: rgba(255, 255, 255, 0.96) !important;
+            }
+
+            [data-theme='dark'] .toast-item {
+                background: rgba(38, 22, 54, 0.96) !important;
+            }
+        }

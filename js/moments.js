@@ -1623,13 +1623,14 @@ function createMomentMedia(rawUrl, className, options = {}) {
             media.addEventListener('error', handleLoaded, { once: true });
         }
     }
-    // 对于视频，自动追加 #t=0.001 强制 Chromium/Safari 寻道并渲染第一帧作为海报封面
-    if (isVideo && !url.includes('#t=')) {
-        media.src = `${url}#t=0.001`;
+    // 若声明 deferLoad (如九宫格折叠项)，暂不赋予真实 src，避免浏览器立即发起并发下载抢占网络通道
+    const finalMediaSrc = (isVideo && !url.includes('#t=')) ? `${url}#t=0.001` : url;
+    if (options.deferLoad) {
+        media.dataset.deferredSrc = finalMediaSrc;
     } else {
-        media.src = url;
+        media.src = finalMediaSrc;
     }
-    if (isVideo && options.autoplay) setupMomentVideoPlayback(media, true);
+    if (isVideo && options.autoplay && !options.deferLoad) setupMomentVideoPlayback(media, true);
     if (options.lightbox) {
         media.dataset.momentAction = 'open-lightbox';
         media.dataset.mediaSrc = url;
@@ -1813,7 +1814,8 @@ function createMomentCardElement(item, options = {}) {
                 const isVid = isVideoMediaUrl(url);
                 const media = createMomentMedia(url, `moment-grid-item${isHidden ? ' hidden-image' : ''}`, {
                     autoplay: false, // 九宫格中不自动并发全量拉取，节省流量与带宽
-                    preload: 'metadata',
+                    preload: isHidden ? 'none' : 'metadata',
+                    deferLoad: isHidden, // 超过 9 张的折叠项延迟拉取
                     lightbox: true,
                     priority: isPriorityCard && index < 4
                 });
@@ -2301,9 +2303,16 @@ window.showAllImages = function(id, triggerElement = null) {
     const hiddenImgs = grid.querySelectorAll('.hidden-image');
     const isExpanded = btn && btn.dataset.expanded === 'true';
     if (!isExpanded) {
-        hiddenImgs.forEach(img => {
-            img.style.display = 'block';
-            if (img instanceof HTMLVideoElement) refreshMomentVideoPlayback(img);
+        hiddenImgs.forEach(item => {
+            const media = (item instanceof HTMLImageElement || item instanceof HTMLVideoElement)
+                ? item
+                : item.querySelector('img, video');
+            if (media && media.dataset.deferredSrc) {
+                media.src = media.dataset.deferredSrc;
+                delete media.dataset.deferredSrc;
+            }
+            item.style.display = 'block';
+            if (item instanceof HTMLVideoElement) refreshMomentVideoPlayback(item);
         });
         if (btn) {
             btn.dataset.expanded = 'true';
@@ -2630,11 +2639,17 @@ async function fetchMoments(append = false, options = {}) {
         renderedMomentIds.add(itemId);
         return true;
     });
-    const renderData = typeof batchHydrateMomentMediaRecords === 'function'
-        ? await batchHydrateMomentMediaRecords(uniquePageData)
+    // 并行化媒体地址解析与收藏星标查询，消除串行网络等待瀑布
+    const hydratePromise = typeof batchHydrateMomentMediaRecords === 'function'
+        ? batchHydrateMomentMediaRecords(uniquePageData)
         : (typeof hydrateMomentMediaRecord === 'function'
-            ? await Promise.all(uniquePageData.map(item => hydrateMomentMediaRecord(item)))
-            : uniquePageData);
+            ? Promise.all(uniquePageData.map(item => hydrateMomentMediaRecord(item)))
+            : Promise.resolve(uniquePageData));
+    const starsPromise = typeof loadMomentStars === 'function'
+        ? loadMomentStars()
+        : Promise.resolve();
+
+    const [renderData] = await Promise.all([hydratePromise, starsPromise]);
     if (requestId !== activeMomentFetchRequest || !isMomentAuthEpochCurrent(requestAuthEpoch)) {
         finishRequest();
         return;
@@ -2654,15 +2669,6 @@ async function fetchMoments(append = false, options = {}) {
     // 移除已有的加载指示器
     const existingLoader = contentDiv.querySelector('.load-more-indicator');
     if (existingLoader) existingLoader.remove();
-
-    // 加载星标收藏数据以供渲染
-    if (typeof loadMomentStars === 'function') {
-        await loadMomentStars();
-        if (requestId !== activeMomentFetchRequest || !isMomentAuthEpochCurrent(requestAuthEpoch)) {
-            finishRequest();
-            return;
-        }
-    }
 
     // 预热首屏前 4 张图片
     if (!append) {

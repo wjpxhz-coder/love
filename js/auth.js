@@ -49,7 +49,13 @@ async function fetchAllProfiles() {
 
         if (error) throw error;
         if (typeof hydrateProfileAvatar === 'function') {
-            await Promise.all((data || []).map(profile => hydrateProfileAvatar(profile)));
+            await Promise.all((data || []).map(profile => {
+                if (currentUserProfile && profile.user_id === currentUserProfile.user_id && currentUserProfile._avatarResolvedUrl) {
+                    profile._avatarResolvedUrl = currentUserProfile._avatarResolvedUrl;
+                    return Promise.resolve(profile);
+                }
+                return hydrateProfileAvatar(profile);
+            }));
         }
         if (epoch !== authEpoch || !currentAuthUser) return;
 
@@ -286,16 +292,25 @@ async function onLoginSuccess(username, isNewLogin) {
 
     hideLockedUI();
 
-    if (typeof initPresence === 'function') await initPresence();
+    // 建立 Realtime 在线与同频监听（后台并行执行，不再阻塞关键渲染）
+    if (typeof initPresence === 'function') {
+        initPresence().catch(err => console.warn('初始化 Presence 失败:', err));
+    }
 
     const loaders = [];
     if (typeof fetchMoments === 'function') loaders.push(fetchMoments());
     if (typeof loadMoods === 'function') loaders.push(loadMoods());
     if (typeof loadNotifications === 'function') loaders.push(loadNotifications());
-    if (typeof cleanupStaleAIInputsForCurrentUser === 'function') {
-        loaders.push(cleanupStaleAIInputsForCurrentUser());
-    }
     await Promise.allSettled(loaders);
+
+    // AI 上传文件后台维护清理：彻底移出主首屏链路，延后至空闲时段调度
+    if (typeof cleanupStaleAIInputsForCurrentUser === 'function') {
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(() => cleanupStaleAIInputsForCurrentUser());
+        } else {
+            setTimeout(cleanupStaleAIInputsForCurrentUser, 3500);
+        }
+    }
 
     if (isNewLogin && typeof spawnHearts === 'function') {
         spawnHearts(window.innerWidth / 2, window.innerHeight / 2);

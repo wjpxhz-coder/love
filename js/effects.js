@@ -306,6 +306,7 @@ if (document.readyState === 'loading') {
 } else {
     initCardGlow();
 }
+let lastGlobalClickParticleTime = 0;
 document.addEventListener('click', (e) => {
     const panel = document.getElementById('notification-panel');
     const bell = document.getElementById('notification-bell');
@@ -314,9 +315,15 @@ document.addEventListener('click', (e) => {
     }
     
     if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, .fab-container, .notification-panel, [role="button"]')) return;
+    
+    const now = performance.now();
+    if (now - lastGlobalClickParticleTime < 180) return;
+    lastGlobalClickParticleTime = now;
+
     spawnHearts(e.clientX, e.clientY);
     if (typeof window.homeSakuraEffect?.createBurst === 'function') {
-        window.homeSakuraEffect.createBurst(e.clientX, e.clientY, 14);
+        const count = typeof isMobileClient === 'function' && isMobileClient() ? 6 : 10;
+        window.homeSakuraEffect.createBurst(e.clientX, e.clientY, count);
     }
 });
 

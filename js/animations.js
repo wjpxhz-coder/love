@@ -647,13 +647,20 @@ function sizeAnimationCanvas(canvas, context, width, height) {
 
         const maxDpr = isMobile ? 1.0 : 1.25;
         sizeHomeCanvas(canvasBg, ctxBg, canvasWidth, canvasHeight, isMobile ? 1.0 : 1.15);
-        sizeHomeCanvas(canvasFg, ctxFg, canvasWidth, canvasHeight, maxDpr);
+        if (isMobile) {
+            canvasFg.style.display = 'none';
+        } else {
+            canvasFg.style.display = '';
+            sizeHomeCanvas(canvasFg, ctxFg, canvasWidth, canvasHeight, maxDpr);
+        }
         syncPetalsPopulation();
     }
 
     function clearAnimationCanvases() {
         ctxBg.clearRect(0, 0, canvasWidth, canvasHeight);
-        ctxFg.clearRect(0, 0, canvasWidth, canvasHeight);
+        if (!isMobile) {
+            ctxFg.clearRect(0, 0, canvasWidth, canvasHeight);
+        }
     }
 
     let isSuspended = false;
@@ -704,15 +711,27 @@ function sizeAnimationCanvas(canvas, context, width, height) {
         for (let i = 0; i < bgPetals.length; i++) {
             bgPetals[i].draw(ctxBg);
         }
+        const targetFgCtx = isMobile ? ctxBg : ctxFg;
         for (let i = 0; i < fgPetals.length; i++) {
-            fgPetals[i].draw(ctxFg);
+            fgPetals[i].draw(targetFgCtx);
         }
         for (let i = 0; i < burstPetals.length; i++) {
-            burstPetals[i].draw(ctxFg);
+            burstPetals[i].draw(targetFgCtx);
         }
     }
 
-    // ── 高刷新率原生帧率动画主循环 (智能帧率预算控制，平衡画质与 GPU 能效) ──
+    // ── 滚动时 GPU 节能与帧率预算自适应控制 ──
+    let isUserScrolling = false;
+    let scrollDebounceTimer = null;
+    window.addEventListener('scroll', () => {
+        isUserScrolling = true;
+        clearTimeout(scrollDebounceTimer);
+        scrollDebounceTimer = setTimeout(() => {
+            isUserScrolling = false;
+        }, 140);
+    }, { passive: true });
+
+    // ── 原生帧率动画主循环 (智能帧率预算控制，平衡画质与能效) ──
     function animate(timestamp) {
         animationFrameId = null;
         if (!shouldRunAnimation()) {
@@ -720,8 +739,9 @@ function sizeAnimationCanvas(canvas, context, width, height) {
             return;
         }
 
-        // 帧率节流：在高刷屏 (120Hz/144Hz) 上平滑限频至约 60 FPS，防止多余 GPU 填充开销
-        if (lastRafTimestamp > 0 && timestamp - lastRafTimestamp < 14) {
+        // 滑动节能节流：页面处于快速滚动时主动退避(~30 FPS)，将 100% 渲染算力让位给列表滑动
+        const frameThresholdMs = isUserScrolling ? 32 : 14;
+        if (lastRafTimestamp > 0 && timestamp - lastRafTimestamp < frameThresholdMs) {
             animationFrameId = requestAnimationFrame(animate);
             return;
         }

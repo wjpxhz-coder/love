@@ -28,18 +28,17 @@ if (document.readyState === 'loading') {
     initializeApp();
 }
 // ==========================================
-// 注册 Service Worker (PWA)
+// Service Worker 更新监听 (PWA)
 // ==========================================
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
-            const registration = await navigator.serviceWorker.register('./sw.js', {
-                updateViaCache: 'none'
-            });
+            const registration = await navigator.serviceWorker.getRegistration();
+            if (!registration) return;
 
             const activateUpdate = worker => {
                 if (!worker || !navigator.serviceWorker.controller) return;
-                showToast('发现新版本，正在完成更新…');
+                if (typeof showToast === 'function') showToast('发现新版本，正在无缝完成更新…');
                 worker.postMessage({ type: 'SKIP_WAITING' });
             };
 
@@ -51,11 +50,8 @@ if ('serviceWorker' in navigator) {
                     if (worker.state === 'installed') activateUpdate(worker);
                 });
             });
-
-            // Check the worker script without cache-busting query strings.
-            await registration.update();
         } catch (error) {
-            console.warn('Service Worker registration failed:', error);
+            console.warn('Service Worker update monitor failed:', error);
         }
     }, { once: true });
 }
