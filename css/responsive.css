@@ -3,8 +3,8 @@
             .site-header h1 { font-size: 2.1em; 
             text-wrap: balance;}
             .timer-card .num { font-size: 1.7em; }
-            .timeline-section { padding: 24px 16px; }
-            .timeline-track { padding-left: 22px; }
+            .timeline-section { padding: 20px 12px; }
+            .timeline-track { padding-left: 0; }
             button { padding: 12px 20px; font-size: 0.88em; }
 
             .modal-box {
