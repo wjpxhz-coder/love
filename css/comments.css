@@ -1,28 +1,37 @@
 /* ── 评论区 ── */
 .comment-toggle-btn {
     font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
-    background: none;
-    border: none;
+    background: rgba(255, 255, 255, 0.65);
+    border: 1px solid rgba(220, 180, 190, 0.28);
     color: var(--text-muted);
-    padding: 8px 0 2px;
+    padding: 5px 12px;
     font-size: 0.82em;
     cursor: pointer;
-    box-shadow: none;
-    letter-spacing: 0.5px;
-    display: flex;
+    box-shadow: none !important;
+    letter-spacing: 0.3px;
+    display: inline-flex;
     align-items: center;
-    gap: 6px;
-    transition: color 0.2s ease;
-    width: 100%;
-    justify-content: flex-start;
-    font-weight: 500;
+    gap: 5px;
+    border-radius: 999px;
+    transition: all 0.22s cubic-bezier(0.25, 1, 0.5, 1);
+    font-weight: 600;
 }
-.comment-toggle-btn:hover { color: var(--primary); transform: none; box-shadow: none; }
+.comment-toggle-btn:hover {
+    color: #8b5cf6;
+    background: rgba(147, 112, 219, 0.08);
+    border-color: rgba(147, 112, 219, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(147, 112, 219, 0.12) !important;
+}
+.comment-toggle-btn::after { display: none !important; }
 
 .comment-section {
-    border-top: 1.5px dashed var(--border);
-    margin-top: 8px;
+    border-top: 1px solid rgba(220, 180, 190, 0.22);
+    margin-top: 12px;
     padding-top: 14px;
+}
+[data-theme='dark'] .comment-section {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .comment-item {
@@ -57,7 +66,7 @@
 }
 
 .comment-bubble {
-    background: rgba(255, 246, 249, 0.95);
+    background: rgba(255, 248, 250, 0.96);
     border-radius: 14px;
     padding: 9px 13px;
     font-size: 0.9em;
@@ -65,51 +74,79 @@
     color: var(--text);
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid var(--border);
-    box-shadow: 0 2px 8px var(--shadow);
+    border: 1px solid rgba(230, 195, 205, 0.45);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
     word-break: break-word;
 }
 
 [data-theme='dark'] .comment-bubble {
     background: rgba(45, 28, 66, 0.92);
-    border-color: var(--border);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
 .comment-time {
-    font-size: 0.72em;
+    font-size: 0.74em;
     color: var(--text-muted);
-    margin-top: 4px;
+    margin-top: 6px;
     padding-left: 2px;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 8px;
+}
+
+.comment-time-text {
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.2px;
+}
+
+.comment-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 4px;
 }
 
 .comment-write-btn {
     font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
-    background: none;
-    border: 1.5px dashed var(--primary-light);
-    color: var(--primary);
-    padding: 6px 16px;
-    border-radius: 20px;
-    font-size: 0.8em;
-    font-weight: 600;
+    background: rgba(255, 101, 132, 0.06);
+    border: 1px solid rgba(255, 101, 132, 0.18);
+    color: var(--text-muted);
+    padding: 9px 18px;
+    border-radius: 999px;
+    font-size: 0.82em;
+    font-weight: 500;
     cursor: pointer;
-    box-shadow: none;
-    margin-top: 8px;
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-    letter-spacing: 0.5px;
+    box-shadow: none !important;
+    margin-top: 10px;
+    transition: all 0.22s ease;
+    letter-spacing: 0.3px;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
+    width: 100%;
+    justify-content: flex-start;
 }
 .comment-write-btn:hover {
     border-color: var(--primary);
     color: var(--primary);
-    background: rgba(255, 101, 132, 0.08);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px var(--shadow);
+    background: rgba(255, 101, 132, 0.1);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 10px rgba(255, 101, 132, 0.12) !important;
+}
+.comment-write-btn::after { display: none !important; }
+
+[data-theme='dark'] .comment-write-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: var(--text-muted);
+}
+[data-theme='dark'] .comment-write-btn:hover {
+    background: rgba(255, 143, 171, 0.15);
+    border-color: var(--primary-light);
+    color: var(--primary-light);
 }
 
 .comment-textarea {
@@ -172,101 +209,241 @@
         }
         .comment-cancel-btn:hover { background: rgba(200,155,155,0.08); transform: none; box-shadow: none; color: var(--text); }
 
-        /* ── 评论点赞 ── */
-        .comment-like-btn {
-            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            padding: 0;
-            font-size: 0.85em;
-            cursor: pointer;
-            box-shadow: none;
-            margin-left: 0;
-            transition: color 0.2s;
+        /* ── 评论区微型胶囊互动组 (Micro-Pills) ── */
+        .comment-actions {
             display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .comment-like-btn:hover { color: #e74c6f; transform: none; box-shadow: none; }
-        .comment-like-btn.liked { color: #e74c6f; }
-        .comment-like-btn::after { display: none; }
-        .comment-like-btn .like-heart { transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1); display: inline-block; }
-        .comment-like-btn.liked .like-heart { animation: likePopIn 0.4s ease; }
-        @keyframes likePopIn {
-            0% { transform: scale(1); }
-            40% { transform: scale(1.5); }
-            100% { transform: scale(1); }
-        }
-
-        /* ── 评论回复 ── */
-        .comment-reply-btn {
-            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            padding: 0;
-            font-size: 0.85em;
-            cursor: pointer;
-            box-shadow: none;
-            margin-left: 0;
-            transition: color 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 2px;
-        }
-        .comment-reply-btn:hover {
-            color: var(--primary);
-            transform: none;
-            box-shadow: none;
-        }
-        .comment-reply-btn::after { display: none; }
-
-        /* ── 动态点赞按钮 ── */
-        .moment-like-bar {
-            display: flex;
             align-items: center;
             gap: 6px;
-            padding: 6px 0 2px;
-            border-top: 1px dashed rgba(200,155,155,0.18);
-            margin-top: 8px;
+            margin-left: 4px;
         }
-        .moment-like-btn {
+
+        .comment-like-btn,
+        .comment-reply-btn,
+        .comment-recall-btn {
             font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
-            background: none;
+            background: transparent;
             border: none;
+            outline: none;
             color: var(--text-muted);
-            padding: 4px 10px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.88em;
+            font-weight: 500;
+            cursor: pointer;
+            box-shadow: none !important;
+            margin: 0;
+            transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            line-height: 1.4;
+            letter-spacing: 0;
+            position: static;
+            overflow: visible !important;
+        }
+
+        .comment-like-btn::after,
+        .comment-reply-btn::after,
+        .comment-recall-btn::after {
+            display: none !important;
+        }
+
+        /* 评论点赞 */
+        .comment-like-btn:hover {
+            color: #e74c6f;
+            background: rgba(231, 76, 111, 0.08);
+            transform: none;
+            box-shadow: none !important;
+        }
+        .comment-like-btn.liked {
+            color: #e74c6f;
+            background: rgba(231, 76, 111, 0.08);
+            font-weight: 600;
+        }
+        .comment-like-btn .like-heart {
+            font-size: 1em;
+            line-height: 1;
+            transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            display: inline-block;
+        }
+        .comment-like-btn.liked .like-heart { animation: likePopIn 0.35s ease; }
+
+        /* 评论回复 */
+        .comment-reply-btn:hover {
+            color: var(--primary);
+            background: rgba(255, 101, 132, 0.08);
+            transform: none;
+            box-shadow: none !important;
+        }
+        .comment-reply-btn .reply-btn-icon {
+            font-size: 0.95em;
+            opacity: 0.85;
+        }
+
+        /* 评论撤回 */
+        .comment-recall-btn {
+            color: var(--text-muted);
+        }
+        .comment-recall-btn:hover {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.09);
+            transform: none;
+            box-shadow: none !important;
+        }
+        .comment-recall-btn .recall-btn-icon {
+            font-size: 0.95em;
+            opacity: 0.85;
+        }
+
+        /* 评论按钮触控微反馈 */
+        .comment-like-btn:active,
+        .comment-reply-btn:active,
+        .comment-recall-btn:active {
+            transform: scale(0.94) !important;
+        }
+
+        /* 暗色主题适配 */
+        [data-theme='dark'] .comment-like-btn:hover,
+        [data-theme='dark'] .comment-like-btn.liked {
+            color: #ff8fab;
+            background: rgba(255, 143, 171, 0.15);
+        }
+        [data-theme='dark'] .comment-reply-btn:hover {
+            color: #ff8fab;
+            background: rgba(255, 143, 171, 0.15);
+        }
+        [data-theme='dark'] .comment-recall-btn:hover {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.2);
+        }
+
+        /* ── 动态卡片统一互动操作栏 (Action Bar) ── */
+        .moment-actions-bar,
+        .moment-like-bar {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px 0 2px;
+            border-top: 1px solid rgba(220, 180, 190, 0.22);
+            margin-top: 12px;
+        }
+        [data-theme='dark'] .moment-actions-bar,
+        [data-theme='dark'] .moment-like-bar {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .moment-buttons-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .moment-like-btn,
+        .moment-star-btn {
+            font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+            background: rgba(255, 255, 255, 0.65);
+            border: 1px solid rgba(220, 180, 190, 0.28);
+            color: var(--text-muted);
+            padding: 5px 12px;
             font-size: 0.82em;
             cursor: pointer;
-            box-shadow: none;
+            box-shadow: none !important;
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            border-radius: 20px;
-            transition: all 0.2s;
-            letter-spacing: 0.5px;
+            border-radius: 999px;
+            transition: all 0.22s cubic-bezier(0.25, 1, 0.5, 1);
+            letter-spacing: 0.3px;
+            font-weight: 600;
+            outline: none;
         }
+
+        .moment-like-btn::after,
+        .moment-star-btn::after {
+            display: none !important;
+        }
+
         .moment-like-btn:hover {
-            background: rgba(231,76,111,0.08);
+            background: rgba(231, 76, 111, 0.08);
+            border-color: rgba(231, 76, 111, 0.3);
             color: #e74c6f;
-            transform: none;
-            box-shadow: none;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(231, 76, 111, 0.12) !important;
         }
         .moment-like-btn.liked {
             color: #e74c6f;
-            background: rgba(231,76,111,0.08);
+            background: rgba(231, 76, 111, 0.12);
+            border-color: rgba(231, 76, 111, 0.4);
+            font-weight: 700;
         }
-        .moment-like-btn::after { display: none; }
-        .moment-like-btn .ml-heart { transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1); display: inline-block; }
-        .moment-like-btn.liked .ml-heart { animation: likePopIn 0.4s ease; }
-        .moment-like-likers {
-            font-size: 0.75em;
+        .moment-like-btn .ml-heart {
+            transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            display: inline-block;
+        }
+        .moment-like-btn.liked .ml-heart {
+            animation: likePopIn 0.35s ease;
+        }
+
+        .moment-star-btn:hover {
+            background: rgba(245, 166, 35, 0.08);
+            border-color: rgba(245, 166, 35, 0.3);
+            color: #f5a623;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(245, 166, 35, 0.12) !important;
+        }
+        .moment-star-btn.starred {
+            color: #f5a623;
+            background: rgba(245, 166, 35, 0.12);
+            border-color: rgba(245, 166, 35, 0.4);
+            font-weight: 700;
+        }
+
+        .moment-like-btn:active,
+        .moment-star-btn:active {
+            transform: scale(0.95) !important;
+        }
+
+        [data-theme='dark'] .moment-like-btn,
+        [data-theme='dark'] .moment-star-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
             color: var(--text-muted);
-            flex: 1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        }
+        [data-theme='dark'] .moment-like-btn:hover {
+            background: rgba(255, 143, 171, 0.15);
+            border-color: rgba(255, 143, 171, 0.3);
+            color: #ff8fab;
+        }
+        [data-theme='dark'] .moment-like-btn.liked {
+            background: rgba(255, 143, 171, 0.2);
+            border-color: rgba(255, 143, 171, 0.45);
+            color: #ff8fab;
+        }
+        [data-theme='dark'] .moment-star-btn:hover {
+            background: rgba(253, 224, 71, 0.15);
+            border-color: rgba(253, 224, 71, 0.3);
+            color: #fde047;
+        }
+        [data-theme='dark'] .moment-star-btn.starred {
+            background: rgba(253, 224, 71, 0.2);
+            border-color: rgba(253, 224, 71, 0.45);
+            color: #fde047;
+        }
+
+        /* 点赞人展示行 */
+        .moment-likers-row {
+            padding-left: 2px;
+        }
+        .moment-like-likers {
+            font-size: 0.78em;
+            color: var(--text-muted);
+            line-height: 1.5;
+            display: inline-block;
+            transition: opacity 0.2s ease;
+        }
+        .moment-like-likers:empty {
+            display: none;
         }
 
         /* ── 评论图片 ── */

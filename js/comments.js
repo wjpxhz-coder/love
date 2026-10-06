@@ -365,7 +365,13 @@ async function loadComments(momentId, targetCard = null) {
         data.forEach((c, commentIndex) => {
             const commentId = Number(c.id);
             if (!Number.isSafeInteger(commentId) || commentId <= 0) return;
-            const dateStr = new Date(c.created_at).toLocaleString('zh-CN', { hour12: false });
+            const createdAt = new Date(c.created_at);
+            const friendlyDateStr = typeof formatFriendlyTime === 'function'
+                ? formatFriendlyTime(createdAt)
+                : (!Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleDateString('zh-CN') : '');
+            const fullDateStr = typeof formatFullTime === 'function'
+                ? formatFullTime(createdAt)
+                : (!Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleString('zh-CN', { hour12: false }) : '');
             const badgeClass = c.author === '小蛇' ? 'author-snake' : 'author-xi';
             const emoji = c.author === '小蛇' ? '🐍' : '🐟';
             
@@ -506,11 +512,22 @@ async function loadComments(momentId, targetCard = null) {
 
             const time = document.createElement('div');
             time.className = 'comment-time';
-            time.appendChild(document.createTextNode(`${dateStr} `));
+
+            const timeTextEl = document.createElement('span');
+            timeTextEl.className = 'comment-time-text';
+            timeTextEl.textContent = friendlyDateStr;
+            if (fullDateStr) timeTextEl.title = fullDateStr;
+            time.appendChild(timeTextEl);
+
+            const actionsWrap = document.createElement('div');
+            actionsWrap.className = 'comment-actions';
+
             const likeButton = document.createElement('button');
             likeButton.type = 'button';
             likeButton.className = `comment-like-btn${isLiked ? ' liked' : ''}`;
             likeButton.id = `like-btn-${commentId}`;
+            likeButton.setAttribute('aria-label', `${isLiked ? '取消点赞' : '点赞'}此评论`);
+            likeButton.setAttribute('aria-pressed', isLiked ? 'true' : 'false');
             const heart = document.createElement('span');
             heart.className = 'like-heart';
             heart.textContent = isLiked ? '❤️' : '🤍';
@@ -520,12 +537,18 @@ async function loadComments(momentId, targetCard = null) {
             count.textContent = likeCount > 0 ? String(likeCount) : '赞';
             likeButton.append(heart, count);
             likeButton.addEventListener('click', () => toggleCommentLike(commentId, momentId));
-            time.appendChild(likeButton);
+            actionsWrap.appendChild(likeButton);
 
             const replyButton = document.createElement('button');
             replyButton.type = 'button';
             replyButton.className = 'comment-reply-btn';
-            replyButton.textContent = '回复';
+            const replyIcon = document.createElement('span');
+            replyIcon.className = 'reply-btn-icon';
+            replyIcon.textContent = '↩';
+            const replyText = document.createElement('span');
+            replyText.className = 'reply-btn-text';
+            replyText.textContent = '回复';
+            replyButton.append(replyIcon, replyText);
             replyButton.setAttribute('aria-label', `回复 ${isAIComment ? '感情助手' : displayName}`);
             replyButton.addEventListener('click', () => {
                 startReplyToComment(momentId, {
@@ -535,19 +558,24 @@ async function loadComments(momentId, targetCard = null) {
                     isAI: isAIComment
                 }, item);
             });
-            time.appendChild(replyButton);
+            actionsWrap.appendChild(replyButton);
+
             if (currentAuthUser && c.user_id === currentAuthUser.id) {
                 const recall = document.createElement('button');
                 recall.type = 'button';
                 recall.className = 'comment-recall-btn';
-                recall.textContent = '撤回';
-                Object.assign(recall.style, {
-                    color: 'var(--primary)', cursor: 'pointer',
-                    border: '0', background: 'transparent', padding: '0'
-                });
+                const recallIcon = document.createElement('span');
+                recallIcon.className = 'recall-btn-icon';
+                recallIcon.textContent = '🗑️';
+                const recallText = document.createElement('span');
+                recallText.className = 'recall-btn-text';
+                recallText.textContent = '撤回';
+                recall.append(recallIcon, recallText);
+                recall.setAttribute('aria-label', '撤回此评论');
                 recall.addEventListener('click', () => confirmDeleteComment(commentId, momentId));
-                time.appendChild(recall);
+                actionsWrap.appendChild(recall);
             }
+            time.appendChild(actionsWrap);
             body.append(bubble, time);
             item.append(header, body);
             fragment.appendChild(item);

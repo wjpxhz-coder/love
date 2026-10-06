@@ -44,6 +44,71 @@ function isMomentAuthEpochCurrent(epoch) {
 }
 
 
+function formatFriendlyTime(dateInput) {
+    if (!dateInput) return '';
+    const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+
+    if (diffMs >= 0 && diffMs < 60 * 1000) {
+        return '刚刚';
+    }
+    if (diffMs >= 60 * 1000 && diffMs < 60 * 60 * 1000) {
+        return `${Math.floor(diffMs / (60 * 1000))}分钟前`;
+    }
+
+    const pad = n => String(n).padStart(2, '0');
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+
+    const isSameDay = now.getFullYear() === date.getFullYear()
+        && now.getMonth() === date.getMonth()
+        && now.getDate() === date.getDate();
+
+    if (isSameDay) {
+        return `今天 ${hours}:${minutes}`;
+    }
+
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const isYesterday = yesterday.getFullYear() === date.getFullYear()
+        && yesterday.getMonth() === date.getMonth()
+        && yesterday.getDate() === date.getDate();
+
+    if (isYesterday) {
+        return `昨天 ${hours}:${minutes}`;
+    }
+
+    const beforeYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+    const isBeforeYesterday = beforeYesterday.getFullYear() === date.getFullYear()
+        && beforeYesterday.getMonth() === date.getMonth()
+        && beforeYesterday.getDate() === date.getDate();
+
+    if (isBeforeYesterday) {
+        return `前天 ${hours}:${minutes}`;
+    }
+
+    if (now.getFullYear() === date.getFullYear()) {
+        return `${date.getMonth() + 1}月${date.getDate()}日 ${hours}:${minutes}`;
+    }
+
+    return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${hours}:${minutes}`;
+}
+
+function formatFullTime(dateInput) {
+    if (!dateInput) return '';
+    const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = n => String(n).padStart(2, '0');
+    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+if (typeof window !== 'undefined') {
+    window.formatFriendlyTime = formatFriendlyTime;
+    window.formatFullTime = formatFullTime;
+}
+
 function getMomentProfileAvatarUrl(profile) {
     if (typeof getProfileAvatarUrl === 'function') return getProfileAvatarUrl(profile);
     return sanitizeMediaUrl(profile && profile.avatar_url);
@@ -1662,61 +1727,87 @@ function createMomentCardElement(item, options = {}) {
     card.id = `card-${momentId}`;
 
     const header = createMomentNode('div', 'card-header');
-    const meta = createMomentNode('div', 'card-meta');
+    const authorInfo = createMomentNode('div', 'card-author-info');
     const createdAt = new Date(item.created_at);
-    const dateText = Number.isNaN(createdAt.getTime())
-        ? ''
-        : createdAt.toLocaleString('zh-CN', { hour12: false });
-    meta.appendChild(createMomentNode('span', 'time-text', dateText));
+
+    const author = typeof item.author === 'string' ? item.author : '';
+    const authorProfile = allProfilesCache[author] || {};
+    const displayName = String(authorProfile.nickname || author || '家人');
+    const avatarUrl = getMomentProfileAvatarUrl(authorProfile);
+    const authorThemeClass = author === '小蛇' ? 'author-snake' : (author === '小奚' ? 'author-xi' : '');
+    const defaultEmoji = author === '小蛇' ? '🐍' : (author === '小奚' ? '🐟' : '💖');
+
+    // 左侧：精致大头像 (40px)
+    const avatarWrap = createMomentNode('div', `card-author-avatar-wrap${authorThemeClass ? ` ${authorThemeClass}` : ''}`);
+    avatarWrap.dataset.momentAction = 'open-profile';
+    avatarWrap.dataset.author = author;
+    avatarWrap.tabIndex = 0;
+    avatarWrap.setAttribute('role', 'button');
+    avatarWrap.setAttribute('aria-label', `查看 ${displayName} 的主页`);
+    avatarWrap.title = '点击查看主页';
+
+    if (avatarUrl) {
+        const avatarImg = document.createElement('img');
+        avatarImg.src = avatarUrl;
+        avatarImg.alt = displayName;
+        avatarImg.className = 'card-author-avatar-img';
+        avatarWrap.appendChild(avatarImg);
+    } else {
+        const avatarEmoji = createMomentNode('span', 'card-author-avatar-emoji', defaultEmoji);
+        avatarWrap.appendChild(avatarEmoji);
+    }
+    authorInfo.appendChild(avatarWrap);
+
+    // 右侧：上下两行排版 (姓名徽章 / 生活化相对时间)
+    const authorTextCol = createMomentNode('div', 'card-author-text');
+
+    // 上行：昵称 + 专属身份小标 + 大事记徽标
+    const authorTopRow = createMomentNode('div', 'card-author-top-row');
+    const nameEl = createMomentNode('span', 'card-author-name', displayName);
+    nameEl.dataset.momentAction = 'open-profile';
+    nameEl.dataset.author = author;
+    nameEl.tabIndex = 0;
+    nameEl.setAttribute('role', 'button');
+    nameEl.title = '点击查看主页';
+    authorTopRow.appendChild(nameEl);
+
+    if (author) {
+        const authorTag = createMomentNode('span', `card-author-tag${authorThemeClass ? ` ${authorThemeClass}` : ''}`, author);
+        authorTopRow.appendChild(authorTag);
+    }
+    if (isMilestone) {
+        authorTopRow.appendChild(createMomentNode('span', 'milestone-badge-timeline', '🏆 大事记'));
+    } else if (options?.showMilestoneDays) {
+        authorTopRow.appendChild(createMomentNode('span', 'milestone-badge-timeline star', '⭐ 收藏'));
+    }
+    authorTextCol.appendChild(authorTopRow);
+
+    // 下行：自然相对时间 + 编辑态 + 纪念天数
+    const authorSubRow = createMomentNode('div', 'card-author-sub-row');
+    const dateText = Number.isNaN(createdAt.getTime()) ? '' : formatFriendlyTime(createdAt);
+    const fullDateText = Number.isNaN(createdAt.getTime()) ? '' : formatFullTime(createdAt);
+    const timeSpan = createMomentNode('span', 'time-text', dateText);
+    if (fullDateText) timeSpan.title = fullDateText;
+    authorSubRow.appendChild(timeSpan);
 
     if (isEdited) {
         const editedDate = new Date(parsedMoment.updated_at || parsedMoment.edited_at);
         const editedTitle = Number.isNaN(editedDate.getTime())
             ? '已编辑'
-            : `最后编辑于 ${editedDate.toLocaleString('zh-CN', { hour12: false })}`;
+            : `最后编辑于 ${formatFullTime(editedDate)}`;
         const editedBadge = createMomentNode('span', 'moment-edited-badge', '已编辑');
         editedBadge.title = editedTitle;
-        meta.appendChild(editedBadge);
-    }
-
-    const author = typeof item.author === 'string' ? item.author : '';
-    if (author) {
-        const authorProfile = allProfilesCache[author] || {};
-        const authorBadgeClass = author === '小蛇' ? 'author-snake' : (author === '小奚' ? 'author-xi' : '');
-        const authorBadge = createMomentNode('span', `author-badge${authorBadgeClass ? ` ${authorBadgeClass}` : ''}`);
-        authorBadge.dataset.momentAction = 'open-profile';
-        authorBadge.dataset.author = author;
-        authorBadge.tabIndex = 0;
-        authorBadge.setAttribute('role', 'button');
-        authorBadge.title = '点击查看主页';
-        authorBadge.style.cursor = 'pointer';
-        const avatarUrl = getMomentProfileAvatarUrl(authorProfile);
-        if (avatarUrl) {
-            const avatar = document.createElement('img');
-            avatar.src = avatarUrl;
-            avatar.alt = '';
-            Object.assign(avatar.style, {
-                width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover',
-                verticalAlign: 'middle', marginRight: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-            });
-            authorBadge.appendChild(avatar);
-        } else {
-            authorBadge.appendChild(document.createTextNode(author === '小蛇' ? '🐍 ' : (author === '小奚' ? '🐟 ' : '')));
-        }
-        authorBadge.appendChild(document.createTextNode(String(authorProfile.nickname || author)));
-        meta.appendChild(authorBadge);
-    }
-    if (isMilestone) {
-        meta.appendChild(createMomentNode('span', 'milestone-badge-timeline', '🏆 大事记'));
-    } else if (options?.showMilestoneDays) {
-        meta.appendChild(createMomentNode('span', 'milestone-badge-timeline star', '⭐ 收藏'));
+        authorSubRow.appendChild(editedBadge);
     }
     if (options?.showMilestoneDays && !Number.isNaN(createdAt.getTime())) {
         const diffMs = Date.now() - createdAt.getTime();
         const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
-        meta.appendChild(createMomentNode('span', 'milestone-days-badge', `已过 ${diffDays} 天 💖`));
+        authorSubRow.appendChild(createMomentNode('span', 'milestone-days-badge', `已过 ${diffDays} 天 💖`));
     }
-    header.appendChild(meta);
+    authorTextCol.appendChild(authorSubRow);
+
+    authorInfo.appendChild(authorTextCol);
+    header.appendChild(authorInfo);
 
     const canDelete = item.user_id === currentAuthUser?.id
         && !Number.isNaN(createdAt.getTime())
@@ -1854,30 +1945,23 @@ function createMomentCardElement(item, options = {}) {
     }
 
     const hasStarred = typeof starredMomentIds !== 'undefined' && starredMomentIds.has(momentId);
-    const likeBar = createMomentNode('div', 'moment-like-bar');
+    const actionsBar = createMomentNode('div', 'moment-actions-bar moment-like-bar');
+    const buttonsGroup = createMomentNode('div', 'moment-buttons-group');
+
+    // 1. 点赞按钮
     const likeButton = createMomentNode('button', 'moment-like-btn');
     likeButton.type = 'button';
     likeButton.id = `moment-like-btn-${momentId}`;
     likeButton.dataset.momentAction = 'toggle-like';
     likeButton.dataset.momentId = String(momentId);
+    likeButton.setAttribute('aria-label', '点赞此动态');
     likeButton.append(
         createMomentNode('span', 'ml-heart', '🤍'),
         createMomentNode('span', 'ml-count', '喜欢')
     );
     likeButton.querySelector('.ml-count').id = `moment-like-count-${momentId}`;
-    const starButton = createMomentNode('button', `moment-star-btn${hasStarred ? ' starred' : ''}`, hasStarred ? '⭐ 已收藏' : '☆ 收藏');
-    starButton.type = 'button';
-    starButton.id = `moment-star-btn-${momentId}`;
-    starButton.dataset.momentAction = 'toggle-star';
-    starButton.dataset.momentId = String(momentId);
-    const starPending = typeof pendingMomentStarIds !== 'undefined' && pendingMomentStarIds.has(momentId);
-    starButton.disabled = starPending;
-    if (starPending) starButton.setAttribute('aria-busy', 'true');
-    const likers = createMomentNode('span', 'moment-like-likers');
-    likers.id = `moment-like-likers-${momentId}`;
-    likeBar.append(likeButton, starButton, likers);
-    card.appendChild(likeBar);
 
+    // 2. 评论展开/收起按钮
     const commentToggle = createMomentNode('button', 'comment-toggle-btn');
     commentToggle.type = 'button';
     commentToggle.id = `comment-toggle-${momentId}`;
@@ -1885,11 +1969,34 @@ function createMomentCardElement(item, options = {}) {
     commentToggle.dataset.momentId = String(momentId);
     commentToggle.setAttribute('aria-controls', `comments-${momentId}`);
     commentToggle.setAttribute('aria-expanded', 'false');
-    commentToggle.appendChild(document.createTextNode('💬 '));
-    const commentCount = createMomentNode('span', '', '评论');
+    commentToggle.setAttribute('aria-label', '展开或收起评论');
+    const commentIcon = createMomentNode('span', 'comment-btn-icon', '💬');
+    const commentCount = createMomentNode('span', 'comment-btn-count', '评论');
     commentCount.id = `comment-count-${momentId}`;
-    commentToggle.appendChild(commentCount);
-    card.appendChild(commentToggle);
+    commentToggle.append(commentIcon, commentCount);
+
+    // 3. 收藏按钮
+    const starButton = createMomentNode('button', `moment-star-btn${hasStarred ? ' starred' : ''}`, hasStarred ? '⭐ 已收藏' : '☆ 收藏');
+    starButton.type = 'button';
+    starButton.id = `moment-star-btn-${momentId}`;
+    starButton.dataset.momentAction = 'toggle-star';
+    starButton.dataset.momentId = String(momentId);
+    starButton.setAttribute('aria-label', hasStarred ? '取消收藏' : '收藏此动态');
+    const starPending = typeof pendingMomentStarIds !== 'undefined' && pendingMomentStarIds.has(momentId);
+    starButton.disabled = starPending;
+    if (starPending) starButton.setAttribute('aria-busy', 'true');
+
+    buttonsGroup.append(likeButton, commentToggle, starButton);
+    actionsBar.appendChild(buttonsGroup);
+
+    // 点赞人展示行 (优雅柔和，空时不占位)
+    const likersRow = createMomentNode('div', 'moment-likers-row');
+    const likers = createMomentNode('span', 'moment-like-likers');
+    likers.id = `moment-like-likers-${momentId}`;
+    likersRow.appendChild(likers);
+    actionsBar.appendChild(likersRow);
+
+    card.appendChild(actionsBar);
 
     const commentSection = createMomentNode('div', 'comment-section');
     commentSection.id = `comments-${momentId}`;
@@ -1897,7 +2004,7 @@ function createMomentCardElement(item, options = {}) {
     commentSection.setAttribute('aria-hidden', 'true');
     const commentList = createMomentNode('div', 'comment-list');
     commentList.id = `comment-list-${momentId}`;
-    const writeButton = createMomentNode('button', 'comment-write-btn', '✏️ 写评论');
+    const writeButton = createMomentNode('button', 'comment-write-btn', '✏️ 写下你的温柔想法…');
     writeButton.type = 'button';
     writeButton.id = `comment-write-btn-${momentId}`;
     writeButton.dataset.momentAction = 'write-comment';
