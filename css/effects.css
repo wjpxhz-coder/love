@@ -355,7 +355,8 @@ button:hover::after {
 .comment-cancel-btn::after, .btn-cancel::after, .mood-emoji-btn::after,
 .ai-tab::after, .theme-toggle::after, .ai-refresh-btn::after,
 .ai-chat-close-btn::after, .ai-chat-send-btn::after,
-.moment-like-btn::after, .comment-img-upload-btn::after,
+.moment-like-btn::after, .moment-star-btn::after, .comment-img-upload-btn::after,
+.comment-reply-btn::after, .comment-recall-btn::after,
 .notification-read-all::after, .user-dropdown-item::after,
 .moment-image-add-btn::after, .edit-avatar-circle::after { display: none; }
 
