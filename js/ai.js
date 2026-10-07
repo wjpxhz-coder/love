@@ -55,6 +55,8 @@ const AI_INPUT_BUCKET = 'ai-inputs';
 const AI_MAX_ATTACHMENTS = 9;
 const AI_MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const AI_MAX_TOTAL_IMAGE_BYTES = 40 * 1024 * 1024;
+const AI_IMAGE_MAX_DIMENSION = 1280;
+const AI_IMAGE_QUALITY = 0.80;
 const AI_DIARY_PAGE_SIZE = 20;
 const AI_SUMMARY_STORY_MAX_CHARACTERS = 3800;
 const AI_STALE_UPLOAD_AGE_MS = 15 * 60 * 1000;
@@ -69,6 +71,7 @@ const AI_IMAGE_EXTENSIONS = new Map([
 let currentAITab = 'topic';
 let chatHistory = [];
 let isChatSending = false;
+let isCompressingAIImages = false;
 let activeChatRequestId = 0;
 let aiInteractionGeneration = 0;
 let pendingChatAttachments = [];
@@ -704,6 +707,7 @@ function renderPendingChatAttachments() {
     const localInput = document.getElementById('aiLocalImageInput');
     if (count) count.textContent = `${pendingChatAttachments.length} / ${AI_MAX_ATTACHMENTS}`;
     const localSelectionDisabled = isChatSending
+        || isCompressingAIImages
         || pendingChatAttachments.length >= AI_MAX_ATTACHMENTS;
     if (localButton) localButton.disabled = localSelectionDisabled;
     if (localInput) localInput.disabled = localSelectionDisabled;
@@ -736,7 +740,7 @@ function renderPendingChatAttachments() {
         remove.className = 'ai-attachment-remove';
         remove.textContent = '×';
         remove.setAttribute('aria-label', `移除待发送图片 ${index + 1}`);
-        remove.disabled = isChatSending;
+        remove.disabled = isChatSending || isCompressingAIImages;
         remove.addEventListener('click', () => removePendingChatAttachment(attachment.id));
 
         item.append(image, source, remove);
@@ -755,7 +759,7 @@ function clearPendingChatAttachments() {
 }
 
 function removePendingChatAttachment(attachmentId) {
-    if (isChatSending) return;
+    if (isChatSending || isCompressingAIImages) return;
     const index = pendingChatAttachments.findIndex(attachment => attachment.id === attachmentId);
     if (index < 0) return;
     const [removed] = pendingChatAttachments.splice(index, 1);
@@ -767,8 +771,87 @@ function notifyAIImageSelection(message) {
     if (typeof showToast === 'function') showToast(message, 4500);
 }
 
+async function inlineCompressAIImage(file, maxWidth = 1280, maxHeight = 1280, quality = 0.80) {
+    if (!file || !file.type?.startsWith('image/')) return file;
+    if (file.size <= 150 * 1024 && (file.type === 'image/webp' || file.type === 'image/jpeg')) {
+        return file;
+    }
+    try {
+        const image = await new Promise((resolve, reject) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                resolve(img);
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('IMAGE_DECODE_FAILED'));
+            };
+            img.src = url;
+        });
+
+        let { naturalWidth: width, naturalHeight: height } = image;
+        if (!width || !height) return file;
+
+        if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.max(1, Math.round(width * ratio));
+            height = Math.max(1, Math.round(height * ratio));
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return file;
+
+        const isPng = file.type === 'image/png';
+        if (!isPng) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+        }
+        ctx.drawImage(image, 0, 0, width, height);
+
+        let blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
+        let targetMime = 'image/webp';
+        let ext = 'webp';
+
+        if (!blob || blob.type !== 'image/webp') {
+            targetMime = isPng ? 'image/png' : 'image/jpeg';
+            ext = isPng ? 'png' : 'jpg';
+            blob = await new Promise(resolve => canvas.toBlob(resolve, targetMime, quality));
+        }
+
+        if (!blob || (blob.size >= file.size && file.type === targetMime)) {
+            return file;
+        }
+
+        const baseName = (file.name || 'image').replace(/\.[^/.]+$/, '');
+        return new File([blob], `${baseName}.${ext}`, { type: targetMime });
+    } catch (err) {
+        console.warn('[AI助手] 内置图片压缩失败，降级使用原图:', err);
+        return file;
+    }
+}
+
+async function compressAIImageFile(file) {
+    if (!file || !file.type?.startsWith('image/')) return file;
+    if (typeof compressImageFile === 'function') {
+        try {
+            const compressed = await compressImageFile(file, AI_IMAGE_MAX_DIMENSION, AI_IMAGE_MAX_DIMENSION, AI_IMAGE_QUALITY);
+            if (compressed && AI_IMAGE_EXTENSIONS.has(compressed.type)) {
+                return compressed;
+            }
+        } catch (err) {
+            console.warn('[AI助手] compressImageFile 处理异常，执行内置压缩兜底:', err);
+        }
+    }
+    return await inlineCompressAIImage(file, AI_IMAGE_MAX_DIMENSION, AI_IMAGE_MAX_DIMENSION, AI_IMAGE_QUALITY);
+}
+
 function openAILocalImagePicker() {
-    if (isChatSending) return;
+    if (isChatSending || isCompressingAIImages) return;
     if (!isAuthenticated()) {
         openLoginModal();
         return;
@@ -780,11 +863,11 @@ function openAILocalImagePicker() {
     document.getElementById('aiLocalImageInput')?.click();
 }
 
-function handleAILocalImageSelect(event) {
+async function handleAILocalImageSelect(event) {
     const input = event?.target;
     const files = Array.from(input?.files || []);
     if (input) input.value = '';
-    if (files.length === 0 || isChatSending) return;
+    if (files.length === 0 || isChatSending || isCompressingAIImages) return;
     if (!isAuthenticated()) {
         openLoginModal();
         return;
@@ -794,47 +877,64 @@ function handleAILocalImageSelect(event) {
         return;
     }
 
+    isCompressingAIImages = true;
+    setAIChatComposerBusy(true);
+
     let localBytes = getPendingLocalImageBytes();
     let rejectedType = false;
     let rejectedSize = false;
     let rejectedTotal = false;
     let rejectedCount = false;
 
-    for (const file of files) {
-        if (pendingChatAttachments.length >= AI_MAX_ATTACHMENTS) {
-            rejectedCount = true;
-            break;
-        }
-        if (!AI_IMAGE_EXTENSIONS.has(file.type)) {
-            rejectedType = true;
-            continue;
-        }
-        if (!Number.isFinite(file.size) || file.size <= 0 || file.size > AI_MAX_IMAGE_BYTES) {
-            rejectedSize = true;
-            continue;
-        }
-        if (localBytes + file.size > AI_MAX_TOTAL_IMAGE_BYTES) {
-            rejectedTotal = true;
-            continue;
+    try {
+        for (const rawFile of files) {
+            if (pendingChatAttachments.length >= AI_MAX_ATTACHMENTS) {
+                rejectedCount = true;
+                break;
+            }
+            if (!AI_IMAGE_EXTENSIONS.has(rawFile.type)) {
+                rejectedType = true;
+                continue;
+            }
+            if (!Number.isFinite(rawFile.size) || rawFile.size <= 0 || rawFile.size > AI_MAX_IMAGE_BYTES) {
+                rejectedSize = true;
+                continue;
+            }
+
+            // 核心流量优化：将原始大图等比压缩至 1280px 并转为高能效 WebP/JPEG，极大节省网络出网流量与 API 视觉 Token
+            let file = rawFile;
+            try {
+                file = await compressAIImageFile(rawFile);
+            } catch (compressErr) {
+                console.warn('[AI助手] 压缩图片时出错，使用原图:', compressErr);
+            }
+
+            if (localBytes + file.size > AI_MAX_TOTAL_IMAGE_BYTES) {
+                rejectedTotal = true;
+                continue;
+            }
+
+            const previewUrl = URL.createObjectURL(file);
+            pendingChatAttachments.push({
+                id: `local-${++aiAttachmentSequence}`,
+                source: 'temporary',
+                file,
+                label: file.name || '本地图片',
+                previewUrl,
+                revokePreview: true
+            });
+            localBytes += file.size;
         }
 
-        const previewUrl = URL.createObjectURL(file);
-        pendingChatAttachments.push({
-            id: `local-${++aiAttachmentSequence}`,
-            source: 'temporary',
-            file,
-            label: file.name || '本地图片',
-            previewUrl,
-            revokePreview: true
-        });
-        localBytes += file.size;
+        renderPendingChatAttachments();
+        if (rejectedCount) notifyAIImageSelection('单次最多选择 9 张图片。');
+        else if (rejectedTotal) notifyAIImageSelection('本地图片总大小不能超过 40 MiB。');
+        else if (rejectedSize) notifyAIImageSelection('每张图片须小于等于 10 MiB，且不能是空文件。');
+        else if (rejectedType) notifyAIImageSelection('仅支持 JPEG、PNG 和 WebP 图片。');
+    } finally {
+        isCompressingAIImages = false;
+        setAIChatComposerBusy(false);
     }
-
-    renderPendingChatAttachments();
-    if (rejectedCount) notifyAIImageSelection('单次最多选择 9 张图片。');
-    else if (rejectedTotal) notifyAIImageSelection('本地图片总大小不能超过 40 MiB。');
-    else if (rejectedSize) notifyAIImageSelection('每张图片须小于等于 10 MiB，且不能是空文件。');
-    else if (rejectedType) notifyAIImageSelection('仅支持 JPEG、PNG 和 WebP 图片。');
 }
 
 function getAIImageReferencePath(value) {
@@ -1292,7 +1392,7 @@ async function cleanupStaleAIInputsForCurrentUser() {
 }
 
 async function sendChatMessage() {
-    if (isChatSending || !isAuthenticated()) return;
+    if (isChatSending || isCompressingAIImages || !isAuthenticated()) return;
     const input = document.getElementById('aiChatInput');
     const message = input?.value.trim() || '';
     const selectedAttachments = pendingChatAttachments.slice();
