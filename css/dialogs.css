@@ -829,16 +829,34 @@ dialog.native-dialog::backdrop {
             display: flex;
             gap: 8px;
             align-items: center;
+            width: 100%;
         }
-        .model-settings-select,
-        .model-custom-input {
-            flex: 1;
-            padding: 8px 12px;
+        .model-settings-select {
+            flex: 1 1 0%;
+            min-width: 0;
+            width: 0;
+            height: 42px;
+            min-height: 42px;
+            padding: 0 12px;
             border-radius: var(--radius-sm);
             border: 1px solid var(--border);
             background: var(--field-bg);
             color: var(--text);
             font-size: 0.88rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease;
+        }
+        .model-custom-input {
+            width: 100%;
+            height: 42px;
+            min-height: 42px;
+            padding: 0 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--field-bg);
+            color: var(--text);
+            font-size: 0.88rem;
+            box-sizing: border-box;
             transition: border-color 0.2s ease;
         }
         .model-settings-select:focus,
@@ -847,11 +865,22 @@ dialog.native-dialog::backdrop {
             outline: none;
         }
         .btn-model-refresh {
-            padding: 8px 12px;
+            width: auto !important;
+            max-width: none;
+            flex: 0 0 auto !important;
+            flex-shrink: 0 !important;
             white-space: nowrap;
-            font-size: 0.82rem;
+            padding: 0 14px;
+            height: 42px;
+            min-height: 42px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            font-size: 0.85rem;
             margin: 0;
             border-radius: var(--radius-sm);
+            box-sizing: border-box;
         }
         .model-custom-wrapper {
             margin-top: 8px;
