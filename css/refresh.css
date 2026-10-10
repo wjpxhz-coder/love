@@ -103,7 +103,7 @@ body.app-page-active .status-bar-shield {
     position: fixed;
     z-index: 1300;
     top: calc(12px + env(safe-area-inset-top, 0px));
-    right: max(16px, calc((100vw - 1120px) / 2));
+    right: max(16px, env(safe-area-inset-right, 0px));
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -293,7 +293,7 @@ body.app-page-active .app-utility-bar {
     position: relative;
     z-index: 1;
     padding: 0;
-    text-align: left;
+    text-align: center;
 }
 
 .home-eyebrow,

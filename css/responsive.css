@@ -43,74 +43,56 @@
             bottom: calc(30px + env(safe-area-inset-bottom));
         }
 
-        /* ── 大屏端 Bento Grid 双列画册架构 ── */
-        @media (min-width: 992px) {
-            .container {
-                max-width: 1140px !important;
-                display: grid;
-                grid-template-columns: 380px minmax(0, 1fr);
-                gap: 36px;
-                align-items: start;
-                padding-top: 30px;
-            }
+        /* ── 保持经典单竖列排布（全平台居中自适应） ── */
+        .container {
+            max-width: 620px !important;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
 
-            .home-sidebar-group {
-                position: sticky;
-                top: 84px;
-                display: flex;
-                flex-direction: column;
-                gap: 20px;
-            }
+        .container > * {
+            width: 100%;
+        }
 
-            .site-header {
-                text-align: left;
-                padding: 0 0 10px 0;
-            }
+        .site-header {
+            text-align: center;
+            width: 100%;
+        }
 
-            .site-header h1 {
-                justify-content: flex-start;
-            }
+        .site-header h1 {
+            justify-content: center;
+        }
 
-            .site-header .tagline {
-                margin: 12px 0 0;
-            }
+        .site-header .tagline {
+            margin: 12px auto 0;
+            display: inline-block;
+        }
 
-            .site-header .header-divider {
-                margin: 14px 0 0 0;
-            }
+        .header-divider {
+            margin: 18px auto 0;
+            justify-content: center;
+        }
 
-            .timer-section {
-                text-align: left;
-                margin-bottom: 0;
-            }
+        .timer-section,
+        .anniv-section {
+            text-align: center;
+            width: 100%;
+        }
 
-            .timer-label {
-                justify-content: flex-start;
-            }
+        .timer-label,
+        .section-label {
+            justify-content: center;
+        }
 
-            .anniv-section {
-                text-align: left;
-                margin-bottom: 0;
-            }
+        .btn-group {
+            justify-content: center;
+        }
 
-            .section-label {
-                justify-content: flex-start;
-            }
-
-            .mood-section {
-                margin-bottom: 0;
-            }
-
-            .btn-group {
-                justify-content: flex-start;
-                margin-bottom: 0;
-            }
-
-            .timeline-section {
-                margin: 0;
-                width: 100%;
-                min-width: 0;
-            }
+        .timeline-section {
+            width: 100%;
         }
 
         :is(.ai-refresh-btn, .ai-chat-close-btn, .login-close-btn, .btn-locked-login) {
