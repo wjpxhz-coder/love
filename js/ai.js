@@ -2,7 +2,19 @@
 // AI 专属助手
 // ==========================================
 const AI_TABS = new Set(['topic', 'anniversary', 'summary']);
-const CHAT_SYSTEM_PROMPT = '你是“我们的感情助手”，也是小蛇和小奚的专属恋爱小助理，语气温暖、俏皮、可爱。帮助他们聊天解闷、提供恋爱建议、推荐约会点子、化解小矛盾或分析本轮附带的图片。回答简洁温馨，每次不超过200字。图片不会在轮次之间保留；当前请求没有附图却追问图片时，请明确提醒用户重新选择图片，不要猜测。';
+const AI_COUPLE_IDENTITY_RULES = [
+    '【情侣专属身份档案与关系设定】',
+    '1. 男方身份：账号名为“小蛇”，男生、男朋友、老公、专属骑士、大蛇蛇（用户本人）。',
+    '2. 女方身份：账号名为“小奚”，女生、女朋友、老婆、欣欣、欣欣宝宝、小仙女、小公主、可爱猫咪。',
+    '3. 关键爱称映射：任何动态文字、评论或聊天记录中出现的“欣欣”、“欣欣宝宝”、“小老婆”、“小宝宝老婆”、“宝宝”，指的统统都是女方【小奚】！',
+    '4. 视觉与截图识别规则：',
+    '   - 自拍或独照：若动态作者为小奚，照片主角是美丽灵动的小奚，赞美小奚的可爱与魅力，小蛇是宠爱她的另一半；切勿颠倒主谓语。',
+    '   - 微信聊天截图视角：发动态者位于微信右侧（绿色气泡），对方位于左侧（白色气泡）。若是小奚发布的截图，右侧绿色是小奚（欣欣宝宝），左侧白色是小蛇（老公）；若是小蛇发布的截图则相反。',
+    '   - 情感互动：准确识别“老公哄老婆 / 骑士守护小公主”的甜蜜互动与默契，分清是谁在撒娇、谁在宠爱包容，绝对不要颠倒角色。'
+].join('\n');
+const CHAT_SYSTEM_PROMPT = `你是“我们的感情助手”，也是小蛇和小奚的专属恋爱小助理，语气温暖、俏皮、可爱。帮助他们聊天解闷、提供恋爱建议、推荐约会点子、化解小矛盾或分析本轮附带的图片。回答简洁温馨，每次不超过200字。
+${AI_COUPLE_IDENTITY_RULES}
+图片不会在轮次之间保留；当前请求没有附图却追问图片时，请明确提醒用户重新选择图片，不要猜测。`;
 const AI_SERVICE_CONSENT_PREFIX = 'ai_service_consent_agnes_2_0_v1_';
 const AGNES_PROVIDER = 'agnes';
 const AGNES_MODEL = 'agnes-2.0-flash';
@@ -527,7 +539,7 @@ async function switchAITab(tabName, forceRefresh = false) {
         let generatedText = '';
         if (tabName === 'topic') {
             generatedText = await callAgnes(
-                '你是一个温暖、可爱的情感小助手，为一对情侣提供能增进感情、唤起回忆的互动话题。',
+                `你是一个温暖、可爱的情感小助手，为情侣【小蛇（男方）】和【小奚（女方，昵称欣欣/欣欣宝宝）】提供能增进感情、唤起回忆的甜蜜互动话题。`,
                 '请生成今天的一个互动话题。直接输出话题，亲切俏皮，200字以内。'
             );
         } else if (tabName === 'anniversary') {
@@ -540,8 +552,8 @@ async function switchAITab(tabName, forceRefresh = false) {
                 return;
             }
             generatedText = await callAgnes(
-                `你是爱情文案助手。这对情侣将在 ${days} 天后迎来相爱纪念日。`,
-                '写一段真挚、克制的纪念日倒计时文案，300字以内。'
+                `你是小蛇（男方）和小奚（女方/欣欣宝宝）的专属爱情文案助手。他们将在 ${days} 天后迎来相爱纪念日。`,
+                '写一段真挚、温暖的纪念日倒计时文案，300字以内。'
             );
         } else {
             const storyLog = await loadRecentStoryLog();
@@ -551,7 +563,7 @@ async function switchAITab(tabName, forceRefresh = false) {
                 return;
             }
             generatedText = await callAgnes(
-                '你是情侣回忆的记录员。根据提供的近期日记，以回忆守护者的第一人称总结生活片段；不虚构未提供的事实。',
+                `你是情侣回忆的记录员。记录小蛇（男方）与小奚（女方，爱称欣欣/欣欣宝宝）的甜蜜生活。根据提供的近期日记，以回忆守护者的第一人称总结生活片段；准确辨别两人的互动与身份，不虚构未提供的事实。`,
                 `近期日记：\n${storyLog}\n\n请写一篇温情的近期故事总结，400字以内。`
             );
         }
@@ -1584,17 +1596,20 @@ async function analyzeMomentWithAI(momentId) {
             hasValidImages
         });
 
+        const authorRole = author === '小奚' ? '（女方/欣欣宝宝）' : (author === '小蛇' ? '（男方/老公）' : '');
         const promptLines = [
             `你是“我们的感情助手”，小蛇与小奚的专属恋爱助手、闺蜜红娘和感情见证官。`,
             `请对他们发布的这条动态进行细腻温暖、浪漫共鸣的感情分析点评：`,
-            `【动态作者】${author}`,
+            AI_COUPLE_IDENTITY_RULES,
+            `【动态作者】${author}${authorRole}`,
             `【动态文字】${displayMomentText || '(未配文字)'}`,
             mediaDescription,
             `【点评要求】`,
             `1. 语气必须温暖甜蜜、灵动俏皮，像深知他们日常的贴心红娘；`,
-            `2. 捕捉图文里的恋爱闪光点与默契瞬间，送上走心甜蜜的祝福或幽默调侃；`,
-            `3. 字数严格控制在 60~120 字之间，精炼动人，适合直接作为评论；`,
-            `4. 请直接输出点评正文内容，不要包含“【分析】”等生硬标题或开场白客套话。`
+            `2. 严格遵循情侣身份设定（特别留意女方爱称“欣欣/欣欣宝宝/小老婆”），准确识别图文中的主角与互动视角，切勿颠倒男女身份或主谓语；`,
+            `3. 捕捉图文里的恋爱闪光点与默契瞬间，送上走心甜蜜的祝福或幽默调侃；`,
+            `4. 字数严格控制在 60~120 字之间，精炼动人，适合直接作为评论；`,
+            `5. 请直接输出点评正文内容，不要包含“【分析】”等生硬标题或开场白客套话。`
         ];
 
         const messages = [
@@ -1714,15 +1729,17 @@ async function continueAICommentConversation({ momentId, userCommentId, userComm
     }
 
     // 3. 构造 Prompt 与上下文
+    const momentAuthorRole = momentAuthor === '小奚' ? '（女方/欣欣宝宝）' : (momentAuthor === '小蛇' ? '（男方/老公）' : '');
     const systemPromptLines = [
         '你是“我们的感情助手”，也是小蛇和小奚的专属恋爱小助理、闺蜜红娘和感情见证官。',
         '语气温暖甜蜜、灵动俏皮、风趣幽默，极懂情调。',
         '你正在这条动态下方的评论区与他们进行多轮互动对话。',
-        `【动态作者】${momentAuthor}`,
+        AI_COUPLE_IDENTITY_RULES,
+        `【动态作者】${momentAuthor}${momentAuthorRole}`,
         `【动态文字】${momentText || '(生活随拍记录)'}`,
         '【对话要求】',
         '1. 必须针对对方最新回复展开生动、机智、贴心的回应，保持话题的连贯互动；',
-        '2. 像深知他们日常的知心密友，可以适当调侃两人的默契、出谋划策或送上温馨爱意；',
+        '2. 深度融入两人角色设定：若对方是小奚（欣欣宝宝/老婆），用闺蜜宠溺小公主的口吻甜蜜互动，可亲切称呼她为欣欣宝宝/小奚/小公主；若对方是小蛇（老公/专属骑士），用机智军师/铁哥们的口吻回应；切勿混淆两人的身份与爱称；',
         '3. 字数严格控制在 40~100 字之间，短小精悍，适合直接作为评论；',
         '4. 直接输出回复正文，绝对不要包含任何前缀、问候套话或“【助手回复】”等格式标记。'
     ];
@@ -1738,15 +1755,17 @@ async function continueAICommentConversation({ momentId, userCommentId, userComm
             messages.push({ role: 'assistant', content: text });
         } else {
             const authorName = turn.author || '我们';
-            messages.push({ role: 'user', content: `${authorName}: ${text}` });
+            const roleTag = authorName === '小奚' ? '（女方/欣欣宝宝）' : (authorName === '小蛇' ? '（男方/老公）' : '');
+            messages.push({ role: 'user', content: `${authorName}${roleTag}: ${text}` });
         }
     });
 
     const currentAuthorName = typeof currentAuthor === 'string' && currentAuthor ? currentAuthor : '我们';
+    const currentRoleTag = currentAuthorName === '小奚' ? '（女方/欣欣宝宝）' : (currentAuthorName === '小蛇' ? '（男方/老公）' : '');
     const cleanUserCommentText = String(userCommentText || '').trim() || '(分享了图片)';
     messages.push({
         role: 'user',
-        content: `${currentAuthorName}: ${cleanUserCommentText}`
+        content: `${currentAuthorName}${currentRoleTag}: ${cleanUserCommentText}`
     });
 
     // 4. 调用 AI 接口生成回复
