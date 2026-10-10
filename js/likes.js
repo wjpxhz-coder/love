@@ -47,7 +47,9 @@ async function loadMomentLikes(momentIds) {
 
                 button?.classList.toggle('liked', liked);
                 button?.setAttribute('aria-pressed', String(liked));
-                if (heart) heart.textContent = liked ? '❤️' : '🤍';
+                if (heart) {
+                    heart.innerHTML = `<svg class="svg-icon" aria-hidden="true"><use href="${liked ? '#icon-heart-filled' : '#icon-heart'}"/></svg>`;
+                }
                 if (countElement) countElement.textContent = count ? String(count) : '喜欢';
                 if (namesElement) namesElement.textContent = likersText;
             });
@@ -59,7 +61,9 @@ async function loadMomentLikes(momentIds) {
                 const heart = button.querySelector('.ml-heart');
                 button.classList.toggle('liked', liked);
                 button.setAttribute('aria-pressed', String(liked));
-                if (heart) heart.textContent = liked ? '❤️' : '🤍';
+                if (heart) {
+                    heart.innerHTML = `<svg class="svg-icon" aria-hidden="true"><use href="${liked ? '#icon-heart-filled' : '#icon-heart'}"/></svg>`;
+                }
             });
             countElements.forEach(el => { el.textContent = count ? String(count) : '喜欢'; });
             namesElements.forEach(el => { el.textContent = likersText; });

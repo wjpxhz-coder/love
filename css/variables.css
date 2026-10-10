@@ -1,31 +1,60 @@
+/* ==========================================================================
+   Design Tokens 2.0 - 浪漫轻奢设计令牌规范
+   ========================================================================== */
+
 :root[data-theme="light"], :root {
     color-scheme: light;
-    --primary: #ff6584;
-    --primary-light: #ffa3b5;
-    --primary-glow: rgba(255, 101, 132, 0.38);
-    --gold: #f5af5f;
-    --gold-light: #fed7aa;
-    --bg: #fff7f9;
-    --text: #4a2835;
-    --text-muted: #9a7484;
-    --surface: #ffffff;
-    --surface-elevated: #ffffff;
-    --surface-subtle: rgba(255, 245, 248, 0.82);
-    --field-bg: #fffbfc;
+    
+    /* 核心主色阶：法式香槟玫瑰 */
+    --primary: #f43f5e;              /* 典雅山茶玫瑰红，告别荧光感 */
+    --primary-light: #fda4af;        /* 晨曦柔粉 */
+    --primary-subtle: #fff1f2;       /* 奶霜背景微粉 */
+    --primary-glow: rgba(244, 63, 94, 0.22);
+    
+    /* 辅助色阶 */
+    --gold: #f59e0b;                 /* 暖香槟金（纪念日/特别闪耀） */
+    --gold-light: #fef3c7;
+    --twilight: #c084fc;             /* 晚霞暮光淡紫（梦幻辅助） */
+    
+    /* 文本与对比度 */
+    --text-main: #3f222e;            /* 高级梅红灰，比纯黑更温和 */
+    --text: #3f222e;
+    --text-muted: #8c6d7a;           /* 灰粉紫次级文案 */
+    
+    /* 背景体系与表面色 */
+    --bg: #fff0f5;
+    --surface: rgba(255, 255, 255, 0.82);
+    --surface-elevated: rgba(255, 255, 255, 0.94);
+    --surface-subtle: rgba(255, 241, 242, 0.85);
+    --field-bg: #ffffff;
     --on-primary: #ffffff;
-    --focus-ring: #ff7d99;
-    --card: rgba(255, 255, 255, 0.82);
-    --border: rgba(255, 168, 186, 0.38);
-    --shadow: rgba(255, 101, 132, 0.16);
-    --shadow-hover: rgba(255, 101, 132, 0.26);
-    --glass-bg: rgba(255, 255, 255, 0.72);
-    --glass-border: rgba(255, 255, 255, 0.85);
+    --focus-ring: #f43f5e;
+    --card: rgba(255, 255, 255, 0.88);
+    --border: rgba(244, 63, 94, 0.18);
+    --shadow: rgba(244, 63, 94, 0.12);
+    --shadow-soft: 0 10px 30px -4px rgba(244, 63, 94, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.02);
+    --shadow-hover: 0 20px 40px -6px rgba(244, 63, 94, 0.16), 0 6px 16px -2px rgba(0, 0, 0, 0.04);
+    --strong-shadow: 0 20px 52px rgba(244, 63, 94, 0.18);
+    --soft-shadow: 0 10px 30px rgba(244, 63, 94, 0.10);
+
+    /* 现代毛玻璃表面 */
+    --glass-bg: rgba(255, 255, 255, 0.78);
+    --glass-surface: rgba(255, 255, 255, 0.82);
+    --glass-border: rgba(255, 255, 255, 0.92);
     --glass-highlight: rgba(255, 255, 255, 0.95);
-    --moment-bg: rgba(255, 255, 255, 0.85);
-    --bg-1: #fff5f7;
-    --bg-2: #fae8f3;
-    --bg-3: #ede9fe;
+    --glass-blur: blur(20px) saturate(180%);
+    --moment-bg: rgba(255, 255, 255, 0.88);
+
+    --bg-1: #fff2f6;
+    --bg-2: #fce7f3;
+    --bg-3: #f5e8ff;
     --bg-4: #fff0f5;
+    
+    /* 现代柔和圆角体系 */
+    --radius-sm: 12px;
+    --radius-md: 18px;
+    --radius-lg: 24px;
+    --radius-pill: 9999px;
     --jelly-radius-sm: 16px;
     --jelly-radius-md: 22px;
     --jelly-radius-lg: 28px;
@@ -33,14 +62,22 @@
 
 :root[data-theme="dark"] {
     color-scheme: dark;
-    --primary: #ff8fab;
-    --primary-light: #fca5a5;
-    --primary-glow: rgba(255, 143, 171, 0.42);
-    --gold: #ffd166;
-    --gold-light: #ffe3a0;
+    
+    /* 深色静谧星夜色阶 */
+    --primary: #fb7185;
+    --primary-light: #fda4af;
+    --primary-subtle: rgba(76, 29, 48, 0.4);
+    --primary-glow: rgba(251, 113, 133, 0.3);
+    
+    --gold: #fbbf24;
+    --gold-light: #78350f;
+    --twilight: #d8b4fe;
+    
+    --text-main: #fbeff3;
+    --text: #fbeff3;
+    --text-muted: #b89fa9;
+    
     --bg: #150d1e;
-    --text: #f8eff8;
-    --text-muted: #c4aecb;
     --surface: #231633;
     --surface-elevated: #2d1c42;
     --surface-subtle: rgba(45, 28, 66, 0.82);
@@ -48,17 +85,30 @@
     --on-primary: #200a16;
     --focus-ring: #ffb3c6;
     --card: rgba(37, 22, 53, 0.75);
-    --border: rgba(255, 143, 171, 0.28);
-    --shadow: rgba(236, 72, 153, 0.28);
-    --shadow-hover: rgba(236, 72, 153, 0.42);
+    --border: rgba(251, 113, 133, 0.25);
+    --shadow: rgba(0, 0, 0, 0.45);
+    
     --glass-bg: rgba(37, 22, 53, 0.62);
-    --glass-border: rgba(216, 180, 254, 0.24);
+    --glass-surface: rgba(30, 18, 32, 0.76);
+    --glass-border: rgba(255, 255, 255, 0.12);
     --glass-highlight: rgba(255, 255, 255, 0.12);
+    --glass-blur: blur(24px) saturate(190%);
     --moment-bg: rgba(40, 24, 58, 0.85);
+    
+    --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.45);
+    --shadow-hover: 0 20px 48px rgba(0, 0, 0, 0.65), 0 0 20px var(--primary-glow);
+    --strong-shadow: 0 20px 56px rgba(0, 0, 0, 0.45);
+    --soft-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+    
     --bg-1: #150d1e;
     --bg-2: #1f102d;
     --bg-3: #180b26;
     --bg-4: #261238;
+    
+    --radius-sm: 12px;
+    --radius-md: 18px;
+    --radius-lg: 24px;
+    --radius-pill: 9999px;
     --jelly-radius-sm: 16px;
     --jelly-radius-md: 22px;
     --jelly-radius-lg: 28px;

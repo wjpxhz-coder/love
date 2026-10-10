@@ -36,38 +36,40 @@ button:active { transform: scale(0.96); }
 button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; transform: none; }
 
 /* ── 时光轴 ── */
+/* ── 时光轴 ── */
 .timeline-section {
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 242, 248, 0.93) 100%);
-    border: 1.5px solid rgba(255, 255, 255, 0.95);
-    outline: 1.5px solid rgba(255, 185, 205, 0.45);
-    border-radius: 24px;
+    background: var(--glass-surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    outline: none !important;
+    border-radius: var(--radius-lg);
     padding: 26px 22px;
-    box-shadow: 0 10px 32px rgba(255, 94, 131, 0.14), inset 0 2px 2px #ffffff;
-    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease, outline-color 0.25s ease;
+    box-shadow: var(--shadow-soft);
+    transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .timeline-section:hover {
-    outline-color: rgba(255, 160, 185, 0.8);
-    box-shadow: 0 14px 38px rgba(255, 94, 131, 0.2);
+    box-shadow: var(--shadow-hover);
+    border-color: rgba(253, 164, 175, 0.6);
 }
 
 [data-theme='dark'] .timeline-section {
-    background: linear-gradient(145deg, rgba(44, 26, 62, 0.95) 0%, rgba(34, 18, 50, 0.95) 100%);
-    border-color: rgba(255, 255, 255, 0.12);
-    outline-color: rgba(255, 143, 171, 0.3);
-    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45), inset 0 1.5px 1px rgba(255, 255, 255, 0.1);
+    border-color: var(--glass-border);
+    box-shadow: var(--shadow-soft);
 }
 
 .timeline-title {
-    font-family: 'ZCOOL KuaiLe', cursive;
-    font-size: 1.35em;
+    font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 1.35rem;
     color: var(--primary);
     text-align: center;
-    letter-spacing: 3px;
+    letter-spacing: 0.08em;
     margin-bottom: 22px;
     padding-bottom: 14px;
-    border-bottom: 1.5px solid rgba(255, 185, 205, 0.45);
-    filter: drop-shadow(0 2px 4px rgba(255, 77, 121, 0.2));
+    border-bottom: 1px solid rgba(244, 63, 94, 0.12);
+    filter: drop-shadow(0 2px 4px var(--primary-glow));
 }
 
 .timeline-track {
@@ -84,26 +86,26 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
 /* ── 记录卡片 ── */
 .moment-card {
     position: relative;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(255, 242, 248, 0.94) 100%);
-    border: 1.5px solid rgba(255, 255, 255, 0.95);
-    outline: 1.5px solid rgba(255, 185, 205, 0.45);
-    border-radius: 20px;
-    padding: 16px 18px;
-    margin-bottom: 18px;
-    box-shadow: 0 6px 20px rgba(255, 94, 131, 0.12), inset 0 1.5px 1.5px #ffffff;
+    background: var(--glass-surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    padding: 20px 22px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-soft);
+    outline: none !important;
     opacity: 1;
     transform: none;
     contain: layout style paint;
     content-visibility: auto;
     contain-intrinsic-size: auto 240px;
-    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease, outline-color 0.25s ease;
+    transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme='dark'] .moment-card {
-    background: linear-gradient(180deg, rgba(46, 28, 66, 0.96) 0%, rgba(36, 20, 52, 0.96) 100%);
-    border-color: rgba(255, 255, 255, 0.15);
-    outline-color: rgba(255, 143, 171, 0.3);
-    box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4), inset 0 1.5px 1px rgba(255, 255, 255, 0.1);
+    border-color: var(--glass-border);
+    box-shadow: var(--shadow-soft);
 }
 
 .moment-card.visible {
@@ -116,9 +118,9 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
 }
 
 .moment-card.visible:hover {
-    transform: translateY(-4px) scale(1.01);
-    box-shadow: 0 14px 36px rgba(255, 77, 121, 0.22);
-    outline-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+    border-color: rgba(253, 164, 175, 0.6);
 }
 
 .card-header {
@@ -726,16 +728,16 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
 
         /* ── 重大事件(大事记)卡片视觉强化 ── */
         .moment-card.milestone {
-            border: 2px solid rgba(245, 166, 35, 0.4);
-            box-shadow: 0 8px 30px rgba(245, 166, 35, 0.12), 0 4px 15px rgba(212, 107, 122, 0.08);
+            border-color: rgba(245, 158, 11, 0.35);
+            background: linear-gradient(180deg, rgba(255, 251, 245, 0.9) 0%, var(--glass-surface) 100%);
+            box-shadow: 0 10px 32px rgba(245, 158, 11, 0.12), var(--shadow-soft);
             position: relative;
-            background: linear-gradient(180deg, rgba(255, 252, 250, 0.98), rgba(255, 248, 240, 0.98));
         }
 
         [data-theme='dark'] .moment-card.milestone {
-            border-color: rgba(245, 166, 35, 0.3);
-            box-shadow: 0 8px 35px rgba(0, 0, 0, 0.4), 0 4px 15px rgba(245, 166, 35, 0.05);
-            background: linear-gradient(180deg, rgba(35, 30, 30, 0.98), rgba(40, 32, 25, 0.98));
+            border-color: rgba(251, 191, 36, 0.3);
+            background: linear-gradient(180deg, rgba(45, 30, 20, 0.75) 0%, var(--glass-surface) 100%);
+            box-shadow: 0 10px 32px rgba(251, 191, 36, 0.1), var(--shadow-soft);
         }
 
         /* 大事记标签徽章 */

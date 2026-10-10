@@ -171,6 +171,9 @@ function appendBlindBoxMedia(container, rawUrl, className, options = {}) {
 function renderBlindBoxMoment(moment) {
     const content = document.getElementById('blindBoxContent');
     if (!content) return;
+    content.classList.remove('blind-box-card-develop');
+    void content.offsetWidth;
+    content.classList.add('blind-box-card-develop');
     content.replaceChildren();
 
     if (moment.type === 'photo') {

@@ -752,3 +752,107 @@ dialog.native-dialog::backdrop {
         .milestone-item-img:hover {
             opacity: 0.9;
         }
+
+        /* ── 浪漫果冻开关样式（重大事件等情侣微动效控件） ── */
+        .romantic-switch-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            user-select: none;
+            margin: 14px 0;
+        }
+        .romantic-switch-input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .romantic-switch-slider {
+            width: 48px;
+            height: 26px;
+            background: rgba(200, 180, 190, 0.3);
+            border-radius: var(--radius-pill);
+            position: relative;
+            transition: background 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            flex-shrink: 0;
+        }
+        .romantic-switch-knob {
+            width: 20px;
+            height: 20px;
+            background: #ffffff;
+            border-radius: 50%;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .romantic-switch-knob .knob-icon {
+            width: 12px;
+            height: 12px;
+            stroke: var(--primary);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .romantic-switch-input:checked + .romantic-switch-slider {
+            background: linear-gradient(135deg, var(--gold), #ea580c);
+        }
+        .romantic-switch-input:checked + .romantic-switch-slider .romantic-switch-knob {
+            transform: translateX(22px);
+        }
+        .romantic-switch-input:checked + .romantic-switch-slider .knob-icon {
+            opacity: 1;
+        }
+        .romantic-switch-text {
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* ── AI 模型设置组件样式（替代行内硬编码，完美适配深浅色） ── */
+        .model-settings-group {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border);
+        }
+        .model-settings-group .settings-sublabel {
+            font-weight: 600;
+            font-size: 0.92rem;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+        .model-select-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .model-settings-select,
+        .model-custom-input {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--field-bg);
+            color: var(--text);
+            font-size: 0.88rem;
+            transition: border-color 0.2s ease;
+        }
+        .model-settings-select:focus,
+        .model-custom-input:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+        .btn-model-refresh {
+            padding: 8px 12px;
+            white-space: nowrap;
+            font-size: 0.82rem;
+            margin: 0;
+            border-radius: var(--radius-sm);
+        }
+        .model-custom-wrapper {
+            margin-top: 8px;
+        }
