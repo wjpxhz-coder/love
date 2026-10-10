@@ -32,7 +32,8 @@ function updateThemeIcon(theme) {
     const btn = document.getElementById('theme-toggle');
     if (btn) {
         const isDark = theme === 'dark';
-        btn.textContent = isDark ? '☀️' : '🌙';
+        const iconId = isDark ? '#icon-sun' : '#icon-moon';
+        btn.innerHTML = `<svg class="svg-icon" aria-hidden="true"><use href="${iconId}"/></svg>`;
         btn.setAttribute('aria-pressed', String(isDark));
         btn.setAttribute('aria-label', isDark ? '切换到浅色主题' : '切换到深色主题');
     }

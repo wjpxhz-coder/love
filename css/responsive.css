@@ -36,21 +36,6 @@
             padding-left: calc(16px + env(safe-area-inset-left, 0px));
         }
 
-        body > .theme-toggle {
-            top: calc(16px + env(safe-area-inset-top));
-            right: calc(16px + env(safe-area-inset-right));
-        }
-
-        body > .notification-bell {
-            top: calc(16px + env(safe-area-inset-top));
-            right: calc(68px + env(safe-area-inset-right));
-        }
-
-        body > :is(.login-trigger-btn, .user-avatar-btn) {
-            top: calc(16px + env(safe-area-inset-top));
-            right: calc(120px + env(safe-area-inset-right));
-        }
-
         .notification-panel { right: calc(16px + env(safe-area-inset-right)); }
         .user-dropdown { right: calc(112px + env(safe-area-inset-right)); }
         .fab-container {
@@ -58,9 +43,74 @@
             bottom: calc(30px + env(safe-area-inset-bottom));
         }
 
-        body > :is(.theme-toggle, .notification-bell, .login-trigger-btn, .user-avatar-btn) {
-            width: 44px;
-            height: 44px;
+        /* ── 大屏端 Bento Grid 双列画册架构 ── */
+        @media (min-width: 992px) {
+            .container {
+                max-width: 1140px !important;
+                display: grid;
+                grid-template-columns: 380px minmax(0, 1fr);
+                gap: 36px;
+                align-items: start;
+                padding-top: 30px;
+            }
+
+            .home-sidebar-group {
+                position: sticky;
+                top: 84px;
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .site-header {
+                text-align: left;
+                padding: 0 0 10px 0;
+            }
+
+            .site-header h1 {
+                justify-content: flex-start;
+            }
+
+            .site-header .tagline {
+                margin: 12px 0 0;
+            }
+
+            .site-header .header-divider {
+                margin: 14px 0 0 0;
+            }
+
+            .timer-section {
+                text-align: left;
+                margin-bottom: 0;
+            }
+
+            .timer-label {
+                justify-content: flex-start;
+            }
+
+            .anniv-section {
+                text-align: left;
+                margin-bottom: 0;
+            }
+
+            .section-label {
+                justify-content: flex-start;
+            }
+
+            .mood-section {
+                margin-bottom: 0;
+            }
+
+            .btn-group {
+                justify-content: flex-start;
+                margin-bottom: 0;
+            }
+
+            .timeline-section {
+                margin: 0;
+                width: 100%;
+                min-width: 0;
+            }
         }
 
         :is(.ai-refresh-btn, .ai-chat-close-btn, .login-close-btn, .btn-locked-login) {

@@ -461,3 +461,25 @@ button:hover::after {
     color: var(--primary-light);
 }
 
+/* ── 回忆盲盒拍立得显影仪式感（Polaroid Reveal） ── */
+@keyframes polaroidDevelop {
+    0% {
+        opacity: 0;
+        filter: blur(14px) brightness(1.8) saturate(0.2);
+        transform: scale(0.94) rotate(-1.5deg);
+    }
+    40% {
+        opacity: 0.85;
+        filter: blur(5px) brightness(1.25) saturate(0.65);
+    }
+    100% {
+        opacity: 1;
+        filter: blur(0px) brightness(1) saturate(1);
+        transform: scale(1) rotate(0deg);
+    }
+}
+
+.blind-box-card-develop {
+    animation: polaroidDevelop 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+

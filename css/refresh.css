@@ -1,74 +1,8 @@
 /* ── 梦幻樱花果冻风·全站视觉革新 ────────────────────────────────────
    极致甜美浪漫、草莓奶霜水润质感、Q弹果冻大圆角与柔焦漫反射光晕。 */
 
-:root[data-theme='light'],
-:root {
-    --primary: #ff4d79;
-    --primary-light: #ffa3b8;
-    --primary-subtle: #fff0f5;
-    --primary-glow: rgba(255, 77, 121, 0.38);
-    --gold: #f5af5f;
-    --gold-light: #fed7aa;
-    --bg: #fff0f5;
-    --text: #452433;
-    --text-muted: #9e7587;
-    --surface: rgba(255, 255, 255, 0.82);
-    --surface-elevated: rgba(255, 255, 255, 0.94);
-    --surface-subtle: rgba(255, 240, 246, 0.85);
-    --field-bg: #ffffff;
-    --on-primary: #ffffff;
-    --focus-ring: #ff6584;
-    --card: rgba(255, 255, 255, 0.88);
-    --border: rgba(255, 175, 195, 0.48);
-    --shadow: rgba(255, 77, 121, 0.16);
-    --glass-bg: rgba(255, 255, 255, 0.78);
-    --glass-border: rgba(255, 255, 255, 0.92);
-    --glass-highlight: rgba(255, 255, 255, 0.95);
-    --moment-bg: rgba(255, 255, 255, 0.88);
-    --bg-1: #fff2f6;
-    --bg-2: #fce7f3;
-    --bg-3: #f5e8ff;
-    --bg-4: #fff0f5;
-    --strong-shadow: 0 20px 52px rgba(255, 94, 131, 0.22);
-    --soft-shadow: 0 10px 30px rgba(255, 94, 131, 0.15);
-    --jelly-radius-sm: 16px;
-    --jelly-radius-md: 22px;
-    --jelly-radius-lg: 30px;
-}
+/* 全站全局设计令牌统一由 variables.css 管理，避免顶层变量冲突 */
 
-:root[data-theme='dark'] {
-    --primary: #ff8fab;
-    --primary-light: #fca5a5;
-    --primary-subtle: #2d1830;
-    --primary-glow: rgba(255, 143, 171, 0.45);
-    --gold: #ffd166;
-    --gold-light: #ffe3a0;
-    --bg: #150d1e;
-    --text: #f9f0f9;
-    --text-muted: #c8b2cf;
-    --surface: #241634;
-    --surface-elevated: #2e1d44;
-    --surface-subtle: rgba(48, 28, 68, 0.85);
-    --field-bg: #1b0f28;
-    --on-primary: #200a16;
-    --focus-ring: #ffb3c6;
-    --card: rgba(38, 22, 55, 0.78);
-    --border: rgba(255, 143, 171, 0.32);
-    --shadow: rgba(236, 72, 153, 0.3);
-    --glass-bg: rgba(38, 22, 55, 0.65);
-    --glass-border: rgba(216, 180, 254, 0.28);
-    --glass-highlight: rgba(255, 255, 255, 0.15);
-    --moment-bg: rgba(42, 25, 60, 0.88);
-    --bg-1: #150d1e;
-    --bg-2: #201130;
-    --bg-3: #190c28;
-    --bg-4: #28133b;
-    --strong-shadow: 0 20px 56px rgba(0, 0, 0, 0.45);
-    --soft-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
-    --jelly-radius-sm: 16px;
-    --jelly-radius-md: 22px;
-    --jelly-radius-lg: 30px;
-}
 
 html {
     scroll-behavior: auto;

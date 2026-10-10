@@ -1955,8 +1955,10 @@ function createMomentCardElement(item, options = {}) {
     likeButton.dataset.momentAction = 'toggle-like';
     likeButton.dataset.momentId = String(momentId);
     likeButton.setAttribute('aria-label', '点赞此动态');
+    const heartSpan = createMomentNode('span', 'ml-heart');
+    heartSpan.innerHTML = '<svg class="svg-icon" aria-hidden="true"><use href="#icon-heart"/></svg>';
     likeButton.append(
-        createMomentNode('span', 'ml-heart', '🤍'),
+        heartSpan,
         createMomentNode('span', 'ml-count', '喜欢')
     );
     likeButton.querySelector('.ml-count').id = `moment-like-count-${momentId}`;
@@ -1970,18 +1972,23 @@ function createMomentCardElement(item, options = {}) {
     commentToggle.setAttribute('aria-controls', `comments-${momentId}`);
     commentToggle.setAttribute('aria-expanded', 'false');
     commentToggle.setAttribute('aria-label', '展开或收起评论');
-    const commentIcon = createMomentNode('span', 'comment-btn-icon', '💬');
+    const commentIcon = createMomentNode('span', 'comment-btn-icon');
+    commentIcon.innerHTML = '<svg class="svg-icon" aria-hidden="true"><use href="#icon-chat"/></svg>';
     const commentCount = createMomentNode('span', 'comment-btn-count', '评论');
     commentCount.id = `comment-count-${momentId}`;
     commentToggle.append(commentIcon, commentCount);
 
     // 3. 收藏按钮
-    const starButton = createMomentNode('button', `moment-star-btn${hasStarred ? ' starred' : ''}`, hasStarred ? '⭐ 已收藏' : '☆ 收藏');
+    const starButton = createMomentNode('button', `moment-star-btn${hasStarred ? ' starred' : ''}`);
     starButton.type = 'button';
     starButton.id = `moment-star-btn-${momentId}`;
     starButton.dataset.momentAction = 'toggle-star';
     starButton.dataset.momentId = String(momentId);
     starButton.setAttribute('aria-label', hasStarred ? '取消收藏' : '收藏此动态');
+    const starIcon = createMomentNode('span', 'star-btn-icon');
+    starIcon.innerHTML = '<svg class="svg-icon" aria-hidden="true"><use href="#icon-star"/></svg>';
+    const starText = createMomentNode('span', 'star-btn-text', hasStarred ? '已收藏' : '收藏');
+    starButton.append(starIcon, starText);
     const starPending = typeof pendingMomentStarIds !== 'undefined' && pendingMomentStarIds.has(momentId);
     starButton.disabled = starPending;
     if (starPending) starButton.setAttribute('aria-busy', 'true');

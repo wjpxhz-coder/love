@@ -105,7 +105,8 @@ async function loadMomentStars(options = {}) {
 function setMomentStarButtonState(button, isStarred) {
     if (button) {
         button.classList.toggle('starred', isStarred);
-        button.textContent = isStarred ? '⭐ 已收藏' : '☆ 收藏';
+        const icon = '<svg class="svg-icon" aria-hidden="true"><use href="#icon-star"/></svg>';
+        button.innerHTML = `${icon}<span>${isStarred ? '已收藏' : '收藏'}</span>`;
     }
 }
 
