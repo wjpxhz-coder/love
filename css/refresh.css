@@ -135,24 +135,56 @@ body.app-page-active .status-bar-shield {
     min-width: 36px;
     min-height: 36px;
     padding: 0;
-    border: 0;
+    border: 1.5px solid transparent;
     border-radius: 50%;
-    color: var(--text);
+    color: var(--text-muted);
     background: transparent;
     box-shadow: none;
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     font-size: 1.1em;
     line-height: 1;
+    box-sizing: border-box;
+}
+
+.app-utility-bar :is(
+    .theme-toggle,
+    .notification-bell,
+    .login-trigger-btn
+) {
+    background: rgba(244, 63, 94, 0.04);
+    border-color: rgba(244, 63, 94, 0.12);
+}
+
+[data-theme='dark'] .app-utility-bar :is(
+    .theme-toggle,
+    .notification-bell,
+    .login-trigger-btn
+) {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.app-utility-bar .svg-icon {
+    width: 19px;
+    height: 19px;
+    min-width: 19px;
+    min-height: 19px;
+    flex-shrink: 0;
+    display: block;
+    stroke-width: 1.75;
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.25s ease;
 }
 
 .app-utility-bar .user-avatar-btn {
     border: 1.5px solid var(--primary-light);
     border-radius: 50%;
     overflow: hidden;
+    background: var(--surface-subtle);
 }
 
 .app-utility-bar .user-avatar-btn img {
@@ -176,8 +208,8 @@ body.app-page-active .status-bar-shield {
 
 .app-utility-bar .notification-badge {
     position: absolute;
-    top: 3px;
-    right: 3px;
+    top: 2px;
+    right: 2px;
     width: 8px;
     height: 8px;
 }
@@ -189,9 +221,10 @@ body.app-page-active .status-bar-shield {
     .user-avatar-btn
 ):hover {
     color: var(--primary);
+    border-color: var(--primary-light);
     background: var(--surface-subtle);
-    transform: scale(1.08);
-    box-shadow: 0 2px 8px var(--shadow);
+    transform: translateY(-1px) scale(1.08);
+    box-shadow: 0 4px 14px var(--shadow);
 }
 
 .app-utility-bar :is(
@@ -200,7 +233,42 @@ body.app-page-active .status-bar-shield {
     .login-trigger-btn,
     .user-avatar-btn
 ):active {
-    transform: scale(0.95);
+    transform: translateY(0) scale(0.95);
+}
+
+/* 萌萌专属悬停交互微动效 */
+@keyframes bellCuteJingle {
+    0% { transform: rotate(0); }
+    20% { transform: rotate(-14deg); }
+    40% { transform: rotate(12deg); }
+    60% { transform: rotate(-7deg); }
+    80% { transform: rotate(4deg); }
+    100% { transform: rotate(0); }
+}
+
+@keyframes moonCuteTwinkle {
+    0% { transform: rotate(0) scale(1); }
+    40% { transform: rotate(-12deg) scale(1.1); }
+    75% { transform: rotate(4deg) scale(1.04); }
+    100% { transform: rotate(0) scale(1); }
+}
+
+@keyframes sunCuteSpin {
+    0% { transform: rotate(0) scale(1); }
+    100% { transform: rotate(45deg) scale(1.12); }
+}
+
+.app-utility-bar .notification-bell:hover .svg-icon {
+    animation: bellCuteJingle 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    transform-origin: 50% 15%;
+}
+
+.app-utility-bar .theme-toggle:hover .svg-icon {
+    animation: moonCuteTwinkle 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.app-utility-bar .theme-toggle:hover svg:has(use[href*="sun"]) {
+    animation: sunCuteSpin 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 body.auth-pending #login-trigger-btn,
@@ -1912,10 +1980,17 @@ body.app-page-active .app-utility-bar {
     }
 
     .app-utility-bar .user-avatar-btn {
-        width: 32px;
-        height: 32px;
-        min-width: 32px;
-        min-height: 32px;
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        min-height: 34px;
+    }
+
+    .app-utility-bar .svg-icon {
+        width: 18px;
+        height: 18px;
+        min-width: 18px;
+        min-height: 18px;
     }
 
     .user-dropdown,
