@@ -1539,6 +1539,18 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
     border-radius: 11px;
 }
 
+.btn-settings-action.btn-model-refresh {
+    width: auto !important;
+    max-width: none;
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap;
+    min-height: 42px;
+    height: 42px;
+    padding: 0 14px;
+    border-radius: var(--radius-sm, 12px);
+}
+
 .storage-size-badge {
     min-height: 44px;
 }
