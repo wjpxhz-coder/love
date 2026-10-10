@@ -276,7 +276,7 @@ body.auth-pending #notification-bell {
     display: none !important;
 }
 
-body.app-page-active .app-utility-bar {
+body.app-page-active :is(.app-utility-bar, .resonance-ui) {
     display: none !important;
 }
 
@@ -1959,8 +1959,10 @@ body.app-page-active .app-utility-bar {
     .app-utility-bar {
         top: calc(env(safe-area-inset-top, 0px) + 6px);
         right: max(12px, env(safe-area-inset-right, 0px));
-        min-height: 40px;
-        padding: 3px 6px;
+        height: 42px;
+        min-height: 42px;
+        box-sizing: border-box;
+        padding: 0 6px;
         gap: 3px;
         border-radius: 9999px;
     }

@@ -81,64 +81,274 @@ function showToast(message, duration = 3000) {
     }, duration);
 }
 
-function createHeartRain() {
+// ==========================================
+// 🦋 一键想你专属：美丽蝴蝶从底部飞入，五颜六色变色发光
+// ==========================================
+const BUTTERFLY_THEMES = [
+    {
+        name: 'aurora',
+        glow: '#38bdf8',
+        accent: '#818cf8',
+        wingGrad1: ['#00f2fe', '#4facfe', '#6a11cb'],
+        wingGrad2: ['#38ef7d', '#11998e', '#0575e6'],
+        particleColor: '#67e8f9'
+    },
+    {
+        name: 'dream-pink',
+        glow: '#f472b6',
+        accent: '#c084fc',
+        wingGrad1: ['#ff758c', '#ff7eb3', '#7928ca'],
+        wingGrad2: ['#ff9a9e', '#fecfef', '#f43f5e'],
+        particleColor: '#fbcfe8'
+    },
+    {
+        name: 'sunset-amber',
+        glow: '#fb923c',
+        accent: '#f43f5e',
+        wingGrad1: ['#ff4e50', '#f9d423', '#f857a6'],
+        wingGrad2: ['#ff8008', '#ffc837', '#e11d48'],
+        particleColor: '#fef08a'
+    },
+    {
+        name: 'mystic-violet',
+        glow: '#c084fc',
+        accent: '#38bdf8',
+        wingGrad1: ['#b224ef', '#7579ff', '#00d2ff'],
+        wingGrad2: ['#e0c3fc', '#8ec5fc', '#9333ea'],
+        particleColor: '#e9d5ff'
+    },
+    {
+        name: 'emerald-fairy',
+        glow: '#34d399',
+        accent: '#6ee7b7',
+        wingGrad1: ['#0ba360', '#3cba92', '#30dd8a'],
+        wingGrad2: ['#43e97b', '#38f9d7', '#10b981'],
+        particleColor: '#a7f3d0'
+    },
+    {
+        name: 'golden-glamour',
+        glow: '#facc15',
+        accent: '#fb923c',
+        wingGrad1: ['#ffe259', '#ffa751', '#ff5858'],
+        wingGrad2: ['#f6d365', '#fda085', '#d97706'],
+        particleColor: '#fef9c3'
+    }
+];
+
+let globalButterflySeq = 0;
+
+function createButterflyLeftWing(theme, gradId) {
+    return `
+        <svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="${gradId}-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="${theme.wingGrad1[0]}" stop-opacity="0.95" />
+                    <stop offset="50%" stop-color="${theme.wingGrad1[1]}" stop-opacity="0.88" />
+                    <stop offset="100%" stop-color="${theme.wingGrad1[2]}" stop-opacity="0.8" />
+                </linearGradient>
+                <linearGradient id="${gradId}-2" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="${theme.wingGrad2[0]}" stop-opacity="0.9" />
+                    <stop offset="50%" stop-color="${theme.wingGrad2[1]}" stop-opacity="0.75" />
+                    <stop offset="100%" stop-color="${theme.wingGrad2[2]}" stop-opacity="0.85" />
+                </linearGradient>
+            </defs>
+            <path d="M 98,62 C 95,45 80,18 52,6 C 26,-5 2,2 0,16 C -2,28 12,48 40,58 C 65,66 90,65 98,62 Z" fill="url(#${gradId}-1)" />
+            <path d="M 92,60 C 82,46 68,24 48,14 C 30,5 12,12 10,22 C 8,32 20,48 44,55 C 64,61 84,62 92,60 Z" fill="rgba(255, 255, 255, 0.32)" />
+            <path d="M 78,55 C 65,40 50,22 34,18 C 22,15 16,22 18,28 C 20,34 32,44 48,49 C 62,53 72,54 78,55 Z" fill="rgba(255, 255, 255, 0.45)" />
+            <path d="M 95,65 C 85,75 68,96 46,112 C 34,121 20,128 14,124 C 8,120 10,110 18,98 C 24,90 22,86 16,84 C 10,82 12,74 24,70 C 45,63 78,63 95,65 Z" fill="url(#${gradId}-2)" />
+            <path d="M 88,68 C 76,78 58,96 42,106 C 30,114 22,116 20,112 C 18,106 24,96 30,88 C 45,72 70,67 88,68 Z" fill="rgba(255, 255, 255, 0.35)" />
+        </svg>
+    `;
+}
+
+function createButterflyRightWing(theme, gradId) {
+    return `
+        <svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="${gradId}-1" x1="100%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="${theme.wingGrad1[0]}" stop-opacity="0.95" />
+                    <stop offset="50%" stop-color="${theme.wingGrad1[1]}" stop-opacity="0.88" />
+                    <stop offset="100%" stop-color="${theme.wingGrad1[2]}" stop-opacity="0.8" />
+                </linearGradient>
+                <linearGradient id="${gradId}-2" x1="100%" y1="100%" x2="0%" y2="0%">
+                    <stop offset="0%" stop-color="${theme.wingGrad2[0]}" stop-opacity="0.9" />
+                    <stop offset="50%" stop-color="${theme.wingGrad2[1]}" stop-opacity="0.75" />
+                    <stop offset="100%" stop-color="${theme.wingGrad2[2]}" stop-opacity="0.85" />
+                </linearGradient>
+            </defs>
+            <path d="M 2,62 C 5,45 20,18 48,6 C 74,-5 98,2 100,16 C 102,28 88,48 60,58 C 35,66 10,65 2,62 Z" fill="url(#${gradId}-1)" />
+            <path d="M 8,60 C 18,46 32,24 52,14 C 70,5 88,12 90,22 C 92,32 80,48 56,55 C 36,61 16,62 8,60 Z" fill="rgba(255, 255, 255, 0.32)" />
+            <path d="M 22,55 C 35,40 50,22 66,18 C 78,15 84,22 82,28 C 80,34 68,44 52,49 C 38,53 28,54 22,55 Z" fill="rgba(255, 255, 255, 0.45)" />
+            <path d="M 5,65 C 15,75 32,96 54,112 C 66,121 80,128 86,124 C 92,120 90,110 82,98 C 76,90 78,86 84,84 C 90,82 88,74 76,70 C 55,63 22,63 5,65 Z" fill="url(#${gradId}-2)" />
+            <path d="M 12,68 C 24,78 42,96 58,106 C 70,114 78,116 80,112 C 82,106 76,96 70,88 C 55,72 30,67 12,68 Z" fill="rgba(255, 255, 255, 0.35)" />
+        </svg>
+    `;
+}
+
+function spawnSingleButterfly(container, options = {}) {
+    const uid = ++globalButterflySeq;
+    const theme = BUTTERFLY_THEMES[Math.floor(Math.random() * BUTTERFLY_THEMES.length)];
+    const isSpecial = options.isSpecial || false;
+
+    const size = isSpecial 
+        ? (52 + Math.random() * 20) 
+        : (36 + Math.random() * 24);
+    
+    const startX = options.startX !== undefined 
+        ? options.startX 
+        : (window.innerWidth * (0.05 + Math.random() * 0.9));
+    
+    const duration = 4.2 + Math.random() * 2.0;
+    const delay = options.delay !== undefined ? options.delay : 0;
+    const flapSpeed = 0.16 + Math.random() * 0.09;
+    const swayDur = 1.4 + Math.random() * 0.8;
+    const colorDur = 3.5 + Math.random() * 2.5;
+
+    const d1 = (Math.random() - 0.5) * 120;
+    const d2 = (Math.random() - 0.5) * 180;
+    const d3 = (Math.random() - 0.5) * 220;
+    const d4 = (Math.random() - 0.5) * 260;
+    const baseAngle = (Math.random() - 0.5) * 20;
+
+    const flightEl = document.createElement('div');
+    flightEl.className = 'butterfly-flight';
+    flightEl.style.setProperty('--start-x', `${startX}px`);
+    flightEl.style.setProperty('--size', `${size}px`);
+    flightEl.style.setProperty('--fly-duration', `${duration}s`);
+    flightEl.style.setProperty('--fly-delay', `${delay}s`);
+    flightEl.style.setProperty('--drift-x1', `${d1}px`);
+    flightEl.style.setProperty('--drift-x2', `${d2}px`);
+    flightEl.style.setProperty('--drift-x3', `${d3}px`);
+    flightEl.style.setProperty('--drift-x4', `${d4}px`);
+
+    const tiltEl = document.createElement('div');
+    tiltEl.className = 'butterfly-body-tilt';
+    tiltEl.style.setProperty('--sway-duration', `${swayDur}s`);
+    tiltEl.style.setProperty('--base-angle', `${baseAngle}deg`);
+
+    const modelEl = document.createElement('div');
+    modelEl.className = 'butterfly-model';
+    modelEl.style.setProperty('--glow-color', theme.glow);
+    modelEl.style.setProperty('--color-cycle-dur', `${colorDur}s`);
+
+    const antennaeEl = document.createElement('div');
+    antennaeEl.className = 'butterfly-antennae';
+    antennaeEl.innerHTML = `
+        <svg viewBox="0 0 24 16" width="100%" height="100%">
+            <path d="M 12,14 Q 8,4 3,2 M 12,14 Q 16,4 21,2" stroke="#ffffff" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+            <circle cx="3" cy="2" r="1.5" fill="${theme.particleColor}"/>
+            <circle cx="21" cy="2" r="1.5" fill="${theme.particleColor}"/>
+        </svg>
+    `;
+
+    const thoraxEl = document.createElement('div');
+    thoraxEl.className = 'butterfly-thorax';
+
+    const gradIdLeft = `bf-grad-${uid}-L`;
+    const wingLeft = document.createElement('div');
+    wingLeft.className = 'butterfly-wing left';
+    wingLeft.style.setProperty('--flap-speed', `${flapSpeed}s`);
+    wingLeft.innerHTML = createButterflyLeftWing(theme, gradIdLeft);
+
+    const gradIdRight = `bf-grad-${uid}-R`;
+    const wingRight = document.createElement('div');
+    wingRight.className = 'butterfly-wing right';
+    wingRight.style.setProperty('--flap-speed', `${flapSpeed}s`);
+    wingRight.innerHTML = createButterflyRightWing(theme, gradIdRight);
+
+    modelEl.appendChild(antennaeEl);
+    modelEl.appendChild(thoraxEl);
+    modelEl.appendChild(wingLeft);
+    modelEl.appendChild(wingRight);
+    tiltEl.appendChild(modelEl);
+    flightEl.appendChild(tiltEl);
+    container.appendChild(flightEl);
+
+    // 发光鳞粉洒落粒子
+    let sparkleTimer = null;
+    const startTimestamp = performance.now() + delay * 1000;
+    const endTimestamp = startTimestamp + duration * 1000;
+
+    const emitSparkle = () => {
+        const now = performance.now();
+        if (now >= startTimestamp && now <= endTimestamp) {
+            const rect = flightEl.getBoundingClientRect();
+            if (rect.top > -50 && rect.top < window.innerHeight + 50) {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'butterfly-sparkle';
+                const pSize = 3 + Math.random() * 5;
+                const pDur = 1.0 + Math.random() * 0.8;
+                const sx = (Math.random() - 0.5) * 24;
+                const sy = 15 + Math.random() * 35;
+
+                sparkle.style.width = `${pSize}px`;
+                sparkle.style.height = `${pSize}px`;
+                sparkle.style.left = `${rect.left + rect.width / 2}px`;
+                sparkle.style.top = `${rect.top + rect.height / 2}px`;
+                sparkle.style.setProperty('--sparkle-color', theme.particleColor);
+                sparkle.style.setProperty('--sparkle-dur', `${pDur}s`);
+                sparkle.style.setProperty('--sx', `${sx}px`);
+                sparkle.style.setProperty('--sy', `${sy}px`);
+
+                container.appendChild(sparkle);
+                setTimeout(() => sparkle.remove(), pDur * 1000);
+            }
+        }
+        if (now < endTimestamp) {
+            sparkleTimer = setTimeout(emitSparkle, 140 + Math.random() * 120);
+        }
+    };
+    sparkleTimer = setTimeout(emitSparkle, delay * 1000);
+
+    const totalLifetime = (delay + duration + 0.5) * 1000;
+    setTimeout(() => {
+        clearTimeout(sparkleTimer);
+        flightEl.remove();
+    }, totalLifetime);
+}
+
+function createButterflyMissEffect(count) {
     if (prefersReducedMotion()) return;
 
-    // 触发全屏桃花雨急落与中心花瓣浪漫绽放
+    // 呼应背景樱花浪漫绽放
     if (typeof window.homeSakuraEffect?.triggerMissYouFlutter === 'function') {
         window.homeSakuraEffect.triggerMissYouFlutter();
     }
 
-    const isMobile = window.innerWidth < 768;
-    const heartCount = isMobile ? 18 : 32;
-    const container = document.createElement('div');
-    container.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100dvh;
-        pointer-events: none;
-        z-index: 9998;
-        overflow: hidden;
-    `;
-    document.body.appendChild(container);
-    
-    const elements = ['🌸', '💖', '✨', '🎀', '🍬', '🍓', '💕', '🧁', '💗', '❀', '💫', '🌷', '💝'];
-    
-    for (let i = 0; i < heartCount; i++) {
-        const item = document.createElement('div');
-        const icon = elements[Math.floor(Math.random() * elements.length)];
-        item.innerText = icon;
-        
-        const startLeft = Math.random() * 100;
-        const size = 16 + Math.random() * 18;
-        const duration = 2.2 + Math.random() * 1.8;
-        const delay = Math.random() * 0.9;
-        const swayX = (Math.random() - 0.5) * 90;
-        const rotEnd = (Math.random() > 0.5 ? 1 : -1) * (180 + Math.random() * 260);
-        
-        item.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            --start-x: ${startLeft}vw;
-            --sway-x: ${swayX}px;
-            --rot-end: ${rotEnd}deg;
-            font-size: ${size}px;
-            opacity: 0;
-            will-change: transform, opacity;
-            animation: fallAndSway ${duration}s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${delay}s forwards;
-            user-select: none;
-            text-shadow: 0 2px 10px rgba(255, 105, 135, 0.4);
-        `;
-        container.appendChild(item);
+    let container = document.getElementById('butterfly-miss-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'butterfly-miss-container';
+        document.body.appendChild(container);
     }
-    
+
+    const isMobile = window.innerWidth < 768;
+    const defaultCount = isMobile ? 12 : 20;
+    const actualCount = count || defaultCount;
+
+    for (let i = 0; i < actualCount; i++) {
+        const delay = i * 0.12 + Math.random() * 0.22;
+        spawnSingleButterfly(container, {
+            delay: delay,
+            isSpecial: i === 0 || i === Math.floor(actualCount / 2)
+        });
+    }
+
+    // 自动清理空容器
     setTimeout(() => {
-        container.remove();
-    }, 5000);
+        if (container && container.childNodes.length === 0) {
+            container.remove();
+        }
+    }, 8000);
 }
+
+// 保持对原有调用接口的全面无缝兼容
+function createHeartRain() {
+    createButterflyMissEffect();
+}
+
+window.createButterflyMissEffect = createButterflyMissEffect;
+
 
 let isSendingMissYou = false;
 let missYouRequestGeneration = 0;
