@@ -71,6 +71,19 @@ function getTopicStorageDirectory() {
     return `${spaceId}/${userId}/topics`;
 }
 
+/**
+ * 确保当前已获取到情侣空间认证资料（支持初始化异步等待）
+ */
+async function ensureTopicAuthReady(maxWaitMs = 4000) {
+    if (currentUserProfile?.space_id && currentAuthUser) return true;
+    const start = Date.now();
+    while (Date.now() - start < maxWaitMs) {
+        if (currentUserProfile?.space_id && currentAuthUser) return true;
+        await new Promise(resolve => setTimeout(resolve, 80));
+    }
+    return Boolean(currentUserProfile?.space_id && currentAuthUser);
+}
+
 // ==========================================================================
 // 1. 首页板块逻辑
 // ==========================================================================
@@ -151,7 +164,15 @@ function renderHomeTopics(topics) {
 async function loadTopicsCatalog(category = activeTopicCategoryFilter) {
     activeTopicCategoryFilter = category;
     const listEl = document.getElementById('topics-catalog-list');
-    if (!listEl || !supabaseClient || !currentUserProfile?.space_id) return;
+    if (!listEl || !supabaseClient) return;
+
+    if (!currentUserProfile?.space_id || !currentAuthUser) {
+        const authed = await ensureTopicAuthReady();
+        if (!authed) {
+            listEl.innerHTML = `<div class="empty-state">请先登录情侣空间后再查看手账目录 🌸</div>`;
+            return;
+        }
+    }
 
     listEl.innerHTML = `<div class="empty-state">正在翻开我们的手账目录… 📖</div>`;
 
@@ -332,12 +353,23 @@ async function submitCreateTopic() {
 // ==========================================================================
 
 async function loadTopicDetail(topicId) {
-    if (!topicId || !supabaseClient || !currentUserProfile?.space_id) return;
+    if (!topicId || !supabaseClient) return;
 
     const titleEl = document.getElementById('topic-detail-title');
     const flowEl = document.getElementById('topic-messages-flow');
     if (titleEl) titleEl.textContent = '手账加载中…';
     if (flowEl) flowEl.innerHTML = '<div class="empty-state">正在展开这一页的对话回忆… 🌸</div>';
+
+    // 确保认证信息就绪
+    if (!currentUserProfile?.space_id || !currentAuthUser) {
+        const authed = await ensureTopicAuthReady();
+        if (!authed) {
+            console.warn('loadTopicDetail: 未能获取到情侣空间认证信息');
+            if (titleEl) titleEl.textContent = '请先登录';
+            if (flowEl) flowEl.innerHTML = '<div class="empty-state">请先登录情侣空间后再查看本手账哦～ 🌸</div>';
+            return;
+        }
+    }
 
     try {
         // 1. 获取话题基本信息
@@ -351,6 +383,7 @@ async function loadTopicDetail(topicId) {
         if (topicErr || !topic) {
             console.error('获取话题失败:', topicErr);
             if (titleEl) titleEl.textContent = '话题不存在或已删除';
+            if (flowEl) flowEl.innerHTML = '<div class="empty-state">话题不存在或已被删除 🌸</div>';
             return;
         }
 
@@ -367,6 +400,7 @@ async function loadTopicDetail(topicId) {
 
         if (msgErr) {
             console.error('获取消息失败:', msgErr);
+            if (flowEl) flowEl.innerHTML = '<div class="empty-state">加载消息流失败，请重试 🌸</div>';
             return;
         }
 
@@ -380,6 +414,8 @@ async function loadTopicDetail(topicId) {
         scrollTopicToBottom();
     } catch (err) {
         console.error('加载话题详情异常:', err);
+        if (titleEl) titleEl.textContent = '加载异常';
+        if (flowEl) flowEl.innerHTML = '<div class="empty-state">加载手账发生异常，请刷新重试 🌸</div>';
     }
 }
 
@@ -751,9 +787,11 @@ function resetTopicComposer() {
     }
 }
 
+let isTopicMessageSending = false;
+
 // ---------------- 执行发送 ----------------
 async function sendTopicMessage() {
-    if (!currentTopicDetail || !currentAuthUser || !currentUserProfile?.space_id) return;
+    if (isTopicMessageSending) return;
 
     const textInput = document.getElementById('topicComposerTextInput');
     const sendBtn = document.getElementById('btn-topic-send');
@@ -763,8 +801,32 @@ async function sendTopicMessage() {
     const hasPhotos = topicSelectedPhotos.length > 0;
     const hasAudio = Boolean(topicAudioBlob);
 
-    if (!hasText && !hasPhotos && !hasAudio) return;
+    if (!hasText && !hasPhotos && !hasAudio) {
+        if (textInput) textInput.focus();
+        return;
+    }
 
+    if (!currentTopicDetail) {
+        console.warn('sendTopicMessage: currentTopicDetail 缺失');
+        if (typeof showToast === 'function') {
+            showToast('手账详情加载中或不存在，请刷新重试 🌸');
+        } else {
+            alert('手账详情加载中或不存在，请刷新重试 🌸');
+        }
+        return;
+    }
+
+    if (!currentAuthUser || !currentUserProfile?.space_id) {
+        console.warn('sendTopicMessage: 认证信息缺失');
+        if (typeof showToast === 'function') {
+            showToast('请先登录情侣空间后再发送消息哦 🌸');
+        } else {
+            alert('请先登录情侣空间后再发送消息哦 🌸');
+        }
+        return;
+    }
+
+    isTopicMessageSending = true;
     if (sendBtn) sendBtn.disabled = true;
 
     try {
@@ -834,14 +896,16 @@ async function sendTopicMessage() {
 
         if (error) {
             console.error('保存消息失败:', error);
-            alert('发送失败：' + error.message);
-            if (sendBtn) sendBtn.disabled = false;
+            if (typeof showToast === 'function') {
+                showToast('发送失败：' + error.message);
+            } else {
+                alert('发送失败：' + error.message);
+            }
             return;
         }
 
         // 清理输入状态
         resetTopicComposer();
-        if (sendBtn) sendBtn.disabled = false;
 
         // 本地立即追加（Realtime 会有去重）
         if (!currentTopicMessages.some(m => m.id === data.id)) {
@@ -851,7 +915,13 @@ async function sendTopicMessage() {
         }
     } catch (err) {
         console.error('发送话题消息异常:', err);
-        alert('发送发生异常，请重试');
+        if (typeof showToast === 'function') {
+            showToast('发送发生异常，请重试');
+        } else {
+            alert('发送发生异常，请重试');
+        }
+    } finally {
+        isTopicMessageSending = false;
         if (sendBtn) sendBtn.disabled = false;
     }
 }
@@ -887,12 +957,20 @@ function closeResolveTopicModal() {
 }
 
 async function submitResolveTopic() {
-    if (!currentTopicDetail || !supabaseClient || !currentUserProfile?.space_id) return;
+    if (!currentTopicDetail || !supabaseClient) return;
 
     const input = document.getElementById('resolveSummaryInput');
     const msg = document.getElementById('resolveTopicModalMsg');
     const submitBtn = document.getElementById('btn-submit-resolve-topic');
     const summary = input ? input.value.trim() : '';
+
+    if (!currentUserProfile?.space_id || !currentAuthUser) {
+        const authed = await ensureTopicAuthReady();
+        if (!authed) {
+            if (msg) msg.textContent = '请先登录情侣空间后再记录共识 🌸';
+            return;
+        }
+    }
 
     if (!summary) {
         if (msg) msg.textContent = '请写下我们达成的约定或解决方案吧～';
@@ -919,20 +997,19 @@ async function submitResolveTopic() {
         if (error) {
             console.error('更新共识失败:', error);
             if (msg) msg.textContent = '保存失败：' + error.message;
-            if (submitBtn) submitBtn.disabled = false;
             return;
         }
 
         currentTopicDetail = data;
         renderTopicDetailShell(data);
         closeResolveTopicModal();
-        if (submitBtn) submitBtn.disabled = false;
 
         // 刷新列表
         loadHomeTopics();
     } catch (err) {
         console.error('保存共识异常:', err);
         if (msg) msg.textContent = '保存共识发生异常';
+    } finally {
         if (submitBtn) submitBtn.disabled = false;
     }
 }
@@ -1027,7 +1104,34 @@ window.requestAITopicAdvice = requestAITopicAdvice;
 window.closeAITopicAdviceModal = closeAITopicAdviceModal;
 window.openTopicPhotoLightbox = openTopicPhotoLightbox;
 
-// 注册全局路由响应钩子
+function enterTopicsPage(_route) {
+    loadTopicsCatalog();
+}
+
+function enterTopicDetailPage(route) {
+    const topicId = route?.params?.id;
+    if (topicId) {
+        loadTopicDetail(topicId);
+    }
+}
+
+function leaveTopicDetailPage(_route) {
+    cleanupTopicRealtimeSubscription();
+    resetTopicComposer();
+    currentTopicDetail = null;
+    currentTopicMessages = [];
+}
+
+function leaveTopicsPage(_route) {
+    // 退出目录页逻辑
+}
+
+window.enterTopicsPage = enterTopicsPage;
+window.enterTopicDetailPage = enterTopicDetailPage;
+window.leaveTopicsPage = leaveTopicsPage;
+window.leaveTopicDetailPage = leaveTopicDetailPage;
+
+// 注册全局路由响应钩子（兜底兼容）
 const prevOnAppRouteEnter = window.onAppRouteEnter;
 window.onAppRouteEnter = function(route, previous) {
     if (typeof prevOnAppRouteEnter === 'function') {
@@ -1048,5 +1152,7 @@ window.onAppRouteLeave = function(current, next) {
     if (current?.id === 'topic-detail') {
         cleanupTopicRealtimeSubscription();
         resetTopicComposer();
+        currentTopicDetail = null;
+        currentTopicMessages = [];
     }
 };
