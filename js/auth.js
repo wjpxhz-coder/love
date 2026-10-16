@@ -301,6 +301,7 @@ async function onLoginSuccess(username, isNewLogin) {
     if (typeof fetchMoments === 'function') loaders.push(fetchMoments());
     if (typeof loadMoods === 'function') loaders.push(loadMoods());
     if (typeof loadNotifications === 'function') loaders.push(loadNotifications());
+    if (typeof loadHomeTopics === 'function') loaders.push(loadHomeTopics());
     await Promise.allSettled(loaders);
 
     // AI 上传文件后台维护清理：彻底移出主首屏链路，延后至空闲时段调度
@@ -690,6 +691,9 @@ function setHomeAuthView(state) {
     const moodSection = document.getElementById('mood-section');
     const moodContent = document.getElementById('mood-unlocked-content');
     const moodLockedCard = document.getElementById('mood-locked-card');
+    const topicsSection = document.getElementById('home-topics-section');
+    const topicsContent = document.getElementById('home-topics-unlocked-content');
+    const topicsLockedCard = document.getElementById('topics-locked-card');
     const actions = document.getElementById('main-btn-group');
     const timelineSection = document.getElementById('timeline-section');
     const timelineContent = document.getElementById('timeline-unlocked-content');
@@ -705,6 +709,9 @@ function setHomeAuthView(state) {
     if (moodSection) moodSection.hidden = state === 'pending';
     if (moodContent) moodContent.hidden = state !== 'unlocked';
     if (moodLockedCard) moodLockedCard.hidden = state !== 'locked';
+    if (topicsSection) topicsSection.hidden = state === 'pending';
+    if (topicsContent) topicsContent.hidden = state !== 'unlocked';
+    if (topicsLockedCard) topicsLockedCard.hidden = state !== 'locked';
     if (actions) actions.hidden = state !== 'unlocked';
     if (timelineSection) timelineSection.hidden = state === 'pending';
     if (timelineContent) timelineContent.hidden = state !== 'unlocked';
