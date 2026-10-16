@@ -7,7 +7,9 @@ const NOTIFICATION_ACTIONS = {
     like: '点赞了评论',
     miss: '给你发来了心电感应',
     recalled: '撤回了该互动',
-    mood: '记录了心情'
+    mood: '记录了心情',
+    topic: '开启了手账话题',
+    topic_message: '在话题手账中留了言'
 };
 let processedMissIds = new Set();
 let missEffectTimer = null;
@@ -253,6 +255,15 @@ function notificationPreview(content) {
             const photoHint = hasPhotos ? ' [🖼️图片]' : '';
             const mainText = moodDesc ? `${moodDesc}${noteText}` : (noteText.replace(/^ · /, '') || '记录了心情');
             return `${specialPrefix}${mainText}${photoHint}`.slice(0, 160);
+        }
+        if (parsed.action === 'create' || parsed.action === 'resolved') {
+            const act = parsed.action === 'resolved' ? '✨ 达成共识：' : '📖 开启话题：';
+            return `${act}${parsed.title || ''}${parsed.summary ? ' · ' + parsed.summary : ''}`.slice(0, 160);
+        }
+        if (typeof parsed.message_id !== 'undefined') {
+            const hasPhotos = parsed.has_photos ? ' [🖼️图片]' : '';
+            const hasAudio = parsed.has_audio ? ' [🎙️录音]' : '';
+            return `${parsed.content || ''}${hasPhotos}${hasAudio}`.trim().slice(0, 160) || '发来了一条话题消息';
         }
         const text = typeof parsed.text === 'string' ? parsed.text.trim() : '';
         const mediaHint = Array.isArray(parsed.images) && parsed.images.length ? ' [🖼️图片]' : '';
@@ -521,6 +532,18 @@ async function handleNotificationClick(notificationId, type, relatedId) {
         }
         if (typeof openMoodDayModal === 'function' && targetDate) {
             openMoodDayModal(targetDate);
+        }
+        loadNotifications();
+        return;
+    }
+
+    if (type === 'topic' || type === 'topic_message') {
+        const panel = document.getElementById('notification-panel');
+        panel?.classList.remove('show');
+        panel?.setAttribute('aria-hidden', 'true');
+        document.getElementById('notification-bell')?.setAttribute('aria-expanded', 'false');
+        if (relatedId && typeof appNavigate === 'function') {
+            appNavigate(`/topics/${relatedId}`);
         }
         loadNotifications();
         return;

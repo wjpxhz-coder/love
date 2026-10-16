@@ -19,6 +19,8 @@
         { id: 'ai-chat', pattern: '/agnes/chat', label: '感情助手聊天', elementId: 'aiChatOverlay', protected: true },
         { id: 'settings', pattern: '/settings', label: '系统设置', elementId: 'settingsModal', protected: true },
         { id: 'milestones', pattern: '/milestones', label: '大事记', elementId: 'milestonesModal', protected: true },
+        { id: 'topics', pattern: '/topics', label: '恋爱手账', elementId: 'topicsModal', protected: true },
+        { id: 'topic-detail', pattern: '/topics/:id', label: '话题手账', elementId: 'topicDetailModal', protected: true },
         // The static edit route must precede the dynamic author route.
         { id: 'edit-profile', pattern: '/profile/edit', label: '编辑资料', elementId: 'edit-profile-page', protected: true },
         { id: 'profile-moments', pattern: '/profile/:author/moments', label: '发布的动态', elementId: 'profile-moments-page', protected: true },
