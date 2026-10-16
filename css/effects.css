@@ -526,9 +526,33 @@ button:hover::after {
     width: 100%;
     height: 100%;
     transform-style: preserve-3d;
-    filter: drop-shadow(0 0 10px var(--glow-color, #f472b6))
-            drop-shadow(0 0 20px var(--glow-color, #c084fc));
-    animation: butterflyColorCycle var(--color-cycle-dur, 4s) linear infinite;
+    filter: drop-shadow(0 0 6px var(--glow-color, #f472b6));
+    will-change: transform;
+}
+
+/* 优雅呼吸光晕（纯 GPU 合成层，不产生重绘） */
+.butterfly-model::before {
+    content: '';
+    position: absolute;
+    inset: 4%;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--glow-color, #f472b6) 0%, transparent 72%);
+    opacity: 0.45;
+    pointer-events: none;
+    transform: translateZ(-1px);
+    will-change: opacity, transform;
+    animation: butterflyAuraPulse var(--sway-duration, 1.8s) ease-in-out infinite alternate;
+}
+
+@keyframes butterflyAuraPulse {
+    0% {
+        opacity: 0.32;
+        transform: translateZ(-1px) scale(0.88);
+    }
+    100% {
+        opacity: 0.68;
+        transform: translateZ(-1px) scale(1.16);
+    }
 }
 
 .butterfly-wing {
@@ -537,7 +561,8 @@ button:hover::after {
     width: 50%;
     height: 100%;
     transform-style: preserve-3d;
-    backface-visibility: visible;
+    backface-visibility: hidden;
+    will-change: transform;
 }
 
 .butterfly-wing.left {
@@ -559,6 +584,10 @@ button:hover::after {
     display: block;
 }
 
+.butterfly-wing.right svg {
+    transform: scaleX(-1);
+}
+
 .butterfly-thorax {
     position: absolute;
     top: 18%;
@@ -570,6 +599,34 @@ button:hover::after {
     border-radius: 4px;
     box-shadow: 0 0 8px rgba(255, 255, 255, 0.95);
     z-index: 5;
+}
+
+/* 灵动微型仙尘拖尾 */
+.butterfly-thorax::after {
+    content: '';
+    position: absolute;
+    top: 75%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 22px;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95), var(--sparkle-color, #f472b6) 55%, transparent 100%);
+    filter: blur(0.5px);
+    opacity: 0.75;
+    border-radius: 2px;
+    pointer-events: none;
+    animation: bfTrailPulse 0.4s ease-in-out infinite alternate;
+}
+
+@keyframes bfTrailPulse {
+    0% {
+        opacity: 0.5;
+        transform: translateX(-50%) scaleY(0.85);
+    }
+    100% {
+        opacity: 0.85;
+        transform: translateX(-50%) scaleY(1.2);
+    }
 }
 
 .butterfly-antennae {
@@ -598,24 +655,6 @@ button:hover::after {
     100% { transform: rotateZ(calc(var(--base-angle, -6deg) + 16deg)) rotateX(-6deg) scale(1.04); }
 }
 
-@keyframes butterflyColorCycle {
-    0% {
-        filter: drop-shadow(0 0 9px var(--glow-color, #f472b6))
-                drop-shadow(0 0 22px var(--glow-color, #c084fc))
-                hue-rotate(0deg);
-    }
-    50% {
-        filter: drop-shadow(0 0 13px var(--glow-color, #38bdf8))
-                drop-shadow(0 0 30px var(--glow-color, #ec4899))
-                hue-rotate(180deg);
-    }
-    100% {
-        filter: drop-shadow(0 0 9px var(--glow-color, #f472b6))
-                drop-shadow(0 0 22px var(--glow-color, #c084fc))
-                hue-rotate(360deg);
-    }
-}
-
 @keyframes butterflyFly {
     0% {
         opacity: 0;
@@ -641,19 +680,87 @@ button:hover::after {
     }
 }
 
-.butterfly-sparkle {
+/* 纯 GPU 驱动的鳞粉洒落尾迹，零 JS 回流 */
+.butterfly-sparkle-trail {
     position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
     pointer-events: none;
-    border-radius: 50%;
-    background: radial-gradient(circle, #ffffff 15%, var(--sparkle-color, #f472b6) 70%, transparent 100%);
-    box-shadow: 0 0 8px #ffffff, 0 0 15px var(--sparkle-color, #f472b6);
-    will-change: transform, opacity;
-    animation: sparkleVanish var(--sparkle-dur, 1.4s) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    z-index: 2;
 }
 
-@keyframes sparkleVanish {
-    0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-    100% { opacity: 0; transform: translate3d(var(--sx, 0px), var(--sy, 25px), 0) scale(0.1); }
+.bf-sparkle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ffffff 30%, var(--sparkle-color, #f472b6) 80%, transparent 100%);
+    box-shadow: 0 0 5px #ffffff, 0 0 9px var(--sparkle-color, #f472b6);
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+}
+
+.bf-sparkle.sp1 {
+    width: 5px;
+    height: 5px;
+    animation: bfSparkleDrop 1.1s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+    animation-delay: 0s;
+    --sx1: -8px;
+    --sx2: -15px;
+}
+
+.bf-sparkle.sp2 {
+    width: 4px;
+    height: 4px;
+    animation: bfSparkleDrop 1.25s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+    animation-delay: 0.28s;
+    --sx1: 7px;
+    --sx2: 14px;
+}
+
+.bf-sparkle.sp3 {
+    width: 6px;
+    height: 6px;
+    animation: bfSparkleDrop 1.35s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+    animation-delay: 0.58s;
+    --sx1: -12px;
+    --sx2: -7px;
+}
+
+.bf-sparkle.sp4 {
+    width: 3.5px;
+    height: 3.5px;
+    animation: bfSparkleDrop 1.15s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+    animation-delay: 0.85s;
+    --sx1: 9px;
+    --sx2: 5px;
+}
+
+@keyframes bfSparkleDrop {
+    0% {
+        opacity: 0;
+        transform: translate3d(0, 0, 0) scale(0.3);
+    }
+    18% {
+        opacity: 0.95;
+        transform: translate3d(var(--sx1, 0px), 16px, 0) scale(1.15);
+    }
+    65% {
+        opacity: 0.75;
+    }
+    100% {
+        opacity: 0;
+        transform: translate3d(var(--sx2, 0px), 75px, 0) scale(0.15);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #butterfly-miss-container {
+        display: none !important;
+    }
 }
 
 
