@@ -1,5 +1,5 @@
 -- ============================================================================
--- 迁移：双人话题手账（恋爱小本本）
+-- 迁移：双人话题手账（恋爱小本本）- 幂等安全版
 -- 表结构：public.topics, public.topic_messages
 -- 支持状态流转、高光共识总结、富媒体（图片/语音）、站内通知与 Realtime
 -- ============================================================================
@@ -28,7 +28,7 @@ create index if not exists topics_space_updated_idx
 create index if not exists topics_space_status_idx
   on public.topics (space_id, status);
 
--- 2. 创建话题消息流表 public.topic_messages
+-- 2. 创建话题消息流表 public.topic_messages（分离约束以保证绝对幂等）
 create table if not exists public.topic_messages (
   id bigint generated always as identity primary key,
   topic_id bigint not null references public.topics(id) on delete cascade,
@@ -38,12 +38,15 @@ create table if not exists public.topic_messages (
   content text check (content is null or length(content) <= 3000),
   photos text[] default '{}' check (photos is null or cardinality(photos) <= 9),
   audio_url text check (audio_url is null or length(audio_url) <= 1000),
-  created_at timestamptz not null default now(),
-  constraint topic_messages_content_check check (
-    (content is not null and length(btrim(content)) > 0)
-    or (photos is not null and cardinality(photos) > 0)
-    or (audio_url is not null and length(btrim(audio_url)) > 0)
-  )
+  created_at timestamptz not null default now()
+);
+
+-- 安全更新检查约束
+alter table public.topic_messages drop constraint if exists topic_messages_content_check;
+alter table public.topic_messages add constraint topic_messages_content_check check (
+  (content is not null and length(btrim(content)) > 0)
+  or (photos is not null and cardinality(photos) > 0)
+  or (audio_url is not null and length(btrim(audio_url)) > 0)
 );
 
 create index if not exists topic_messages_topic_created_idx
@@ -162,7 +165,6 @@ begin
   -- 若是 topics 的 UPDATE，仅当状态改变为 resolved 时才推送“达成共识”通知
   if tg_table_name = 'topics' and tg_op = 'UPDATE' then
     if old.status = 'open' and new.status = 'resolved' then
-      -- 触发达成共识通知
       null;
     else
       return new;
