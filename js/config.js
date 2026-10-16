@@ -321,17 +321,17 @@ const supabaseClient = window.supabase?.createClient
 window.extractStorageObjectPath = extractStorageObjectPath;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.85';
+const APP_VERSION = 'v3.9.86';
 const CONFIG = {
-    version: 'v3.9.85',
+    version: 'v3.9.86',
     date: '2026-10-16',
-    title: '全新双人恋爱手账重磅上线 · 像日记本一样记录我们的小故事 📖💕',
+    title: '恋爱手账会话体验与消息发送修复 💌✨',
     features: [
+        '修复手账详情页路由生命周期响应与发送消息按钮点击无反应的问题 💌',
+        '完善手账会话认证预加载与弱网状态提示，优化发送拦截与按钮状态自愈 ⚡',
         '恋爱话题手账目录：像日记目录一样分专题交流，再也不用把严肃沟通和日常聊天混在一起 📖',
         '解决方案与共识便签：聊完可一键标记「达成共识」，写下双方约定，高光置顶随时重温 🤝',
-        '丰富多媒体支持：支持随时发送文字、精美照片九宫格与语音录音条 🎙️📸',
-        '感情助手 Agnes 智囊：沟通陷入僵局或想要梳理时，可一键请教 Agnes 获取调解建议与共识草稿 🤖',
-        '实时同频同步：双方进入同一手账时消息实时弹出，离开时通过铃铛即时提醒 ⚡'
+        '丰富多媒体支持：支持随时发送文字、精美照片九宫格与语音录音条 🎙️📸'
     ]
 };
 const UPDATE_LOG = CONFIG;

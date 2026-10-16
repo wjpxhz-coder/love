@@ -304,6 +304,15 @@ async function onLoginSuccess(username, isNewLogin) {
     if (typeof loadHomeTopics === 'function') loaders.push(loadHomeTopics());
     await Promise.allSettled(loaders);
 
+    const activeRoute = typeof getCurrentAppRoute === 'function' ? getCurrentAppRoute() : null;
+    if (activeRoute && activeRoute.id !== 'home' && typeof onAppRouteEnter === 'function') {
+        try {
+            onAppRouteEnter(activeRoute);
+        } catch (err) {
+            console.warn('登录后重新加载当前活跃页面失败:', err);
+        }
+    }
+
     // AI 上传文件后台维护清理：彻底移出主首屏链路，延后至空闲时段调度
     if (typeof cleanupStaleAIInputsForCurrentUser === 'function') {
         if ('requestIdleCallback' in window) {

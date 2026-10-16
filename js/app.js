@@ -124,6 +124,8 @@ function onAppRouteEnter(route) {
     else if (route.id === 'ai-chat' && typeof enterAIChatPage === 'function') enterAIChatPage(route);
     else if (route.id === 'settings' && typeof enterSettingsPage === 'function') enterSettingsPage(route);
     else if (route.id === 'milestones' && typeof enterMilestonesPage === 'function') enterMilestonesPage(route);
+    else if (route.id === 'topics' && typeof enterTopicsPage === 'function') enterTopicsPage(route);
+    else if (route.id === 'topic-detail' && typeof enterTopicDetailPage === 'function') enterTopicDetailPage(route);
     else if (route.id === 'profile' && typeof enterProfilePage === 'function') enterProfilePage(route);
     else if (route.id === 'profile-moments' && typeof enterProfileMomentsPage === 'function') enterProfileMomentsPage(route);
     else if (route.id === 'profile-photos' && typeof enterProfilePhotosPage === 'function') enterProfilePhotosPage(route);
@@ -146,6 +148,8 @@ function onAppRouteLeave(route) {
     else if (route.id === 'blindbox' && typeof leaveBlindBoxPage === 'function') leaveBlindBoxPage();
     else if (route.id === 'ai' && typeof leaveAIPage === 'function') leaveAIPage();
     else if (route.id === 'ai-chat' && typeof leaveAIChatPage === 'function') leaveAIChatPage();
+    else if (route.id === 'topics' && typeof leaveTopicsPage === 'function') leaveTopicsPage();
+    else if (route.id === 'topic-detail' && typeof leaveTopicDetailPage === 'function') leaveTopicDetailPage();
     else if (route.id === 'profile' && typeof leaveProfilePage === 'function') leaveProfilePage();
     else if (route.id === 'profile-moments' && typeof leaveProfileMomentsPage === 'function') leaveProfileMomentsPage();
     else if (route.id === 'profile-photos' && typeof leaveProfilePhotosPage === 'function') leaveProfilePhotosPage();
@@ -160,6 +164,10 @@ function canLeaveAppRoute(route) {
         return false;
     }
     if (route.id === 'mood' && typeof isMoodSaving !== 'undefined' && isMoodSaving) return false;
+    if (route.id === 'topic-detail' && typeof isTopicMessageSending !== 'undefined' && isTopicMessageSending) {
+        if (typeof showToast === 'function') showToast('正在发送手账消息，请稍候…');
+        return false;
+    }
     if (route.id === 'edit-profile' && typeof isProfileSaving !== 'undefined' && isProfileSaving) {
         if (typeof showToast === 'function') showToast('资料正在保存，请稍候…');
         return false;
