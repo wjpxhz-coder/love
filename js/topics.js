@@ -98,6 +98,60 @@ async function ensureTopicAuthReady(maxWaitMs = 4000) {
     return Boolean(currentUserProfile?.space_id && currentAuthUser);
 }
 
+/**
+ * 跨浏览器/移动端统一手账弹窗显示
+ */
+function showTopicModal(modal) {
+    if (!modal) return;
+    initTopicModalBackdropHandlers();
+    try {
+        if (typeof modal.showModal === 'function') {
+            if (!modal.open) {
+                modal.showModal();
+            }
+        } else {
+            modal.setAttribute('open', '');
+        }
+    } catch (_e) {
+        modal.setAttribute('open', '');
+    }
+    modal.classList.add('is-open');
+}
+
+/**
+ * 跨浏览器/移动端统一手账弹窗隐藏
+ */
+function hideTopicModal(modal) {
+    if (!modal) return;
+    try {
+        if (typeof modal.close === 'function') {
+            if (modal.open) {
+                modal.close();
+            }
+        } else {
+            modal.removeAttribute('open');
+        }
+    } catch (_e) {
+        modal.removeAttribute('open');
+    }
+    modal.classList.remove('is-open');
+}
+
+/**
+ * 为手账弹窗绑定点击背景遮罩自动关闭事件
+ */
+function initTopicModalBackdropHandlers() {
+    document.querySelectorAll('dialog.topic-modal-dialog').forEach(modal => {
+        if (modal.dataset.backdropBound) return;
+        modal.dataset.backdropBound = 'true';
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideTopicModal(modal);
+            }
+        });
+    });
+}
+
 // ==========================================================================
 // 1. 首页板块逻辑
 // ==========================================================================
@@ -159,23 +213,25 @@ function renderHomeTopics(topics) {
             ? `<div class="home-topic-card-summary">🤝 我们的约定：${escapeHtml(topic.summary)}</div>`
             : '';
 
+        const safeId = escapeHtml(String(topic.id));
+
         return `
-            <div class="home-topic-card ${isResolved ? 'is-resolved' : ''}" onclick="appNavigate('/topics/${topic.id}')" role="button" tabindex="0">
+            <div class="home-topic-card ${isResolved ? 'is-resolved' : ''}" onclick="appNavigate('/topics/${safeId}')" role="button" tabindex="0">
                 <div class="home-topic-card-header">
-                    <div class="home-topic-header-tags">
-                        <span class="topic-tag category-${escapeHtml(topic.category)}">${catInfo.label}</span>
-                        ${statusHtml}
-                    </div>
-                    <div class="topic-card-actions" onclick="event.stopPropagation()">
-                        <button class="topic-card-action-btn" type="button" onclick="openEditTopicModal(${topic.id}, event)" title="编辑手账" aria-label="编辑手账">✏️</button>
-                        <button class="topic-card-action-btn danger" type="button" onclick="deleteTopic(${topic.id}, event)" title="删除手账" aria-label="删除手账">🗑️</button>
-                    </div>
+                    <span class="topic-tag category-${escapeHtml(topic.category)}">${catInfo.label}</span>
+                    ${statusHtml}
                 </div>
                 <h3 class="home-topic-card-title">${escapeHtml(topic.title)}</h3>
                 ${summaryHtml}
                 <div class="home-topic-card-footer">
                     <span class="home-topic-card-author">✍️ ${escapeHtml(topic.author)}</span>
-                    <span class="home-topic-card-time">${formatTopicTime(topic.updated_at || topic.created_at)}</span>
+                    <div class="home-topic-footer-right">
+                        <span class="home-topic-card-time">${formatTopicTime(topic.updated_at || topic.created_at)}</span>
+                        <div class="topic-card-actions" onclick="event.stopPropagation()">
+                            <button class="topic-card-action-link" type="button" onclick="openEditTopicModal('${safeId}', event)" title="编辑手账" aria-label="编辑手账">✏️</button>
+                            <button class="topic-card-action-link danger" type="button" onclick="deleteTopic('${safeId}', event)" title="删除手账" aria-label="删除手账">🗑️</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -259,23 +315,25 @@ function renderTopicsCatalog(topics) {
             ? `<div class="home-topic-card-summary" style="margin-top:6px;">🤝 约定：${escapeHtml(topic.summary)}</div>`
             : '';
 
+        const safeId = escapeHtml(String(topic.id));
+
         return `
-            <div class="topic-list-card ${isResolved ? 'is-resolved' : ''}" onclick="appNavigate('/topics/${topic.id}')" role="button" tabindex="0">
+            <div class="topic-list-card ${isResolved ? 'is-resolved' : ''}" onclick="appNavigate('/topics/${safeId}')" role="button" tabindex="0">
                 <div class="topic-list-card-top">
-                    <div class="topic-list-card-top-tags">
-                        <span class="topic-tag category-${escapeHtml(topic.category)}">${catInfo.label}</span>
-                        ${statusHtml}
-                    </div>
-                    <div class="topic-card-actions" onclick="event.stopPropagation()">
-                        <button class="topic-card-action-btn" type="button" onclick="openEditTopicModal(${topic.id}, event)" title="编辑手账" aria-label="编辑手账">✏️</button>
-                        <button class="topic-card-action-btn danger" type="button" onclick="deleteTopic(${topic.id}, event)" title="删除手账" aria-label="删除手账">🗑️</button>
-                    </div>
+                    <span class="topic-tag category-${escapeHtml(topic.category)}">${catInfo.label}</span>
+                    ${statusHtml}
                 </div>
                 <div class="topic-list-card-title">${escapeHtml(topic.title)}</div>
                 ${summaryHtml}
                 <div class="topic-list-card-bottom">
                     <span>由 ${escapeHtml(topic.author)} 发起</span>
-                    <span>${formatTopicTime(topic.updated_at || topic.created_at)}</span>
+                    <div class="topic-list-bottom-right">
+                        <span>${formatTopicTime(topic.updated_at || topic.created_at)}</span>
+                        <div class="topic-card-actions" onclick="event.stopPropagation()">
+                            <button class="topic-card-action-link" type="button" onclick="openEditTopicModal('${safeId}', event)" title="编辑手账" aria-label="编辑手账">✏️ 编辑</button>
+                            <button class="topic-card-action-link danger" type="button" onclick="deleteTopic('${safeId}', event)" title="删除手账" aria-label="删除手账">🗑️ 删除</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -311,19 +369,12 @@ function openNewTopicModal() {
         btn.classList.toggle('selected', btn.dataset.category === selectedNewTopicCategory);
     });
 
-    if (typeof modal.showModal === 'function') {
-        modal.showModal();
-    } else {
-        modal.setAttribute('open', '');
-    }
+    showTopicModal(modal);
 }
 
 function closeNewTopicModal() {
     const modal = document.getElementById('newTopicModal');
-    if (modal) {
-        if (typeof modal.close === 'function') modal.close();
-        else modal.removeAttribute('open');
-    }
+    hideTopicModal(modal);
 }
 
 function selectTopicCategory(cat) {
@@ -421,6 +472,7 @@ async function loadTopicDetail(topicId) {
         }
 
         currentTopicDetail = topic;
+        window.currentTopicDetail = topic;
         renderTopicDetailShell(topic);
 
         // 2. 获取该话题的消息记录
@@ -1012,19 +1064,12 @@ function openResolveTopicModal() {
     }
     if (msg) msg.textContent = '';
 
-    if (typeof modal.showModal === 'function') {
-        modal.showModal();
-    } else {
-        modal.setAttribute('open', '');
-    }
+    showTopicModal(modal);
 }
 
 function closeResolveTopicModal() {
     const modal = document.getElementById('resolveTopicModal');
-    if (modal) {
-        if (typeof modal.close === 'function') modal.close();
-        else modal.removeAttribute('open');
-    }
+    hideTopicModal(modal);
 }
 
 async function submitResolveTopic() {
@@ -1099,8 +1144,7 @@ async function requestAITopicAdvice() {
     contentArea.innerHTML = `<div class="ai-loading">🌸 正在请教感情助手 Agnes，请稍候… ✨</div>`;
     if (applyBtn) applyBtn.hidden = true;
 
-    if (typeof modal.showModal === 'function') modal.showModal();
-    else modal.setAttribute('open', '');
+    showTopicModal(modal);
 
     try {
         // 整理近期对话记录作为上下文
@@ -1144,10 +1188,7 @@ async function requestAITopicAdvice() {
 
 function closeAITopicAdviceModal() {
     const modal = document.getElementById('aiTopicAdviceModal');
-    if (modal) {
-        if (typeof modal.close === 'function') modal.close();
-        else modal.removeAttribute('open');
-    }
+    hideTopicModal(modal);
 }
 
 // ==========================================================================
@@ -1183,31 +1224,24 @@ async function openEditTopicModal(topicId, event) {
     if (event && typeof event.stopPropagation === 'function') {
         event.stopPropagation();
     }
-    const id = topicId || currentTopicDetail?.id;
-    if (!id) return;
+    const id = topicId 
+        || currentTopicDetail?.id 
+        || window.currentTopicDetail?.id 
+        || (window.currentAppRoute?.params?.id)
+        || null;
+
+    if (!id) {
+        console.warn('openEditTopicModal: 缺少手账话题ID');
+        return;
+    }
 
     editingTopicId = id;
 
-    // 尝试优先从缓存中寻找话题对象
+    // 尝试优先从内存缓存中寻找话题对象
     let topic = (homeTopicsList || []).find(t => String(t.id) === String(id))
         || (catalogTopicsList || []).find(t => String(t.id) === String(id))
-        || (currentTopicDetail && String(currentTopicDetail.id) === String(id) ? currentTopicDetail : null);
-
-    if (!topic && supabaseClient) {
-        try {
-            const { data } = await supabaseClient
-                .from('topics')
-                .select('*')
-                .eq('id', id)
-                .single();
-            topic = data;
-        } catch (_e) {}
-    }
-
-    if (!topic) {
-        alert('未找到该话题数据');
-        return;
-    }
+        || (currentTopicDetail && String(currentTopicDetail.id) === String(id) ? currentTopicDetail : null)
+        || (window.currentTopicDetail && String(window.currentTopicDetail.id) === String(id) ? window.currentTopicDetail : null);
 
     const modal = document.getElementById('editTopicModal');
     const input = document.getElementById('editTopicTitleInput');
@@ -1217,11 +1251,11 @@ async function openEditTopicModal(topicId, event) {
 
     if (!modal) return;
 
-    if (input) input.value = topic.title || '';
+    if (input) input.value = topic ? (topic.title || '') : '';
     if (msg) msg.textContent = '';
 
-    selectedEditTopicCategory = topic.category || 'general';
-    selectedEditTopicStatus = topic.status || 'open';
+    selectedEditTopicCategory = topic?.category || 'general';
+    selectedEditTopicStatus = topic?.status || 'open';
 
     // 设置分类选中高亮
     document.querySelectorAll('#editCategoryRadioGroup .category-radio-btn').forEach(btn => {
@@ -1234,24 +1268,48 @@ async function openEditTopicModal(topicId, event) {
     });
 
     // 设置共识约定输入框
-    if (summaryInput) summaryInput.value = topic.summary || '';
+    if (summaryInput) summaryInput.value = topic?.summary || '';
     if (summaryField) {
         summaryField.hidden = selectedEditTopicStatus !== 'resolved';
     }
 
-    if (typeof modal.showModal === 'function') {
-        modal.showModal();
-    } else {
-        modal.setAttribute('open', '');
+    // 立即秒发展示弹窗，保证极佳交互响应
+    showTopicModal(modal);
+
+    // 如果未命中缓存，在后台异步拉取并补全
+    if (!topic && supabaseClient) {
+        try {
+            const { data } = await supabaseClient
+                .from('topics')
+                .select('*')
+                .eq('id', id)
+                .single();
+            if (data && String(editingTopicId) === String(id)) {
+                topic = data;
+                if (input) input.value = data.title || '';
+                selectedEditTopicCategory = data.category || 'general';
+                selectedEditTopicStatus = data.status || 'open';
+
+                document.querySelectorAll('#editCategoryRadioGroup .category-radio-btn').forEach(btn => {
+                    btn.classList.toggle('selected', btn.dataset.category === selectedEditTopicCategory);
+                });
+                document.querySelectorAll('#editStatusRadioGroup .category-radio-btn').forEach(btn => {
+                    btn.classList.toggle('selected', btn.dataset.status === selectedEditTopicStatus);
+                });
+                if (summaryInput) summaryInput.value = data.summary || '';
+                if (summaryField) {
+                    summaryField.hidden = selectedEditTopicStatus !== 'resolved';
+                }
+            }
+        } catch (fetchErr) {
+            console.warn('异步查询话题手账失败:', fetchErr);
+        }
     }
 }
 
 function closeEditTopicModal() {
     const modal = document.getElementById('editTopicModal');
-    if (modal) {
-        if (typeof modal.close === 'function') modal.close();
-        else modal.removeAttribute('open');
-    }
+    hideTopicModal(modal);
     editingTopicId = null;
 }
 
@@ -1360,7 +1418,11 @@ async function deleteTopic(topicId, event) {
     if (event && typeof event.stopPropagation === 'function') {
         event.stopPropagation();
     }
-    const id = topicId || currentTopicDetail?.id;
+    const id = topicId 
+        || currentTopicDetail?.id 
+        || window.currentTopicDetail?.id 
+        || (window.currentAppRoute?.params?.id)
+        || null;
     if (!id || !supabaseClient) return;
 
     if (!confirm('确定要删除这本手账话题吗？\n删除后里面所有的交流回忆都将抹去，不可恢复哦 🌸')) {
@@ -1533,6 +1595,7 @@ function leaveTopicDetailPage(_route) {
     cleanupTopicRealtimeSubscription();
     resetTopicComposer();
     currentTopicDetail = null;
+    window.currentTopicDetail = null;
     currentTopicMessages = [];
 }
 
@@ -1567,6 +1630,14 @@ window.onAppRouteLeave = function(current, next) {
         cleanupTopicRealtimeSubscription();
         resetTopicComposer();
         currentTopicDetail = null;
+        window.currentTopicDetail = null;
         currentTopicMessages = [];
     }
 };
+
+// 初始化弹窗背景点击关闭监听
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTopicModalBackdropHandlers);
+} else {
+    initTopicModalBackdropHandlers();
+}

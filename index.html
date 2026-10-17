@@ -65,7 +65,7 @@
     <link rel="stylesheet" href="css/effects.css?v=3.9.87">
     <link rel="stylesheet" href="css/responsive.css?v=3.9.87">
     <link rel="stylesheet" href="css/pages.css?v=3.9.87">
-    <link rel="stylesheet" href="css/topics.css?v=3.9.88">
+    <link rel="stylesheet" href="css/topics.css?v=3.9.89">
 </head>
 <body class="auth-pending">
 <!-- 内联矢量微光 SVG 图标库 -->
@@ -1047,8 +1047,8 @@
             </div>
             <div class="topic-detail-topbar-actions">
                 <button class="btn-resolve-topic" id="btn-topic-resolve-action" type="button" onclick="openResolveTopicModal()">🤝 达成共识</button>
-                <button class="topic-topbar-action-icon-btn" id="btn-topic-detail-edit" type="button" onclick="openEditTopicModal(currentTopicDetail?.id)" title="编辑手账" aria-label="编辑手账">✏️</button>
-                <button class="topic-topbar-action-icon-btn danger" id="btn-topic-detail-delete" type="button" onclick="deleteTopic(currentTopicDetail?.id)" title="删除手账" aria-label="删除手账">🗑️</button>
+                <button class="topic-topbar-action-icon-btn" id="btn-topic-detail-edit" type="button" onclick="openEditTopicModal()" title="编辑手账" aria-label="编辑手账">✏️</button>
+                <button class="topic-topbar-action-icon-btn danger" id="btn-topic-detail-delete" type="button" onclick="deleteTopic()" title="删除手账" aria-label="删除手账">🗑️</button>
             </div>
         </header>
         <div class="app-page-scroll" style="flex:1;">
@@ -1101,7 +1101,7 @@
 
 <!-- 新建手账话题弹窗 -->
 <dialog class="native-dialog topic-modal-dialog" id="newTopicModal" aria-labelledby="newTopicTitle">
-    <div class="modal-box">
+    <div class="topic-modal-box" onclick="event.stopPropagation()">
         <h2 class="modal-title" id="newTopicTitle">✨ 开启新的手账话题</h2>
         <div style="font-size:0.86rem; color:var(--text-muted); margin-bottom:12px;">为我们这次交流起一个名字吧，像目录一样整齐记录～</div>
         <input type="text" id="newTopicTitleInput" class="modal-input" placeholder="例如：周末的小矛盾 / 期末备考计划 / 去青岛旅行" maxlength="80">
@@ -1126,14 +1126,14 @@
 
 <!-- 编辑手账话题弹窗 -->
 <dialog class="native-dialog topic-modal-dialog" id="editTopicModal" aria-labelledby="editTopicTitle">
-    <div class="modal-box">
+    <div class="topic-modal-box" onclick="event.stopPropagation()">
         <h2 class="modal-title" id="editTopicTitle">✏️ 编辑手账话题</h2>
         <div style="font-size:0.86rem; color:var(--text-muted); margin-bottom:12px;">修改话题题目、分类或当前交流状态～</div>
         
-        <label class="modal-field-label" for="editTopicTitleInput" style="font-size:0.88rem; font-weight:700; margin-bottom:6px; display:block; color:var(--text-color);">手账题目</label>
-        <input type="text" id="editTopicTitleInput" class="modal-input" placeholder="输入手账题目" maxlength="80">
+        <label class="modal-field-label" for="editTopicTitleInput" style="font-size:0.88rem; font-weight:700; margin-bottom:6px; display:block; color:var(--text-color); text-align:left;">手账题目</label>
+        <input type="text" id="editTopicTitleInput" class="modal-input" placeholder="输入手账题目" maxlength="80" style="margin-top:0;">
         
-        <div style="font-size:0.88rem; font-weight:700; margin-top:14px; margin-bottom:6px; color:var(--text-color);">🏷️ 手账分类</div>
+        <div style="font-size:0.88rem; font-weight:700; margin-top:14px; margin-bottom:6px; color:var(--text-color); text-align:left;">🏷️ 手账分类</div>
         <div class="category-radio-group" id="editCategoryRadioGroup">
             <div class="category-radio-btn" data-category="reconciliation" onclick="selectEditTopicCategory('reconciliation')">矛盾和解 🌿</div>
             <div class="category-radio-btn" data-category="study" onclick="selectEditTopicCategory('study')">学习备考 📚</div>
@@ -1143,15 +1143,15 @@
             <div class="category-radio-btn" data-category="general" onclick="selectEditTopicCategory('general')">专属话题 ✨</div>
         </div>
 
-        <div style="font-size:0.88rem; font-weight:700; margin-top:14px; margin-bottom:6px; color:var(--text-color);">📌 交流状态</div>
+        <div style="font-size:0.88rem; font-weight:700; margin-top:14px; margin-bottom:6px; color:var(--text-color); text-align:left;">📌 交流状态</div>
         <div class="category-radio-group" id="editStatusRadioGroup">
             <div class="category-radio-btn" data-status="open" onclick="selectEditTopicStatus('open')">💬 正在交流</div>
             <div class="category-radio-btn" data-status="resolved" onclick="selectEditTopicStatus('resolved')">✨ 达成共识</div>
         </div>
 
         <div id="editTopicSummaryField" style="margin-top:12px;" hidden>
-            <label class="modal-field-label" for="editTopicSummaryInput" style="font-size:0.88rem; font-weight:700; margin-bottom:6px; display:block; color:var(--text-color);">🤝 达成的约定与共识方案</label>
-            <textarea id="editTopicSummaryInput" class="modal-input" placeholder="写下我们达成的解决方案或约定…" rows="3" maxlength="1500"></textarea>
+            <label class="modal-field-label" for="editTopicSummaryInput" style="font-size:0.88rem; font-weight:700; margin-bottom:6px; display:block; color:var(--text-color); text-align:left;">🤝 达成的约定与共识方案</label>
+            <textarea id="editTopicSummaryInput" class="modal-input" placeholder="写下我们达成的解决方案或约定…" rows="3" maxlength="1500" style="margin-top:0;"></textarea>
         </div>
 
         <div class="modal-msg" id="editTopicModalMsg" role="status" aria-live="polite"></div>
@@ -1167,7 +1167,7 @@
 
 <!-- 达成共识与解决方案弹窗 -->
 <dialog class="native-dialog topic-modal-dialog" id="resolveTopicModal" aria-labelledby="resolveTopicTitle">
-    <div class="modal-box">
+    <div class="topic-modal-box" onclick="event.stopPropagation()">
         <h2 class="modal-title" id="resolveTopicTitle">🤝 达成共识 · 解决方案</h2>
         <div style="font-size:0.86rem; color:var(--text-muted); margin-bottom:12px;">记录下我们最终是怎么商量解决的，日后翻开看依然充满温暖与力量 💕</div>
         <textarea id="resolveSummaryInput" class="modal-input" placeholder="例如：我们约定好下次情绪激动时先抱抱一分钟，然后再听对方把话说完……" rows="4" maxlength="1500"></textarea>
@@ -1182,7 +1182,7 @@
 
 <!-- Agnes 感情助手调解/建议弹窗 -->
 <dialog class="native-dialog topic-modal-dialog" id="aiTopicAdviceModal" aria-labelledby="aiTopicAdviceTitle">
-    <div class="modal-box">
+    <div class="topic-modal-box" onclick="event.stopPropagation()">
         <h2 class="modal-title" id="aiTopicAdviceTitle">🤖 感情助手 Agnes 的温柔建议</h2>
         <div id="aiTopicAdviceContent" style="margin: 14px 0; max-height: 55vh; overflow-y: auto; font-size: 0.92rem; color: var(--text-color);"></div>
         <div class="modal-btns">
@@ -1212,7 +1212,7 @@
 <script src="js/presence.js?v=3.9.87"></script>
 <script src="js/theme.js?v=3.9.87"></script>
 <script src="js/notifications.js?v=3.9.87"></script>
-<script src="js/topics.js?v=3.9.88"></script>
+<script src="js/topics.js?v=3.9.89"></script>
 <script src="js/effects.js?v=3.9.87"></script>
 <script src="js/settings.js?v=3.9.87"></script>
 <script src="js/router.js?v=3.9.87"></script>
