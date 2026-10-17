@@ -256,9 +256,6 @@
 }
 
 /* ---------------- 全屏手账目录页面 (#topicsModal) ---------------- */
-.topics-catalog-page {
-    position: relative;
-}
 
 .topics-filter-bar {
     display: flex;

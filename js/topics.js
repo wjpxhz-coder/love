@@ -33,6 +33,20 @@ let topicRecordingSeconds = 0;
 let topicRecordingStream = null;
 
 /**
+ * HTML 转义工具函数，防止 XSS 注入并安全渲染纯文本
+ */
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+window.escapeHtml = escapeHtml;
+
+/**
  * 格式化相对或友好的时间显示
  */
 function formatTopicTime(dateString) {
@@ -90,7 +104,12 @@ async function ensureTopicAuthReady(maxWaitMs = 4000) {
 
 async function loadHomeTopics() {
     const container = document.getElementById('home-topics-content');
-    if (!container || !supabaseClient || !currentUserProfile?.space_id) return;
+    if (!container || !supabaseClient) return;
+
+    if (!currentUserProfile?.space_id || !currentAuthUser) {
+        const authed = await ensureTopicAuthReady();
+        if (!authed) return;
+    }
 
     try {
         const { data, error } = await supabaseClient
@@ -102,6 +121,7 @@ async function loadHomeTopics() {
 
         if (error) {
             console.error('加载首页话题手账失败:', error);
+            container.innerHTML = `<div class="empty-state">加载手账失败，请稍后刷新重试 🌸</div>`;
             return;
         }
 
@@ -109,6 +129,7 @@ async function loadHomeTopics() {
         renderHomeTopics(homeTopicsList);
     } catch (err) {
         console.error('加载首页话题异常:', err);
+        container.innerHTML = `<div class="empty-state">加载手账发生异常 🌸</div>`;
     }
 }
 
