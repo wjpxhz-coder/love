@@ -162,8 +162,14 @@ function renderHomeTopics(topics) {
         return `
             <div class="home-topic-card ${isResolved ? 'is-resolved' : ''}" onclick="appNavigate('/topics/${topic.id}')" role="button" tabindex="0">
                 <div class="home-topic-card-header">
-                    <span class="topic-tag category-${escapeHtml(topic.category)}">${catInfo.label}</span>
-                    ${statusHtml}
+                    <div class="home-topic-header-tags">
+                        <span class="topic-tag category-${escapeHtml(topic.category)}">${catInfo.label}</span>
+                        ${statusHtml}
+                    </div>
+                    <div class="topic-card-actions" onclick="event.stopPropagation()">
+                        <button class="topic-card-action-btn" type="button" onclick="openEditTopicModal(${topic.id}, event)" title="编辑手账" aria-label="编辑手账">✏️</button>
+                        <button class="topic-card-action-btn danger" type="button" onclick="deleteTopic(${topic.id}, event)" title="删除手账" aria-label="删除手账">🗑️</button>
+                    </div>
                 </div>
                 <h3 class="home-topic-card-title">${escapeHtml(topic.title)}</h3>
                 ${summaryHtml}
@@ -256,8 +262,14 @@ function renderTopicsCatalog(topics) {
         return `
             <div class="topic-list-card ${isResolved ? 'is-resolved' : ''}" onclick="appNavigate('/topics/${topic.id}')" role="button" tabindex="0">
                 <div class="topic-list-card-top">
-                    <span class="topic-tag category-${escapeHtml(topic.category)}">${catInfo.label}</span>
-                    ${statusHtml}
+                    <div class="topic-list-card-top-tags">
+                        <span class="topic-tag category-${escapeHtml(topic.category)}">${catInfo.label}</span>
+                        ${statusHtml}
+                    </div>
+                    <div class="topic-card-actions" onclick="event.stopPropagation()">
+                        <button class="topic-card-action-btn" type="button" onclick="openEditTopicModal(${topic.id}, event)" title="编辑手账" aria-label="编辑手账">✏️</button>
+                        <button class="topic-card-action-btn danger" type="button" onclick="deleteTopic(${topic.id}, event)" title="删除手账" aria-label="删除手账">🗑️</button>
+                    </div>
                 </div>
                 <div class="topic-list-card-title">${escapeHtml(topic.title)}</div>
                 ${summaryHtml}
@@ -537,13 +549,20 @@ async function renderTopicMessages(messages) {
             }
         }
 
+        const deleteMsgBtnHtml = isSelf
+            ? `<button class="topic-msg-action-btn" type="button" onclick="deleteTopicMessage(${msg.id})" title="撤回这条心声" aria-label="撤回心声">撤回</button>`
+            : '';
+
         return `
             <div class="topic-message-row ${isSelf ? 'is-self' : ''}" data-msg-id="${msg.id}">
                 <div class="topic-message-avatar">${avatarHtml}</div>
                 <div class="topic-message-body">
                     <div class="topic-message-author-time">
-                        <span class="topic-msg-author">${escapeHtml(msg.author)}</span>
-                        <span class="topic-msg-time">${formatTopicTime(msg.created_at)}</span>
+                        <div class="topic-msg-author-meta">
+                            <span class="topic-msg-author">${escapeHtml(msg.author)}</span>
+                            <span class="topic-msg-time">${formatTopicTime(msg.created_at)}</span>
+                        </div>
+                        ${deleteMsgBtnHtml}
                     </div>
                     ${textBubbleHtml}
                     ${photosHtml}
@@ -599,6 +618,20 @@ function initTopicRealtimeSubscription(topicId) {
         .on(
             'postgres_changes',
             {
+                event: 'DELETE',
+                schema: 'public',
+                table: 'topic_messages',
+                filter: `topic_id=eq.${topicId}`
+            },
+            async (payload) => {
+                if (!payload?.old?.id) return;
+                currentTopicMessages = currentTopicMessages.filter(m => m.id !== payload.old.id);
+                await renderTopicMessages(currentTopicMessages);
+            }
+        )
+        .on(
+            'postgres_changes',
+            {
                 event: 'UPDATE',
                 schema: 'public',
                 table: 'topics',
@@ -609,6 +642,23 @@ function initTopicRealtimeSubscription(topicId) {
                     currentTopicDetail = payload.new;
                     renderTopicDetailShell(payload.new);
                 }
+            }
+        )
+        .on(
+            'postgres_changes',
+            {
+                event: 'DELETE',
+                schema: 'public',
+                table: 'topics',
+                filter: `id=eq.${topicId}`
+            },
+            (_payload) => {
+                if (typeof showToast === 'function') {
+                    showToast('当前手账已被删除 🌸');
+                }
+                closeTopicDetail();
+                loadHomeTopics();
+                loadTopicsCatalog(activeTopicCategoryFilter);
             }
         )
         .subscribe();
@@ -1100,6 +1150,342 @@ function closeAITopicAdviceModal() {
     }
 }
 
+// ==========================================================================
+// 8. 话题编辑、删除与心声撤回逻辑
+// ==========================================================================
+
+async function removeUploadedTopicObjects(pathsOrRefs) {
+    if (!Array.isArray(pathsOrRefs) || !pathsOrRefs.length || !supabaseClient) return;
+    const paths = pathsOrRefs.map(val => {
+        if (typeof extractStorageObjectPath === 'function') {
+            return extractStorageObjectPath(val);
+        }
+        if (typeof val === 'string' && typeof STORAGE_REFERENCE_PREFIX === 'string' && val.startsWith(STORAGE_REFERENCE_PREFIX)) {
+            return typeof getStorageObjectPath === 'function' ? getStorageObjectPath(val) : '';
+        }
+        return (typeof val === 'string' && !val.startsWith('http') && !val.includes('avatars')) ? val : '';
+    }).filter(Boolean);
+    if (!paths.length) return;
+    const uniquePaths = Array.from(new Set(paths));
+    try {
+        const { error } = await supabaseClient.storage.from('photos').remove(uniquePaths);
+        if (error) console.error('清理话题媒体失败:', error);
+    } catch (err) {
+        console.error('清理话题媒体异常:', err);
+    }
+}
+
+let editingTopicId = null;
+let selectedEditTopicCategory = 'general';
+let selectedEditTopicStatus = 'open';
+
+async function openEditTopicModal(topicId, event) {
+    if (event && typeof event.stopPropagation === 'function') {
+        event.stopPropagation();
+    }
+    const id = topicId || currentTopicDetail?.id;
+    if (!id) return;
+
+    editingTopicId = id;
+
+    // 尝试优先从缓存中寻找话题对象
+    let topic = (homeTopicsList || []).find(t => String(t.id) === String(id))
+        || (catalogTopicsList || []).find(t => String(t.id) === String(id))
+        || (currentTopicDetail && String(currentTopicDetail.id) === String(id) ? currentTopicDetail : null);
+
+    if (!topic && supabaseClient) {
+        try {
+            const { data } = await supabaseClient
+                .from('topics')
+                .select('*')
+                .eq('id', id)
+                .single();
+            topic = data;
+        } catch (_e) {}
+    }
+
+    if (!topic) {
+        alert('未找到该话题数据');
+        return;
+    }
+
+    const modal = document.getElementById('editTopicModal');
+    const input = document.getElementById('editTopicTitleInput');
+    const summaryInput = document.getElementById('editTopicSummaryInput');
+    const summaryField = document.getElementById('editTopicSummaryField');
+    const msg = document.getElementById('editTopicModalMsg');
+
+    if (!modal) return;
+
+    if (input) input.value = topic.title || '';
+    if (msg) msg.textContent = '';
+
+    selectedEditTopicCategory = topic.category || 'general';
+    selectedEditTopicStatus = topic.status || 'open';
+
+    // 设置分类选中高亮
+    document.querySelectorAll('#editCategoryRadioGroup .category-radio-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.category === selectedEditTopicCategory);
+    });
+
+    // 设置状态单选高亮
+    document.querySelectorAll('#editStatusRadioGroup .category-radio-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.status === selectedEditTopicStatus);
+    });
+
+    // 设置共识约定输入框
+    if (summaryInput) summaryInput.value = topic.summary || '';
+    if (summaryField) {
+        summaryField.hidden = selectedEditTopicStatus !== 'resolved';
+    }
+
+    if (typeof modal.showModal === 'function') {
+        modal.showModal();
+    } else {
+        modal.setAttribute('open', '');
+    }
+}
+
+function closeEditTopicModal() {
+    const modal = document.getElementById('editTopicModal');
+    if (modal) {
+        if (typeof modal.close === 'function') modal.close();
+        else modal.removeAttribute('open');
+    }
+    editingTopicId = null;
+}
+
+function selectEditTopicCategory(cat) {
+    selectedEditTopicCategory = cat;
+    document.querySelectorAll('#editCategoryRadioGroup .category-radio-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.category === cat);
+    });
+}
+
+function selectEditTopicStatus(status) {
+    selectedEditTopicStatus = status;
+    document.querySelectorAll('#editStatusRadioGroup .category-radio-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.status === status);
+    });
+
+    const summaryField = document.getElementById('editTopicSummaryField');
+    if (summaryField) {
+        summaryField.hidden = status !== 'resolved';
+    }
+}
+
+async function submitEditTopic() {
+    if (!editingTopicId || !supabaseClient) return;
+
+    const input = document.getElementById('editTopicTitleInput');
+    const summaryInput = document.getElementById('editTopicSummaryInput');
+    const msg = document.getElementById('editTopicModalMsg');
+    const submitBtn = document.getElementById('btn-submit-edit-topic');
+
+    if (!currentUserProfile?.space_id || !currentAuthUser) {
+        const authed = await ensureTopicAuthReady();
+        if (!authed) {
+            if (msg) msg.textContent = '请先登录情侣空间后再修改手账 🌸';
+            return;
+        }
+    }
+
+    const title = input ? input.value.trim() : '';
+    if (!title) {
+        if (msg) msg.textContent = '请填写手账题目～';
+        return;
+    }
+
+    const isResolved = selectedEditTopicStatus === 'resolved';
+    const summary = summaryInput ? summaryInput.value.trim() : '';
+
+    if (submitBtn) submitBtn.disabled = true;
+    if (msg) msg.textContent = '正在保存修改... ✨';
+
+    try {
+        const updatePayload = {
+            title: title,
+            category: selectedEditTopicCategory,
+            status: selectedEditTopicStatus,
+            summary: isResolved ? (summary || null) : null,
+            updated_at: new Date().toISOString()
+        };
+
+        if (isResolved) {
+            updatePayload.resolved_at = new Date().toISOString();
+            updatePayload.resolved_by = currentUserProfile.username;
+        } else {
+            updatePayload.resolved_at = null;
+            updatePayload.resolved_by = null;
+        }
+
+        const { data, error } = await supabaseClient
+            .from('topics')
+            .update(updatePayload)
+            .eq('id', editingTopicId)
+            .eq('space_id', currentUserProfile.space_id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('更新手账失败:', error);
+            if (msg) msg.textContent = '修改失败：' + (error.message || '未知错误');
+            return;
+        }
+
+        // 如果当前在详情页且正是此话题，刷新详情页展示
+        if (currentTopicDetail && String(currentTopicDetail.id) === String(editingTopicId)) {
+            currentTopicDetail = data;
+            renderTopicDetailShell(data);
+        }
+
+        closeEditTopicModal();
+
+        // 刷新列表
+        loadHomeTopics();
+        loadTopicsCatalog(activeTopicCategoryFilter);
+
+        if (typeof showToast === 'function') {
+            showToast('手账已更新 ✨');
+        }
+    } catch (err) {
+        console.error('更新手账异常:', err);
+        if (msg) msg.textContent = '保存异常，请稍后重试';
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+    }
+}
+
+async function deleteTopic(topicId, event) {
+    if (event && typeof event.stopPropagation === 'function') {
+        event.stopPropagation();
+    }
+    const id = topicId || currentTopicDetail?.id;
+    if (!id || !supabaseClient) return;
+
+    if (!confirm('确定要删除这本手账话题吗？\n删除后里面所有的交流回忆都将抹去，不可恢复哦 🌸')) {
+        return;
+    }
+
+    if (!currentUserProfile?.space_id || !currentAuthUser) {
+        const authed = await ensureTopicAuthReady();
+        if (!authed) {
+            alert('请先登录情侣空间后再操作 🌸');
+            return;
+        }
+    }
+
+    try {
+        // 1. 收集待清理的媒体资源（从 messages 表中）
+        const mediaToDelete = [];
+        try {
+            const { data: msgs } = await supabaseClient
+                .from('topic_messages')
+                .select('photos, audio_url')
+                .eq('topic_id', id);
+
+            if (Array.isArray(msgs)) {
+                msgs.forEach(m => {
+                    if (Array.isArray(m.photos)) mediaToDelete.push(...m.photos);
+                    if (m.audio_url) mediaToDelete.push(m.audio_url);
+                });
+            }
+        } catch (collectErr) {
+            console.warn('收集话题媒体失败:', collectErr);
+        }
+
+        // 2. 从 topics 表删除（数据库外键级联删除关联消息）
+        const { error } = await supabaseClient
+            .from('topics')
+            .delete()
+            .eq('id', id)
+            .eq('space_id', currentUserProfile.space_id);
+
+        if (error) {
+            console.error('删除手账失败:', error);
+            if (typeof showToast === 'function') {
+                showToast('删除手账失败：' + error.message);
+            } else {
+                alert('删除失败：' + error.message);
+            }
+            return;
+        }
+
+        // 3. 异步清理 Storage 媒体
+        if (mediaToDelete.length > 0) {
+            removeUploadedTopicObjects(mediaToDelete);
+        }
+
+        // 4. 关闭编辑弹窗（如果正开着）
+        closeEditTopicModal();
+
+        // 5. 如果当前在详情页且删除的是当前话题，退出详情页
+        if (currentTopicDetail && String(currentTopicDetail.id) === String(id)) {
+            closeTopicDetail();
+        }
+
+        // 6. 刷新首页和手账目录
+        loadHomeTopics();
+        loadTopicsCatalog(activeTopicCategoryFilter);
+
+        if (typeof showToast === 'function') {
+            showToast('手账已删除 🌸');
+        }
+    } catch (err) {
+        console.error('删除话题异常:', err);
+        alert('删除发生异常，请稍后重试');
+    }
+}
+
+async function deleteTopicMessage(msgId) {
+    if (!msgId || !supabaseClient || !currentAuthUser) return;
+
+    if (!confirm('确定撤回这条心声留言吗？')) {
+        return;
+    }
+
+    try {
+        const targetMsg = (currentTopicMessages || []).find(m => String(m.id) === String(msgId));
+
+        const { error } = await supabaseClient
+            .from('topic_messages')
+            .delete()
+            .eq('id', msgId)
+            .eq('user_id', currentAuthUser.id);
+
+        if (error) {
+            console.error('撤回消息失败:', error);
+            if (typeof showToast === 'function') {
+                showToast('撤回失败：' + error.message);
+            } else {
+                alert('撤回失败：' + error.message);
+            }
+            return;
+        }
+
+        // 异步清理媒体
+        if (targetMsg) {
+            const mediaToDelete = [];
+            if (Array.isArray(targetMsg.photos)) mediaToDelete.push(...targetMsg.photos);
+            if (targetMsg.audio_url) mediaToDelete.push(targetMsg.audio_url);
+            if (mediaToDelete.length > 0) {
+                removeUploadedTopicObjects(mediaToDelete);
+            }
+        }
+
+        // 从当前消息列表过滤并重新渲染
+        currentTopicMessages = (currentTopicMessages || []).filter(m => String(m.id) !== String(msgId));
+        await renderTopicMessages(currentTopicMessages);
+
+        if (typeof showToast === 'function') {
+            showToast('已撤回心声留言 🌸');
+        }
+    } catch (err) {
+        console.error('撤回消息异常:', err);
+        alert('撤回异常，请稍后重试');
+    }
+}
+
 // 导出全局供 router 和 html 调用
 window.loadHomeTopics = loadHomeTopics;
 window.loadTopicsCatalog = loadTopicsCatalog;
@@ -1124,6 +1510,13 @@ window.submitResolveTopic = submitResolveTopic;
 window.requestAITopicAdvice = requestAITopicAdvice;
 window.closeAITopicAdviceModal = closeAITopicAdviceModal;
 window.openTopicPhotoLightbox = openTopicPhotoLightbox;
+window.openEditTopicModal = openEditTopicModal;
+window.closeEditTopicModal = closeEditTopicModal;
+window.selectEditTopicCategory = selectEditTopicCategory;
+window.selectEditTopicStatus = selectEditTopicStatus;
+window.submitEditTopic = submitEditTopic;
+window.deleteTopic = deleteTopic;
+window.deleteTopicMessage = deleteTopicMessage;
 
 function enterTopicsPage(_route) {
     loadTopicsCatalog();

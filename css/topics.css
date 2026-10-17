@@ -810,3 +810,152 @@
     border-color: rgba(255, 150, 180, 0.2);
     color: #f3e8ee;
 }
+
+/* ---------------- 手账编辑与删除扩展样式 ---------------- */
+.home-topic-header-tags,
+.topic-list-card-top-tags {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.topic-card-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+    z-index: 2;
+}
+
+.topic-card-action-btn {
+    background: var(--surface-bg-translucent, rgba(255, 255, 255, 0.8));
+    border: 1px solid var(--border-color-light, rgba(255, 182, 193, 0.45));
+    border-radius: 8px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.82rem;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    color: var(--text-color, #4a383d);
+    padding: 0;
+    line-height: 1;
+}
+
+.topic-card-action-btn:hover {
+    background: var(--theme-pink-light, #ffeef2);
+    border-color: var(--theme-pink, #ff6b8b);
+    transform: scale(1.1);
+}
+
+.topic-card-action-btn.danger:hover {
+    background: #fee2e2;
+    border-color: #f87171;
+}
+
+/* 详情页顶部操作栏小图标按钮 */
+.topic-topbar-action-icon-btn {
+    background: var(--surface-bg-translucent, rgba(255, 255, 255, 0.8));
+    border: 1px solid var(--border-color-light, rgba(255, 182, 193, 0.45));
+    border-radius: 999px;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.88rem;
+    transition: all 0.2s ease;
+    padding: 0;
+    color: var(--text-color, #4a383d);
+}
+
+.topic-topbar-action-icon-btn:hover {
+    background: var(--theme-pink-light, #ffeef2);
+    border-color: var(--theme-pink, #ff6b8b);
+    transform: scale(1.08);
+}
+
+.topic-topbar-action-icon-btn.danger:hover {
+    background: #fee2e2;
+    border-color: #ef4444;
+}
+
+/* 弹窗底部两端对齐 */
+.modal-btns-split {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.danger-text {
+    color: #e11d48 !important;
+    background: rgba(225, 29, 72, 0.08) !important;
+    border: 1px solid rgba(225, 29, 72, 0.2) !important;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.danger-text:hover {
+    background: rgba(225, 29, 72, 0.16) !important;
+    transform: translateY(-1px);
+}
+
+/* 消息流中的撤回按钮 */
+.topic-msg-author-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.topic-msg-action-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted, #948287);
+    font-size: 0.72rem;
+    cursor: pointer;
+    padding: 1px 6px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    opacity: 0.75;
+}
+
+.topic-msg-action-btn:hover {
+    opacity: 1;
+    color: #e11d48;
+    background: rgba(225, 29, 72, 0.08);
+}
+
+/* 暗色模式适配 */
+[data-theme="dark"] .topic-card-action-btn,
+[data-theme="dark"] .topic-topbar-action-icon-btn {
+    background: rgba(45, 36, 54, 0.85);
+    border-color: rgba(255, 150, 180, 0.2);
+    color: #f3e8ee;
+}
+
+[data-theme="dark"] .topic-card-action-btn:hover,
+[data-theme="dark"] .topic-topbar-action-icon-btn:hover {
+    background: rgba(60, 48, 72, 0.95);
+    border-color: var(--theme-pink, #ff6b8b);
+}
+
+[data-theme="dark"] .topic-card-action-btn.danger:hover,
+[data-theme="dark"] .topic-topbar-action-icon-btn.danger:hover {
+    background: rgba(127, 29, 29, 0.45);
+    border-color: #ef4444;
+}
+
+[data-theme="dark"] .danger-text {
+    color: #fda4af !important;
+    background: rgba(225, 29, 72, 0.2) !important;
+    border-color: rgba(244, 63, 94, 0.35) !important;
+}
+

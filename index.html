@@ -65,7 +65,7 @@
     <link rel="stylesheet" href="css/effects.css?v=3.9.87">
     <link rel="stylesheet" href="css/responsive.css?v=3.9.87">
     <link rel="stylesheet" href="css/pages.css?v=3.9.87">
-    <link rel="stylesheet" href="css/topics.css?v=3.9.87">
+    <link rel="stylesheet" href="css/topics.css?v=3.9.88">
 </head>
 <body class="auth-pending">
 <!-- 内联矢量微光 SVG 图标库 -->
@@ -1047,6 +1047,8 @@
             </div>
             <div class="topic-detail-topbar-actions">
                 <button class="btn-resolve-topic" id="btn-topic-resolve-action" type="button" onclick="openResolveTopicModal()">🤝 达成共识</button>
+                <button class="topic-topbar-action-icon-btn" id="btn-topic-detail-edit" type="button" onclick="openEditTopicModal(currentTopicDetail?.id)" title="编辑手账" aria-label="编辑手账">✏️</button>
+                <button class="topic-topbar-action-icon-btn danger" id="btn-topic-detail-delete" type="button" onclick="deleteTopic(currentTopicDetail?.id)" title="删除手账" aria-label="删除手账">🗑️</button>
             </div>
         </header>
         <div class="app-page-scroll" style="flex:1;">
@@ -1122,6 +1124,47 @@
     </div>
 </dialog>
 
+<!-- 编辑手账话题弹窗 -->
+<dialog class="native-dialog topic-modal-dialog" id="editTopicModal" aria-labelledby="editTopicTitle">
+    <div class="modal-box">
+        <h2 class="modal-title" id="editTopicTitle">✏️ 编辑手账话题</h2>
+        <div style="font-size:0.86rem; color:var(--text-muted); margin-bottom:12px;">修改话题题目、分类或当前交流状态～</div>
+        
+        <label class="modal-field-label" for="editTopicTitleInput" style="font-size:0.88rem; font-weight:700; margin-bottom:6px; display:block; color:var(--text-color);">手账题目</label>
+        <input type="text" id="editTopicTitleInput" class="modal-input" placeholder="输入手账题目" maxlength="80">
+        
+        <div style="font-size:0.88rem; font-weight:700; margin-top:14px; margin-bottom:6px; color:var(--text-color);">🏷️ 手账分类</div>
+        <div class="category-radio-group" id="editCategoryRadioGroup">
+            <div class="category-radio-btn" data-category="reconciliation" onclick="selectEditTopicCategory('reconciliation')">矛盾和解 🌿</div>
+            <div class="category-radio-btn" data-category="study" onclick="selectEditTopicCategory('study')">学习备考 📚</div>
+            <div class="category-radio-btn" data-category="trip" onclick="selectEditTopicCategory('trip')">旅行规划 ✈️</div>
+            <div class="category-radio-btn" data-category="promise" onclick="selectEditTopicCategory('promise')">未来约定 💍</div>
+            <div class="category-radio-btn" data-category="life" onclick="selectEditTopicCategory('life')">生活琐事 💬</div>
+            <div class="category-radio-btn" data-category="general" onclick="selectEditTopicCategory('general')">专属话题 ✨</div>
+        </div>
+
+        <div style="font-size:0.88rem; font-weight:700; margin-top:14px; margin-bottom:6px; color:var(--text-color);">📌 交流状态</div>
+        <div class="category-radio-group" id="editStatusRadioGroup">
+            <div class="category-radio-btn" data-status="open" onclick="selectEditTopicStatus('open')">💬 正在交流</div>
+            <div class="category-radio-btn" data-status="resolved" onclick="selectEditTopicStatus('resolved')">✨ 达成共识</div>
+        </div>
+
+        <div id="editTopicSummaryField" style="margin-top:12px;" hidden>
+            <label class="modal-field-label" for="editTopicSummaryInput" style="font-size:0.88rem; font-weight:700; margin-bottom:6px; display:block; color:var(--text-color);">🤝 达成的约定与共识方案</label>
+            <textarea id="editTopicSummaryInput" class="modal-input" placeholder="写下我们达成的解决方案或约定…" rows="3" maxlength="1500"></textarea>
+        </div>
+
+        <div class="modal-msg" id="editTopicModalMsg" role="status" aria-live="polite"></div>
+        <div class="modal-btns modal-btns-split">
+            <button class="btn-cancel danger-text" type="button" onclick="deleteTopic(editingTopicId)">🗑️ 删除手账</button>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-cancel" type="button" onclick="closeEditTopicModal()">取消</button>
+                <button id="btn-submit-edit-topic" type="button" onclick="submitEditTopic()">保存修改 ✨</button>
+            </div>
+        </div>
+    </div>
+</dialog>
+
 <!-- 达成共识与解决方案弹窗 -->
 <dialog class="native-dialog topic-modal-dialog" id="resolveTopicModal" aria-labelledby="resolveTopicTitle">
     <div class="modal-box">
@@ -1169,7 +1212,7 @@
 <script src="js/presence.js?v=3.9.87"></script>
 <script src="js/theme.js?v=3.9.87"></script>
 <script src="js/notifications.js?v=3.9.87"></script>
-<script src="js/topics.js?v=3.9.87"></script>
+<script src="js/topics.js?v=3.9.88"></script>
 <script src="js/effects.js?v=3.9.87"></script>
 <script src="js/settings.js?v=3.9.87"></script>
 <script src="js/router.js?v=3.9.87"></script>
