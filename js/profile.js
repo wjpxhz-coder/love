@@ -1082,13 +1082,23 @@ async function loadProfilePhotos(targetAuthor) {
                         parsed.images.forEach(imgUrl => {
                             const safeUrl = typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(imgUrl) : imgUrl;
                             if (safeUrl) {
+                                const isVid = typeof isVideoMediaUrl === 'function' ? isVideoMediaUrl(safeUrl) : false;
+                                let poster = '';
+                                if (isVid && parsed.video_posters && typeof parsed.video_posters === 'object') {
+                                    poster = parsed.video_posters[safeUrl] || parsed.video_posters[imgUrl] || '';
+                                    if (!poster && typeof extractStorageObjectPath === 'function') {
+                                        const objPath = extractStorageObjectPath(safeUrl) || extractStorageObjectPath(imgUrl);
+                                        if (objPath && parsed.video_posters[objPath]) poster = parsed.video_posters[objPath];
+                                    }
+                                }
                                 photos.push({
                                     url: safeUrl,
+                                    poster: poster || '',
                                     momentId,
                                     createdAt,
                                     author: item.author,
                                     textSnippet: parsed.text ? parsed.text.slice(0, 60) : '',
-                                    isVideo: typeof isVideoMediaUrl === 'function' ? isVideoMediaUrl(safeUrl) : false
+                                    isVideo: isVid
                                 });
                             }
                         });
@@ -1137,13 +1147,23 @@ function renderProfilePhotosGrid(photos, container) {
         itemEl.setAttribute('aria-label', photo.isVideo ? '查看视频' : `查看照片 ${index + 1}/${photos.length}`);
 
         if (photo.isVideo) {
-            const video = document.createElement('video');
-            video.src = photo.url;
-            video.className = 'profile-photo-img';
-            video.preload = 'metadata';
-            video.muted = true;
-            video.playsInline = true;
-            itemEl.appendChild(video);
+            if (photo.poster) {
+                const img = document.createElement('img');
+                img.src = photo.poster;
+                img.alt = photo.textSnippet ? photo.textSnippet.slice(0, 30) : '视频封面';
+                img.className = 'profile-photo-img';
+                img.loading = index < 15 ? 'eager' : 'lazy';
+                img.decoding = 'async';
+                itemEl.appendChild(img);
+            } else {
+                const video = document.createElement('video');
+                video.src = photo.url;
+                video.className = 'profile-photo-img';
+                video.preload = 'none';
+                video.muted = true;
+                video.playsInline = true;
+                itemEl.appendChild(video);
+            }
 
             const playBadge = document.createElement('div');
             playBadge.className = 'profile-photo-video-badge';

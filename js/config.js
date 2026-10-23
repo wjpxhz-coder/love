@@ -105,7 +105,7 @@ function extractStorageObjectPath(value) {
     if (typeof STORAGE_REFERENCE_PREFIX === 'string' && trimmed.startsWith(STORAGE_REFERENCE_PREFIX)) {
         objectPath = trimmed.slice(STORAGE_REFERENCE_PREFIX.length);
     } else {
-        const urlMatch = trimmed.match(/\/storage\/v1\/object\/(?:public\/)?photos\/(.+?)(?:\?.*)?$/i);
+        const urlMatch = trimmed.match(/\/storage\/v1\/object\/(?:(?:sign|public)\/)?photos\/(.+?)(?:\?.*)?$/i);
         if (urlMatch) {
             objectPath = decodeURIComponent(urlMatch[1]);
         } else if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://') && !trimmed.startsWith('blob:') && !trimmed.startsWith('data:')) {
@@ -223,6 +223,23 @@ async function hydrateStructuredMediaContent(rawContent) {
             parsed.images = (await batchResolveMediaUrls(parsed.images)).filter(Boolean);
         }
         if (parsed.audio) parsed.audio = await resolveMediaUrl(parsed.audio);
+        if (parsed.video_posters && typeof parsed.video_posters === 'object') {
+            const entries = Object.entries(parsed.video_posters);
+            const posterRefs = entries.map(([_, p]) => p);
+            const resolvedPosters = await batchResolveMediaUrls(posterRefs);
+            const hydratedPosters = {};
+            entries.forEach(([videoRef, _], idx) => {
+                const resolvedPoster = resolvedPosters[idx];
+                if (resolvedPoster) {
+                    hydratedPosters[videoRef] = resolvedPoster;
+                    const videoObjPath = typeof extractStorageObjectPath === 'function' ? extractStorageObjectPath(videoRef) : '';
+                    if (videoObjPath) {
+                        hydratedPosters[videoObjPath] = resolvedPoster;
+                    }
+                }
+            });
+            parsed.video_posters = hydratedPosters;
+        }
         return JSON.stringify(parsed);
     } catch (_error) {
         return rawContent;
@@ -258,6 +275,11 @@ async function batchHydrateMomentMediaRecords(records) {
                 if (parsed && typeof parsed === 'object') {
                     if (Array.isArray(parsed.images)) allMediaValues.push(...parsed.images);
                     if (parsed.audio) allMediaValues.push(parsed.audio);
+                    if (parsed.video_posters && typeof parsed.video_posters === 'object') {
+                        Object.values(parsed.video_posters).forEach(p => {
+                            if (p) allMediaValues.push(p);
+                        });
+                    }
                 }
             } catch (_e) {}
         }
@@ -303,6 +325,7 @@ function parseMomentPayload(rawContent, type) {
             return {
                 text: typeof parsed.text === 'string' ? parsed.text : '',
                 images: Array.isArray(parsed.images) ? parsed.images.filter(Boolean) : [],
+                video_posters: (parsed.video_posters && typeof parsed.video_posters === 'object') ? parsed.video_posters : {},
                 audio: typeof parsed.audio === 'string' ? parsed.audio : null,
                 is_milestone: Boolean(parsed.is_milestone)
             };
@@ -364,7 +387,7 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.90';
+const APP_VERSION = 'v3.9.91';
 const CONFIG = {
     version: 'v3.9.90',
     date: '2026-10-23',
