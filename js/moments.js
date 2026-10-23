@@ -15,6 +15,8 @@ let isMomentSubmitting = false;
 let editingMomentId = null;
 let editingExistingMedia = []; // Array of { ref: string, url: string, isVideo: boolean }
 let editingOriginalMediaRefs = [];
+let editingExistingVideoPosters = {};
+let editingOriginalVideoPosters = {};
 let editingAudioRef = null;
 let editingAudioUrl = null;
 let editingOriginalAudioRef = null;
@@ -164,6 +166,7 @@ function clearMomentPhotoPreviews() {
     momentPhotoPreviewUrls.clear();
     momentSelectedFiles = [];
     editingExistingMedia = [];
+    editingExistingVideoPosters = {};
 
     if (!previewContainer) return;
     previewContainer.querySelectorAll('.moment-preview-item').forEach(item => item.remove());
@@ -215,6 +218,8 @@ function resetMomentComposer(options = {}) {
     editingAudioRef = null;
     editingAudioUrl = null;
     editingOriginalAudioRef = null;
+    editingExistingVideoPosters = {};
+    editingOriginalVideoPosters = {};
 
     if (clearPhotos) clearMomentPhotoPreviews();
     if (clearAudio) {
@@ -319,7 +324,12 @@ function renderExistingMediaPreviews(existingList) {
         Object.assign(removeBtn.style, { border: '0', padding: '0' });
         removeBtn.addEventListener('click', () => {
             const index = editingExistingMedia.indexOf(item);
-            if (index >= 0) editingExistingMedia.splice(index, 1);
+            if (index >= 0) {
+                editingExistingMedia.splice(index, 1);
+                if (item.ref && editingExistingVideoPosters[item.ref]) {
+                    delete editingExistingVideoPosters[item.ref];
+                }
+            }
             if (media.tagName === 'VIDEO') releaseMomentVideo(media, true);
             previewItem.remove();
         });
@@ -425,6 +435,10 @@ async function enterMomentPage(route) {
                     rawImages = Array.isArray(parsed.images) ? parsed.images : [];
                     rawAudio = parsed.audio || null;
                     isMilestone = parsed.is_milestone === true;
+                    if (parsed.video_posters && typeof parsed.video_posters === 'object') {
+                        editingExistingVideoPosters = { ...parsed.video_posters };
+                        editingOriginalVideoPosters = { ...parsed.video_posters };
+                    }
                 }
             } catch (e) {
                 rawText = data.content || '';
@@ -899,6 +913,106 @@ async function compressVideoFile(file, onProgress) {
     }
 }
 
+async function captureVideoFrame(videoFile, seekTime = 0.2) {
+    if (!videoFile || !isMomentVideoFile(videoFile)) return null;
+    return new Promise((resolve) => {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.muted = true;
+        video.playsInline = true;
+
+        let objectUrl = '';
+        try {
+            objectUrl = URL.createObjectURL(videoFile);
+        } catch (_err) {
+            return resolve(null);
+        }
+        video.src = objectUrl;
+
+        let resolved = false;
+        const cleanup = () => {
+            if (resolved) return;
+            resolved = true;
+            try {
+                video.pause();
+                video.removeAttribute('src');
+                video.load();
+                URL.revokeObjectURL(objectUrl);
+            } catch (_) {}
+        };
+
+        const timer = setTimeout(() => {
+            cleanup();
+            resolve(null);
+        }, 8000);
+
+        video.addEventListener('loadedmetadata', () => {
+            const targetTime = Math.min(
+                Math.max(0.1, seekTime),
+                Math.max(0.1, (video.duration || 1) * 0.15)
+            );
+            try {
+                video.currentTime = targetTime;
+            } catch (_) {
+                cleanup();
+                resolve(null);
+            }
+        }, { once: true });
+
+        video.addEventListener('seeked', () => {
+            clearTimeout(timer);
+            try {
+                const canvas = document.createElement('canvas');
+                const maxDim = 1280;
+                let width = video.videoWidth || 640;
+                let height = video.videoHeight || 360;
+
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, width, height);
+
+                const exportBlob = (type, quality, fallbackType) => {
+                    canvas.toBlob((blob) => {
+                        cleanup();
+                        if (blob) {
+                            const ext = type.includes('webp') ? 'webp' : 'jpg';
+                            const posterFile = new File([blob], `poster_${Date.now()}.${ext}`, { type: blob.type || type });
+                            resolve(posterFile);
+                        } else if (fallbackType) {
+                            exportBlob(fallbackType, 0.82, null);
+                        } else {
+                            resolve(null);
+                        }
+                    }, type, quality);
+                };
+
+                // 优先生成 WebP，不支持时自动降级到 JPEG
+                exportBlob('image/webp', 0.82, 'image/jpeg');
+            } catch (err) {
+                cleanup();
+                resolve(null);
+            }
+        }, { once: true });
+
+        video.addEventListener('error', () => {
+            clearTimeout(timer);
+            cleanup();
+            resolve(null);
+        }, { once: true });
+    });
+}
+
 const MOMENT_UPLOAD_TIMEOUT_MS = 60000;
 
 async function uploadStorageFileWithTimeout(bucket, path, file, options = {}) {
@@ -960,7 +1074,8 @@ async function submitMomentPost() {
             const totalFiles = momentSelectedFiles.length;
             const processedFiles = [];
 
-            // 第一阶段：客户端智能优化（超清压缩图片，全平台兼容性转码视频）
+            // 第一阶段：客户端智能优化（超清压缩图片，全平台兼容性转码视频，自动提取静态海报）
+            const processedItems = [];
             for (let i = 0; i < totalFiles; i++) {
                 let file = momentSelectedFiles[i];
                 if (isMomentVideoFile(file)) {
@@ -971,29 +1086,55 @@ async function submitMomentPost() {
                             btn.textContent = `⏳ 视频兼容性转码 ${progress}% (${i + 1}/${totalFiles})...`;
                         });
                     }
+                    btn.textContent = `⏳ 提取视频海报 (${i + 1}/${totalFiles})...`;
+                    let posterFile = null;
+                    try {
+                        posterFile = await captureVideoFrame(file);
+                    } catch (frameErr) {
+                        console.warn('提取视频海报失败，降级为无封面:', frameErr);
+                    }
+                    processedItems.push({ file, isVideo: true, posterFile });
                 } else if (file.type.startsWith('image/')) {
                     btn.textContent = `⏳ 正在优化画质 (${i + 1}/${totalFiles})...`;
                     file = await compressImageFile(file);
+                    processedItems.push({ file, isVideo: false });
+                } else {
+                    processedItems.push({ file, isVideo: false });
                 }
-                processedFiles.push(file);
             }
 
             // 第二阶段：并行极速上传
             let finishedUploads = 0;
+            const videoPostersMap = {};
             btn.textContent = totalFiles > 1 ? `⏳ 正在极速上传 (0/${totalFiles})…` : '⏳ 正在极速上传…';
-            const uploadTasks = processedFiles.map(async (file, index) => {
-                const fileExt = getMomentFileExtension(file);
+            const uploadTasks = processedItems.map(async (item, index) => {
+                const fileExt = getMomentFileExtension(item.file);
                 const fileName = `${storageDirectory}/${Date.now()}_${index}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-                await uploadStorageFileWithTimeout('photos', fileName, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+                await uploadStorageFileWithTimeout('photos', fileName, item.file, { contentType: item.file.type || 'application/octet-stream', upsert: false });
                 finishedUploads++;
                 if (btn) {
                     btn.textContent = totalFiles > 1
                         ? `⏳ 正在极速上传 (${finishedUploads}/${totalFiles})…`
                         : '⏳ 正在极速上传…';
                 }
+                const mediaRef = createStorageReference(fileName);
+
+                if (item.isVideo && item.posterFile) {
+                    const posterExt = item.posterFile.type.includes('webp') ? 'webp' : 'jpg';
+                    const posterFileName = `${storageDirectory}/poster_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 9)}.${posterExt}`;
+                    try {
+                        await uploadStorageFileWithTimeout('photos', posterFileName, item.posterFile, { contentType: item.posterFile.type, upsert: false });
+                        uploadedObjectPaths.push(posterFileName);
+                        const posterRef = createStorageReference(posterFileName);
+                        videoPostersMap[mediaRef] = posterRef;
+                    } catch (posterErr) {
+                        console.warn('上传视频海报失败:', posterErr);
+                    }
+                }
+
                 return {
                     path: fileName,
-                    ref: createStorageReference(fileName)
+                    ref: mediaRef
                 };
             });
 
@@ -1025,6 +1166,10 @@ async function submitMomentPost() {
         const retainedImages = editingExistingMedia.map(item => item.ref).filter(Boolean);
         const finalImages = [...retainedImages, ...uploadedUrls];
         const finalAudio = audioUrl || editingAudioRef || null;
+        const finalVideoPosters = {
+            ...(editingExistingVideoPosters || {}),
+            ...videoPostersMap
+        };
 
         const momentPayload = {
             text: text,
@@ -1032,6 +1177,9 @@ async function submitMomentPost() {
             audio: finalAudio,
             is_milestone: isMilestone
         };
+        if (Object.keys(finalVideoPosters).length > 0) {
+            momentPayload.video_posters = finalVideoPosters;
+        }
         if (isEditing) {
             momentPayload.updated_at = new Date().toISOString();
         }
@@ -1084,6 +1232,11 @@ async function submitMomentPost() {
             if (editingOriginalAudioRef && editingOriginalAudioRef !== finalAudio) {
                 removedMediaRefs.push(editingOriginalAudioRef);
             }
+            removedMediaRefs.forEach(ref => {
+                if (editingOriginalVideoPosters && editingOriginalVideoPosters[ref]) {
+                    removedMediaRefs.push(editingOriginalVideoPosters[ref]);
+                }
+            });
             if (removedMediaRefs.length > 0) {
                 removeUploadedMomentObjects(removedMediaRefs);
             }
@@ -1638,38 +1791,76 @@ function createMomentMedia(rawUrl, className, options = {}) {
     const url = sanitizeMediaUrl(rawUrl);
     if (!url) return null;
     const isVideo = isVideoMediaUrl(url);
+    const posterUrl = sanitizeMediaUrl(options.poster);
+
+    // 缩略图模式（如九宫格、折叠项）且已具备静态海报：以高性能 <img> 替代 <video>，实现零视频流量消耗与原生图片懒加载
+    if (isVideo && posterUrl && options.lightbox && !options.controls) {
+        const img = document.createElement('img');
+        img.className = className;
+        img.alt = '视频封面';
+        img.crossOrigin = 'anonymous';
+        if (options.priority) {
+            img.loading = 'eager';
+            img.fetchPriority = 'high';
+        } else {
+            img.loading = 'lazy';
+            img.fetchPriority = 'auto';
+        }
+        img.decoding = 'async';
+        img.classList.add('media-loading');
+        const handleLoaded = () => {
+            img.classList.remove('media-loading');
+            img.classList.add('media-loaded');
+        };
+        if (img.complete) {
+            handleLoaded();
+        } else {
+            img.addEventListener('load', handleLoaded, { once: true });
+            img.addEventListener('error', handleLoaded, { once: true });
+        }
+        if (options.deferLoad) {
+            img.dataset.deferredSrc = posterUrl;
+        } else {
+            img.src = posterUrl;
+        }
+        img.dataset.momentAction = 'open-lightbox';
+        img.dataset.mediaSrc = url;
+        img.tabIndex = 0;
+        img.setAttribute('role', 'button');
+        img.setAttribute('aria-label', '打开视频预览');
+        return img;
+    }
+
     const media = document.createElement(isVideo ? 'video' : 'img');
     media.className = className;
     if (isVideo) {
         media.playsInline = true;
         media.setAttribute('playsinline', '');
-        media.preload = options.controls ? 'metadata' : (options.preload || 'metadata');
+        // 关键改动：视频元素 preload 严格锁定为 'none'，禁止进入页面时主动拉取视频流与 Range 探测
+        media.preload = 'none';
+        if (posterUrl) {
+            media.poster = posterUrl;
+        }
         if (options.controls) media.controls = true;
         if (options.autoplay) {
             media.muted = true;
             media.loop = true;
         } else {
-            // 静音以确保浏览器允许预取和解码首帧
             media.muted = true;
         }
 
-        // 骨架屏流光占位与加载首帧完成后平滑淡入
+        // 骨架屏流光占位与加载完成后平滑淡入
         media.classList.add('media-loading');
         const handleVideoLoaded = () => {
             media.classList.remove('media-loading');
             media.classList.add('media-loaded');
         };
-        if (media.readyState >= 1) {
+        if (posterUrl || media.readyState >= 1) {
             handleVideoLoaded();
         } else {
-            media.addEventListener('loadedmetadata', () => {
-                handleVideoLoaded();
-                if (!options.controls && media.currentTime === 0) {
-                    try { media.currentTime = 0.001; } catch (_) {}
-                }
-            }, { once: true });
-            media.addEventListener('loadeddata', handleVideoLoaded, { once: true });
+            media.addEventListener('loadedmetadata', handleVideoLoaded, { once: true });
             media.addEventListener('canplay', handleVideoLoaded, { once: true });
+            media.addEventListener('play', handleVideoLoaded, { once: true });
             media.addEventListener('error', handleVideoLoaded, { once: true });
         }
     } else {
@@ -1697,8 +1888,9 @@ function createMomentMedia(rawUrl, className, options = {}) {
             media.addEventListener('error', handleLoaded, { once: true });
         }
     }
-    // 若声明 deferLoad (如九宫格折叠项)，暂不赋予真实 src，避免浏览器立即发起并发下载抢占网络通道
-    const finalMediaSrc = (isVideo && !url.includes('#t=')) ? `${url}#t=0.001` : url;
+
+    // 彻底移除 #t=0.001 分段参数，保持纯净规范的媒体源地址
+    const finalMediaSrc = url;
     if (options.deferLoad) {
         media.dataset.deferredSrc = finalMediaSrc;
     } else {
@@ -1713,6 +1905,18 @@ function createMomentMedia(rawUrl, className, options = {}) {
         media.setAttribute('aria-label', isVideo ? '打开视频预览' : '打开图片预览');
     }
     return media;
+}
+
+function getPosterForVideo(videoUrlOrRef, postersMap) {
+    if (!videoUrlOrRef || !postersMap || typeof postersMap !== 'object') return '';
+    if (postersMap[videoUrlOrRef]) return postersMap[videoUrlOrRef];
+    const objPath = typeof extractStorageObjectPath === 'function' ? extractStorageObjectPath(videoUrlOrRef) : '';
+    if (objPath && postersMap[objPath]) return postersMap[objPath];
+    for (const [k, v] of Object.entries(postersMap)) {
+        const kPath = typeof extractStorageObjectPath === 'function' ? extractStorageObjectPath(k) : '';
+        if (kPath && kPath === objPath) return v;
+    }
+    return '';
 }
 
 function createMomentCardElement(item, options = {}) {
@@ -1893,10 +2097,14 @@ function createMomentCardElement(item, options = {}) {
             ? parsedMoment.images.map(url => sanitizeMediaUrl(url)).filter(Boolean)
             : [];
         if (images.length === 1) {
+            const isVid = isVideoMediaUrl(images[0]);
+            const posterUrl = isVid ? getPosterForVideo(images[0], parsedMoment?.video_posters) : '';
             const single = createMomentMedia(images[0], 'moment-single-image', {
-                controls: isVideoMediaUrl(images[0]),
-                lightbox: !isVideoMediaUrl(images[0]),
-                priority: isPriorityCard
+                controls: isVid,
+                lightbox: !isVid,
+                priority: isPriorityCard,
+                poster: posterUrl,
+                preload: 'none'
             });
             if (single) {
                 if (single.tagName === 'VIDEO') {
@@ -1917,12 +2125,14 @@ function createMomentCardElement(item, options = {}) {
             images.forEach((url, index) => {
                 const isHidden = index >= INITIAL_DISPLAY_COUNT;
                 const isVid = isVideoMediaUrl(url);
+                const posterUrl = isVid ? getPosterForVideo(url, parsedMoment?.video_posters) : '';
                 const media = createMomentMedia(url, `moment-grid-item${isHidden ? ' hidden-image' : ''}`, {
                     autoplay: false, // 九宫格中不自动并发全量拉取，节省流量与带宽
-                    preload: isHidden ? 'none' : 'metadata',
+                    preload: 'none',
                     deferLoad: isHidden, // 超过 9 张的折叠项延迟拉取
                     lightbox: true,
-                    priority: isPriorityCard && index < 4
+                    priority: isPriorityCard && index < 4,
+                    poster: posterUrl
                 });
                 if (!media) return;
                 media.dataset.mediaIndex = String(index);
@@ -3118,6 +3328,9 @@ async function deleteMoment(id) {
                     if (parsed && typeof parsed === 'object') {
                         if (Array.isArray(parsed.images)) mediaToDelete.push(...parsed.images);
                         if (parsed.audio) mediaToDelete.push(parsed.audio);
+                        if (parsed.video_posters && typeof parsed.video_posters === 'object') {
+                            mediaToDelete.push(...Object.values(parsed.video_posters));
+                        }
                     }
                 } catch (_) {
                     if (typeof mContent === 'string' && (mContent.startsWith('http') || mContent.startsWith('storage://'))) {

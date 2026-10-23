@@ -197,9 +197,12 @@ function renderBlindBoxMoment(moment) {
             if (Array.isArray(parsed.images) && parsed.images.length) {
                 if (parsed.images.length === 1) {
                     const video = typeof isVideoMediaUrl === 'function' && isVideoMediaUrl(sanitizeMediaUrl(parsed.images[0]));
+                    const posterUrl = (video && parsed.video_posters && (parsed.video_posters[parsed.images[0]])) || '';
                     appendBlindBoxMedia(content, parsed.images[0], 'blind-box-img', {
                         controls: video,
-                        lightbox: !video
+                        lightbox: !video,
+                        poster: posterUrl,
+                        preload: 'none'
                     });
                 } else {
                     const grid = document.createElement('div');
@@ -207,8 +210,9 @@ function renderBlindBoxMoment(moment) {
                     parsed.images.slice(0, 9).forEach(rawUrl => {
                         const url = sanitizeMediaUrl(rawUrl);
                         const video = typeof isVideoMediaUrl === 'function' && isVideoMediaUrl(url);
+                        const posterUrl = (video && parsed.video_posters && (parsed.video_posters[url] || parsed.video_posters[rawUrl])) || '';
                         const media = typeof createMomentMedia === 'function'
-                            ? createMomentMedia(url, 'moment-grid-item', { autoplay: false, preload: 'metadata', lightbox: true })
+                            ? createMomentMedia(url, 'moment-grid-item', { autoplay: false, preload: 'none', lightbox: true, poster: posterUrl })
                             : null;
                         if (media) {
                             if (video) {
