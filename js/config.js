@@ -312,6 +312,46 @@ function parseMomentPayload(rawContent, type) {
 }
 
 
+/**
+ * 获取当前登录用户在指定子目录（如 moments、topics）下的安全存储路径前缀。
+ */
+function getSpaceStorageDirectory(subFolder = 'moments') {
+    const spaceId = currentUserProfile && String(currentUserProfile.space_id || '');
+    const userId = currentAuthUser && String(currentAuthUser.id || '');
+    const safeFolder = String(subFolder || '').trim();
+    const isSafeSegment = value => /^[A-Za-z0-9_-]+$/.test(value);
+    if (!isSafeSegment(spaceId) || !isSafeSegment(userId) || !isSafeSegment(safeFolder)) return '';
+    return `${spaceId}/${userId}/${safeFolder}`;
+}
+
+/**
+ * 安全提取文件的小写字母数字扩展名。
+ */
+function getSafeFileExtension(file, fallback = 'bin') {
+    const nameExtension = String(file && file.name || '').split('.').pop().toLowerCase();
+    if (/^[a-z0-9]{1,8}$/.test(nameExtension)) return nameExtension;
+    const typeExtension = String(file && file.type || '').split('/').pop().split(';')[0].toLowerCase();
+    return /^[a-z0-9]{1,8}$/.test(typeExtension) ? typeExtension : fallback;
+}
+
+/**
+ * 统一提取存储路径、去重并清理 photos 桶中的文件。
+ */
+async function removeStorageObjects(pathsOrRefs) {
+    if (!Array.isArray(pathsOrRefs) || !pathsOrRefs.length || !supabaseClient) return;
+    const paths = pathsOrRefs
+        .map(val => extractStorageObjectPath(val))
+        .filter(Boolean);
+    if (!paths.length) return;
+    const uniquePaths = Array.from(new Set(paths));
+    try {
+        const { error } = await supabaseClient.storage.from('photos').remove(uniquePaths);
+        if (error) console.error('清理存储媒体失败:', error);
+    } catch (err) {
+        console.error('清理存储媒体异常:', err);
+    }
+}
+
 const supabaseClient = window.supabase?.createClient
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
         global: { fetch: (...args) => fetch(...args) }
@@ -319,14 +359,21 @@ const supabaseClient = window.supabase?.createClient
     : null;
 
 window.extractStorageObjectPath = extractStorageObjectPath;
+window.getSpaceStorageDirectory = getSpaceStorageDirectory;
+window.getSafeFileExtension = getSafeFileExtension;
+window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.86';
+const APP_VERSION = 'v3.9.90';
 const CONFIG = {
-    version: 'v3.9.86',
-    date: '2026-10-16',
-    title: '恋爱手账会话体验与消息发送修复 💌✨',
+    version: 'v3.9.90',
+    date: '2026-10-23',
+    title: '全栈安全加固、夜间玻璃拟态升级与极致丝滑体验 🛡️🌙✨',
     features: [
+        '全栈安全加固：升级相册存储桶与动态编辑 RLS 细粒度权限，登出自动彻底擦除私密状态与媒体缓存 🛡️',
+        '手账体验全面进化：支持 Agnes AI 温柔智囊、增量无闪烁消息流、多图灯箱左右滑动及发送异常自动回滚 💌',
+        '夜间模式与视觉打磨：深紫星空玻璃拟态全面适配，移动端顶栏与安全区防遮挡深度优化 🌙',
+        '极致性能与高甜互动：Service Worker 离线缓存路径修复与后台静默热更新，支持双人同频共振特效 ⚡💓',
         '修复手账详情页路由生命周期响应与发送消息按钮点击无反应的问题 💌',
         '完善手账会话认证预加载与弱网状态提示，优化发送拦截与按钮状态自愈 ⚡',
         '恋爱话题手账目录：像日记目录一样分专题交流，再也不用把严肃沟通和日常聊天混在一起 📖',

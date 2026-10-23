@@ -868,10 +868,15 @@ function getEmojiSprite(emoji, size = 32) {
     return profileEmojiSpriteMap[key];
 }
 
-// 提前预热主页 Emoji 雪碧图
-profileEmojis.forEach(e => {
-    getEmojiSprite(e, 24);
-    getEmojiSprite(e, 32);
+window.getEmojiSprite = getEmojiSprite;
+
+// 空闲时预热主页 Emoji 雪碧图，避免阻塞首屏与脚本评估主线程
+const scheduleEmojiPrewarm = window.requestIdleCallback || ((cb) => setTimeout(cb, 1200));
+scheduleEmojiPrewarm(() => {
+    profileEmojis.forEach(e => {
+        getEmojiSprite(e, 24);
+        getEmojiSprite(e, 32);
+    });
 });
 
 function pauseProfileParticles(clearCanvas = false) {

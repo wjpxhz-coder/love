@@ -53,6 +53,7 @@ let moodSelectedFiles = [];
 let moodExistingPhotos = [];
 let moodPhotosToDeleteOnSave = [];
 const moodPhotoPreviewUrls = new Map();
+const deletingMoodIds = new Set();
 
 /**
  * 强健解析并规范化照片列表，兼容原生 Array、JSON 字符串以及 PostgreSQL text[] 数组字面量
@@ -744,11 +745,30 @@ async function submitMood() {
 
         if (!entryBeingEdited && targetDate === getAppDateKey()) todayOwnMoodCount += 1;
 
+        const savedScore = Number(selectedMoodScore);
         editingMoodId = null;
         targetMoodCheckinDate = null;
         await loadMoods(currentMoodMonthKey || getCurrentMoodMonthKey());
+        window.moodsData = moodEntriesByDate;
         if (!isCurrentAuthSnapshot(epoch, userId)) return;
-        if (typeof showToast === 'function') {
+
+        const dayEntries = Array.isArray(moodEntriesByDate[targetDate]) ? moodEntriesByDate[targetDate] : [];
+        const matchedPartnerEntry = dayEntries.find(item => {
+            if (!item) return false;
+            const isPartner = (item.user_id && item.user_id !== userId)
+                || (item.author && currentAuthor && item.author !== currentAuthor);
+            return isPartner && Number(item.score) === savedScore;
+        });
+
+        if (matchedPartnerEntry) {
+            const partnerAuthor = matchedPartnerEntry.author || (currentAuthor === '小蛇' ? '小奚' : '小蛇');
+            const partnerProfile = (typeof allProfilesCache === 'object' && allProfilesCache?.[partnerAuthor]) || null;
+            const partnerName = partnerProfile?.nickname || partnerProfile?.username || partnerAuthor || 'TA';
+            if (typeof createHeartRain === 'function') createHeartRain();
+            if (typeof showToast === 'function') {
+                showToast(`💞 心有灵犀！你和 ${partnerName} 这天都选择了「${MOOD_DESCRIPTIONS[savedScore] || '同款心情'}」！`, 4500);
+            }
+        } else if (typeof showToast === 'function') {
             const isRetroactiveSave = !entryBeingEdited && targetDate < getAppDateKey();
             const isFutureSave = !entryBeingEdited && targetDate > getAppDateKey();
             if (isRetroactiveSave) {
@@ -1158,6 +1178,23 @@ function createMoodDayEntry(entry) {
         deleteButton.addEventListener('click', () => deleteMoodEntry(entry.id));
         actions.append(editButton, deleteButton);
         card.appendChild(actions);
+    } else if (entry.author !== currentAuthor && entry.user_id !== currentAuthUser?.id) {
+        const actions = document.createElement('div');
+        actions.className = 'mood-day-entry-actions';
+        const hugButton = document.createElement('button');
+        hugButton.type = 'button';
+        hugButton.className = 'mood-hug-partner-btn';
+        hugButton.textContent = '🫂 抱抱 TA';
+        hugButton.addEventListener('click', () => {
+            const moodLabel = MOOD_DESCRIPTIONS[Number(entry.score)] || '';
+            if (typeof window.sendWarmHugToPartner === 'function') {
+                window.sendWarmHugToPartner(moodLabel);
+            } else if (typeof sendMissYou === 'function') {
+                sendMissYou();
+            }
+        });
+        actions.appendChild(hugButton);
+        card.appendChild(actions);
     }
     return card;
 }
@@ -1463,45 +1500,54 @@ function editMoodEntry(entryId) {
 async function deleteMoodEntry(entryId) {
     const entry = getMoodEntryById(entryId);
     if (!entry || entry.user_id !== currentAuthUser?.id || !isAuthenticated()) return;
+    if (deletingMoodIds.has(entry.id)) return;
     if (!window.confirm('确定删除这条心情记录吗？删除后无法恢复。')) return;
+    if (deletingMoodIds.has(entry.id)) return;
+    deletingMoodIds.add(entry.id);
 
-    const epoch = authEpoch;
-    const userId = currentAuthUser.id;
-    const dateKey = entry.date;
-    const photosToDelete = normalizeMoodPhotos(entry.photos);
+    try {
+        const epoch = authEpoch;
+        const userId = currentAuthUser.id;
+        const dateKey = entry.date;
+        const photosToDelete = normalizeMoodPhotos(entry.photos);
 
-    const { error } = await supabaseClient
-        .from('moods')
-        .delete()
-        .eq('id', entry.id)
-        .eq('user_id', userId);
+        const { error } = await supabaseClient
+            .from('moods')
+            .delete()
+            .eq('id', entry.id)
+            .eq('user_id', userId);
 
-    if (!isCurrentAuthSnapshot(epoch, userId)) return;
-    if (error) {
-        console.error('删除心情失败:', error);
-        if (typeof showToast === 'function') showToast('删除失败，请稍后重试。');
-        return;
-    }
-
-    if (photosToDelete.length > 0) {
-        removeUploadedMoodObjects(photosToDelete);
-    }
-
-    if (dateKey === getAppDateKey()) todayOwnMoodCount = Math.max(0, todayOwnMoodCount - 1);
-    await loadMoods(currentMoodMonthKey);
-    const stillViewingDeletedMoodDay = (
-        (typeof isAppRouteActive !== 'function' || isAppRouteActive('mood-day'))
-        && activeMoodDetailDate === dateKey
-    );
-    if (stillViewingDeletedMoodDay) {
-        if ((moodEntriesByDate[dateKey] || []).length) {
-            enterMoodDayPage({ params: { date: dateKey } });
-        } else {
-            closeMoodDayModal();
+        if (!isCurrentAuthSnapshot(epoch, userId)) return;
+        if (error) {
+            console.error('删除心情失败:', error);
+            if (typeof showToast === 'function') showToast('删除失败，请稍后重试。');
+            return;
         }
+
+        if (photosToDelete.length > 0) {
+            removeUploadedMoodObjects(photosToDelete);
+        }
+
+        if (dateKey === getAppDateKey()) todayOwnMoodCount = Math.max(0, todayOwnMoodCount - 1);
+        await loadMoods(currentMoodMonthKey);
+        window.moodsData = moodEntriesByDate;
+        const stillViewingDeletedMoodDay = (
+            (typeof isAppRouteActive !== 'function' || isAppRouteActive('mood-day'))
+            && activeMoodDetailDate === dateKey
+        );
+        if (stillViewingDeletedMoodDay) {
+            if ((moodEntriesByDate[dateKey] || []).length) {
+                enterMoodDayPage({ params: { date: dateKey } });
+            } else {
+                closeMoodDayModal();
+            }
+        }
+        if (typeof refreshMoodReminderState === 'function') await refreshMoodReminderState();
+    } finally {
+        deletingMoodIds.delete(entry.id);
     }
-    if (typeof refreshMoodReminderState === 'function') await refreshMoodReminderState();
 }
+window.renderMoodDayModal = enterMoodDayPage;
 
 function resetMoodState() {
     moodLoadRequestId += 1;

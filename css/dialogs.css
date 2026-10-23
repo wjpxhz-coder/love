@@ -133,6 +133,13 @@ dialog.native-dialog::backdrop {
             box-shadow: 0 0 0 3px rgba(212, 160, 168, 0.15);
         }
 
+        textarea.modal-input,
+        #newTopicTitleInput,
+        #editTopicTitleInput {
+            text-align: left;
+            line-height: 1.6;
+        }
+
         .modal-msg {
             font-size: 0.88em;
             min-height: 20px;

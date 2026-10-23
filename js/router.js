@@ -54,6 +54,7 @@
     let lastProcessedHref = '';
     const HOME_SCROLL_STORAGE_KEY = 'sweet_diary_home_scroll_y';
     let homeScrollY = 0;
+    let homeScrollSaveTimer = null;
     try {
         const savedScroll = Number(global.sessionStorage?.getItem(HOME_SCROLL_STORAGE_KEY));
         if (Number.isFinite(savedScroll) && savedScroll > 0) homeScrollY = savedScroll;
@@ -375,15 +376,35 @@
     function rememberHomeScroll(forceSync = false) {
         if (currentRoute?.id !== 'home' && !forceSync) return;
         homeScrollY = Math.max(0, global.scrollY || global.pageYOffset || 0);
-        try {
-            global.sessionStorage?.setItem(HOME_SCROLL_STORAGE_KEY, String(homeScrollY));
-        } catch (_e) {}
+        if (forceSync) {
+            if (homeScrollSaveTimer !== null) {
+                global.clearTimeout(homeScrollSaveTimer);
+                homeScrollSaveTimer = null;
+            }
+            try {
+                global.sessionStorage?.setItem(HOME_SCROLL_STORAGE_KEY, String(homeScrollY));
+            } catch (_e) {}
+            return;
+        }
+        if (homeScrollSaveTimer !== null) {
+            global.clearTimeout(homeScrollSaveTimer);
+        }
+        homeScrollSaveTimer = global.setTimeout(() => {
+            homeScrollSaveTimer = null;
+            try {
+                global.sessionStorage?.setItem(HOME_SCROLL_STORAGE_KEY, String(homeScrollY));
+            } catch (_e) {}
+        }, 200);
     }
 
     function setRouterHomeScroll(top) {
         const value = Number(top);
         if (Number.isFinite(value) && value >= 0) {
             homeScrollY = value;
+            if (homeScrollSaveTimer !== null) {
+                global.clearTimeout(homeScrollSaveTimer);
+                homeScrollSaveTimer = null;
+            }
             try {
                 global.sessionStorage?.setItem(HOME_SCROLL_STORAGE_KEY, String(homeScrollY));
             } catch (_e) {}
@@ -482,7 +503,7 @@
         const previous = currentRoute;
         const changed = !previous || previous.fullPath !== route.fullPath;
 
-        if (previous?.id === 'home' && route.id !== 'home') rememberHomeScroll();
+        if (previous?.id === 'home' && route.id !== 'home') rememberHomeScroll(true);
         if (changed && previous) rememberRouteFocus(previous);
         if (changed && previous) invokeHook('onAppRouteLeave', previous, route);
 
@@ -573,7 +594,7 @@
             return;
         }
 
-        if (currentRoute?.id === 'home' && nextRoute.id !== 'home') rememberHomeScroll();
+        if (currentRoute?.id === 'home' && nextRoute.id !== 'home') rememberHomeScroll(true);
 
         if (mustReplaceUrl) {
             const hash = routeHash(nextRoute);
@@ -638,20 +659,20 @@
             scrollSyncRaf = runOnNextFrame(() => {
                 scrollSyncRaf = null;
                 if (currentRoute?.id === 'home') {
-                    rememberHomeScroll();
+                    rememberHomeScroll(false);
                 }
             });
         }, { passive: true });
 
         document.addEventListener('visibilitychange', () => {
             if (document.hidden && currentRoute?.id === 'home') {
-                rememberHomeScroll();
+                rememberHomeScroll(true);
             }
         });
 
         global.addEventListener('pagehide', () => {
             if (currentRoute?.id === 'home') {
-                rememberHomeScroll();
+                rememberHomeScroll(true);
             }
         });
 
@@ -732,7 +753,7 @@
             return true;
         }
 
-        if (currentRoute?.id === 'home' && nextRoute.id !== 'home') rememberHomeScroll();
+        if (currentRoute?.id === 'home' && nextRoute.id !== 'home') rememberHomeScroll(true);
 
         const nextDepth = replace ? currentDepth : currentDepth + 1;
         const baseState = replace ? global.history.state : null;
@@ -763,7 +784,8 @@
         if (!initialized) initAppRouter();
         if (!initialized) return false;
 
-        rememberHomeScroll();
+        if (currentRoute?.id === 'home') rememberHomeScroll(true);
+        else rememberHomeScroll();
         if (currentDepth > 0) {
             pendingBackOptions = {
                 ...options,

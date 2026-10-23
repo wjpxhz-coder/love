@@ -473,6 +473,31 @@ dialog.native-dialog.app-page::backdrop {
         min-height: 44px;
     }
 
+    .app-page :is(
+        .topic-topbar-action-icon-btn,
+        .mood-photo-remove-btn,
+        .ai-attachment-remove,
+        .moment-preview-remove,
+        .moment-audio-delete,
+        .comment-reply-banner-close,
+        .moment-menu-trigger,
+        .topic-composer-photo-remove-btn,
+        .topic-audio-remove-btn,
+        .remove-btn,
+        .rm-btn
+    ) {
+        min-height: 0 !important;
+        aspect-ratio: 1 / 1;
+    }
+
+    .app-page .topic-topbar-action-icon-btn {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px !important;
+        border-radius: 50%;
+    }
+
     #aiModal.app-page .ai-content-area {
         min-height: clamp(260px, 46dvh, 500px);
     }

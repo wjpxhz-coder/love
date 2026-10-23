@@ -3,12 +3,23 @@ import { isRecord } from "./validation.ts";
 
 const PRODUCTION_ORIGIN = "https://wjpxhz-coder.github.io";
 const CUSTOM_DOMAIN_HTTPS = "https://xiaoxi666.kdns.fr";
-const CUSTOM_DOMAIN_HTTP = "http://xiaoxi666.kdns.fr";
+const LOCALHOST_ORIGINS = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://localhost:5500",
+  "http://localhost:8000",
+  "http://localhost:8080",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5500",
+  "http://127.0.0.1:8000",
+  "http://127.0.0.1:8080",
+];
 
 const DEFAULT_ALLOWED_ORIGINS = [
   PRODUCTION_ORIGIN,
   CUSTOM_DOMAIN_HTTPS,
-  CUSTOM_DOMAIN_HTTP,
+  ...LOCALHOST_ORIGINS,
 ];
 export const AGNES_CONSENT_HEADER = "x-agnes-consent-version";
 export const AGNES_CONSENT_VERSION = "agnes-2.0-v1";

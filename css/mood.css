@@ -83,6 +83,21 @@
     box-shadow: 0 6px 18px rgba(255, 77, 121, 0.25);
 }
 
+[data-theme='dark'] .mood-today-btn,
+[data-theme="dark"] .mood-today-btn {
+    background: var(--surface-elevated);
+    border-color: var(--border);
+    color: var(--primary-light);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='dark'] .mood-today-btn:hover,
+[data-theme="dark"] .mood-today-btn:hover {
+    background: rgba(76, 29, 48, 0.75);
+    border-color: var(--primary);
+    color: #ffffff;
+}
+
 
 
 .mood-month-picker {
@@ -150,6 +165,20 @@
     transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
     position: relative;
     user-select: none;
+}
+
+[data-theme='dark'] .mood-month-nav,
+[data-theme="dark"] .mood-month-nav {
+    background: var(--surface-elevated);
+    border-color: var(--border);
+    color: var(--primary-light);
+}
+
+[data-theme='dark'] .mood-month-nav:not(:disabled):hover,
+[data-theme="dark"] .mood-month-nav:not(:disabled):hover {
+    background: rgba(76, 29, 48, 0.75);
+    border-color: var(--primary);
+    color: #ffffff;
 }
 
 .mood-nav-icon {
@@ -288,12 +317,12 @@
     width: 100%;
     overflow: hidden;
     color: var(--text-muted);
-    font-size: 0.58em;
-    line-height: 1.15;
-    text-align: left;
+    font-size: 0.66rem;
+    line-height: 1.25;
+    text-align: center;
     overflow-wrap: anywhere;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
 }
 
 .mood-entry-count {
@@ -436,6 +465,71 @@
 }
 
 .mood-day-entry-actions button.danger { color: #b54f5d; }
+
+/* 单日心情详情“🫂 抱抱 TA”暖粉胶囊微光按钮 */
+.mood-hug-partner-btn,
+.mood-day-entry-actions .mood-hug-partner-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(244, 63, 94, 0.28);
+    background: linear-gradient(135deg, rgba(255, 241, 242, 0.95) 0%, rgba(255, 228, 234, 0.9) 100%);
+    color: var(--primary);
+    font-size: 0.78rem;
+    font-weight: 700;
+    box-shadow: 0 3px 12px rgba(244, 63, 94, 0.14), inset 0 1px 1px rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mood-hug-partner-btn:hover,
+.mood-day-entry-actions .mood-hug-partner-btn:hover {
+    background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+    color: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 6px 18px var(--primary-glow);
+    transform: translateY(-2px) scale(1.04);
+}
+
+.mood-hug-partner-btn:active,
+.mood-day-entry-actions .mood-hug-partner-btn:active {
+    transform: scale(0.95);
+}
+
+.mood-hug-partner-btn.is-hugged,
+.mood-hug-partner-btn.hugged,
+.mood-hug-partner-btn:disabled,
+.mood-day-entry-actions .mood-hug-partner-btn.is-hugged,
+.mood-day-entry-actions .mood-hug-partner-btn.hugged,
+.mood-day-entry-actions .mood-hug-partner-btn:disabled {
+    background: linear-gradient(135deg, rgba(251, 113, 133, 0.18), rgba(244, 63, 94, 0.12));
+    color: var(--primary);
+    border-color: rgba(244, 63, 94, 0.25);
+    opacity: 0.88;
+}
+
+[data-theme='dark'] .mood-hug-partner-btn,
+[data-theme="dark"] .mood-hug-partner-btn,
+[data-theme='dark'] .mood-day-entry-actions .mood-hug-partner-btn,
+[data-theme="dark"] .mood-day-entry-actions .mood-hug-partner-btn {
+    background: linear-gradient(135deg, rgba(76, 29, 48, 0.72) 0%, rgba(56, 20, 38, 0.82) 100%);
+    border-color: rgba(251, 113, 133, 0.38);
+    color: #fda4af;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35), 0 0 12px rgba(251, 113, 133, 0.15);
+}
+
+[data-theme='dark'] .mood-hug-partner-btn:hover,
+[data-theme="dark"] .mood-hug-partner-btn:hover,
+[data-theme='dark'] .mood-day-entry-actions .mood-hug-partner-btn:hover,
+[data-theme="dark"] .mood-day-entry-actions .mood-hug-partner-btn:hover {
+    background: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+    color: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 6px 20px rgba(251, 113, 133, 0.35);
+}
 
 /* ── 心情日历“标记这一天”金光特效与星徽 ── */
 .mood-calendar-day.is-special {
@@ -924,6 +1018,13 @@
     font: inherit;
 }
 
+[data-theme='dark'] .mood-reminder-time-row input,
+[data-theme="dark"] .mood-reminder-time-row input {
+    background: var(--field-bg);
+    border-color: var(--border);
+    color: var(--text);
+}
+
 .mood-reminder-time-row input:disabled { opacity: 0.5; }
 .mood-reminder-save { margin-top: 11px; }
 
@@ -941,7 +1042,7 @@
     .mood-weekdays, .mood-calendar-grid { gap: 3px; }
     .mood-calendar-day, .mood-calendar-spacer { min-height: 68px; border-radius: 9px; }
     .mood-calendar-day { padding-right: 0; padding-left: 0; }
-    .mood-entry-count { font-size: 0.52em; }
+    .mood-entry-count { display: none; }
     .mood-emoji-row { grid-template-columns: repeat(4, 1fr); gap: 10px 6px; }
     .mood-emoji-btn { width: 46px; height: 46px; font-size: 1.4em; }
     .mood-special-toggle { padding: 8px 10px; gap: 9px; }

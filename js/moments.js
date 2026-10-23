@@ -10,6 +10,7 @@ let momentRecordingShouldDiscard = false;
 let isMomentRecording = false;
 let momentAudioPreviewUrl = null;
 const momentPhotoPreviewUrls = new Set();
+const deletingMomentIds = new Set();
 let isMomentSubmitting = false;
 let editingMomentId = null;
 let editingExistingMedia = []; // Array of { ref: string, url: string, isVideo: boolean }
@@ -402,6 +403,11 @@ async function enterMomentPage(route) {
         if (error || !data) {
             console.error('加载待编辑动态失败:', error);
             if (typeof showToast === 'function') showToast('无法读取该动态，可能已被删除。');
+            closeMomentModal(true);
+            return;
+        }
+        if (!currentAuthUser?.id || data.user_id !== currentAuthUser.id) {
+            if (typeof showToast === 'function') showToast('只能编辑自己发布的动态哦 🌸');
             closeMomentModal(true);
             return;
         }
@@ -1087,6 +1093,9 @@ async function submitMomentPost() {
         
         closeMomentModal(true);
         clearTimelineSnapshot();
+        if (typeof invalidateProfileMomentsCache === 'function') {
+            invalidateProfileMomentsCache();
+        }
         fetchMoments(false, { forceRefresh: true });
         if (typeof renderMilestonesContent === 'function') {
             renderMilestonesContent();
@@ -1254,7 +1263,7 @@ function deleteRecordedAudio() {
 const MOMENTS_SNAPSHOT_KEY = 'sweet_diary_timeline_snapshot';
 const MOMENTS_SCROLL_KEY = 'sweet_diary_home_scroll_y';
 const MAX_SNAPSHOT_MOMENTS = 45;
-const SNAPSHOT_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 小时有效
+const SNAPSHOT_MAX_AGE_MS = 45 * 60 * 1000; // 45 分钟有效（小于 1 小时签名 URL 有效期）
 
 let scrollObserver = null;
 let momentTimelineCursor = null;
@@ -1809,11 +1818,12 @@ function createMomentCardElement(item, options = {}) {
     authorInfo.appendChild(authorTextCol);
     header.appendChild(authorInfo);
 
-    const canDelete = item.user_id === currentAuthUser?.id
+    const isOwner = Boolean(currentAuthUser?.id && item.user_id === currentAuthUser.id);
+    const canDelete = isOwner
         && !Number.isNaN(createdAt.getTime())
         && Date.now() - createdAt.getTime() < 86400000;
 
-    const actionsMenu = createMomentNode('div', 'moment-actions-menu');
+    const actionsMenu = createMomentNode('div', 'moment-actions-menu moment-menu-container');
     actionsMenu.id = `moment-menu-${momentId}`;
 
     const triggerBtn = createMomentNode('button', 'moment-menu-trigger');
@@ -1830,13 +1840,15 @@ function createMomentCardElement(item, options = {}) {
     dropdown.id = `moment-dropdown-${momentId}`;
     dropdown.setAttribute('role', 'menu');
 
-    const editItem = createMomentNode('button', 'moment-menu-item');
-    editItem.type = 'button';
-    editItem.setAttribute('role', 'menuitem');
-    editItem.dataset.momentAction = 'edit';
-    editItem.dataset.momentId = String(momentId);
-    editItem.appendChild(document.createTextNode('✏️ 编辑'));
-    dropdown.appendChild(editItem);
+    if (isOwner) {
+        const editItem = createMomentNode('button', 'moment-menu-item');
+        editItem.type = 'button';
+        editItem.setAttribute('role', 'menuitem');
+        editItem.dataset.momentAction = 'edit';
+        editItem.dataset.momentId = String(momentId);
+        editItem.appendChild(document.createTextNode('✏️ 编辑'));
+        dropdown.appendChild(editItem);
+    }
 
     const aiItem = createMomentNode('button', 'moment-menu-item moment-menu-item--ai');
     aiItem.type = 'button';
@@ -1856,8 +1868,10 @@ function createMomentCardElement(item, options = {}) {
         dropdown.appendChild(deleteItem);
     }
 
-    actionsMenu.appendChild(dropdown);
-    header.appendChild(actionsMenu);
+    if (dropdown.childElementCount > 0) {
+        actionsMenu.appendChild(dropdown);
+        header.appendChild(actionsMenu);
+    }
     card.appendChild(header);
 
     if (item.type === 'text') {
@@ -2607,6 +2621,7 @@ let momentLoadingAuthEpoch = null;
 async function fetchMoments(append = false, options = {}) {
     const contentDiv = document.getElementById('timeline-content');
     if (!hasMomentAuthContext()) {
+        clearOnThisDaySection();
         if (scrollObserver) scrollObserver.disconnect();
         if (typeof clearAllCommentImageSelections === 'function') clearAllCommentImageSelections();
         if (contentDiv) {
@@ -2624,6 +2639,7 @@ async function fetchMoments(append = false, options = {}) {
             if (restored) {
                 const topId = snapshot.moments[0]?.id;
                 checkNewMomentsInBackground(topId);
+                checkAndRenderOnThisDay();
                 return;
             }
         }
@@ -2771,6 +2787,7 @@ async function fetchMoments(append = false, options = {}) {
 
     if (!append && pageData.length === 0) {
         contentDiv.replaceChildren(createMomentNode('div', 'empty-state', '还没有记录哦，快去添加第一条回忆吧！'));
+        if (isDefaultFilter()) clearOnThisDaySection();
         finishRequest();
         return;
     }
@@ -2833,6 +2850,9 @@ async function fetchMoments(append = false, options = {}) {
 
     if (!append) {
         currentRenderedMomentsList = [...renderData];
+        if (isDefaultFilter()) {
+            checkAndRenderOnThisDay();
+        }
     } else {
         currentRenderedMomentsList = currentRenderedMomentsList.concat(renderData).slice(0, MAX_SNAPSHOT_MOMENTS);
     }
@@ -2848,6 +2868,201 @@ async function fetchMoments(append = false, options = {}) {
     setupScrollObserver();
     finishRequest();
 }
+
+let lastOnThisDayAuthEpoch = -1;
+let lastOnThisDayDateKey = '';
+
+function clearOnThisDaySection() {
+    lastOnThisDayAuthEpoch = -1;
+    lastOnThisDayDateKey = '';
+    const section = document.getElementById('on-this-day-section');
+    if (section) {
+        section.hidden = true;
+        section.replaceChildren();
+    }
+}
+window.clearOnThisDaySection = clearOnThisDaySection;
+
+function extractMomentPreviewSummary(item) {
+    let text = '';
+    let thumbUrl = '';
+    if (!item) return { text: '', thumbUrl: '' };
+
+    if (item.type === 'photo') {
+        thumbUrl = sanitizeMediaUrl(item.content);
+        text = '📷 珍藏照片回忆';
+    } else if (item.type === 'audio') {
+        text = '🎙️ 一段温柔的语音留言';
+    } else if (item.type === 'moment') {
+        try {
+            const parsed = typeof item.content === 'string' ? JSON.parse(item.content) : item.content;
+            if (parsed && typeof parsed === 'object') {
+                text = String(parsed.text || '').trim();
+                if (Array.isArray(parsed.images) && parsed.images.length > 0) {
+                    const firstImg = parsed.images.find(u => {
+                        const clean = sanitizeMediaUrl(u);
+                        return clean && !isVideoMediaUrl(clean);
+                    });
+                    if (firstImg) thumbUrl = sanitizeMediaUrl(firstImg);
+                }
+                if (!text) {
+                    if (parsed.audio) text = '🎙️ 语音心情动态';
+                    else if (Array.isArray(parsed.images) && parsed.images.length > 0) text = '📷 图文光影瞬间';
+                }
+            }
+        } catch (_e) {
+            text = String(item.content || '').trim();
+        }
+    } else {
+        text = String(item.content || '').trim();
+    }
+
+    if (!text) text = '✨ 美好的一刻';
+    if (text.length > 68) text = `${text.slice(0, 68)}…`;
+    return { text, thumbUrl };
+}
+
+async function checkAndRenderOnThisDay() {
+    const section = document.getElementById('on-this-day-section');
+    if (!section) return;
+    if (!hasMomentAuthContext() || !supabaseClient) {
+        clearOnThisDaySection();
+        return;
+    }
+
+    const requestAuthEpoch = getMomentAuthEpoch();
+    const now = new Date();
+    const todayYear = now.getFullYear();
+    const todayMonth = now.getMonth() + 1;
+    const todayDate = now.getDate();
+    const dateKey = `${todayYear}-${String(todayMonth).padStart(2, '0')}-${String(todayDate).padStart(2, '0')}`;
+
+    if (lastOnThisDayAuthEpoch === requestAuthEpoch && lastOnThisDayDateKey === dateKey && !section.hidden && section.childElementCount > 0) {
+        return;
+    }
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('moments')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(400);
+
+        if (error || !isMomentAuthEpochCurrent(requestAuthEpoch)) return;
+        const rows = Array.isArray(data) ? data : [];
+
+        const yearlyMatches = [];
+        const monthlyMatches = [];
+
+        rows.forEach(item => {
+            if (!item?.created_at) return;
+            const d = new Date(item.created_at);
+            if (Number.isNaN(d.getTime())) return;
+            const y = d.getFullYear();
+            const m = d.getMonth() + 1;
+            const day = d.getDate();
+
+            if (y === todayYear && m === todayMonth && day === todayDate) return;
+
+            if (day === todayDate && m === todayMonth && y < todayYear) {
+                yearlyMatches.push({ item, yearsAgo: todayYear - y, dateObj: d });
+            } else if (day === todayDate && (y < todayYear || (y === todayYear && m < todayMonth))) {
+                const monthsAgo = (todayYear - y) * 12 + (todayMonth - m);
+                if (monthsAgo >= 1) {
+                    monthlyMatches.push({ item, monthsAgo, dateObj: d });
+                }
+            }
+        });
+
+        const isYearly = yearlyMatches.length > 0;
+        const chosenEntries = (isYearly ? yearlyMatches : monthlyMatches).slice(0, 3);
+        if (chosenEntries.length === 0) {
+            section.hidden = true;
+            section.replaceChildren();
+            return;
+        }
+
+        const rawItems = chosenEntries.map(entry => entry.item);
+        const hydratedItems = typeof batchHydrateMomentMediaRecords === 'function'
+            ? await batchHydrateMomentMediaRecords(rawItems)
+            : (typeof hydrateMomentMediaRecord === 'function'
+                ? await Promise.all(rawItems.map(item => hydrateMomentMediaRecord(item)))
+                : rawItems);
+
+        if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
+
+        lastOnThisDayAuthEpoch = requestAuthEpoch;
+        lastOnThisDayDateKey = dateKey;
+
+        section.replaceChildren();
+        const cardWrap = createMomentNode('div', 'on-this-day-card');
+
+        const header = createMomentNode('div', 'on-this-day-header');
+        const badge = createMomentNode(
+            'span',
+            'on-this-day-badge',
+            isYearly
+                ? `🕰️ 那年今日 · ${chosenEntries[0].yearsAgo} 年前的今天`
+                : `💌 往月今日 · ${chosenEntries[0].monthsAgo} 个月前的今天`
+        );
+        const subTitle = createMomentNode(
+            'span',
+            'on-this-day-subtitle',
+            `在时光长河里重逢 ${chosenEntries.length} 段心动记忆 ✨`
+        );
+        header.append(badge, subTitle);
+        cardWrap.appendChild(header);
+
+        const list = createMomentNode('div', 'on-this-day-list');
+        hydratedItems.forEach((hydratedItem, idx) => {
+            const metaInfo = chosenEntries[idx];
+            const itemRow = createMomentNode('button', 'on-this-day-item');
+            itemRow.type = 'button';
+
+            const { text, thumbUrl } = extractMomentPreviewSummary(hydratedItem);
+            if (thumbUrl) {
+                const thumb = document.createElement('img');
+                thumb.className = 'on-this-day-thumb';
+                thumb.src = thumbUrl;
+                thumb.alt = '那年今日回忆配图';
+                thumb.loading = 'lazy';
+                thumb.decoding = 'async';
+                itemRow.appendChild(thumb);
+            }
+
+            const body = createMomentNode('div', 'on-this-day-item-body');
+            const metaLine = createMomentNode('div', 'on-this-day-item-meta');
+            const d = metaInfo.dateObj;
+            const dateLabel = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+            const tagText = isYearly ? `${metaInfo.yearsAgo}年前` : `${metaInfo.monthsAgo}个月前`;
+            const profile = (typeof allProfilesCache === 'object' && allProfilesCache?.[hydratedItem.author]) || {};
+            const authorLabel = profile.nickname || hydratedItem.author || '成员';
+            metaLine.textContent = `${dateLabel}（${tagText}） · ${authorLabel}`;
+
+            const excerpt = createMomentNode('div', 'on-this-day-item-text', text);
+            body.append(metaLine, excerpt);
+            itemRow.appendChild(body);
+
+            const arrow = createMomentNode('span', 'on-this-day-item-arrow', '📍 回看');
+            itemRow.appendChild(arrow);
+
+            itemRow.addEventListener('click', () => {
+                if (typeof locateMomentOnTimeline === 'function') {
+                    locateMomentOnTimeline(hydratedItem, { backLabel: '🔙 返回全部回忆' });
+                }
+            });
+            list.appendChild(itemRow);
+        });
+
+        cardWrap.appendChild(list);
+        section.appendChild(cardWrap);
+        section.hidden = false;
+    } catch (err) {
+        console.warn('加载那年今日回忆失败:', err);
+    }
+}
+window.checkAndRenderOnThisDay = checkAndRenderOnThisDay;
 
 function setupScrollObserver() {
     if (scrollObserver) scrollObserver.disconnect();
@@ -2867,88 +3082,106 @@ function confirmDelete(id) {
         if (typeof openLoginModal === 'function') openLoginModal();
         return;
     }
+    const momentId = normalizeMomentId(id);
+    if (!momentId || deletingMomentIds.has(momentId)) return;
     if (!confirm('确定要撤回这条回忆吗？此操作不可逆哦 💖')) {
         return;
     }
-    deleteMoment(id);
+    deleteMoment(momentId);
 }
 
 async function deleteMoment(id) {
     if (!hasMomentAuthContext()) return;
     const momentId = normalizeMomentId(id);
-    if (!momentId) return;
-    const requestAuthEpoch = getMomentAuthEpoch();
+    if (!momentId || deletingMomentIds.has(momentId)) return;
+    deletingMomentIds.add(momentId);
 
-    // 撤回前收集动态自身媒体与级联评论的媒体图片（用于物理清理，杜绝孤儿文件）
-    const mediaToDelete = [];
     try {
-        const cachedItem = currentRenderedMomentsList.find(item => normalizeMomentId(item?.id) === momentId);
-        let mContent = cachedItem?.content;
-        if (!mContent) {
-            const { data: mRow } = await supabaseClient
-                .from('moments')
-                .select('content')
-                .eq('id', momentId)
-                .maybeSingle();
-            if (mRow) mContent = mRow.content;
-        }
-        if (mContent) {
-            try {
-                const parsed = typeof mContent === 'string' ? JSON.parse(mContent) : mContent;
-                if (parsed && typeof parsed === 'object') {
-                    if (Array.isArray(parsed.images)) mediaToDelete.push(...parsed.images);
-                    if (parsed.audio) mediaToDelete.push(parsed.audio);
-                }
-            } catch (_) {
-                if (typeof mContent === 'string' && (mContent.startsWith('http') || mContent.startsWith('storage://'))) {
-                    mediaToDelete.push(mContent);
+        const requestAuthEpoch = getMomentAuthEpoch();
+
+        // 撤回前收集动态自身媒体与级联评论的媒体图片（用于物理清理，杜绝孤儿文件）
+        const mediaToDelete = [];
+        try {
+            const cachedItem = currentRenderedMomentsList.find(item => normalizeMomentId(item?.id) === momentId);
+            let mContent = cachedItem?.content;
+            if (!mContent) {
+                const { data: mRow } = await supabaseClient
+                    .from('moments')
+                    .select('content')
+                    .eq('id', momentId)
+                    .maybeSingle();
+                if (mRow) mContent = mRow.content;
+            }
+            if (mContent) {
+                try {
+                    const parsed = typeof mContent === 'string' ? JSON.parse(mContent) : mContent;
+                    if (parsed && typeof parsed === 'object') {
+                        if (Array.isArray(parsed.images)) mediaToDelete.push(...parsed.images);
+                        if (parsed.audio) mediaToDelete.push(parsed.audio);
+                    }
+                } catch (_) {
+                    if (typeof mContent === 'string' && (mContent.startsWith('http') || mContent.startsWith('storage://'))) {
+                        mediaToDelete.push(mContent);
+                    }
                 }
             }
+
+            // 收集该动态下评论所附带的图片（动态删除时评论由数据库外键级联删除）
+            const { data: commentsRows } = await supabaseClient
+                .from('comments')
+                .select('content')
+                .eq('moment_id', momentId);
+            if (Array.isArray(commentsRows) && commentsRows.length > 0) {
+                commentsRows.forEach(c => {
+                    if (!c.content) return;
+                    try {
+                        const parsedC = JSON.parse(c.content);
+                        if (parsedC && Array.isArray(parsedC.images)) {
+                            mediaToDelete.push(...parsedC.images);
+                        }
+                    } catch (_) {}
+                });
+            }
+        } catch (collectErr) {
+            console.warn('收集待撤回动态媒体失败:', collectErr);
         }
 
-        // 收集该动态下评论所附带的图片（动态删除时评论由数据库外键级联删除）
-        const { data: commentsRows } = await supabaseClient
-            .from('comments')
-            .select('content')
-            .eq('moment_id', momentId);
-        if (Array.isArray(commentsRows) && commentsRows.length > 0) {
-            commentsRows.forEach(c => {
-                if (!c.content) return;
-                try {
-                    const parsedC = JSON.parse(c.content);
-                    if (parsedC && Array.isArray(parsedC.images)) {
-                        mediaToDelete.push(...parsedC.images);
+        const { data: deleted, error } = await supabaseClient.rpc('recall_and_delete_moment', {
+            p_moment_id: momentId
+        });
+        if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
+        if (error || deleted !== true) {
+            console.error('撤回动态失败:', error);
+            alert('撤回失败。仅支持撤回 24 小时内由当前账号发布的动态。');
+        } else {
+            // 撤回成功后，物理清理所有关联的媒体文件
+            if (mediaToDelete.length > 0) {
+                removeUploadedMomentObjects(mediaToDelete);
+            }
+            if (typeof invalidateProfileMomentsCache === 'function') {
+                invalidateProfileMomentsCache();
+            }
+
+            const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
+            if (cards.length > 0) {
+                cards.forEach(card => {
+                    releaseMomentVideosWithin(card, true);
+                    card.style.transition = 'opacity 0.3s, transform 0.3s';
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateX(-16px)';
+                });
+                clearTimelineSnapshot();
+                setTimeout(() => {
+                    fetchMoments(false, { forceRefresh: true });
+                    const milestonesActive = typeof isAppRouteActive === 'function'
+                        ? isAppRouteActive('milestones')
+                        : document.getElementById('milestonesModal')?.classList.contains('is-active');
+                    if (milestonesActive && typeof renderMilestonesContent === 'function') {
+                        renderMilestonesContent();
                     }
-                } catch (_) {}
-            });
-        }
-    } catch (collectErr) {
-        console.warn('收集待撤回动态媒体失败:', collectErr);
-    }
-
-    const { data: deleted, error } = await supabaseClient.rpc('recall_and_delete_moment', {
-        p_moment_id: momentId
-    });
-    if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
-    if (error || deleted !== true) {
-        console.error('撤回动态失败:', error);
-        alert('撤回失败。仅支持撤回 24 小时内由当前账号发布的动态。');
-    } else {
-        // 撤回成功后，物理清理所有关联的媒体文件
-        if (mediaToDelete.length > 0) {
-            removeUploadedMomentObjects(mediaToDelete);
-        }
-
-        const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
-        if (cards.length > 0) {
-            cards.forEach(card => {
-                releaseMomentVideosWithin(card, true);
-                card.style.transition = 'opacity 0.3s, transform 0.3s';
-                card.style.opacity = '0';
-                card.style.transform = 'translateX(-16px)';
-            });
-            clearTimelineSnapshot();
-            setTimeout(() => {
+                }, 300);
+            } else {
+                clearTimelineSnapshot();
                 fetchMoments(false, { forceRefresh: true });
                 const milestonesActive = typeof isAppRouteActive === 'function'
                     ? isAppRouteActive('milestones')
@@ -2956,16 +3189,9 @@ async function deleteMoment(id) {
                 if (milestonesActive && typeof renderMilestonesContent === 'function') {
                     renderMilestonesContent();
                 }
-            }, 300);
-        } else {
-            clearTimelineSnapshot();
-            fetchMoments(false, { forceRefresh: true });
-            const milestonesActive = typeof isAppRouteActive === 'function'
-                ? isAppRouteActive('milestones')
-                : document.getElementById('milestonesModal')?.classList.contains('is-active');
-            if (milestonesActive && typeof renderMilestonesContent === 'function') {
-                renderMilestonesContent();
             }
         }
+    } finally {
+        deletingMomentIds.delete(momentId);
     }
 }

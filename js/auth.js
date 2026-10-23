@@ -444,9 +444,15 @@ function scrubPrivateDom() {
         button.setAttribute('aria-pressed', 'false');
     });
 
-    ['milestonesContent', 'blindBoxContent', 'aiContentArea', 'aiChatMessages', 'mood-day-list'].forEach(id => {
+    ['milestonesContent', 'blindBoxContent', 'aiContentArea', 'aiChatMessages', 'mood-day-list', 'home-topics-content', 'topics-catalog-list', 'topic-messages-flow'].forEach(id => {
         document.getElementById(id)?.replaceChildren();
     });
+    const topicSummaryBanner = document.getElementById('topic-summary-banner');
+    if (topicSummaryBanner) {
+        topicSummaryBanner.hidden = true;
+        topicSummaryBanner.replaceChildren();
+    }
+    if (typeof resetTopicsStateOnLogout === 'function') resetTopicsStateOnLogout();
 }
 
 async function resetAuthenticatedUI() {
@@ -468,6 +474,9 @@ async function resetAuthenticatedUI() {
 
     clearUserLocalState();
     if (typeof clearSignedMediaCache === 'function') clearSignedMediaCache();
+    if (typeof caches !== 'undefined' && caches?.delete) {
+        caches.delete('love-diary-media-v1').catch(() => {});
+    }
     if (typeof resetNotificationState === 'function') resetNotificationState();
     else if (typeof processedMissIds !== 'undefined') processedMissIds.clear();
     if (typeof resetMoodState === 'function') resetMoodState();
@@ -475,6 +484,7 @@ async function resetAuthenticatedUI() {
         ? cleanupPresence()
         : Promise.resolve();
     if (typeof resetMomentComposer === 'function') resetMomentComposer();
+    if (typeof resetTopicsStateOnLogout === 'function') resetTopicsStateOnLogout();
     if (typeof clearAllCommentImageSelections === 'function') clearAllCommentImageSelections();
     if (typeof commentLoadRequests !== 'undefined') commentLoadRequests.clear();
     if (typeof clearPendingAvatar === 'function') clearPendingAvatar();
@@ -577,6 +587,9 @@ const loginEmojis = ['💖', '💗', '💕', '✨', '🌸', '💝', '🌹', '�
 const loginEmojiSpriteMap = {};
 
 function getLoginEmojiSprite(emoji, size = 32) {
+    if (typeof getEmojiSprite === 'function') {
+        return getEmojiSprite(emoji, size);
+    }
     const key = `${emoji}_${size}`;
     if (loginEmojiSpriteMap[key]) return loginEmojiSpriteMap[key];
     const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);

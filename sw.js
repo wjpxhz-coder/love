@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'love-diary-';
-const CACHE_NAME = 'love-diary-v3.9.89';
+const CACHE_NAME = 'love-diary-v3.9.90';
 const MEDIA_CACHE_NAME = 'love-diary-media-v1';
 const MAX_MEDIA_CACHE_ENTRIES = 160;
 
@@ -83,7 +83,15 @@ async function networkFirstNavigation(request) {
 async function cacheFirstShell(request, canonicalUrl) {
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(canonicalUrl);
-    if (cached) return cached;
+    if (cached) {
+        // Stale-While-Revalidate：立即返回本地缓存保证首屏秒开，同时后台静默刷新最新外壳资源
+        fetch(request).then(freshResponse => {
+            if (freshResponse && freshResponse.ok && freshResponse.type === 'basic') {
+                cache.put(canonicalUrl, freshResponse.clone()).catch(() => {});
+            }
+        }).catch(() => {});
+        return cached;
+    }
 
     const response = await fetch(request);
     if (response.ok && response.type === 'basic') {
@@ -111,8 +119,7 @@ function isCacheableStorageImage(request, url) {
 function getCanonicalMediaKey(url) {
     // 规范化路径并剥离短期鉴权 token 参数，以持久化命中本地缓存
     const normalizedPath = url.pathname
-        .replace('/storage/v1/object/sign/', '/storage/v1/object/photos/')
-        .replace('/storage/v1/object/public/', '/storage/v1/object/photos/');
+        .replace(/^\/storage\/v1\/object\/(?:sign|public)\/photos\//, '/storage/v1/object/photos/');
     return `https://${url.hostname}${normalizedPath}`;
 }
 
@@ -161,14 +168,15 @@ async function cacheFirstStorageMedia(request) {
 
         // 仅在完整成功 (HTTP 200) 时写入缓存，杜绝 206 Partial Content 等非完整响应
         if (response && response.status === 200) {
-            // 写入本地媒体缓存，保证后续加载 0ms 命中
-            cache.put(canonicalKey, response.clone()).then(() => {
+            // 在 return response 之前同步克隆副本，避免异步回调中对已消费的原始响应调用 clone() 报错
+            const responseToCache = response.clone();
+            cache.put(canonicalKey, responseToCache.clone()).then(() => {
                 trimMediaCache(cache);
             }).catch(async (putErr) => {
                 if (putErr && putErr.name === 'QuotaExceededError') {
                     await emergencyEvictMediaCache(cache);
                     try {
-                        await cache.put(canonicalKey, response.clone());
+                        await cache.put(canonicalKey, responseToCache);
                     } catch (_) {}
                 } else {
                     console.warn('Cache media put failed:', putErr);

@@ -174,10 +174,6 @@
     box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
-            border-color: var(--primary-light);
-            box-shadow: 0 0 0 3px rgba(212, 160, 168, 0.12);
-        }
-
         .comment-submit-row {
             display: flex;
             justify-content: flex-end;

@@ -3,7 +3,7 @@
     display: flex;
     gap: 14px;
     justify-content: center;
-    margin-bottom: 40px;
+    margin-bottom: 24px;
     flex-wrap: wrap;
 }
 
@@ -670,6 +670,12 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
         [data-theme='dark'] video.moment-single-image {
             background-color: #100c0e;
         }
+        img.moment-single-image:not(.media-loaded) {
+            min-height: 180px;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+        }
         .moment-single-image.media-loaded {
             background: none;
             animation: none;
@@ -863,5 +869,193 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
         [data-theme='dark'] .new-moments-pill {
             border-color: rgba(255, 255, 255, 0.25);
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        /* ── [20] 那年今日 · 时光回响横幅 (On This Day Banner) ── */
+        .on-this-day-section {
+            margin: 0 0 24px;
+        }
+
+        .on-this-day-card,
+        .on-this-day-banner {
+            position: relative;
+            margin: 0;
+            padding: 18px 20px;
+            border-radius: 24px;
+            border: 1.5px solid rgba(245, 158, 11, 0.35);
+            background: linear-gradient(135deg, rgba(255, 251, 235, 0.95) 0%, rgba(255, 241, 242, 0.92) 55%, rgba(254, 243, 199, 0.88) 100%);
+            box-shadow: 0 8px 26px rgba(245, 158, 11, 0.14), inset 0 1.5px 1px rgba(255, 255, 255, 0.9);
+            color: var(--text);
+            overflow: hidden;
+            transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease;
+        }
+
+        [data-theme='dark'] .on-this-day-card,
+        [data-theme="dark"] .on-this-day-card,
+        [data-theme='dark'] .on-this-day-banner,
+        [data-theme="dark"] .on-this-day-banner {
+            border-color: rgba(251, 191, 36, 0.32);
+            background: linear-gradient(135deg, rgba(58, 38, 24, 0.88) 0%, rgba(52, 26, 46, 0.88) 60%, rgba(45, 28, 66, 0.92) 100%);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+            color: var(--text);
+        }
+
+        .on-this-day-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px 12px;
+            margin-bottom: 12px;
+        }
+
+        .on-this-day-badge,
+        .on-this-day-title {
+            font-size: 0.84rem;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: 999px;
+            background: rgba(245, 158, 11, 0.16);
+            color: #b45309;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            letter-spacing: 0.02em;
+        }
+
+        [data-theme='dark'] .on-this-day-badge,
+        [data-theme="dark"] .on-this-day-badge,
+        [data-theme='dark'] .on-this-day-title,
+        [data-theme="dark"] .on-this-day-title {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fde68a;
+            border-color: rgba(251, 191, 36, 0.35);
+        }
+
+        .on-this-day-subtitle {
+            font-size: 0.78rem;
+            color: var(--text-light);
+            font-weight: 600;
+        }
+
+        .on-this-day-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .on-this-day-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            text-align: left;
+            padding: 10px 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.76);
+            border: 1px solid rgba(245, 158, 11, 0.22);
+            box-shadow: 0 3px 10px rgba(245, 158, 11, 0.08);
+            cursor: pointer;
+            transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .on-this-day-item:hover {
+            transform: translateY(-1px);
+            background: rgba(255, 255, 255, 0.94);
+            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.15);
+        }
+
+        [data-theme='dark'] .on-this-day-item,
+        [data-theme="dark"] .on-this-day-item {
+            background: rgba(30, 18, 45, 0.68);
+            border-color: rgba(251, 191, 36, 0.22);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme='dark'] .on-this-day-item:hover,
+        [data-theme="dark"] .on-this-day-item:hover {
+            background: rgba(42, 25, 62, 0.85);
+        }
+
+        .on-this-day-thumb {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            object-fit: cover;
+            flex-shrink: 0;
+            border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+
+        .on-this-day-item-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .on-this-day-item-meta {
+            font-size: 0.74rem;
+            color: var(--text-light);
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .on-this-day-item-text,
+        .on-this-day-text,
+        .on-this-day-preview {
+            font-size: 0.88rem;
+            line-height: 1.5;
+            color: var(--text);
+            font-weight: 600;
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .on-this-day-item-arrow,
+        .on-this-day-action,
+        .on-this-day-btn {
+            flex-shrink: 0;
+            padding: 5px 12px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #ffffff;
+            border: none;
+            box-shadow: 0 3px 10px rgba(245, 158, 11, 0.26);
+        }
+
+
+        /* ── [23] 盲盒「📸 生成拍立得纪念卡」轻奢按钮 (.btn-polaroid-share) ── */
+        .btn-polaroid-share {
+            background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 50%, #fef3c7 100%);
+            color: var(--primary);
+            border: 1.5px solid rgba(244, 63, 94, 0.32);
+            box-shadow: 0 6px 18px rgba(244, 63, 94, 0.14), inset 0 1px 1px #ffffff;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .btn-polaroid-share:hover {
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+            color: #ffffff;
+            border-color: transparent;
+            box-shadow: 0 10px 24px var(--primary-glow);
+            transform: translateY(-2px) scale(1.03);
+        }
+
+        [data-theme='dark'] .btn-polaroid-share,
+        [data-theme="dark"] .btn-polaroid-share {
+            background: linear-gradient(135deg, rgba(76, 29, 48, 0.78) 0%, rgba(62, 34, 58, 0.85) 100%);
+            color: #fda4af;
+            border-color: rgba(251, 113, 133, 0.4);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+        }
+
+        [data-theme='dark'] .btn-polaroid-share:hover,
+        [data-theme="dark"] .btn-polaroid-share:hover {
+            background: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+            color: #ffffff;
+            border-color: transparent;
+            box-shadow: 0 10px 26px rgba(251, 113, 133, 0.38);
         }
 

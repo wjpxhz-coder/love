@@ -481,14 +481,13 @@ async function callAgnes(
     }
 
     if (!providerResponse.ok) {
-      let errBody = "";
       try {
-        errBody = await providerResponse.text();
+        await providerResponse.body?.cancel();
       } catch {
         // ignore
       }
       console.error(
-        `[PROVIDER_ERROR] status=${providerResponse.status} body=${errBody}`,
+        `[PROVIDER_ERROR] status=${providerResponse.status}`,
       );
       safeLog(
         requestId,
@@ -504,7 +503,6 @@ async function callAgnes(
         origin,
         {
           provider_status: providerResponse.status,
-          provider_error: errBody.slice(0, 500),
         },
       );
     }
@@ -620,8 +618,9 @@ async function handleListModels(
       return jsonResponse(502, "PROVIDER_UNAVAILABLE", requestId, origin);
     }
 
-    const data = await providerResponse.json();
-    const modelList = Array.isArray(data?.data)
+    const rawText = await readProviderResponse(providerResponse);
+    const data: unknown = JSON.parse(rawText);
+    const modelList = isRecord(data) && Array.isArray(data.data)
       ? data.data
           .map((item: unknown) => isRecord(item) && typeof item.id === "string" ? item.id : "")
           .filter(Boolean)

@@ -81,12 +81,8 @@ function initAccessibleUiState() {
 
     const syncSelectedState = selector => {
         document.querySelectorAll(selector).forEach(element => {
-            const syncState = () => {
-                const isSelected = element.classList.contains('active') || element.classList.contains('selected');
-                element.setAttribute(element.getAttribute('role') === 'tab' ? 'aria-selected' : 'aria-pressed', String(isSelected));
-            };
-            syncState();
-            new MutationObserver(syncState).observe(element, { attributes: true, attributeFilter: ['class'] });
+            const isSelected = element.classList.contains('active') || element.classList.contains('selected');
+            element.setAttribute(element.getAttribute('role') === 'tab' ? 'aria-selected' : 'aria-pressed', String(isSelected));
         });
     };
 
@@ -114,6 +110,7 @@ function initAccessibleUiState() {
 function onAppRouteEnter(route) {
     if (!route) return;
     window.homeSakuraEffect?.setRouteActive(route.id === 'home');
+    if (typeof updatePresenceRouteActivity === 'function') updatePresenceRouteActivity(route.id);
     if (route.id === 'login' && typeof enterLoginPage === 'function') enterLoginPage(route);
     else if (route.id === 'moment' && typeof enterMomentPage === 'function') enterMomentPage(route);
     else if (route.id === 'mood' && typeof enterMoodPage === 'function') enterMoodPage(route);

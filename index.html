@@ -47,25 +47,25 @@
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
-    <link rel="stylesheet" href="css/variables.css?v=3.9.77">
-    <link rel="stylesheet" href="css/refresh.css?v=3.9.80">
-    <link rel="stylesheet" href="css/base.css?v=3.9.77">
-    <link rel="stylesheet" href="css/header.css?v=3.9.77">
-    <link rel="stylesheet" href="css/timer.css?v=3.9.77">
-    <link rel="stylesheet" href="css/timeline.css?v=3.9.77">
-    <link rel="stylesheet" href="css/dialogs.css?v=3.9.80">
-    <link rel="stylesheet" href="css/comments.css?v=3.9.77">
-    <link rel="stylesheet" href="css/ai-panel.css?v=3.9.77">
-    <link rel="stylesheet" href="css/fab.css?v=3.9.77">
-    <link rel="stylesheet" href="css/auth.css?v=3.9.77">
-    <link rel="stylesheet" href="css/profile.css?v=3.9.77">
-    <link rel="stylesheet" href="css/notifications.css?v=3.9.77">
-    <link rel="stylesheet" href="css/mood.css?v=3.9.77">
-    <link rel="stylesheet" href="css/anniversary.css?v=3.9.77">
-    <link rel="stylesheet" href="css/effects.css?v=3.9.87">
-    <link rel="stylesheet" href="css/responsive.css?v=3.9.87">
-    <link rel="stylesheet" href="css/pages.css?v=3.9.87">
-    <link rel="stylesheet" href="css/topics.css?v=3.9.89">
+    <link rel="stylesheet" href="css/variables.css?v=3.9.90">
+    <link rel="stylesheet" href="css/refresh.css?v=3.9.90">
+    <link rel="stylesheet" href="css/base.css?v=3.9.90">
+    <link rel="stylesheet" href="css/header.css?v=3.9.90">
+    <link rel="stylesheet" href="css/timer.css?v=3.9.90">
+    <link rel="stylesheet" href="css/timeline.css?v=3.9.90">
+    <link rel="stylesheet" href="css/dialogs.css?v=3.9.90">
+    <link rel="stylesheet" href="css/comments.css?v=3.9.90">
+    <link rel="stylesheet" href="css/ai-panel.css?v=3.9.90">
+    <link rel="stylesheet" href="css/fab.css?v=3.9.90">
+    <link rel="stylesheet" href="css/auth.css?v=3.9.90">
+    <link rel="stylesheet" href="css/profile.css?v=3.9.90">
+    <link rel="stylesheet" href="css/notifications.css?v=3.9.90">
+    <link rel="stylesheet" href="css/mood.css?v=3.9.90">
+    <link rel="stylesheet" href="css/anniversary.css?v=3.9.90">
+    <link rel="stylesheet" href="css/effects.css?v=3.9.90">
+    <link rel="stylesheet" href="css/responsive.css?v=3.9.90">
+    <link rel="stylesheet" href="css/pages.css?v=3.9.90">
+    <link rel="stylesheet" href="css/topics.css?v=3.9.90">
 </head>
 <body class="auth-pending">
 <!-- 内联矢量微光 SVG 图标库 -->
@@ -199,6 +199,8 @@
         <div class="anniv-grid" id="anniv-grid"></div>
     </section>
 
+    <section id="on-this-day-section" class="on-this-day-section" aria-label="那年今日回忆" hidden></section>
+
     <section class="home-auth-skeleton" id="home-auth-skeleton" aria-label="正在恢复情侣空间">
         <div class="skeleton-line skeleton-line--title"></div>
         <div class="skeleton-line"></div>
@@ -308,7 +310,7 @@
             <div class="app-page-content app-page-content--medium">
     <div class="modal-box app-page-card moment-page-card">
         <label class="visually-hidden" for="momentTextInput">动态内容</label>
-        <textarea class="modal-input moment-text-input" id="momentTextInput" placeholder="这一刻的想法..." rows="4"></textarea>
+        <textarea class="modal-input moment-text-input" id="momentTextInput" maxlength="5000" placeholder="这一刻的想法..." rows="4"></textarea>
         
         <div id="momentImagePreviewContainer" class="moment-image-preview-container">
             <button class="moment-image-add-btn" type="button" onclick="document.getElementById('momentPhotoInput').click()" aria-label="添加照片或视频">
@@ -531,6 +533,7 @@
         </div>
         <div class="modal-btns">
             <button onclick="triggerBlindBox(false)">再摇一次</button>
+            <button type="button" class="btn-polaroid-share" id="btn-blindbox-polaroid" onclick="exportBlindBoxPolaroid()">📸 生成拍立得纪念卡</button>
         </div>
     </div>
             </div>
@@ -883,7 +886,7 @@
     <div class="modal-box version-modal-box">
         <div class="version-decor-heart">💝</div>
         <h2 class="modal-title" id="versionTitle">恋爱手账会话体验与消息发送修复 💌✨</h2>
-        <div class="version-tag" id="versionNumber">v3.9.86</div>
+        <div class="version-tag" id="versionNumber">v3.9.90</div>
         <div class="version-body">
             <div class="version-date" id="versionDate">更新时间：2026-10-16</div>
 
@@ -974,7 +977,7 @@
         </div>
         
         <div class="settings-footer">
-            <span id="settingsVersion">当前版本：v3.9.86</span>
+            <span id="settingsVersion">当前版本：v3.9.90</span>
         </div>
 
         
@@ -1073,7 +1076,7 @@
             <!-- 录音预览条 -->
             <div id="topicAudioPreviewWrap" style="margin-bottom:8px; display:flex; align-items:center; gap:8px;" hidden>
                 <audio id="topicAudioPlayer" controls style="height:36px; flex:1;"></audio>
-                <button type="button" style="background:rgba(0,0,0,0.06); border:none; border-radius:50%; width:28px; height:28px; cursor:pointer;" onclick="deleteTopicAudioPreview()">×</button>
+                <button type="button" class="topic-audio-remove-btn" style="background:rgba(0,0,0,0.06); border:none; border-radius:50%; width:28px; height:28px; cursor:pointer;" onclick="deleteTopicAudioPreview()">×</button>
             </div>
             <!-- 图片预览横滑容器 -->
             <div class="topic-composer-photo-previews" id="topicComposerPhotoPreviews" style="margin-bottom:8px; overflow-x:auto; white-space:nowrap;" hidden></div>
@@ -1092,7 +1095,7 @@
             </div>
             <!-- 文本输入与发送 -->
             <div class="topic-composer-input-row">
-                <textarea class="topic-text-input" id="topicComposerTextInput" placeholder="写下想和 TA 说的心里话…" rows="1" onkeydown="handleTopicTextKeyDown(event)"></textarea>
+                <textarea class="topic-text-input" id="topicComposerTextInput" maxlength="3000" placeholder="写下想和 TA 说的心里话…" rows="1" onkeydown="handleTopicTextKeyDown(event)"></textarea>
                 <button class="topic-send-btn" id="btn-topic-send" type="button" onclick="sendTopicMessage()" aria-label="发送消息">💌</button>
             </div>
         </footer>
@@ -1106,7 +1109,7 @@
         <div style="font-size:0.86rem; color:var(--text-muted); margin-bottom:12px;">为我们这次交流起一个名字吧，像目录一样整齐记录～</div>
         <input type="text" id="newTopicTitleInput" class="modal-input" placeholder="例如：周末的小矛盾 / 期末备考计划 / 去青岛旅行" maxlength="80">
         
-        <div style="font-size:0.88rem; font-weight:700; margin-top:14px; color:var(--text-color);">🏷️ 选择手账分类</div>
+        <div style="font-size:0.88rem; font-weight:700; margin-top:14px; color:var(--text);">🏷️ 选择手账分类</div>
         <div class="category-radio-group">
             <div class="category-radio-btn selected" data-category="reconciliation" onclick="selectTopicCategory('reconciliation')">矛盾和解 🌿</div>
             <div class="category-radio-btn" data-category="study" onclick="selectTopicCategory('study')">学习备考 📚</div>
@@ -1130,10 +1133,10 @@
         <h2 class="modal-title" id="editTopicTitle">✏️ 编辑手账话题</h2>
         <div style="font-size:0.86rem; color:var(--text-muted); margin-bottom:12px;">修改话题题目、分类或当前交流状态～</div>
         
-        <label class="modal-field-label" for="editTopicTitleInput" style="font-size:0.88rem; font-weight:700; margin-bottom:6px; display:block; color:var(--text-color); text-align:left;">手账题目</label>
+        <label class="modal-field-label" for="editTopicTitleInput" style="font-size:0.88rem; font-weight:700; margin-bottom:6px; display:block; color:var(--text); text-align:left;">手账题目</label>
         <input type="text" id="editTopicTitleInput" class="modal-input" placeholder="输入手账题目" maxlength="80" style="margin-top:0;">
         
-        <div style="font-size:0.88rem; font-weight:700; margin-top:14px; margin-bottom:6px; color:var(--text-color); text-align:left;">🏷️ 手账分类</div>
+        <div style="font-size:0.88rem; font-weight:700; margin-top:14px; margin-bottom:6px; color:var(--text); text-align:left;">🏷️ 手账分类</div>
         <div class="category-radio-group" id="editCategoryRadioGroup">
             <div class="category-radio-btn" data-category="reconciliation" onclick="selectEditTopicCategory('reconciliation')">矛盾和解 🌿</div>
             <div class="category-radio-btn" data-category="study" onclick="selectEditTopicCategory('study')">学习备考 📚</div>
@@ -1143,14 +1146,14 @@
             <div class="category-radio-btn" data-category="general" onclick="selectEditTopicCategory('general')">专属话题 ✨</div>
         </div>
 
-        <div style="font-size:0.88rem; font-weight:700; margin-top:14px; margin-bottom:6px; color:var(--text-color); text-align:left;">📌 交流状态</div>
+        <div style="font-size:0.88rem; font-weight:700; margin-top:14px; margin-bottom:6px; color:var(--text); text-align:left;">📌 交流状态</div>
         <div class="category-radio-group" id="editStatusRadioGroup">
             <div class="category-radio-btn" data-status="open" onclick="selectEditTopicStatus('open')">💬 正在交流</div>
             <div class="category-radio-btn" data-status="resolved" onclick="selectEditTopicStatus('resolved')">✨ 达成共识</div>
         </div>
 
         <div id="editTopicSummaryField" style="margin-top:12px;" hidden>
-            <label class="modal-field-label" for="editTopicSummaryInput" style="font-size:0.88rem; font-weight:700; margin-bottom:6px; display:block; color:var(--text-color); text-align:left;">🤝 达成的约定与共识方案</label>
+            <label class="modal-field-label" for="editTopicSummaryInput" style="font-size:0.88rem; font-weight:700; margin-bottom:6px; display:block; color:var(--text); text-align:left;">🤝 达成的约定与共识方案</label>
             <textarea id="editTopicSummaryInput" class="modal-input" placeholder="写下我们达成的解决方案或约定…" rows="3" maxlength="1500" style="margin-top:0;"></textarea>
         </div>
 
@@ -1184,7 +1187,7 @@
 <dialog class="native-dialog topic-modal-dialog" id="aiTopicAdviceModal" aria-labelledby="aiTopicAdviceTitle">
     <div class="topic-modal-box" onclick="event.stopPropagation()">
         <h2 class="modal-title" id="aiTopicAdviceTitle">🤖 感情助手 Agnes 的温柔建议</h2>
-        <div id="aiTopicAdviceContent" style="margin: 14px 0; max-height: 55vh; overflow-y: auto; font-size: 0.92rem; color: var(--text-color);"></div>
+        <div id="aiTopicAdviceContent" style="margin: 14px 0; max-height: 55vh; overflow-y: auto; font-size: 0.92rem; color: var(--text);"></div>
         <div class="modal-btns">
             <button class="btn-cancel" type="button" onclick="closeAITopicAdviceModal()">关闭</button>
             <button id="btn-ai-apply-summary" type="button" hidden>✨ 一键采用为共识草稿</button>
@@ -1192,31 +1195,31 @@
     </div>
 </dialog>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"
         integrity="sha384-nWa0WrJ8Dl90YqhjSU0vNB8IxSO54t6AmEmV83LMTb/Img+Af2MfK7XJE54mwpSR"
         crossorigin="anonymous"></script>
-<script src="js/config.js?v=3.9.87"></script>
-<script src="js/animations.js?v=3.9.87"></script>
-<script src="js/timer.js?v=3.9.87"></script>
-<script src="js/auth.js?v=3.9.87"></script>
-<script src="js/profile.js?v=3.9.87"></script>
-<script src="js/moments.js?v=3.9.87"></script>
-<script src="js/milestones.js?v=3.9.87"></script>
-<script src="js/comments.js?v=3.9.87"></script>
-<script src="js/likes.js?v=3.9.87"></script>
-<script src="js/mood.js?v=3.9.87"></script>
-<script src="js/anniversary.js?v=3.9.87"></script>
-<script src="js/lightbox.js?v=3.9.87"></script>
-<script src="js/ai.js?v=3.9.87"></script>
-<script src="js/blindbox.js?v=3.9.87"></script>
-<script src="js/presence.js?v=3.9.87"></script>
-<script src="js/theme.js?v=3.9.87"></script>
-<script src="js/notifications.js?v=3.9.87"></script>
-<script src="js/topics.js?v=3.9.89"></script>
-<script src="js/effects.js?v=3.9.87"></script>
-<script src="js/settings.js?v=3.9.87"></script>
-<script src="js/router.js?v=3.9.87"></script>
-<script src="js/app.js?v=3.9.87"></script>
+<script defer src="js/config.js?v=3.9.90"></script>
+<script defer src="js/animations.js?v=3.9.90"></script>
+<script defer src="js/timer.js?v=3.9.90"></script>
+<script defer src="js/auth.js?v=3.9.90"></script>
+<script defer src="js/profile.js?v=3.9.90"></script>
+<script defer src="js/moments.js?v=3.9.90"></script>
+<script defer src="js/milestones.js?v=3.9.90"></script>
+<script defer src="js/comments.js?v=3.9.90"></script>
+<script defer src="js/likes.js?v=3.9.90"></script>
+<script defer src="js/mood.js?v=3.9.90"></script>
+<script defer src="js/anniversary.js?v=3.9.90"></script>
+<script defer src="js/lightbox.js?v=3.9.90"></script>
+<script defer src="js/ai.js?v=3.9.90"></script>
+<script defer src="js/blindbox.js?v=3.9.90"></script>
+<script defer src="js/presence.js?v=3.9.90"></script>
+<script defer src="js/theme.js?v=3.9.90"></script>
+<script defer src="js/notifications.js?v=3.9.90"></script>
+<script defer src="js/topics.js?v=3.9.90"></script>
+<script defer src="js/effects.js?v=3.9.90"></script>
+<script defer src="js/settings.js?v=3.9.90"></script>
+<script defer src="js/router.js?v=3.9.90"></script>
+<script defer src="js/app.js?v=3.9.90"></script>
 
 </body>
 </html>

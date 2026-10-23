@@ -7,6 +7,40 @@ let pendingAvatarPreviewUrl = '';
 let isProfileSaving = false;
 let profileStatsRequestGeneration = 0;
 let currentViewingProfileAuthor = '';
+const PROFILE_MOMENTS_CACHE_TTL_MS = 30 * 1000;
+let profileMomentsMemoryCache = {
+    author: '',
+    epoch: -1,
+    timestamp: 0,
+    items: null
+};
+
+function getCachedProfileMoments(targetAuthor, epoch) {
+    if (!targetAuthor || !Array.isArray(profileMomentsMemoryCache.items)) return null;
+    if (profileMomentsMemoryCache.author !== targetAuthor || profileMomentsMemoryCache.epoch !== epoch) return null;
+    if (Date.now() - profileMomentsMemoryCache.timestamp > PROFILE_MOMENTS_CACHE_TTL_MS) return null;
+    return profileMomentsMemoryCache.items;
+}
+
+function setCachedProfileMoments(targetAuthor, epoch, items) {
+    if (!targetAuthor || !Array.isArray(items)) return;
+    profileMomentsMemoryCache = {
+        author: targetAuthor,
+        epoch,
+        timestamp: Date.now(),
+        items
+    };
+}
+
+function invalidateProfileMomentsCache() {
+    profileMomentsMemoryCache = {
+        author: '',
+        epoch: -1,
+        timestamp: 0,
+        items: null
+    };
+}
+window.invalidateProfileMomentsCache = invalidateProfileMomentsCache;
 
 function getProfileAvatarUrl(profile) {
     if (!profile) return '';
@@ -437,37 +471,39 @@ async function loadProfileStats(targetAuthor) {
     if (postsElement) postsElement.textContent = '…';
     if (photosElement) photosElement.textContent = '…';
 
-    const [countResult, mediaResult] = await Promise.all([
-        supabaseClient
+    let rows = getCachedProfileMoments(targetAuthor, epoch);
+    if (!rows) {
+        const { data, error } = await supabaseClient
             .from('moments')
-            .select('id', { count: 'exact', head: true })
-            .eq('author', targetAuthor),
-        supabaseClient
-            .from('moments')
-            .select('type, content')
+            .select('*')
             .eq('author', targetAuthor)
-            .in('type', ['photo', 'moment'])
-    ]);
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(300);
 
-    if (!isCurrentProfileStatsRequest(
-        requestGeneration,
-        targetAuthor,
-        epoch,
-        userId
-    )) return;
-    if (countResult.error || mediaResult.error) {
-        console.error('加载资料统计失败:', countResult.error || mediaResult.error);
-        if (postsElement) postsElement.textContent = '—';
-        if (photosElement) photosElement.textContent = '—';
-        return;
+        if (!isCurrentProfileStatsRequest(
+            requestGeneration,
+            targetAuthor,
+            epoch,
+            userId
+        )) return;
+        if (error) {
+            console.error('加载资料统计失败:', error);
+            if (postsElement) postsElement.textContent = '—';
+            if (photosElement) photosElement.textContent = '—';
+            return;
+        }
+        rows = data || [];
+        setCachedProfileMoments(targetAuthor, epoch, rows);
     }
 
     let photoCount = 0;
-    (mediaResult.data || []).forEach(item => {
+    rows.forEach(item => {
         if (item.type === 'photo') {
             photoCount += 1;
             return;
         }
+        if (item.type !== 'moment') return;
         try {
             const content = JSON.parse(item.content);
             if (Array.isArray(content.images)) photoCount += content.images.length;
@@ -476,7 +512,7 @@ async function loadProfileStats(targetAuthor) {
         }
     });
 
-    const finalPosts = String(countResult.count || 0);
+    const finalPosts = String(rows.length);
     const finalPhotos = String(photoCount);
     if (postsElement) postsElement.textContent = finalPosts;
     if (photosElement) photosElement.textContent = finalPhotos;
@@ -871,16 +907,24 @@ async function loadProfileMoments(targetAuthor) {
     contentContainer.replaceChildren(createMomentNode('div', 'empty-state', '正在加载甜蜜动态… ✨'));
 
     try {
-        const { data, error } = await supabaseClient
-            .from('moments')
-            .select('*')
-            .eq('author', targetAuthor)
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false })
-            .limit(200);
+        let data = getCachedProfileMoments(targetAuthor, epoch);
+        if (data) {
+            data = data.slice(0, 200);
+        } else {
+            const res = await supabaseClient
+                .from('moments')
+                .select('*')
+                .eq('author', targetAuthor)
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false })
+                .limit(300);
 
-        if (requestGeneration !== profileMomentsRequestGeneration || !isCurrentAuthSnapshot(epoch, userId)) return;
-        if (error) throw error;
+            if (requestGeneration !== profileMomentsRequestGeneration || !isCurrentAuthSnapshot(epoch, userId)) return;
+            if (res.error) throw res.error;
+            const rows = res.data || [];
+            setCachedProfileMoments(targetAuthor, epoch, rows);
+            data = rows.slice(0, 200);
+        }
 
         const count = String(data ? data.length : 0);
         document.querySelectorAll('.profile-subpage-moments-count').forEach(el => el.textContent = count);
@@ -990,17 +1034,23 @@ async function loadProfilePhotos(targetAuthor) {
     gridContainer.replaceChildren(createMomentNode('div', 'empty-state', '正在加载甜蜜照片… 📷'));
 
     try {
-        const { data, error } = await supabaseClient
-            .from('moments')
-            .select('*')
-            .eq('author', targetAuthor)
-            .in('type', ['photo', 'moment'])
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false })
-            .limit(300);
+        let data = getCachedProfileMoments(targetAuthor, epoch);
+        if (data) {
+            data = data.filter(item => item.type === 'photo' || item.type === 'moment').slice(0, 300);
+        } else {
+            const res = await supabaseClient
+                .from('moments')
+                .select('*')
+                .eq('author', targetAuthor)
+                .in('type', ['photo', 'moment'])
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false })
+                .limit(300);
 
-        if (requestGeneration !== profilePhotosRequestGeneration || !isCurrentAuthSnapshot(epoch, userId)) return;
-        if (error) throw error;
+            if (requestGeneration !== profilePhotosRequestGeneration || !isCurrentAuthSnapshot(epoch, userId)) return;
+            if (res.error) throw res.error;
+            data = res.data || [];
+        }
 
         const hydratedItems = typeof batchHydrateMomentMediaRecords === 'function'
             ? await batchHydrateMomentMediaRecords(data)

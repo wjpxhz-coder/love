@@ -660,7 +660,7 @@ function bindAIChatModalLifecycle() {
 }
 
 function handleChatKeyDown(event) {
-    if (event.isComposing) return;
+    if (event.isComposing || event.keyCode === 229) return;
     if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         sendChatMessage();
@@ -857,11 +857,11 @@ async function inlineCompressAIImage(file, maxWidth = 1280, maxHeight = 1280, qu
     }
 }
 
-async function compressAIImageFile(file) {
+async function compressAIImageFile(file, maxEdge = AI_IMAGE_MAX_DIMENSION, quality = AI_IMAGE_QUALITY) {
     if (!file || !file.type?.startsWith('image/')) return file;
     if (typeof compressImageFile === 'function') {
         try {
-            const compressed = await compressImageFile(file, AI_IMAGE_MAX_DIMENSION, AI_IMAGE_MAX_DIMENSION, AI_IMAGE_QUALITY);
+            const compressed = await compressImageFile(file, maxEdge, maxEdge, quality);
             if (compressed && AI_IMAGE_EXTENSIONS.has(compressed.type)) {
                 return compressed;
             }
@@ -869,7 +869,7 @@ async function compressAIImageFile(file) {
             console.warn('[AI助手] compressImageFile 处理异常，执行内置压缩兜底:', err);
         }
     }
-    return await inlineCompressAIImage(file, AI_IMAGE_MAX_DIMENSION, AI_IMAGE_MAX_DIMENSION, AI_IMAGE_QUALITY);
+    return await inlineCompressAIImage(file, maxEdge, maxEdge, quality);
 }
 
 function openAILocalImagePicker() {
@@ -1517,6 +1517,7 @@ function clearPrivateFeatureState() {
     const aiContent = document.getElementById('aiContentArea');
     if (aiContent) aiContent.replaceChildren();
     if (typeof cleanupBlindBox === 'function') cleanupBlindBox();
+    if (typeof clearOnThisDaySection === 'function') clearOnThisDaySection();
     window.currentBlindBoxMoment = null;
 }
 

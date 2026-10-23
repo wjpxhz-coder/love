@@ -58,6 +58,15 @@
     --jelly-radius-sm: 16px;
     --jelly-radius-md: 22px;
     --jelly-radius-lg: 28px;
+
+    /* 语义映射令牌（兼容 topics 等扩展模块） */
+    --text-color: var(--text-main);
+    --card-bg: var(--surface-elevated);
+    --surface-bg: var(--surface);
+    --surface-bg-translucent: var(--glass-surface);
+    --border-color-light: var(--border);
+    --theme-pink: var(--primary);
+    --theme-pink-light: var(--primary-subtle);
 }
 
 :root[data-theme="dark"] {
@@ -82,7 +91,7 @@
     --surface-elevated: #2d1c42;
     --surface-subtle: rgba(45, 28, 66, 0.82);
     --field-bg: #1a0f26;
-    --on-primary: #200a16;
+    --on-primary: #ffffff;
     --focus-ring: #ffb3c6;
     --card: rgba(37, 22, 53, 0.75);
     --border: rgba(251, 113, 133, 0.25);
@@ -112,4 +121,13 @@
     --jelly-radius-sm: 16px;
     --jelly-radius-md: 22px;
     --jelly-radius-lg: 28px;
+
+    /* 语义映射令牌（兼容 topics 等扩展模块） */
+    --text-color: var(--text-main);
+    --card-bg: var(--surface-elevated);
+    --surface-bg: var(--surface);
+    --surface-bg-translucent: var(--glass-surface);
+    --border-color-light: var(--border);
+    --theme-pink: var(--primary);
+    --theme-pink-light: var(--primary-subtle);
 }
