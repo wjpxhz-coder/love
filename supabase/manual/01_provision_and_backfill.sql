@@ -10,8 +10,8 @@ begin;
 
 do $provision$
 declare
-  snake_user_id uuid := '4580efe4-cffa-49a4-a9ba-2b70db239e5e';
-  xi_user_id uuid := '323ed5d3-cef6-4743-acc8-fa7f6f2bfa4e';
+  snake_user_id uuid := '00000000-0000-0000-0000-000000000001';
+  xi_user_id uuid := '00000000-0000-0000-0000-000000000002';
   shared_space_id uuid := gen_random_uuid();
   result jsonb;
 begin

@@ -299,62 +299,10 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
 
 /* ── 首页骨架 ─────────────────────────────────────────────────────── */
 
-.container,
-.home-shell {
+.container {
     width: 100%;
     max-width: 1120px;
     margin: 0 auto;
-}
-
-.home-shell {
-    display: flex;
-    flex-direction: column;
-    gap: 26px;
-}
-
-.home-hero {
-    position: relative;
-    display: grid;
-    grid-template-columns: minmax(330px, 0.92fr) minmax(500px, 1.3fr);
-    gap: clamp(28px, 5vw, 72px);
-    align-items: center;
-    min-height: 360px;
-    padding: clamp(34px, 5vw, 64px);
-    overflow: hidden;
-    border: 2px solid rgba(255, 255, 255, 0.95);
-    border-radius: 34px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 242, 248, 0.93) 100%);
-    box-shadow: 0 18px 52px rgba(255, 105, 140, 0.18), inset 0 2px 4px #ffffff;
-}
-
-[data-theme='dark'] .home-hero {
-    border-color: rgba(255, 143, 171, 0.35);
-    background: linear-gradient(135deg, rgba(42, 26, 60, 0.95) 0%, rgba(32, 18, 48, 0.95) 100%);
-    box-shadow: 0 18px 52px rgba(0, 0, 0, 0.45), inset 0 1.5px 1px rgba(255, 255, 255, 0.12);
-}
-
-.home-hero::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 8px;
-    border-top-left-radius: 34px;
-    border-bottom-left-radius: 34px;
-    background: linear-gradient(180deg, var(--primary), var(--primary-light), var(--gold));
-}
-
-.home-hero::after {
-    content: '🌸';
-    position: absolute;
-    right: -15px;
-    bottom: -35px;
-    font-size: 14rem;
-    line-height: 1;
-    opacity: 0.12;
-    pointer-events: none;
-    filter: drop-shadow(0 4px 20px rgba(255, 105, 140, 0.5));
 }
 
 .site-header {
@@ -429,14 +377,6 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
     display: inline-block;
     filter: drop-shadow(0 2px 8px var(--primary-glow));
     animation: gentleRotate 6s ease-in-out infinite;
-}
-
-.home-hero-dashboard {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    gap: 22px;
-    min-width: 0;
 }
 
 .timer-section,
@@ -565,17 +505,13 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
     filter: drop-shadow(0 2px 4px rgba(255, 77, 121, 0.18));
 }
 
-.home-auth-skeleton,
-.home-auth-gate {
+.home-auth-skeleton {
     min-height: 176px;
     padding: clamp(24px, 4vw, 38px);
     border: 2px solid rgba(255, 255, 255, 0.9);
     border-radius: 28px;
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 242, 248, 0.92));
     box-shadow: var(--soft-shadow);
-}
-
-.home-auth-skeleton {
     display: grid;
     grid-template-columns: minmax(180px, 0.6fr) 1fr;
     gap: 16px 34px;
@@ -629,85 +565,6 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
 @keyframes skeleton-sweep {
     from { transform: translateX(-120%); }
     to { transform: translateX(360%); }
-}
-
-.home-auth-gate {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 30px;
-    border-left: 6px solid var(--primary);
-}
-
-.home-auth-copy {
-    max-width: 680px;
-}
-
-.home-auth-copy h2 {
-    margin: 0 0 8px;
-    font-size: clamp(1.45rem, 3vw, 2rem);
-    line-height: 1.25;
-}
-
-.home-auth-copy p {
-    color: var(--text-muted);
-    line-height: 1.75;
-}
-
-.home-auth-button {
-    flex: 0 0 auto;
-    min-height: 48px;
-    padding: 13px 24px;
-    border-radius: 13px;
-}
-
-.home-quick-actions {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 12px;
-    margin: 0;
-    padding: 12px;
-    border: 1.5px solid var(--border);
-    border-radius: 28px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 240, 246, 0.92) 100%);
-    box-shadow: 0 12px 36px rgba(255, 105, 140, 0.16), inset 0 2px 2px #fff;
-}
-
-.home-quick-actions button {
-    justify-content: center;
-    min-width: 0;
-    min-height: 48px;
-    padding: 11px 12px;
-    border: 1.5px solid rgba(255, 185, 205, 0.4);
-    border-radius: 20px;
-    color: var(--text);
-    background: rgba(255, 255, 255, 0.85);
-    box-shadow: 0 4px 12px rgba(255, 105, 140, 0.08);
-    white-space: nowrap;
-    font-weight: 700;
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.home-quick-actions button:first-child {
-    color: var(--on-primary);
-    background: linear-gradient(135deg, var(--primary-light), var(--primary));
-    border-color: transparent;
-    box-shadow: 0 6px 18px var(--primary-glow);
-}
-
-.home-quick-actions button:hover {
-    transform: translateY(-3px) scale(1.05);
-    border-color: var(--primary-light);
-    color: var(--primary);
-    background: #ffffff;
-    box-shadow: 0 8px 24px rgba(255, 77, 121, 0.22);
-}
-
-.home-private-dashboard {
-    display: grid;
-    grid-template-columns: minmax(330px, 0.72fr) minmax(0, 1.55fr);
-    gap: 24px;
-    align-items: start;
 }
 
 .mood-section,
@@ -933,12 +790,6 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
     text-align: center;
     font-size: 1rem;
     font-weight: 500;
-}
-
-/* ── 移动端主导航 ─────────────────────────────────────────────────── */
-
-.mobile-app-nav {
-    display: none;
 }
 
 /* ── 路由页面：去除旧弹窗套壳，保留清晰内容边界 ───────────────────── */
@@ -1201,6 +1052,16 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
     border-color: var(--primary);
 }
 
+[data-theme='dark'] .moment-image-add-btn {
+    background: rgba(45, 28, 66, 0.65);
+    border-color: rgba(251, 113, 133, 0.38);
+}
+
+[data-theme='dark'] .moment-image-add-btn:hover {
+    background: rgba(76, 29, 48, 0.78);
+    border-color: var(--primary);
+}
+
 .moment-image-add-icon {
     color: var(--primary);
     font-size: 2rem;
@@ -1230,6 +1091,18 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
 .moment-audio-button:hover {
     background: rgba(255, 225, 238, 0.9);
     border-color: var(--primary);
+}
+
+[data-theme='dark'] .moment-audio-button {
+    background: rgba(45, 28, 66, 0.72);
+    border-color: rgba(251, 113, 133, 0.38);
+    color: var(--primary-light);
+}
+
+[data-theme='dark'] .moment-audio-button:hover {
+    background: rgba(76, 29, 48, 0.85);
+    border-color: var(--primary);
+    color: #ffffff;
 }
 
 .moment-audio-preview {
@@ -1901,11 +1774,6 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
         padding-top: calc(84px + env(safe-area-inset-top));
     }
 
-    .home-hero {
-        grid-template-columns: 1fr;
-        gap: 36px;
-    }
-
     .site-header {
         width: 100%;
         max-width: none;
@@ -1925,20 +1793,8 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
         margin-left: auto;
     }
 
-    .home-private-dashboard {
-        grid-template-columns: 1fr;
-    }
-
     .mood-section {
         position: static;
-    }
-
-    .home-quick-actions {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .home-quick-actions button:nth-child(n + 4) {
-        grid-column: span 1;
     }
 }
 
@@ -2013,26 +1869,6 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
         right: max(12px, env(safe-area-inset-right, 0px));
     }
 
-    .home-shell {
-        gap: 18px;
-    }
-
-    .home-hero {
-        min-height: 0;
-        padding: 30px 20px 24px 25px;
-        border-radius: 26px;
-    }
-
-    .home-hero::before {
-        width: 5px;
-    }
-
-    .home-hero::after {
-        right: -20px;
-        bottom: -30px;
-        font-size: 10rem;
-    }
-
     .site-header h1 {
         font-size: clamp(2.35rem, 15vw, 3.2rem);
     }
@@ -2045,10 +1881,6 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
 
     .header-divider {
         margin-top: 18px;
-    }
-
-    .home-hero-dashboard {
-        gap: 16px;
     }
 
     .timer-grid {
@@ -2086,14 +1918,10 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
         font-size: 1.45rem;
     }
 
-    .home-auth-skeleton,
-    .home-auth-gate {
+    .home-auth-skeleton {
         min-height: 150px;
         padding: 22px;
         border-radius: 22px;
-    }
-
-    .home-auth-skeleton {
         grid-template-columns: 1fr;
     }
 
@@ -2104,36 +1932,6 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
 
     .skeleton-grid span {
         height: 62px;
-    }
-
-    .home-auth-gate {
-        align-items: stretch;
-        flex-direction: column;
-        gap: 20px;
-        border-left-width: 5px;
-    }
-
-    .home-auth-button {
-        justify-content: center;
-        width: 100%;
-    }
-
-    .home-quick-actions {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
-        padding: 8px;
-        border-radius: 20px;
-    }
-
-    .home-quick-actions button {
-        min-height: 46px;
-        padding: 9px 8px;
-        border-radius: 14px;
-        font-size: 0.82rem;
-    }
-
-    .home-quick-actions button:first-child {
-        grid-column: 1 / -1;
     }
 
     .mood-section,
@@ -2176,59 +1974,6 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
         border-radius: 18px;
     }
 
-    .mobile-app-nav:not([hidden]) {
-        position: fixed;
-        z-index: 1250;
-        right: max(8px, env(safe-area-inset-right));
-        bottom: max(8px, env(safe-area-inset-bottom));
-        left: max(8px, env(safe-area-inset-left));
-        display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        align-items: end;
-        min-height: 68px;
-        padding: 7px 6px;
-        border: 1.5px solid var(--border);
-        border-radius: 24px;
-        background: rgba(255, 255, 255, 0.96);
-        box-shadow: 0 14px 38px rgba(255, 94, 131, 0.22);
-    }
-
-    .mobile-app-nav button {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        gap: 2px;
-        min-width: 0;
-        min-height: 52px;
-        padding: 5px 2px;
-        border: 0;
-        border-radius: 14px;
-        color: var(--text-muted);
-        background: transparent;
-        box-shadow: none;
-        font-size: 0.68rem;
-        line-height: 1.2;
-    }
-
-    .mobile-app-nav button > span:first-child {
-        color: var(--primary);
-        font-size: 1.25rem;
-        line-height: 1;
-    }
-
-    .mobile-app-nav .mobile-app-nav-primary {
-        min-height: 56px;
-        color: var(--on-primary);
-        background: linear-gradient(135deg, var(--primary-light), var(--primary));
-        border-radius: 18px;
-        box-shadow: 0 6px 18px var(--primary-glow);
-    }
-
-    .mobile-app-nav .mobile-app-nav-primary > span:first-child {
-        color: inherit;
-        font-size: 1.55rem;
-    }
-
     .app-page-topbar {
         grid-template-columns: minmax(76px, 1fr) minmax(0, auto) minmax(76px, 1fr);
         gap: 8px;
@@ -2257,17 +2002,6 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
             max(14px, env(safe-area-inset-right))
             max(28px, env(safe-area-inset-bottom))
             max(14px, env(safe-area-inset-left));
-    }
-
-    .app-page .modal-btns {
-        position: sticky;
-        bottom: calc(-28px - env(safe-area-inset-bottom));
-        z-index: 3;
-        margin-right: -14px;
-        margin-left: -14px;
-        padding: 14px;
-        border-top: 1px solid var(--border);
-        background: var(--bg);
     }
 
     .app-page .modal-btns > button {

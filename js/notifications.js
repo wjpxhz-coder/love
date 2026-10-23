@@ -320,7 +320,18 @@ function createNotificationItem(notification) {
     } else {
         const actor = document.createElement('strong');
         actor.textContent = notification.actor || '成员';
-        headline.append(actor, document.createTextNode(` ${NOTIFICATION_ACTIONS[notification.type] || '发来了一条通知'}`));
+        let actionLabel = NOTIFICATION_ACTIONS[notification.type] || '发来了一条通知';
+        if (notification.type === 'topic' && typeof notification.content === 'string') {
+            try {
+                const parsedTopic = JSON.parse(notification.content);
+                if (parsedTopic && parsedTopic.action === 'resolved') {
+                    actionLabel = '达成了手账共识 🤝';
+                }
+            } catch (_e) {}
+        } else if (notification.type === 'miss' && typeof notification.content === 'string' && notification.content.includes('拥抱')) {
+            actionLabel = '给你发来了一个大大的拥抱 🫂';
+        }
+        headline.append(actor, document.createTextNode(` ${actionLabel}`));
     }
     item.appendChild(headline);
 

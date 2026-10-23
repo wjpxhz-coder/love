@@ -7,3 +7,5 @@ check_profiles.py
 !.env.example
 .supabase/
 supabase/.temp/
+diff.txt
+gitlog.txt

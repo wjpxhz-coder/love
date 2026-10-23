@@ -18,12 +18,23 @@ let currentTopicDetail = null;
 let currentTopicMessages = [];
 let activeTopicCategoryFilter = 'all';
 
+// 请求代次与防重入状态锁
+let homeTopicsReqId = 0;
+let catalogTopicsReqId = 0;
+let topicDetailReqId = 0;
+let isTopicAIRequesting = false;
+const deletingTopicIds = new Set();
+const deletingTopicMsgIds = new Set();
+
 // Realtime 订阅通道
 let topicRealtimeChannel = null;
 
 // 多媒体暂存状态
+const MAX_TOPIC_PHOTO_BYTES = 20 * 1024 * 1024;
+const MAX_TOPIC_TEXT_LENGTH = 3000;
 let topicSelectedPhotos = [];
 let topicPhotoPreviewUrls = new Set();
+let topicPhotoItemSeq = 0;
 let isTopicRecording = false;
 let topicMediaRecorder = null;
 let topicAudioChunks = [];
@@ -31,6 +42,10 @@ let topicAudioBlob = null;
 let topicAudioDurationTimer = null;
 let topicRecordingSeconds = 0;
 let topicRecordingStream = null;
+
+function getTopicCurrentAuthEpoch() {
+    return typeof getAuthEpoch === 'function' ? getAuthEpoch() : (typeof authEpoch === 'number' ? authEpoch : 0);
+}
 
 /**
  * HTML 转义工具函数，防止 XSS 注入并安全渲染纯文本
@@ -75,9 +90,12 @@ function formatTopicTime(dateString) {
 }
 
 /**
- * 获取当前登录用户的专属存储路径前缀
+ * 获取当前登录用户的专属存储路径前缀（优先复用 config.js 公共函数）
  */
 function getTopicStorageDirectory() {
+    if (typeof getSpaceStorageDirectory === 'function') {
+        return getSpaceStorageDirectory('topics');
+    }
     const spaceId = currentUserProfile && String(currentUserProfile.space_id || '');
     const userId = currentAuthUser && String(currentAuthUser.id || '');
     const isSafe = val => /^[A-Za-z0-9_-]+$/.test(val);
@@ -160,10 +178,14 @@ async function loadHomeTopics() {
     const container = document.getElementById('home-topics-content');
     if (!container || !supabaseClient) return;
 
+    const reqId = ++homeTopicsReqId;
+
     if (!currentUserProfile?.space_id || !currentAuthUser) {
         const authed = await ensureTopicAuthReady();
-        if (!authed) return;
+        if (!authed || reqId !== homeTopicsReqId) return;
     }
+
+    const reqEpoch = getTopicCurrentAuthEpoch();
 
     try {
         const { data, error } = await supabaseClient
@@ -172,6 +194,8 @@ async function loadHomeTopics() {
             .eq('space_id', currentUserProfile.space_id)
             .order('updated_at', { ascending: false })
             .limit(4);
+
+        if (reqId !== homeTopicsReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
 
         if (error) {
             console.error('加载首页话题手账失败:', error);
@@ -182,6 +206,7 @@ async function loadHomeTopics() {
         homeTopicsList = data || [];
         renderHomeTopics(homeTopicsList);
     } catch (err) {
+        if (reqId !== homeTopicsReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
         console.error('加载首页话题异常:', err);
         container.innerHTML = `<div class="empty-state">加载手账发生异常 🌸</div>`;
     }
@@ -249,20 +274,24 @@ async function loadTopicsCatalog(category = activeTopicCategoryFilter) {
     const listEl = document.getElementById('topics-catalog-list');
     if (!listEl || !supabaseClient) return;
 
+    const reqId = ++catalogTopicsReqId;
+
+    // 更新筛选胶囊高亮
+    document.querySelectorAll('.topics-filter-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.dataset.category === category);
+    });
+
     if (!currentUserProfile?.space_id || !currentAuthUser) {
         const authed = await ensureTopicAuthReady();
+        if (reqId !== catalogTopicsReqId) return;
         if (!authed) {
             listEl.innerHTML = `<div class="empty-state">请先登录情侣空间后再查看手账目录 🌸</div>`;
             return;
         }
     }
 
+    const reqEpoch = getTopicCurrentAuthEpoch();
     listEl.innerHTML = `<div class="empty-state">正在翻开我们的手账目录… 📖</div>`;
-
-    // 更新筛选胶囊高亮
-    document.querySelectorAll('.topics-filter-pill').forEach(pill => {
-        pill.classList.toggle('active', pill.dataset.category === category);
-    });
 
     try {
         let query = supabaseClient
@@ -276,6 +305,8 @@ async function loadTopicsCatalog(category = activeTopicCategoryFilter) {
         }
 
         const { data, error } = await query;
+        if (reqId !== catalogTopicsReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
+
         if (error) {
             listEl.innerHTML = `<div class="empty-state">加载手账目录失败，请稍后重试</div>`;
             return;
@@ -284,6 +315,7 @@ async function loadTopicsCatalog(category = activeTopicCategoryFilter) {
         catalogTopicsList = data || [];
         renderTopicsCatalog(catalogTopicsList);
     } catch (err) {
+        if (reqId !== catalogTopicsReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
         console.error('加载话题手账目录异常:', err);
         listEl.innerHTML = `<div class="empty-state">加载手账目录异常</div>`;
     }
@@ -439,6 +471,8 @@ async function submitCreateTopic() {
 async function loadTopicDetail(topicId) {
     if (!topicId || !supabaseClient) return;
 
+    const reqId = ++topicDetailReqId;
+
     const titleEl = document.getElementById('topic-detail-title');
     const flowEl = document.getElementById('topic-messages-flow');
     if (titleEl) titleEl.textContent = '手账加载中…';
@@ -447,6 +481,7 @@ async function loadTopicDetail(topicId) {
     // 确保认证信息就绪
     if (!currentUserProfile?.space_id || !currentAuthUser) {
         const authed = await ensureTopicAuthReady();
+        if (reqId !== topicDetailReqId) return;
         if (!authed) {
             console.warn('loadTopicDetail: 未能获取到情侣空间认证信息');
             if (titleEl) titleEl.textContent = '请先登录';
@@ -454,6 +489,8 @@ async function loadTopicDetail(topicId) {
             return;
         }
     }
+
+    const reqEpoch = getTopicCurrentAuthEpoch();
 
     try {
         // 1. 获取话题基本信息
@@ -463,6 +500,8 @@ async function loadTopicDetail(topicId) {
             .eq('id', topicId)
             .eq('space_id', currentUserProfile.space_id)
             .single();
+
+        if (reqId !== topicDetailReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
 
         if (topicErr || !topic) {
             console.error('获取话题失败:', topicErr);
@@ -483,6 +522,8 @@ async function loadTopicDetail(topicId) {
             .eq('space_id', currentUserProfile.space_id)
             .order('created_at', { ascending: true });
 
+        if (reqId !== topicDetailReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
+
         if (msgErr) {
             console.error('获取消息失败:', msgErr);
             if (flowEl) flowEl.innerHTML = '<div class="empty-state">加载消息流失败，请重试 🌸</div>';
@@ -491,6 +532,7 @@ async function loadTopicDetail(topicId) {
 
         currentTopicMessages = messages || [];
         await renderTopicMessages(currentTopicMessages);
+        if (reqId !== topicDetailReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
 
         // 3. 订阅该话题的 Realtime 动态
         initTopicRealtimeSubscription(topicId);
@@ -498,6 +540,7 @@ async function loadTopicDetail(topicId) {
         // 滚动到底部最新消息
         scrollTopicToBottom();
     } catch (err) {
+        if (reqId !== topicDetailReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
         console.error('加载话题详情异常:', err);
         if (titleEl) titleEl.textContent = '加载异常';
         if (flowEl) flowEl.innerHTML = '<div class="empty-state">加载手账发生异常，请刷新重试 🌸</div>';
@@ -518,14 +561,14 @@ function renderTopicDetailShell(topic) {
         catEl.textContent = catInfo.label;
     }
 
-    // 达成共识按钮
+    // 达成共识按钮（精简移动端文案防止挤压标题）
     if (resolveBtn) {
         if (topic.status === 'resolved') {
             resolveBtn.className = 'btn-resolve-topic is-resolved';
-            resolveBtn.innerHTML = '✨ 编辑我们的共识';
+            resolveBtn.innerHTML = '✨ 编辑共识';
         } else {
             resolveBtn.className = 'btn-resolve-topic';
-            resolveBtn.innerHTML = '🤝 达成共识 / 记录方案';
+            resolveBtn.innerHTML = '🤝 达成共识';
         }
     }
 
@@ -549,82 +592,142 @@ function renderTopicDetailShell(topic) {
     }
 }
 
+function getEmptyTopicMessagesHtml() {
+    return `
+        <div class="empty-state" style="padding: 30px 10px;">
+            💌 还没有发言呢～<br>在下方留言、发照片或录下想说的心声，开始我们的探讨吧！
+        </div>
+    `;
+}
+
+async function buildTopicMessageRowHtml(msg) {
+    const isSelf = msg.user_id === currentAuthUser?.id || msg.author === currentUserProfile?.username;
+    const authorProfile = Object.values(allProfilesCache || {}).find(p => p.username === msg.author) || null;
+    const avatarUrl = authorProfile?._avatarResolvedUrl
+        || (authorProfile?.avatar_url ? await resolveMediaUrl(authorProfile.avatar_url) : '');
+    const avatarHtml = avatarUrl
+        ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(msg.author)}">`
+        : (msg.author === '小奚' ? '🌸' : '🐍');
+
+    // 文字内容
+    let textBubbleHtml = '';
+    if (msg.content && msg.content.trim()) {
+        textBubbleHtml = `<div class="topic-message-bubble">${escapeHtml(msg.content)}</div>`;
+    }
+
+    // 图片内容（使用索引委托灯箱，彻底杜绝单引号逃逸并支持多图滑动）
+    let photosHtml = '';
+    if (msg.photos && msg.photos.length > 0) {
+        const resolvedPhotos = (typeof batchResolveMediaUrls === 'function'
+            ? await batchResolveMediaUrls(msg.photos)
+            : await Promise.all(msg.photos.map(ref => resolveMediaUrl(ref)))
+        ).filter(Boolean);
+        msg._resolvedPhotos = resolvedPhotos;
+        const safeMsgId = escapeHtml(String(msg.id));
+        const photoItems = resolvedPhotos.map((url, idx) => `
+            <div class="topic-message-photo-item" data-msg-id="${safeMsgId}" data-photo-idx="${idx}" onclick="openTopicPhotoLightboxByIndex('${safeMsgId}', ${idx})">
+                <img src="${escapeHtml(url)}" alt="话题图片" loading="lazy">
+            </div>
+        `).join('');
+        photosHtml = `<div class="topic-message-photos">${photoItems}</div>`;
+    }
+
+    // 音频内容
+    let audioHtml = '';
+    if (msg.audio_url) {
+        const resolvedAudio = await resolveMediaUrl(msg.audio_url);
+        if (resolvedAudio) {
+            audioHtml = `
+                <div class="topic-message-audio-wrap">
+                    <audio src="${escapeHtml(resolvedAudio)}" controls preload="none"></audio>
+                </div>
+            `;
+        }
+    }
+
+    const safeMsgId = escapeHtml(String(msg.id));
+    const deleteMsgBtnHtml = isSelf
+        ? `<button class="topic-msg-action-btn" type="button" onclick="deleteTopicMessage('${safeMsgId}')" title="撤回这条心声" aria-label="撤回心声">撤回</button>`
+        : '';
+
+    return `
+        <div class="topic-message-row ${isSelf ? 'is-self' : ''}" data-msg-id="${safeMsgId}">
+            <div class="topic-message-avatar">${avatarHtml}</div>
+            <div class="topic-message-body">
+                <div class="topic-message-author-time">
+                    <div class="topic-msg-author-meta">
+                        <span class="topic-msg-author">${escapeHtml(msg.author)}</span>
+                        <span class="topic-msg-time">${formatTopicTime(msg.created_at)}</span>
+                    </div>
+                    ${deleteMsgBtnHtml}
+                </div>
+                ${textBubbleHtml}
+                ${photosHtml}
+                ${audioHtml}
+            </div>
+        </div>
+    `;
+}
+
 async function renderTopicMessages(messages) {
     const flowEl = document.getElementById('topic-messages-flow');
     if (!flowEl) return;
 
     if (!messages || messages.length === 0) {
-        flowEl.innerHTML = `
-            <div class="empty-state" style="padding: 30px 10px;">
-                💌 还没有发言呢～<br>在下方留言、发照片或录下想说的心声，开始我们的探讨吧！
-            </div>
-        `;
+        flowEl.innerHTML = getEmptyTopicMessagesHtml();
         return;
     }
 
-    const rowsHtml = await Promise.all(messages.map(async msg => {
-        const isSelf = msg.user_id === currentAuthUser?.id || msg.author === currentUserProfile?.username;
-        const authorProfile = Object.values(allProfilesCache || {}).find(p => p.username === msg.author) || null;
-        const avatarUrl = authorProfile?.avatar_url ? await resolveMediaUrl(authorProfile.avatar_url) : '';
-        const avatarHtml = avatarUrl
-            ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(msg.author)}">`
-            : (msg.author === '小奚' ? '🌸' : '🐍');
-
-        // 文字内容
-        let textBubbleHtml = '';
-        if (msg.content && msg.content.trim()) {
-            textBubbleHtml = `<div class="topic-message-bubble">${escapeHtml(msg.content)}</div>`;
+    // 批量收集所有媒体路径，一次性预热签名缓存，消除 N+1 签名网络往返
+    if (typeof batchResolveMediaUrls === 'function') {
+        const mediaRefsToWarm = [];
+        Object.values(allProfilesCache || {}).forEach(p => {
+            if (p?.avatar_url && !p._avatarResolvedUrl) mediaRefsToWarm.push(p.avatar_url);
+        });
+        messages.forEach(m => {
+            if (Array.isArray(m?.photos)) mediaRefsToWarm.push(...m.photos);
+            if (m?.audio_url) mediaRefsToWarm.push(m.audio_url);
+        });
+        if (mediaRefsToWarm.length > 0) {
+            await batchResolveMediaUrls(mediaRefsToWarm);
         }
+    }
 
-        // 图片内容
-        let photosHtml = '';
-        if (msg.photos && msg.photos.length > 0) {
-            const resolvedPhotos = await Promise.all(msg.photos.map(ref => resolveMediaUrl(ref)));
-            const photoItems = resolvedPhotos.map((url, idx) => `
-                <div class="topic-message-photo-item" onclick="openTopicPhotoLightbox('${escapeHtml(url)}')">
-                    <img src="${escapeHtml(url)}" alt="话题图片" loading="lazy">
-                </div>
-            `).join('');
-            photosHtml = `<div class="topic-message-photos">${photoItems}</div>`;
-        }
-
-        // 音频内容
-        let audioHtml = '';
-        if (msg.audio_url) {
-            const resolvedAudio = await resolveMediaUrl(msg.audio_url);
-            if (resolvedAudio) {
-                audioHtml = `
-                    <div class="topic-message-audio-wrap">
-                        <audio src="${escapeHtml(resolvedAudio)}" controls preload="none"></audio>
-                    </div>
-                `;
-            }
-        }
-
-        const deleteMsgBtnHtml = isSelf
-            ? `<button class="topic-msg-action-btn" type="button" onclick="deleteTopicMessage(${msg.id})" title="撤回这条心声" aria-label="撤回心声">撤回</button>`
-            : '';
-
-        return `
-            <div class="topic-message-row ${isSelf ? 'is-self' : ''}" data-msg-id="${msg.id}">
-                <div class="topic-message-avatar">${avatarHtml}</div>
-                <div class="topic-message-body">
-                    <div class="topic-message-author-time">
-                        <div class="topic-msg-author-meta">
-                            <span class="topic-msg-author">${escapeHtml(msg.author)}</span>
-                            <span class="topic-msg-time">${formatTopicTime(msg.created_at)}</span>
-                        </div>
-                        ${deleteMsgBtnHtml}
-                    </div>
-                    ${textBubbleHtml}
-                    ${photosHtml}
-                    ${audioHtml}
-                </div>
-            </div>
-        `;
-    }));
-
+    const rowsHtml = await Promise.all(messages.map(msg => buildTopicMessageRowHtml(msg)));
     flowEl.innerHTML = rowsHtml.join('');
+}
+
+async function appendSingleTopicMessageToFlow(msg) {
+    const flowEl = document.getElementById('topic-messages-flow');
+    if (!flowEl || !msg) return;
+
+    const msgIdStr = String(msg.id);
+    if (flowEl.querySelector(`.topic-message-row[data-msg-id="${CSS.escape(msgIdStr)}"]`)) {
+        return;
+    }
+
+    const rowHtml = await buildTopicMessageRowHtml(msg);
+    if (flowEl.querySelector(`.topic-message-row[data-msg-id="${CSS.escape(msgIdStr)}"]`)) {
+        return;
+    }
+
+    const emptyEl = flowEl.querySelector('.empty-state');
+    if (emptyEl) emptyEl.remove();
+
+    flowEl.insertAdjacentHTML('beforeend', rowHtml);
+}
+
+function removeSingleTopicMessageFromFlow(msgId) {
+    const flowEl = document.getElementById('topic-messages-flow');
+    if (!flowEl) return;
+
+    const msgIdStr = String(msgId);
+    const rowEl = flowEl.querySelector(`.topic-message-row[data-msg-id="${CSS.escape(msgIdStr)}"]`);
+    if (rowEl) rowEl.remove();
+
+    if (!flowEl.querySelector('.topic-message-row')) {
+        flowEl.innerHTML = getEmptyTopicMessagesHtml();
+    }
 }
 
 function scrollTopicToBottom() {
@@ -636,10 +739,36 @@ function scrollTopicToBottom() {
     }
 }
 
-function openTopicPhotoLightbox(url) {
+function openTopicPhotoLightbox(url, gallery = null, initialIndex = 0) {
     if (typeof openLightbox === 'function') {
-        openLightbox(url, 'image');
+        if (Array.isArray(gallery) && gallery.length > 0) {
+            openLightbox(url, { gallery, initialIndex });
+        } else {
+            openLightbox(url);
+        }
     }
+}
+
+function openTopicPhotoLightboxByIndex(msgId, photoIdx = 0) {
+    const msg = (currentTopicMessages || []).find(m => String(m.id) === String(msgId));
+    let gallery = Array.isArray(msg?._resolvedPhotos) && msg._resolvedPhotos.length > 0
+        ? msg._resolvedPhotos
+        : [];
+
+    if (gallery.length === 0) {
+        const flowEl = document.getElementById('topic-messages-flow');
+        const rowEl = flowEl?.querySelector(`.topic-message-row[data-msg-id="${CSS.escape(String(msgId))}"]`);
+        if (rowEl) {
+            gallery = Array.from(rowEl.querySelectorAll('.topic-message-photo-item img'))
+                .map(img => img.getAttribute('src') || img.src)
+                .filter(Boolean);
+        }
+    }
+
+    const idx = Number.isInteger(Number(photoIdx)) ? Number(photoIdx) : 0;
+    const targetUrl = gallery[idx] || gallery[0] || '';
+    if (!targetUrl) return;
+    openTopicPhotoLightbox(targetUrl, gallery, idx);
 }
 
 // ---------------- Realtime 订阅 ----------------
@@ -658,11 +787,11 @@ function initTopicRealtimeSubscription(topicId) {
             },
             async (payload) => {
                 if (!payload?.new) return;
-                // 如果是新消息且列表中尚未包含
-                const exists = currentTopicMessages.some(m => m.id === payload.new.id);
+                // 如果是新消息且列表中尚未包含，增量追加而不重绘历史消息
+                const exists = currentTopicMessages.some(m => String(m.id) === String(payload.new.id));
                 if (!exists) {
                     currentTopicMessages.push(payload.new);
-                    await renderTopicMessages(currentTopicMessages);
+                    await appendSingleTopicMessageToFlow(payload.new);
                     scrollTopicToBottom();
                 }
             }
@@ -675,10 +804,10 @@ function initTopicRealtimeSubscription(topicId) {
                 table: 'topic_messages',
                 filter: `topic_id=eq.${topicId}`
             },
-            async (payload) => {
+            (payload) => {
                 if (!payload?.old?.id) return;
-                currentTopicMessages = currentTopicMessages.filter(m => m.id !== payload.old.id);
-                await renderTopicMessages(currentTopicMessages);
+                currentTopicMessages = currentTopicMessages.filter(m => String(m.id) !== String(payload.old.id));
+                removeSingleTopicMessageFromFlow(payload.old.id);
             }
         )
         .on(
@@ -692,6 +821,7 @@ function initTopicRealtimeSubscription(topicId) {
             (payload) => {
                 if (payload?.new) {
                     currentTopicDetail = payload.new;
+                    window.currentTopicDetail = payload.new;
                     renderTopicDetailShell(payload.new);
                 }
             }
@@ -727,6 +857,7 @@ function closeTopicDetail() {
     cleanupTopicRealtimeSubscription();
     resetTopicComposer();
     currentTopicDetail = null;
+    window.currentTopicDetail = null;
     currentTopicMessages = [];
     appBack('/topics');
 }
@@ -736,6 +867,7 @@ function closeTopicDetail() {
 // ==========================================================================
 
 function handleTopicTextKeyDown(event) {
+    if (event.isComposing || event.keyCode === 229) return;
     if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         sendTopicMessage();
@@ -752,37 +884,67 @@ async function handleTopicPhotoSelect(event) {
     if (!files.length) return;
 
     if (topicSelectedPhotos.length + files.length > 9) {
-        alert('最多只能选择 9 张照片哦～');
+        if (typeof showToast === 'function') {
+            showToast('最多只能选择 9 张照片哦～ 🌸');
+        } else {
+            alert('最多只能选择 9 张照片哦～');
+        }
+        event.target.value = '';
         return;
     }
 
     const previewContainer = document.getElementById('topicComposerPhotoPreviews');
-    if (previewContainer) previewContainer.hidden = false;
 
     for (const file of files) {
-        if (!file.type.startsWith('image/')) continue;
-        topicSelectedPhotos.push(file);
+        if (!file.type || !file.type.startsWith('image/')) {
+            if (typeof showToast === 'function') {
+                showToast('仅支持选择图片格式的文件哦 🌸');
+            }
+            continue;
+        }
+        if (file.size > MAX_TOPIC_PHOTO_BYTES) {
+            if (typeof showToast === 'function') {
+                showToast(`图片「${file.name}」超过 20MB 上限，请换一张更小的图片 🌸`);
+            } else {
+                alert(`图片「${file.name}」超过 20MB 上限`);
+            }
+            continue;
+        }
+
         const objUrl = URL.createObjectURL(file);
+        const itemId = ++topicPhotoItemSeq;
+        topicSelectedPhotos.push({ id: itemId, file, previewUrl: objUrl });
         topicPhotoPreviewUrls.add(objUrl);
 
-        const imgWrap = document.createElement('div');
-        imgWrap.className = 'topic-composer-photo-preview-item';
-        imgWrap.style.cssText = 'position:relative; width:56px; height:56px; border-radius:8px; overflow:hidden; display:inline-block; margin-right:6px;';
-        imgWrap.innerHTML = `
-            <img src="${objUrl}" style="width:100%; height:100%; object-fit:cover;">
-            <button type="button" style="position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%; width:18px; height:18px; font-size:12px; cursor:pointer;" onclick="removeTopicPhotoPreview(this, '${objUrl}')">×</button>
-        `;
-        previewContainer.appendChild(imgWrap);
+        if (previewContainer) {
+            previewContainer.hidden = false;
+            const imgWrap = document.createElement('div');
+            imgWrap.className = 'topic-composer-photo-preview-item';
+            imgWrap.dataset.previewUrl = objUrl;
+            imgWrap.style.cssText = 'position:relative; width:56px; height:56px; border-radius:8px; overflow:hidden; display:inline-block; margin-right:6px;';
+            imgWrap.innerHTML = `
+                <img src="${escapeHtml(objUrl)}" style="width:100%; height:100%; object-fit:cover;">
+                <button type="button" style="position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%; width:18px; height:18px; font-size:12px; cursor:pointer;" onclick="removeTopicPhotoPreview(this, '${escapeHtml(objUrl)}')">×</button>
+            `;
+            previewContainer.appendChild(imgWrap);
+        }
     }
     event.target.value = '';
 }
 
 function removeTopicPhotoPreview(btn, url) {
+    const targetUrl = url || btn?.parentElement?.dataset?.previewUrl || '';
     if (btn && btn.parentElement) {
         btn.parentElement.remove();
     }
-    URL.revokeObjectURL(url);
-    topicPhotoPreviewUrls.delete(url);
+    if (targetUrl) {
+        topicSelectedPhotos = topicSelectedPhotos.filter(item => {
+            const itemUrl = item?.previewUrl || item?._previewUrl || '';
+            return itemUrl !== targetUrl;
+        });
+        URL.revokeObjectURL(targetUrl);
+        topicPhotoPreviewUrls.delete(targetUrl);
+    }
     const container = document.getElementById('topicComposerPhotoPreviews');
     if (container && container.children.length === 0) {
         container.hidden = true;
@@ -805,6 +967,15 @@ async function startTopicRecording() {
     }
 
     try {
+        if (topicAudioDurationTimer) {
+            clearInterval(topicAudioDurationTimer);
+            topicAudioDurationTimer = null;
+        }
+        if (topicRecordingStream) {
+            topicRecordingStream.getTracks().forEach(track => track.stop());
+            topicRecordingStream = null;
+        }
+
         topicRecordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
             ? 'audio/webm;codecs=opus'
@@ -834,6 +1005,7 @@ async function startTopicRecording() {
         const btnRecord = document.getElementById('btn-topic-record');
         if (recordBar) recordBar.hidden = false;
         if (btnRecord) btnRecord.classList.add('recording');
+        if (timerText) timerText.textContent = '00:00';
 
         topicAudioDurationTimer = setInterval(() => {
             topicRecordingSeconds += 1;
@@ -876,6 +1048,9 @@ function showTopicAudioPreview(blob) {
     const previewWrap = document.getElementById('topicAudioPreviewWrap');
     const audioPlayer = document.getElementById('topicAudioPlayer');
     if (previewWrap && audioPlayer) {
+        if (audioPlayer.src && audioPlayer.src.startsWith('blob:')) {
+            URL.revokeObjectURL(audioPlayer.src);
+        }
         audioPlayer.src = URL.createObjectURL(blob);
         previewWrap.hidden = false;
     }
@@ -885,7 +1060,9 @@ function deleteTopicAudioPreview() {
     const previewWrap = document.getElementById('topicAudioPreviewWrap');
     const audioPlayer = document.getElementById('topicAudioPlayer');
     if (audioPlayer && audioPlayer.src) {
-        URL.revokeObjectURL(audioPlayer.src);
+        if (audioPlayer.src.startsWith('blob:')) {
+            URL.revokeObjectURL(audioPlayer.src);
+        }
         audioPlayer.src = '';
     }
     topicAudioBlob = null;
@@ -910,6 +1087,38 @@ function resetTopicComposer() {
     }
 }
 
+/**
+ * 登出时彻底重置手账内存状态、订阅通道与私密 DOM
+ */
+function resetTopicsStateOnLogout() {
+    homeTopicsReqId += 1;
+    catalogTopicsReqId += 1;
+    topicDetailReqId += 1;
+    deletingTopicIds.clear();
+    deletingTopicMsgIds.clear();
+    isTopicAIRequesting = false;
+    isTopicMessageSending = false;
+
+    cleanupTopicRealtimeSubscription();
+    resetTopicComposer();
+
+    homeTopicsList = [];
+    catalogTopicsList = [];
+    currentTopicDetail = null;
+    window.currentTopicDetail = null;
+    currentTopicMessages = [];
+
+    ['home-topics-content', 'topics-catalog-list', 'topic-messages-flow'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+    });
+    const summaryBanner = document.getElementById('topic-summary-banner');
+    if (summaryBanner) {
+        summaryBanner.hidden = true;
+        summaryBanner.innerHTML = '';
+    }
+}
+
 let isTopicMessageSending = false;
 
 // ---------------- 执行发送 ----------------
@@ -919,6 +1128,15 @@ async function sendTopicMessage() {
     const textInput = document.getElementById('topicComposerTextInput');
     const sendBtn = document.getElementById('btn-topic-send');
     const text = textInput ? textInput.value.trim() : '';
+
+    if (text.length > MAX_TOPIC_TEXT_LENGTH) {
+        if (typeof showToast === 'function') {
+            showToast(`心声留言最多支持 ${MAX_TOPIC_TEXT_LENGTH} 字，请精简后再发送 🌸`);
+        } else {
+            alert(`心声留言最多支持 ${MAX_TOPIC_TEXT_LENGTH} 字`);
+        }
+        return;
+    }
 
     const hasText = Boolean(text);
     const hasPhotos = topicSelectedPhotos.length > 0;
@@ -952,15 +1170,22 @@ async function sendTopicMessage() {
     isTopicMessageSending = true;
     if (sendBtn) sendBtn.disabled = true;
 
+    const uploadedPhotoRefs = [];
+    let uploadedAudioRef = null;
+
     try {
         const storageDir = getTopicStorageDirectory();
-        const uploadedPhotoRefs = [];
-        let uploadedAudioRef = null;
+        if ((hasPhotos || hasAudio) && !storageDir) {
+            throw new Error('STORAGE_DIR_UNAVAILABLE');
+        }
 
         // 1. 上传图片
         if (hasPhotos) {
             for (let i = 0; i < topicSelectedPhotos.length; i++) {
-                const file = topicSelectedPhotos[i];
+                const rawItem = topicSelectedPhotos[i];
+                const file = rawItem?.file || rawItem;
+                if (!file) continue;
+
                 let uploadBlob = file;
                 if (typeof compressImageFile === 'function') {
                     try {
@@ -969,7 +1194,9 @@ async function sendTopicMessage() {
                         uploadBlob = file;
                     }
                 }
-                const ext = getMomentFileExtension(file);
+                const ext = typeof getSafeFileExtension === 'function'
+                    ? getSafeFileExtension(file, 'jpg')
+                    : (typeof getMomentFileExtension === 'function' ? getMomentFileExtension(file) : 'jpg');
                 const randomName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
                 const objectPath = `${storageDir}/${randomName}`;
 
@@ -1019,6 +1246,7 @@ async function sendTopicMessage() {
 
         if (error) {
             console.error('保存消息失败:', error);
+            await removeUploadedTopicObjects([...uploadedPhotoRefs, uploadedAudioRef].filter(Boolean));
             if (typeof showToast === 'function') {
                 showToast('发送失败：' + error.message);
             } else {
@@ -1030,14 +1258,15 @@ async function sendTopicMessage() {
         // 清理输入状态
         resetTopicComposer();
 
-        // 本地立即追加（Realtime 会有去重）
-        if (!currentTopicMessages.some(m => m.id === data.id)) {
+        // 本地立即增量追加（Realtime 会有去重）
+        if (!currentTopicMessages.some(m => String(m.id) === String(data.id))) {
             currentTopicMessages.push(data);
-            await renderTopicMessages(currentTopicMessages);
-            scrollTopicToBottom();
         }
+        await appendSingleTopicMessageToFlow(data);
+        scrollTopicToBottom();
     } catch (err) {
         console.error('发送话题消息异常:', err);
+        await removeUploadedTopicObjects([...uploadedPhotoRefs, uploadedAudioRef].filter(Boolean));
         if (typeof showToast === 'function') {
             showToast('发送发生异常，请重试');
         } else {
@@ -1117,6 +1346,7 @@ async function submitResolveTopic() {
         }
 
         currentTopicDetail = data;
+        window.currentTopicDetail = data;
         renderTopicDetailShell(data);
         closeResolveTopicModal();
 
@@ -1135,37 +1365,62 @@ async function submitResolveTopic() {
 // ==========================================================================
 
 async function requestAITopicAdvice() {
-    if (!currentTopicDetail) return;
+    if (isTopicAIRequesting || !currentTopicDetail) return;
     const modal = document.getElementById('aiTopicAdviceModal');
     const contentArea = document.getElementById('aiTopicAdviceContent');
     const applyBtn = document.getElementById('btn-ai-apply-summary');
     if (!modal || !contentArea) return;
 
-    contentArea.innerHTML = `<div class="ai-loading">🌸 正在请教感情助手 Agnes，请稍候… ✨</div>`;
     if (applyBtn) applyBtn.hidden = true;
-
     showTopicModal(modal);
 
+    if (typeof hasAIServiceConsent === 'function' && !hasAIServiceConsent()) {
+        contentArea.innerHTML = `<div class="empty-state">请先在「头像 → 设置 → 我们的感情助手」中开启服务后再召唤 Agnes 哦 🌸</div>`;
+        return;
+    }
+
+    isTopicAIRequesting = true;
+    contentArea.innerHTML = `<div class="ai-loading">🌸 正在请教感情助手 Agnes，请稍候… ✨</div>`;
+
     try {
-        // 整理近期对话记录作为上下文
-        const recentMessages = currentTopicMessages.slice(-10).map(m => `${m.author}: ${m.content || '[多媒体]'}`).join('\n');
-        const prompt = `我们正在情侣小家的话题手账讨论「${currentTopicDetail.title}」（分类：${currentTopicDetail.category}）。\n以下是我们近期的沟通记录：\n${recentMessages}\n\n请作为我们温柔体贴的恋爱小助理，从客观、温和、充满爱意的角度给出：\n1. 调解与建议锦囊（如何更好互相理解与解决）；\n2. 一份建议的「达成共识与约定草稿」（50~150字，以情侣双方第一人称视角，充满仪式感）。`;
+        const catInfo = TOPIC_CATEGORIES[currentTopicDetail.category] || TOPIC_CATEGORIES.general;
+        const recentMessages = currentTopicMessages
+            .slice(-12)
+            .map(m => `${m.author}: ${m.content || (m.photos?.length ? '[图片]' : '') || (m.audio_url ? '[语音]' : '[多媒体]')}`)
+            .join('\n');
 
-        // 调用现有 AI 接口
-        const response = await supabaseClient.functions.invoke('ai-chat', {
-            body: {
-                message: prompt,
-                history: [],
-                model: 'agnes-2.0-flash'
-            }
-        });
+        const systemPrompt = [
+            '你是“我们的感情助手” Agnes，小奚和小蛇专属的温柔恋爱智囊与沟通调解官。',
+            typeof AI_COUPLE_IDENTITY_RULES === 'string' ? AI_COUPLE_IDENTITY_RULES : '',
+            '请始终保持温暖、客观、充满爱意与同理心的语气，帮助两人互相理解、化解分歧或共同规划未来。'
+        ].filter(Boolean).join('\n');
 
-        if (response.error || !response.data?.reply) {
+        const prompt = `我们正在情侣小家的话题手账讨论「${currentTopicDetail.title}」（分类：${catInfo.name}）。\n以下是我们近期的沟通记录：\n${recentMessages || '（暂未开始发言，请针对话题题目给出破冰沟通建议）'}\n\n请作为我们温柔体贴的恋爱小助理，从客观、温和、充满爱意的角度给出：\n1. 调解与建议锦囊（如何更好互相理解与解决）；\n2. 一份建议的「达成共识与约定草稿」（50~150字，以情侣双方第一人称视角，充满仪式感）。`;
+
+        let replyText = '';
+        if (typeof callAgnes === 'function') {
+            replyText = await callAgnes(systemPrompt, prompt);
+        } else {
+            const response = await supabaseClient.functions.invoke('ai-chat', {
+                headers: {
+                    'x-agnes-consent-version': typeof AGNES_CONSENT_VERSION === 'string' ? AGNES_CONSENT_VERSION : 'agnes-2.0-v1'
+                },
+                body: {
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: prompt }
+                    ]
+                }
+            });
+            if (response.error) throw response.error;
+            replyText = response.data?.choices?.[0]?.message?.content?.trim() || response.data?.reply || '';
+        }
+
+        if (!replyText) {
             contentArea.innerHTML = `<div class="empty-state">Agnes 正在小憩，暂时无法回答，请稍后再试～</div>`;
             return;
         }
 
-        const replyText = response.data.reply;
         contentArea.innerHTML = `<div class="ai-advice-body" style="line-height:1.65; white-space:pre-wrap;">${escapeHtml(replyText)}</div>`;
 
         // 提取建议草稿用于一键应用
@@ -1182,7 +1437,12 @@ async function requestAITopicAdvice() {
         }
     } catch (err) {
         console.error('召唤 AI 建议异常:', err);
-        contentArea.innerHTML = `<div class="empty-state">获取建议失败，请检查网络后重试。</div>`;
+        const friendlyMsg = typeof getFriendlyAIError === 'function'
+            ? getFriendlyAIError(err)
+            : '获取建议失败，请检查网络后重试。';
+        contentArea.innerHTML = `<div class="empty-state">${escapeHtml(friendlyMsg)}</div>`;
+    } finally {
+        isTopicAIRequesting = false;
     }
 }
 
@@ -1196,6 +1456,9 @@ function closeAITopicAdviceModal() {
 // ==========================================================================
 
 async function removeUploadedTopicObjects(pathsOrRefs) {
+    if (typeof removeStorageObjects === 'function') {
+        return removeStorageObjects(pathsOrRefs);
+    }
     if (!Array.isArray(pathsOrRefs) || !pathsOrRefs.length || !supabaseClient) return;
     const paths = pathsOrRefs.map(val => {
         if (typeof extractStorageObjectPath === 'function') {
@@ -1394,6 +1657,7 @@ async function submitEditTopic() {
         // 如果当前在详情页且正是此话题，刷新详情页展示
         if (currentTopicDetail && String(currentTopicDetail.id) === String(editingTopicId)) {
             currentTopicDetail = data;
+            window.currentTopicDetail = data;
             renderTopicDetailShell(data);
         }
 
@@ -1425,6 +1689,9 @@ async function deleteTopic(topicId, event) {
         || null;
     if (!id || !supabaseClient) return;
 
+    const idKey = String(id);
+    if (deletingTopicIds.has(idKey)) return;
+
     if (!confirm('确定要删除这本手账话题吗？\n删除后里面所有的交流回忆都将抹去，不可恢复哦 🌸')) {
         return;
     }
@@ -1436,6 +1703,8 @@ async function deleteTopic(topicId, event) {
             return;
         }
     }
+
+    deletingTopicIds.add(idKey);
 
     try {
         // 1. 收集待清理的媒体资源（从 messages 表中）
@@ -1496,18 +1765,25 @@ async function deleteTopic(topicId, event) {
     } catch (err) {
         console.error('删除话题异常:', err);
         alert('删除发生异常，请稍后重试');
+    } finally {
+        deletingTopicIds.delete(idKey);
     }
 }
 
 async function deleteTopicMessage(msgId) {
     if (!msgId || !supabaseClient || !currentAuthUser) return;
 
+    const msgKey = String(msgId);
+    if (deletingTopicMsgIds.has(msgKey)) return;
+
     if (!confirm('确定撤回这条心声留言吗？')) {
         return;
     }
 
+    deletingTopicMsgIds.add(msgKey);
+
     try {
-        const targetMsg = (currentTopicMessages || []).find(m => String(m.id) === String(msgId));
+        const targetMsg = (currentTopicMessages || []).find(m => String(m.id) === msgKey);
 
         const { error } = await supabaseClient
             .from('topic_messages')
@@ -1535,9 +1811,9 @@ async function deleteTopicMessage(msgId) {
             }
         }
 
-        // 从当前消息列表过滤并重新渲染
-        currentTopicMessages = (currentTopicMessages || []).filter(m => String(m.id) !== String(msgId));
-        await renderTopicMessages(currentTopicMessages);
+        // 从当前消息列表过滤并增量移除节点，避免打断其他语音播放或导致图片闪烁
+        currentTopicMessages = (currentTopicMessages || []).filter(m => String(m.id) !== msgKey);
+        removeSingleTopicMessageFromFlow(msgId);
 
         if (typeof showToast === 'function') {
             showToast('已撤回心声留言 🌸');
@@ -1545,6 +1821,8 @@ async function deleteTopicMessage(msgId) {
     } catch (err) {
         console.error('撤回消息异常:', err);
         alert('撤回异常，请稍后重试');
+    } finally {
+        deletingTopicMsgIds.delete(msgKey);
     }
 }
 
@@ -1564,6 +1842,7 @@ window.openTopicPhotoPicker = openTopicPhotoPicker;
 window.handleTopicPhotoSelect = handleTopicPhotoSelect;
 window.removeTopicPhotoPreview = removeTopicPhotoPreview;
 window.toggleTopicRecording = toggleTopicRecording;
+window.stopTopicRecording = stopTopicRecording;
 window.deleteTopicAudioPreview = deleteTopicAudioPreview;
 window.sendTopicMessage = sendTopicMessage;
 window.openResolveTopicModal = openResolveTopicModal;
@@ -1572,6 +1851,7 @@ window.submitResolveTopic = submitResolveTopic;
 window.requestAITopicAdvice = requestAITopicAdvice;
 window.closeAITopicAdviceModal = closeAITopicAdviceModal;
 window.openTopicPhotoLightbox = openTopicPhotoLightbox;
+window.openTopicPhotoLightboxByIndex = openTopicPhotoLightboxByIndex;
 window.openEditTopicModal = openEditTopicModal;
 window.closeEditTopicModal = closeEditTopicModal;
 window.selectEditTopicCategory = selectEditTopicCategory;
@@ -1579,6 +1859,7 @@ window.selectEditTopicStatus = selectEditTopicStatus;
 window.submitEditTopic = submitEditTopic;
 window.deleteTopic = deleteTopic;
 window.deleteTopicMessage = deleteTopicMessage;
+window.resetTopicsStateOnLogout = resetTopicsStateOnLogout;
 
 function enterTopicsPage(_route) {
     loadTopicsCatalog();
@@ -1607,33 +1888,6 @@ window.enterTopicsPage = enterTopicsPage;
 window.enterTopicDetailPage = enterTopicDetailPage;
 window.leaveTopicsPage = leaveTopicsPage;
 window.leaveTopicDetailPage = leaveTopicDetailPage;
-
-// 注册全局路由响应钩子（兜底兼容）
-const prevOnAppRouteEnter = window.onAppRouteEnter;
-window.onAppRouteEnter = function(route, previous) {
-    if (typeof prevOnAppRouteEnter === 'function') {
-        try { prevOnAppRouteEnter(route, previous); } catch (_e) {}
-    }
-    if (route?.id === 'topics') {
-        loadTopicsCatalog();
-    } else if (route?.id === 'topic-detail' && route.params?.id) {
-        loadTopicDetail(route.params.id);
-    }
-};
-
-const prevOnAppRouteLeave = window.onAppRouteLeave;
-window.onAppRouteLeave = function(current, next) {
-    if (typeof prevOnAppRouteLeave === 'function') {
-        try { prevOnAppRouteLeave(current, next); } catch (_e) {}
-    }
-    if (current?.id === 'topic-detail') {
-        cleanupTopicRealtimeSubscription();
-        resetTopicComposer();
-        currentTopicDetail = null;
-        window.currentTopicDetail = null;
-        currentTopicMessages = [];
-    }
-};
 
 // 初始化弹窗背景点击关闭监听
 if (document.readyState === 'loading') {

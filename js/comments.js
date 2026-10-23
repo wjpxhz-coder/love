@@ -3,6 +3,8 @@ let commentImgFiles = {}; // momentId -> { id, file, objectUrl }[]
 let nextCommentImageId = 1;
 const commentLoadRequests = new Map();
 const commentSubmitRequests = new Set();
+const commentLikeInFlight = new Set();
+const commentDeleteInFlight = new Set();
 const activeCommentReplies = new Map(); // momentId -> { commentId, author, snippet, isAI }
 const activeAICommentReplies = new Set(); // momentId -> awaiting AI reply
 const MAX_COMMENT_TEXT_LENGTH = 1000;
@@ -357,6 +359,28 @@ async function loadComments(momentId, targetCard = null) {
         });
     }
 
+    const allCommentImageRefs = [];
+    data.forEach(comment => {
+        if (!comment || typeof comment.content !== 'string') return;
+        const trimmed = comment.content.trim();
+        if (!trimmed.startsWith('{')) return;
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (parsed && Array.isArray(parsed.images)) {
+                parsed.images.forEach(img => {
+                    if (typeof img === 'string' && img.trim()) {
+                        allCommentImageRefs.push(img.trim());
+                    }
+                });
+            }
+        } catch (_e) {}
+    });
+    if (allCommentImageRefs.length > 0 && typeof batchResolveMediaUrls === 'function') {
+        try {
+            await batchResolveMediaUrls(allCommentImageRefs);
+        } catch (_e) {}
+    }
+
     const resolvedContents = await Promise.all(data.map(comment => resolveCommentContent(comment.content)));
     if (!isCommentAuthEpochCurrent(requestAuthEpoch) || commentLoadRequests.get(momentId) !== requestId) return;
 
@@ -603,45 +627,53 @@ async function toggleCommentLike(commentId, momentId) {
         if (typeof openLoginModal === 'function') openLoginModal();
         return;
     }
-    const requestAuthEpoch = getCommentAuthEpoch();
+    const lockKey = String(commentId ?? '').trim();
+    if (!lockKey || commentLikeInFlight.has(lockKey)) return;
+    commentLikeInFlight.add(lockKey);
 
-    const btns = document.querySelectorAll(`[id="like-btn-${commentId}"]`);
-    const isLiked = btns.length ? btns[0].classList.contains('liked') : false;
+    try {
+        const requestAuthEpoch = getCommentAuthEpoch();
 
-    let error = null;
-    if (isLiked) {
-        // 取消点赞
-        if (!currentAuthUser || !currentAuthUser.id) return;
-        const res = await supabaseClient.from('comment_likes')
-            .delete()
-            .eq('comment_id', commentId)
-            .eq('user_id', currentAuthUser.id);
-        error = res.error;
-        if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
-        if (!error && currentAuthUser) {
-            await supabaseClient.from('notifications')
-                .update({ type: 'recalled', content: '此点赞互动已被对方撤回' })
-                .eq('type', 'like')
-                .eq('related_id', commentId.toString())
-                .eq('actor_id', currentAuthUser.id);
+        const btns = document.querySelectorAll(`[id="like-btn-${commentId}"]`);
+        const isLiked = btns.length ? btns[0].classList.contains('liked') : false;
+
+        let error = null;
+        if (isLiked) {
+            // 取消点赞
+            if (!currentAuthUser || !currentAuthUser.id) return;
+            const res = await supabaseClient.from('comment_likes')
+                .delete()
+                .eq('comment_id', commentId)
+                .eq('user_id', currentAuthUser.id);
+            error = res.error;
             if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
+            if (!error && currentAuthUser) {
+                await supabaseClient.from('notifications')
+                    .update({ type: 'recalled', content: '此点赞互动已被对方撤回' })
+                    .eq('type', 'like')
+                    .eq('related_id', commentId.toString())
+                    .eq('actor_id', currentAuthUser.id);
+                if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
+            }
+        } else {
+            // 点赞
+            const res = await supabaseClient.from('comment_likes')
+                .insert([{ comment_id: commentId }]);
+            error = res.error;
         }
-    } else {
-        // 点赞
-        const res = await supabaseClient.from('comment_likes')
-            .insert([{ comment_id: commentId }]);
-        error = res.error;
-    }
-    if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
+        if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
 
-    if (error) {
-        console.error('评论点赞失败:', error);
-        alert('点赞失败，请稍后重试。');
-        return;
-    }
+        if (error) {
+            console.error('评论点赞失败:', error);
+            alert('点赞失败，请稍后重试。');
+            return;
+        }
 
-    // 刷新该评论的点赞状态
-    updateSingleLike(commentId);
+        // 刷新该评论的点赞状态
+        await updateSingleLike(commentId);
+    } finally {
+        commentLikeInFlight.delete(lockKey);
+    }
 }
 
 async function updateSingleLike(commentId) {
@@ -672,51 +704,58 @@ async function deleteComment(commentId, momentId) {
     if (!hasCommentAuthContext()) return;
     const normalizedCommentId = Number(commentId);
     if (!Number.isSafeInteger(normalizedCommentId) || normalizedCommentId <= 0) return;
-    const requestAuthEpoch = getCommentAuthEpoch();
+    if (commentDeleteInFlight.has(normalizedCommentId)) return;
+    commentDeleteInFlight.add(normalizedCommentId);
 
-    // 撤回前收集该评论所包含的图片（用于物理清理，杜绝孤儿文件）
-    let mediaToDelete = [];
     try {
-        const { data: cRow } = await supabaseClient
-            .from('comments')
-            .select('content')
-            .eq('id', normalizedCommentId)
-            .maybeSingle();
-        if (cRow && cRow.content) {
-            try {
-                const parsed = JSON.parse(cRow.content);
-                if (parsed && Array.isArray(parsed.images)) {
-                    mediaToDelete = parsed.images;
-                }
-            } catch (_) {}
-        }
-    } catch (collectErr) {
-        console.warn('收集待撤回评论媒体失败:', collectErr);
-    }
+        const requestAuthEpoch = getCommentAuthEpoch();
 
-    const { data: deleted, error } = await supabaseClient.rpc('recall_and_delete_comment', {
-        p_comment_id: normalizedCommentId
-    });
-    if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
-    if (error || deleted !== true) {
-        console.error('撤回评论失败:', error);
-        alert('撤回失败，请稍后重试。');
-    } else {
-        // 撤回成功后，物理清理该评论包含的图片
-        if (mediaToDelete.length > 0) {
-            removeUploadedCommentObjects(mediaToDelete);
+        // 撤回前收集该评论所包含的图片（用于物理清理，杜绝孤儿文件）
+        let mediaToDelete = [];
+        try {
+            const { data: cRow } = await supabaseClient
+                .from('comments')
+                .select('content')
+                .eq('id', normalizedCommentId)
+                .maybeSingle();
+            if (cRow && cRow.content) {
+                try {
+                    const parsed = JSON.parse(cRow.content);
+                    if (parsed && Array.isArray(parsed.images)) {
+                        mediaToDelete = parsed.images;
+                    }
+                } catch (_) {}
+            }
+        } catch (collectErr) {
+            console.warn('收集待撤回评论媒体失败:', collectErr);
         }
 
-        const items = document.querySelectorAll(`[id="comment-${normalizedCommentId}"]`);
-        items.forEach(item => {
-            item.style.transition = 'opacity 0.3s, transform 0.3s';
-            item.style.opacity = '0';
-            item.style.transform = 'translateX(-10px)';
+        const { data: deleted, error } = await supabaseClient.rpc('recall_and_delete_comment', {
+            p_comment_id: normalizedCommentId
         });
-        setTimeout(() => {
-            loadComments(momentId);
-            loadCommentCounts([momentId]);
-        }, 300);
+        if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
+        if (error || deleted !== true) {
+            console.error('撤回评论失败:', error);
+            alert('撤回失败，请稍后重试。');
+        } else {
+            // 撤回成功后，物理清理该评论包含的图片
+            if (mediaToDelete.length > 0) {
+                removeUploadedCommentObjects(mediaToDelete);
+            }
+
+            const items = document.querySelectorAll(`[id="comment-${normalizedCommentId}"]`);
+            items.forEach(item => {
+                item.style.transition = 'opacity 0.3s, transform 0.3s';
+                item.style.opacity = '0';
+                item.style.transform = 'translateX(-10px)';
+            });
+            setTimeout(() => {
+                loadComments(momentId);
+                loadCommentCounts([momentId]);
+            }, 300);
+        }
+    } finally {
+        commentDeleteInFlight.delete(normalizedCommentId);
     }
 }
 

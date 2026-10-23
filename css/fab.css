@@ -39,11 +39,12 @@
     opacity: 1;
     transform: translateX(0);
 }
-.fab-item-wrapper:nth-child(1) { transition-delay: 0.04s; }
-.fab-item-wrapper:nth-child(2) { transition-delay: 0.08s; }
-.fab-item-wrapper:nth-child(3) { transition-delay: 0.12s; }
-.fab-item-wrapper:nth-child(4) { transition-delay: 0.16s; }
-.fab-item-wrapper:nth-child(5) { transition-delay: 0.20s; }
+.fab-item-wrapper:nth-child(6) { transition-delay: 0.02s; }
+.fab-item-wrapper:nth-child(5) { transition-delay: 0.05s; }
+.fab-item-wrapper:nth-child(4) { transition-delay: 0.08s; }
+.fab-item-wrapper:nth-child(3) { transition-delay: 0.11s; }
+.fab-item-wrapper:nth-child(2) { transition-delay: 0.14s; }
+.fab-item-wrapper:nth-child(1) { transition-delay: 0.17s; }
 
 .fab-label {
     position: absolute;
@@ -119,6 +120,7 @@
 }
 /* 柔和晚霞暮光色相体系 */
 .fab-item-miss       { background: linear-gradient(135deg, #fb7185, #e11d48); } /* 一键想你：心动粉红 */
+.fab-item-topics     { background: linear-gradient(135deg, #fb7185, #e11d48); } /* 恋爱小本本：山茶粉红 */
 .fab-item-chat       { background: linear-gradient(135deg, #c084fc, #9333ea); } /* 感情助手聊天：静谧紫 */
 .fab-item-ai         { background: linear-gradient(135deg, #f472b6, #db2777); } /* 感情助手：浪漫洋红 */
 .fab-item-filter     { background: linear-gradient(135deg, #818cf8, #6366f1); } /* 检索回忆：晨曦蓝紫 */

@@ -69,6 +69,7 @@
     margin: 12px auto 0;
     display: inline-block;
     box-shadow: var(--shadow-soft);
+    text-shadow: none;
     animation: taglineAppear 1s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both;
 }
 

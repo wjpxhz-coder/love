@@ -305,3 +305,269 @@ function locateToMoment() {
     }
 }
 
+function drawRoundedRectPath(ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + width, y, x + width, y + height, r);
+    ctx.arcTo(x + width, y + height, x, y + height, r);
+    ctx.arcTo(x, y + height, x, y, r);
+    ctx.arcTo(x, y, x + width, y, r);
+    ctx.closePath();
+}
+
+function loadPolaroidImage(url) {
+    return new Promise((resolve) => {
+        if (!url) {
+            resolve(null);
+            return;
+        }
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        const timer = setTimeout(() => resolve(null), 8000);
+        img.onload = () => {
+            clearTimeout(timer);
+            resolve(img);
+        };
+        img.onerror = () => {
+            clearTimeout(timer);
+            resolve(null);
+        };
+        img.src = url;
+    });
+}
+
+function wrapPolaroidTextLines(ctx, text, maxWidth, maxLines = 5) {
+    const normalized = String(text || '').replace(/\r/g, '').trim() || '✨ 珍藏在时光里的温柔碎片';
+    const paragraphs = normalized.split('\n');
+    const lines = [];
+
+    for (const para of paragraphs) {
+        const chars = Array.from(para.trim() || ' ');
+        let currentLine = '';
+        for (const ch of chars) {
+            const testLine = currentLine + ch;
+            if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+                lines.push(currentLine);
+                currentLine = ch;
+                if (lines.length >= maxLines) break;
+            } else {
+                currentLine = testLine;
+            }
+        }
+        if (lines.length >= maxLines) {
+            const lastIdx = maxLines - 1;
+            lines[lastIdx] = lines[lastIdx].replace(/.$/, '…');
+            break;
+        }
+        if (currentLine) {
+            lines.push(currentLine);
+            if (lines.length >= maxLines) break;
+        }
+    }
+    return lines;
+}
+
+window.exportBlindBoxPolaroid = async function() {
+    const moment = window.currentBlindBoxMoment;
+    if (!moment) {
+        if (typeof showToast === 'function') showToast('请先抽取一张盲盒回忆再生成纪念卡哦 🎲');
+        return;
+    }
+
+    const btn = document.getElementById('btn-blindbox-polaroid');
+    const prevLabel = btn ? btn.textContent : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ 正在显影拍立得...';
+    }
+
+    try {
+        let imageUrl = '';
+        let bodyText = '';
+        if (moment.type === 'photo') {
+            imageUrl = sanitizeMediaUrl(moment.content);
+            bodyText = '📷 定格的温柔瞬间';
+        } else if (moment.type === 'audio') {
+            bodyText = '🎙️ 藏在声音里的心动悄悄话';
+        } else if (moment.type === 'moment') {
+            try {
+                const parsed = JSON.parse(moment.content || '{}');
+                bodyText = String(parsed.text || '').trim();
+                const images = Array.isArray(parsed.images) ? parsed.images : [];
+                const firstVisual = images.find(u => {
+                    const clean = sanitizeMediaUrl(u);
+                    return clean && !(typeof isVideoMediaUrl === 'function' && isVideoMediaUrl(clean));
+                });
+                if (firstVisual) imageUrl = sanitizeMediaUrl(firstVisual);
+                if (!bodyText && parsed.audio) bodyText = '🎙️ 附带一段温柔语音记录';
+            } catch (_e) {
+                bodyText = String(moment.content || '').trim();
+            }
+        } else {
+            bodyText = String(moment.content || '').trim();
+        }
+
+        const loadedImg = await loadPolaroidImage(imageUrl);
+
+        const canvas = document.createElement('canvas');
+        const width = 720;
+        const height = 960;
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        // 1. 柔和渐变暖色背景
+        const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+        bgGrad.addColorStop(0, '#fff7f9');
+        bgGrad.addColorStop(0.5, '#fdf2f7');
+        bgGrad.addColorStop(1, '#f8eef9');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // 2. 拍立得白色相纸外框与立体阴影
+        const cardX = 48;
+        const cardY = 44;
+        const cardW = width - cardX * 2;
+        const cardH = height - cardY * 2;
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(180, 120, 145, 0.22)';
+        ctx.shadowBlur = 34;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 16;
+        drawRoundedRectPath(ctx, cardX, cardY, cardW, cardH, 26);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.restore();
+
+        // 3. 顶部专属标题水印
+        ctx.fillStyle = '#c97a95';
+        ctx.font = '600 22px "Noto Serif SC", "PingFang SC", "Microsoft YaHei", serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('小蛇 ♡ 小奚 · 时光拍立得', width / 2, cardY + 46);
+
+        // 4. 相纸主视觉区域（居中裁剪图片或信笺底纹）
+        const frameX = cardX + 36;
+        const frameY = cardY + 72;
+        const frameW = cardW - 72;
+        const frameH = 480;
+
+        ctx.save();
+        drawRoundedRectPath(ctx, frameX, frameY, frameW, frameH, 16);
+        ctx.clip();
+
+        if (loadedImg && loadedImg.width > 0 && loadedImg.height > 0) {
+            const imgRatio = loadedImg.width / loadedImg.height;
+            const boxRatio = frameW / frameH;
+            let sx = 0, sy = 0, sw = loadedImg.width, sh = loadedImg.height;
+            if (imgRatio > boxRatio) {
+                sw = loadedImg.height * boxRatio;
+                sx = (loadedImg.width - sw) / 2;
+            } else {
+                sh = loadedImg.width / boxRatio;
+                sy = (loadedImg.height - sh) / 2;
+            }
+            ctx.drawImage(loadedImg, sx, sy, sw, sh, frameX, frameY, frameW, frameH);
+        } else {
+            const paperGrad = ctx.createLinearGradient(frameX, frameY, frameX + frameW, frameY + frameH);
+            paperGrad.addColorStop(0, '#fff5f8');
+            paperGrad.addColorStop(1, '#fcebf2');
+            ctx.fillStyle = paperGrad;
+            ctx.fillRect(frameX, frameY, frameW, frameH);
+
+            ctx.strokeStyle = 'rgba(217, 138, 167, 0.22)';
+            ctx.lineWidth = 1.5;
+            for (let y = frameY + 76; y < frameY + frameH - 40; y += 46) {
+                ctx.beginPath();
+                ctx.moveTo(frameX + 42, y);
+                ctx.lineTo(frameX + frameW - 42, y);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = 'rgba(201, 122, 149, 0.26)';
+            ctx.font = '48px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('🌸 💌 ✨', width / 2, frameY + 125);
+
+            ctx.fillStyle = '#5e434d';
+            ctx.font = '500 26px "Noto Serif SC", "PingFang SC", "Microsoft YaHei", serif';
+            const innerLines = wrapPolaroidTextLines(ctx, bodyText, frameW - 96, 6);
+            innerLines.forEach((line, idx) => {
+                ctx.fillText(line, width / 2, frameY + 195 + idx * 46);
+            });
+        }
+        ctx.restore();
+
+        // 相纸内框细描边
+        ctx.save();
+        drawRoundedRectPath(ctx, frameX, frameY, frameW, frameH, 16);
+        ctx.strokeStyle = 'rgba(217, 138, 167, 0.25)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+
+        // 5. 摘录正文文案
+        ctx.fillStyle = '#4a353d';
+        ctx.font = '500 24px "Noto Serif SC", "PingFang SC", "Microsoft YaHei", serif';
+        ctx.textAlign = 'center';
+        const captionText = loadedImg ? (bodyText || '✨ 把这一刻的心动装进拍立得里') : '✨ 愿岁岁年年，都有今日的温柔回响';
+        const captionLines = wrapPolaroidTextLines(ctx, captionText, frameW - 24, 3);
+        captionLines.forEach((line, index) => {
+            ctx.fillText(line, width / 2, frameY + frameH + 54 + index * 38);
+        });
+
+        // 6. 发布日期与作者昵称
+        const createdAt = new Date(moment.created_at);
+        const dateStr = Number.isNaN(createdAt.getTime())
+            ? '美好的一天'
+            : `${createdAt.getFullYear()}.${String(createdAt.getMonth() + 1).padStart(2, '0')}.${String(createdAt.getDate()).padStart(2, '0')} ${String(createdAt.getHours()).padStart(2, '0')}:${String(createdAt.getMinutes()).padStart(2, '0')}`;
+        const profile = (typeof allProfilesCache === 'object' && allProfilesCache?.[moment.author]) || {};
+        const authorName = profile.nickname || moment.author || '成员';
+
+        ctx.fillStyle = '#9c7a86';
+        ctx.font = '400 20px "PingFang SC", "Microsoft YaHei", sans-serif';
+        ctx.fillText(`📅 ${dateStr}  ·  来自 ${authorName}`, width / 2, cardY + cardH - 82);
+
+        // 7. 底部相伴天数印章
+        const refStartDate = typeof startDate !== 'undefined' && startDate instanceof Date
+            ? startDate
+            : new Date(2025, 1, 20, 0, 0, 0);
+        const togetherDays = Math.max(1, Math.floor((Date.now() - refStartDate.getTime()) / 86400000));
+
+        ctx.fillStyle = '#d46a8c';
+        ctx.font = '600 21px "PingFang SC", "Microsoft YaHei", sans-serif';
+        ctx.fillText(`💖 我们已相伴 ${togetherDays} 天`, width / 2, cardY + cardH - 36);
+
+        // 8. 导出 PNG 并触发下载
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error('生成图片数据失败');
+
+        const fileDateTag = Number.isNaN(createdAt.getTime())
+            ? new Date().toISOString().slice(0, 10)
+            : `${createdAt.getFullYear()}${String(createdAt.getMonth() + 1).padStart(2, '0')}${String(createdAt.getDate()).padStart(2, '0')}`;
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = `小蛇和小奚_回忆盲盒_${fileDateTag}.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
+
+        if (typeof showToast === 'function') {
+            showToast('📸 拍立得纪念卡已生成并保存！');
+        }
+    } catch (err) {
+        console.error('导出盲盒拍立得纪念卡失败:', err);
+        if (typeof showToast === 'function') {
+            showToast('生成纪念卡失败，请稍后重试 😢');
+        }
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = prevLabel || '📸 生成拍立得纪念卡';
+        }
+    }
+};
+

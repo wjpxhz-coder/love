@@ -27,11 +27,12 @@ function updateTimer() {
 }
 let timerInterval = setInterval(updateTimer, 1000);
 document.addEventListener('visibilitychange', () => {
-if (document.hidden) {
-    clearInterval(timerInterval);
-} else {
-    updateTimer();
-    timerInterval = setInterval(updateTimer, 1000);
-}
+    if (document.hidden) {
+        clearInterval(timerInterval);
+    } else {
+        clearInterval(timerInterval);
+        updateTimer();
+        timerInterval = setInterval(updateTimer, 1000);
+    }
 });
 updateTimer();

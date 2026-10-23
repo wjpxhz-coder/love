@@ -5,10 +5,25 @@
 
 /* ---------------- 首页手账专属板块 ---------------- */
 .home-topics-section {
-    margin: 28px 0 20px;
-    padding: 0;
+    margin: 0 0 24px;
+    padding: 24px 22px;
     position: relative;
     z-index: 2;
+    background: var(--glass-surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1.5px solid var(--border);
+    border-radius: var(--jelly-radius-lg, 28px);
+    box-shadow: var(--shadow-soft);
+}
+
+@media (max-width: 768px) {
+    .home-topics-section {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: var(--surface-elevated);
+        padding: 18px 14px;
+    }
 }
 
 .home-topics-header {
@@ -353,8 +368,8 @@
 /* 浮动新建手账按钮 */
 .topics-fab-add {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
+    bottom: max(24px, calc(18px + env(safe-area-inset-bottom, 0px)));
+    right: max(20px, calc(16px + env(safe-area-inset-right, 0px)));
     background: linear-gradient(135deg, #ff758c 0%, #ff5277 100%);
     color: #fff;
     border: none;
@@ -765,6 +780,109 @@
 }
 
 /* ---------------- 深色主题适配 ---------------- */
+[data-theme="dark"] .home-topics-section {
+    background: var(--glass-surface);
+    border-color: var(--border);
+    box-shadow: var(--shadow-soft);
+}
+
+@media (max-width: 768px) {
+    [data-theme="dark"] .home-topics-section {
+        background: var(--surface-elevated);
+    }
+}
+
+[data-theme="dark"] .home-topics-title,
+[data-theme="dark"] .home-topic-card-title,
+[data-theme="dark"] .topic-list-card-title {
+    color: var(--text);
+}
+
+[data-theme="dark"] .btn-topics-more,
+[data-theme="dark"] .topics-filter-pill:not(.active),
+[data-theme="dark"] .topic-tool-btn:not(.btn-ai-helper),
+[data-theme="dark"] .category-radio-btn {
+    background: rgba(45, 28, 66, 0.78);
+    border-color: rgba(251, 113, 133, 0.25);
+    color: var(--text);
+}
+
+[data-theme="dark"] .btn-topics-more:hover,
+[data-theme="dark"] .topics-filter-pill:not(.active):hover,
+[data-theme="dark"] .topic-tool-btn:not(.btn-ai-helper):hover {
+    background: rgba(76, 29, 48, 0.65);
+    border-color: var(--primary);
+    color: var(--primary-light);
+}
+
+[data-theme="dark"] .category-radio-btn.selected {
+    background: rgba(251, 113, 133, 0.22);
+    border-color: var(--primary);
+    color: var(--primary-light);
+}
+
+[data-theme="dark"] .topic-tag.category-reconciliation {
+    background: rgba(225, 29, 72, 0.2);
+    color: #fda4af;
+    border-color: rgba(251, 113, 133, 0.35);
+}
+
+[data-theme="dark"] .topic-tag.category-study {
+    background: rgba(37, 99, 235, 0.22);
+    color: #93c5fd;
+    border-color: rgba(96, 165, 250, 0.35);
+}
+
+[data-theme="dark"] .topic-tag.category-trip {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+    border-color: rgba(52, 211, 153, 0.35);
+}
+
+[data-theme="dark"] .topic-tag.category-promise {
+    background: rgba(219, 39, 119, 0.22);
+    color: #f9a8d4;
+    border-color: rgba(244, 114, 182, 0.35);
+}
+
+[data-theme="dark"] .topic-tag.category-life,
+[data-theme="dark"] .topic-tag.category-general {
+    background: rgba(234, 88, 12, 0.22);
+    color: #fdba74;
+    border-color: rgba(251, 146, 60, 0.35);
+}
+
+[data-theme="dark"] .topic-status-badge.open {
+    background: rgba(217, 119, 6, 0.22);
+    color: #fcd34d;
+}
+
+[data-theme="dark"] .topic-status-badge.resolved {
+    background: rgba(5, 150, 105, 0.24);
+    color: #6ee7b7;
+}
+
+[data-theme="dark"] .btn-resolve-topic {
+    background: rgba(5, 150, 105, 0.22);
+    color: #6ee7b7;
+    border-color: rgba(52, 211, 153, 0.35);
+}
+
+[data-theme="dark"] .btn-resolve-topic:hover {
+    background: rgba(5, 150, 105, 0.34);
+}
+
+[data-theme="dark"] .btn-resolve-topic.is-resolved {
+    background: rgba(21, 128, 61, 0.26);
+    color: #86efac;
+}
+
+[data-theme="dark"] .topic-audio-recording-bar {
+    background: rgba(136, 19, 55, 0.35);
+    border-color: rgba(251, 113, 133, 0.4);
+    color: #fda4af;
+}
+
 [data-theme="dark"] .home-topic-card {
     background: rgba(30, 24, 34, 0.85);
     border-color: rgba(255, 150, 180, 0.15);
@@ -839,7 +957,8 @@
     background: var(--surface-bg-translucent, rgba(255, 255, 255, 0.75));
     border: 1px solid var(--border-color-light, rgba(255, 182, 193, 0.45));
     border-radius: 999px;
-    padding: 2px 8px;
+    padding: 5px 10px;
+    min-height: 30px;
     font-size: 0.72rem;
     font-weight: 600;
     color: var(--text-color, #4a383d);
@@ -896,6 +1015,14 @@
 .topic-topbar-action-icon-btn.danger:hover {
     background: #fee2e2;
     border-color: #ef4444;
+}
+
+@media (max-width: 680px) {
+    #topicDetailModal .btn-resolve-topic {
+        padding: 5px 10px;
+        font-size: 0.76rem;
+        white-space: nowrap;
+    }
 }
 
 /* ---------------- 弹窗全屏遮罩与居中修复 (解决点不开与样式重叠) ---------------- */

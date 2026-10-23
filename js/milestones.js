@@ -268,9 +268,11 @@ async function renderMilestonesContent() {
             const isStarred = starredMomentIds.has(item.id);
             return isMilestone || isStarred;
         });
-        const items = typeof hydrateMomentMediaRecord === 'function'
-            ? await Promise.all(selectedItems.map(item => hydrateMomentMediaRecord(item)))
-            : selectedItems;
+        const items = typeof batchHydrateMomentMediaRecords === 'function'
+            ? await batchHydrateMomentMediaRecords(selectedItems)
+            : (typeof hydrateMomentMediaRecord === 'function'
+                ? await Promise.all(selectedItems.map(item => hydrateMomentMediaRecord(item)))
+                : selectedItems);
         if (requestId !== milestoneRenderRequestId || !isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
 
         if (items.length === 0) {
