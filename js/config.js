@@ -133,11 +133,15 @@ async function resolveMediaUrl(value) {
     if (directUrl) return directUrl;
 
     const objectPath = getStorageObjectPath(value);
-    if (!objectPath || !currentAuthUser) return '';
-    const requestUserId = currentAuthUser.id;
-    const requestAuthEpoch = typeof authEpoch === 'number' ? authEpoch : null;
+    if (!objectPath) return '';
     const cachedUrl = getCachedSignedMediaUrl(objectPath);
     if (cachedUrl) return cachedUrl;
+
+    if (!currentAuthUser) {
+        return sanitizeMediaUrl(`${R2_STORAGE_URL}/storage/v1/object/photos/${objectPath}`) || '';
+    }
+    const requestUserId = currentAuthUser.id;
+    const requestAuthEpoch = typeof authEpoch === 'number' ? authEpoch : null;
 
     try {
         const { data, error } = await supabaseClient.storage
@@ -169,7 +173,16 @@ async function resolveMediaUrl(value) {
 async function batchResolveMediaUrls(values) {
     if (!Array.isArray(values) || values.length === 0) return [];
     if (!currentAuthUser || !supabaseClient) {
-        return values.map(v => sanitizeMediaUrl(v)).filter(Boolean);
+        return values.map(val => {
+            if (typeof val !== 'string') return '';
+            const direct = sanitizeMediaUrl(val);
+            if (direct) return direct;
+            const objPath = getStorageObjectPath(val);
+            if (!objPath) return '';
+            const cachedUrl = getCachedSignedMediaUrl(objPath);
+            if (cachedUrl) return cachedUrl;
+            return sanitizeMediaUrl(`${R2_STORAGE_URL}/storage/v1/object/photos/${objPath}`) || '';
+        }).filter(Boolean);
     }
 
     const requestUserId = currentAuthUser.id;
@@ -569,12 +582,15 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.92';
+const APP_VERSION = 'v3.9.93';
 const CONFIG = {
-    version: 'v3.9.92',
+    version: 'v3.9.93',
     date: '2026-10-24',
-    title: '云端相册全量迁移至 Cloudflare R2 全球边缘存储 ☁️⚡💖',
+    title: '全量视频流式播放与首帧智能感知修复 🎬⚡💖',
     features: [
+        '视频播放修复：恢复原生首帧嗅探与 Range 分段流畅播放，彻底根除九宫格黑屏假死与未登录媒体洗空缺陷 🎬⚡',
+        '边缘流媒体适配：全量兼容 .mov/.mp4 双模式，无缝降级原片下载与移动端防阻断自动静音起播 🛡️',
+        '存储架构平稳运行：基于 Cloudflare R2 全球边缘存储，零出口流量费用、离线秒开 ☁️💖',
         '存储架构升级：全量 209 个相册与视频媒体无缝迁移至 Cloudflare R2，零出口流量限制、全球边缘极速加载 ☁️⚡',
         '全栈安全加固：升级相册存储桶与动态编辑 RLS 细粒度权限，登出自动彻底擦除私密状态与媒体缓存 🛡️',
         '手账体验全面进化：支持 Agnes AI 温柔智囊、增量无闪烁消息流、多图灯箱左右滑动及发送异常自动回滚 💌',
