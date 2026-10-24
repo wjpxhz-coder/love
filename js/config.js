@@ -582,9 +582,9 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.93';
+const APP_VERSION = 'v3.9.94';
 const CONFIG = {
-    version: 'v3.9.93',
+    version: 'v3.9.94',
     date: '2026-10-24',
     title: '全量视频流式播放与首帧智能感知修复 🎬⚡💖',
     features: [

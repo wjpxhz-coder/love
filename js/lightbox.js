@@ -385,21 +385,23 @@ function showLightboxItem(index, animate = false) {
     if (fallback) fallback.style.display = 'none';
     video.pause();
     video.style.display = 'none';
-    video.removeAttribute('src');
-    video.load();
+    video.onerror = null;
+
+    if (window._lightboxVideoFallbackTimer) {
+        clearTimeout(window._lightboxVideoFallbackTimer);
+        window._lightboxVideoFallbackTimer = null;
+    }
 
     if (isLightboxVideoUrl(safeSrc)) {
         const cleanVideoSrc = safeSrc.replace(/#t=[\d.]+.*$/, '');
-        video.src = cleanVideoSrc;
-        video.preload = 'auto';
-        video.currentTime = 0;
-        video.playsInline = true;
-        video.setAttribute('playsinline', '');
-        video.style.display = 'block';
-        video.load();
 
-        video.onerror = () => {
-            console.warn('[Lightbox] 视频加载失败，可能是当前浏览器不支持该视频编码 (如苹果 MOV/HEVC):', cleanVideoSrc);
+        const triggerFallback = (reason) => {
+            console.warn('[Lightbox] 视频画面不可解码，启用安全降级通道:', reason, cleanVideoSrc);
+            video.style.display = 'none';
+            if (window._lightboxVideoFallbackTimer) {
+                clearTimeout(window._lightboxVideoFallbackTimer);
+                window._lightboxVideoFallbackTimer = null;
+            }
             if (fallback) {
                 if (downloadBtn) {
                     downloadBtn.href = cleanVideoSrc;
@@ -411,11 +413,45 @@ function showLightboxItem(index, animate = false) {
                 fallback.style.display = 'block';
             }
             if (typeof showToast === 'function') {
-                showToast('该视频格式在当前浏览器无法直接播放，已提供下载/原片查看通道', 4500);
+                showToast('当前浏览器暂不支持该视频编码画面，已提供原片下载与新标签页播放', 4500);
             }
         };
 
-        // 优先尝试有声播放；若被移动端/浏览器策略拦截（NotAllowedError），自动降级为静音预起播保证画面呈现
+        video.onerror = () => triggerFallback('video.onerror (MEDIA_ERR)');
+        video.crossOrigin = 'anonymous';
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.preload = 'metadata';
+        video.style.display = 'block';
+
+        let hasValidDimensions = false;
+        const onMetadata = () => {
+            if (video.videoWidth > 0 && video.videoHeight > 0) {
+                hasValidDimensions = true;
+                if (window._lightboxVideoFallbackTimer) {
+                    clearTimeout(window._lightboxVideoFallbackTimer);
+                    window._lightboxVideoFallbackTimer = null;
+                }
+            } else {
+                triggerFallback('videoWidth is 0 (unsupported codec)');
+            }
+        };
+
+        video.addEventListener('loadedmetadata', onMetadata, { once: true });
+        video.addEventListener('canplay', () => {
+            if (video.videoWidth > 0) hasValidDimensions = true;
+        }, { once: true });
+
+        // 设置安全降级计时器，若 2.5 秒内无任何画面维度或处于故障状态自动降级展示
+        window._lightboxVideoFallbackTimer = setTimeout(() => {
+            if (!hasValidDimensions && (video.videoWidth === 0 || video.networkState === 3 || video.error)) {
+                triggerFallback('timeout: no decoded video dimensions');
+            }
+        }, 2500);
+
+        video.src = cleanVideoSrc;
+
+        // 优先尝试有声播放；若被拦截则降级为静音播放
         video.muted = false;
         const playPromise = video.play();
         if (playPromise && typeof playPromise.catch === 'function') {
@@ -528,6 +564,10 @@ function closeLightbox(event) {
     lightboxGallery = [];
     lightboxCurrentIndex = 0;
 
+    if (window._lightboxVideoFallbackTimer) {
+        clearTimeout(window._lightboxVideoFallbackTimer);
+        window._lightboxVideoFallbackTimer = null;
+    }
     if (video) {
         video.onerror = null;
         video.pause();
