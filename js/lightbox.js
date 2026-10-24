@@ -415,9 +415,16 @@ function showLightboxItem(index, animate = false) {
             }
         };
 
+        // 优先尝试有声播放；若被移动端/浏览器策略拦截（NotAllowedError），自动降级为静音预起播保证画面呈现
+        video.muted = false;
         const playPromise = video.play();
         if (playPromise && typeof playPromise.catch === 'function') {
-            playPromise.catch(() => {});
+            playPromise.catch((playErr) => {
+                if (playErr && playErr.name === 'NotAllowedError') {
+                    video.muted = true;
+                    video.play().catch(() => {});
+                }
+            });
         }
     } else {
         img.decoding = 'async';

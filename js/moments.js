@@ -1836,8 +1836,8 @@ function createMomentMedia(rawUrl, className, options = {}) {
     if (isVideo) {
         media.playsInline = true;
         media.setAttribute('playsinline', '');
-        // 关键改动：视频元素 preload 严格锁定为 'none'，禁止进入页面时主动拉取视频流与 Range 探测
-        media.preload = 'none';
+        // 智能预加载策略：有静态海报时保持 none 节省流量；无海报时（如历史全量视频）设为 metadata 以允许浏览器轻量解码首帧
+        media.preload = posterUrl ? 'none' : (options.preload || 'metadata');
         if (posterUrl) {
             media.poster = posterUrl;
         }
@@ -1858,7 +1858,13 @@ function createMomentMedia(rawUrl, className, options = {}) {
         if (posterUrl || media.readyState >= 1) {
             handleVideoLoaded();
         } else {
-            media.addEventListener('loadedmetadata', handleVideoLoaded, { once: true });
+            media.addEventListener('loadedmetadata', () => {
+                handleVideoLoaded();
+                if (!options.controls && media.currentTime === 0) {
+                    try { media.currentTime = 0.001; } catch (_) {}
+                }
+            }, { once: true });
+            media.addEventListener('loadeddata', handleVideoLoaded, { once: true });
             media.addEventListener('canplay', handleVideoLoaded, { once: true });
             media.addEventListener('play', handleVideoLoaded, { once: true });
             media.addEventListener('error', handleVideoLoaded, { once: true });
@@ -1889,8 +1895,8 @@ function createMomentMedia(rawUrl, className, options = {}) {
         }
     }
 
-    // 彻底移除 #t=0.001 分段参数，保持纯净规范的媒体源地址
-    const finalMediaSrc = url;
+    // 若无静态海报且为视频，自动附带 #t=0.001 提示浏览器解码首帧海报（HTML5 Media Fragment 规范）
+    const finalMediaSrc = (isVideo && !posterUrl && !url.includes('#t=')) ? `${url}#t=0.001` : url;
     if (options.deferLoad) {
         media.dataset.deferredSrc = finalMediaSrc;
     } else {
@@ -2104,7 +2110,7 @@ function createMomentCardElement(item, options = {}) {
                 lightbox: !isVid,
                 priority: isPriorityCard,
                 poster: posterUrl,
-                preload: 'none'
+                preload: posterUrl ? 'none' : 'metadata'
             });
             if (single) {
                 if (single.tagName === 'VIDEO') {
@@ -2128,7 +2134,7 @@ function createMomentCardElement(item, options = {}) {
                 const posterUrl = isVid ? getPosterForVideo(url, parsedMoment?.video_posters) : '';
                 const media = createMomentMedia(url, `moment-grid-item${isHidden ? ' hidden-image' : ''}`, {
                     autoplay: false, // 九宫格中不自动并发全量拉取，节省流量与带宽
-                    preload: 'none',
+                    preload: isHidden ? 'none' : (posterUrl ? 'none' : 'metadata'),
                     deferLoad: isHidden, // 超过 9 张的折叠项延迟拉取
                     lightbox: true,
                     priority: isPriorityCard && index < 4,
