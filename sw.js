@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'love-diary-';
-const CACHE_NAME = 'love-diary-v3.9.93';
+const CACHE_NAME = 'love-diary-v3.9.94';
 const MEDIA_CACHE_NAME = 'love-diary-media-v1';
 const MAX_MEDIA_CACHE_ENTRIES = 160;
 const R2_MEDIA_HOST = 'media.xiaoxi666.kdns.fr';
