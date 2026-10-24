@@ -20,13 +20,17 @@ const ANNIVERSARIES = [
 
 const SUPABASE_URL = 'https://tveiegolbotlqpjpwpes.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_AhdN1U9vSR1efN_5zDYMLQ_D_fyt3gN';
+const R2_STORAGE_URL = 'https://media.xiaoxi666.kdns.fr';
+const SUPABASE_HOST = new URL(SUPABASE_URL).hostname;
+const R2_STORAGE_HOST = new URL(R2_STORAGE_URL).hostname;
 const TRUSTED_MEDIA_HOSTS = new Set([
     window.location.hostname,
-    new URL(SUPABASE_URL).hostname
+    SUPABASE_HOST,
+    R2_STORAGE_HOST
 ]);
 const STORAGE_REFERENCE_PREFIX = 'storage://photos/';
 const signedMediaUrlCache = new Map();
-const SIGNED_MEDIA_SESSION_PREFIX = 'love_signed_media_';
+const SIGNED_MEDIA_SESSION_PREFIX = 'love_r2_signed_media_';
 
 function getCachedSignedMediaUrl(objectPath) {
     if (!objectPath) return '';
@@ -66,13 +70,20 @@ function setCachedSignedMediaUrl(objectPath, signedUrl, ttlMs = 50 * 60 * 1000) 
 
 /**
  * 将数据库中的媒体地址收敛到受信任来源。
- * 生产媒体只允许 HTTPS 的当前站点或本项目 Supabase 域；本地预览可显式允许 blob:。
+ * 生产媒体只允许 HTTPS 的当前站点、Cloudflare R2 媒体域或本项目 Supabase 域；本地预览可显式允许 blob:。
  */
 function sanitizeMediaUrl(value, { allowBlob = false } = {}) {
     if (typeof value !== 'string' || !value.trim()) return '';
     try {
         const url = new URL(value, window.location.href);
         if (allowBlob && url.protocol === 'blob:') return url.href;
+
+        // 自动将遗留的 Supabase photos 存储地址无缝重写至 Cloudflare R2 边缘域名
+        if (url.protocol === 'https:' && url.hostname === SUPABASE_HOST
+            && /^\/storage\/v1\/object\/(?:(?:sign|public|authenticated)\/)?photos\//i.test(url.pathname)) {
+            url.hostname = R2_STORAGE_HOST;
+            url.port = '';
+        }
 
         const isLocalDevelopment = (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]')
             && (url.protocol === 'http:' || url.protocol === 'https:');
@@ -148,7 +159,7 @@ async function resolveMediaUrl(value) {
     }
 
     // 弱网或断网降级：返回规范化路径。若 Service Worker 已在本地 CacheStorage 缓存该文件，将直接离线秒开命中
-    const canonicalFallback = sanitizeMediaUrl(`${SUPABASE_URL}/storage/v1/object/photos/${objectPath}`);
+    const canonicalFallback = sanitizeMediaUrl(`${R2_STORAGE_URL}/storage/v1/object/photos/${objectPath}`);
     return canonicalFallback || '';
 }
 
@@ -211,7 +222,7 @@ async function batchResolveMediaUrls(values) {
         if (!objPath) return '';
         const cached = getCachedSignedMediaUrl(objPath);
         if (cached) return cached;
-        return sanitizeMediaUrl(`${SUPABASE_URL}/storage/v1/object/photos/${objPath}`) || '';
+        return sanitizeMediaUrl(`${R2_STORAGE_URL}/storage/v1/object/photos/${objPath}`) || '';
     });
 }
 
@@ -298,7 +309,7 @@ function clearSignedMediaCache() {
         const keysToRemove = [];
         for (let i = 0; i < sessionStorage.length; i++) {
             const key = sessionStorage.key(i);
-            if (key && key.startsWith(SIGNED_MEDIA_SESSION_PREFIX)) {
+            if (key && (key.startsWith(SIGNED_MEDIA_SESSION_PREFIX) || key.startsWith('love_signed_media_'))) {
                 keysToRemove.push(key);
             }
         }
@@ -375,24 +386,196 @@ async function removeStorageObjects(pathsOrRefs) {
     }
 }
 
+function encodeStorageObjectPath(objectPath) {
+    return String(objectPath || '')
+        .replace(/^\/+/, '')
+        .split('/')
+        .map(seg => encodeURIComponent(seg))
+        .join('/');
+}
+
+async function getR2AuthHeaders(extraHeaders = {}) {
+    let token = '';
+    try {
+        if (supabaseClient && supabaseClient.auth) {
+            const { data } = await supabaseClient.auth.getSession();
+            token = data?.session?.access_token || '';
+        }
+    } catch (_e) {}
+    const headers = { ...extraHeaders };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+}
+
+/**
+ * Cloudflare R2 媒体存储桶适配器（兼容 @supabase/storage-js 的 photos 桶契约）。
+ */
+function createR2PhotosBucketAdapter() {
+    return {
+        async upload(path, file, options = {}) {
+            try {
+                const cleanPath = String(path || '').replace(/^\/+/, '');
+                if (!cleanPath) {
+                    return { data: null, error: new Error('Invalid storage path') };
+                }
+                const contentType = options.contentType
+                    || (file && file.type)
+                    || 'application/octet-stream';
+                const headers = await getR2AuthHeaders({
+                    'Content-Type': contentType,
+                    'x-upsert': String(Boolean(options.upsert))
+                });
+                const resp = await fetch(`${R2_STORAGE_URL}/storage/v1/object/photos/${encodeStorageObjectPath(cleanPath)}`, {
+                    method: 'POST',
+                    headers,
+                    body: file
+                });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok) {
+                    return {
+                        data: null,
+                        error: new Error(payload.message || payload.error || `R2 upload failed (${resp.status})`)
+                    };
+                }
+                return {
+                    data: {
+                        path: cleanPath,
+                        id: payload.Id || cleanPath,
+                        fullPath: payload.Key || `photos/${cleanPath}`
+                    },
+                    error: null
+                };
+            } catch (err) {
+                return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
+            }
+        },
+
+        async createSignedUrl(path, expiresIn = 3600) {
+            try {
+                const cleanPath = String(path || '').replace(/^\/+/, '');
+                if (!cleanPath) {
+                    return { data: null, error: new Error('Invalid storage path') };
+                }
+                const headers = await getR2AuthHeaders({
+                    'Content-Type': 'application/json'
+                });
+                const resp = await fetch(`${R2_STORAGE_URL}/storage/v1/object/sign/photos/${encodeStorageObjectPath(cleanPath)}`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ expiresIn })
+                });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok || !payload.signedUrl) {
+                    return {
+                        data: null,
+                        error: new Error(payload.error || `R2 sign failed (${resp.status})`)
+                    };
+                }
+                return {
+                    data: { signedUrl: payload.signedUrl, signedURL: payload.signedURL },
+                    error: null
+                };
+            } catch (err) {
+                return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
+            }
+        },
+
+        async createSignedUrls(paths, expiresIn = 3600) {
+            try {
+                if (!Array.isArray(paths) || paths.length === 0) {
+                    return { data: [], error: null };
+                }
+                const headers = await getR2AuthHeaders({
+                    'Content-Type': 'application/json'
+                });
+                const resp = await fetch(`${R2_STORAGE_URL}/storage/v1/object/sign/photos`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ paths, expiresIn })
+                });
+                const payload = await resp.json().catch(() => null);
+                if (!resp.ok || !Array.isArray(payload)) {
+                    return {
+                        data: null,
+                        error: new Error((payload && payload.error) || `R2 batch sign failed (${resp.status})`)
+                    };
+                }
+                return { data: payload, error: null };
+            } catch (err) {
+                return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
+            }
+        },
+
+        async remove(paths) {
+            try {
+                if (!Array.isArray(paths) || paths.length === 0) {
+                    return { data: [], error: null };
+                }
+                const headers = await getR2AuthHeaders({
+                    'Content-Type': 'application/json'
+                });
+                const resp = await fetch(`${R2_STORAGE_URL}/storage/v1/object/photos`, {
+                    method: 'DELETE',
+                    headers,
+                    body: JSON.stringify({ prefixes: paths })
+                });
+                const payload = await resp.json().catch(() => null);
+                if (!resp.ok) {
+                    return {
+                        data: null,
+                        error: new Error((payload && payload.error) || `R2 delete failed (${resp.status})`)
+                    };
+                }
+                return { data: Array.isArray(payload) ? payload : [], error: null };
+            } catch (err) {
+                return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
+            }
+        },
+
+        getPublicUrl(path) {
+            const cleanPath = String(path || '').replace(/^\/+/, '');
+            return {
+                data: {
+                    publicUrl: `${R2_STORAGE_URL}/storage/v1/object/public/photos/${encodeStorageObjectPath(cleanPath)}`
+                }
+            };
+        }
+    };
+}
+
 const supabaseClient = window.supabase?.createClient
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
         global: { fetch: (...args) => fetch(...args) }
     })
     : null;
 
+if (supabaseClient && supabaseClient.storage && typeof supabaseClient.storage.from === 'function') {
+    const nativeStorageFrom = supabaseClient.storage.from.bind(supabaseClient.storage);
+    const r2PhotosAdapter = createR2PhotosBucketAdapter();
+    supabaseClient.storage.from = function(bucketId) {
+        if (bucketId === 'photos') {
+            return r2PhotosAdapter;
+        }
+        return nativeStorageFrom(bucketId);
+    };
+}
+
+window.R2_STORAGE_URL = R2_STORAGE_URL;
 window.extractStorageObjectPath = extractStorageObjectPath;
 window.getSpaceStorageDirectory = getSpaceStorageDirectory;
 window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.91';
+const APP_VERSION = 'v3.9.92';
 const CONFIG = {
-    version: 'v3.9.90',
-    date: '2026-10-23',
-    title: '全栈安全加固、夜间玻璃拟态升级与极致丝滑体验 🛡️🌙✨',
+    version: 'v3.9.92',
+    date: '2026-10-24',
+    title: '云端相册全量迁移至 Cloudflare R2 全球边缘存储 ☁️⚡💖',
     features: [
+        '存储架构升级：全量 209 个相册与视频媒体无缝迁移至 Cloudflare R2，零出口流量限制、全球边缘极速加载 ☁️⚡',
         '全栈安全加固：升级相册存储桶与动态编辑 RLS 细粒度权限，登出自动彻底擦除私密状态与媒体缓存 🛡️',
         '手账体验全面进化：支持 Agnes AI 温柔智囊、增量无闪烁消息流、多图灯箱左右滑动及发送异常自动回滚 💌',
         '夜间模式与视觉打磨：深紫星空玻璃拟态全面适配，移动端顶栏与安全区防遮挡深度优化 🌙',
@@ -405,7 +588,3 @@ const CONFIG = {
     ]
 };
 const UPDATE_LOG = CONFIG;
-
-
-
-
