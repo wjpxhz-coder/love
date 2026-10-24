@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'love-diary-';
-const CACHE_NAME = 'love-diary-v3.9.95';
+const CACHE_NAME = 'love-diary-v3.9.96';
 const MEDIA_CACHE_NAME = 'love-diary-media-v1';
 const MAX_MEDIA_CACHE_ENTRIES = 160;
 const R2_MEDIA_HOST = 'media.xiaoxi666.kdns.fr';
@@ -14,7 +14,7 @@ const PRECACHE_ASSETS = [
     './css/variables.css', './css/base.css', './css/header.css', './css/timer.css', './css/timeline.css',
     './css/dialogs.css', './css/comments.css', './css/ai-panel.css', './css/fab.css', './css/auth.css',
     './css/profile.css', './css/notifications.css', './css/mood.css', './css/anniversary.css',
-    './css/effects.css', './css/responsive.css', './css/pages.css', './css/refresh.css', './css/topics.css',
+    './css/effects.css', './css/responsive.css', './css/pages.css', './css/refresh.css', './css/topics.css', './css/premium.css',
     './js/config.js', './js/animations.js', './js/timer.js', './js/auth.js', './js/profile.js',
     './js/moments.js', './js/milestones.js', './js/comments.js', './js/likes.js', './js/mood.js', './js/anniversary.js',
     './js/lightbox.js', './js/ai.js', './js/blindbox.js', './js/presence.js', './js/theme.js',

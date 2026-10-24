@@ -264,6 +264,24 @@ async function hydrateStructuredMediaContent(rawContent) {
             });
             parsed.video_posters = hydratedPosters;
         }
+        if (parsed.image_thumbnails && typeof parsed.image_thumbnails === 'object') {
+            const entries = Object.entries(parsed.image_thumbnails);
+            const thumbRefs = entries.map(([_, t]) => t);
+            const resolvedThumbs = await batchResolveMediaUrls(thumbRefs);
+            const hydratedThumbs = {};
+            entries.forEach(([imgRef, _], idx) => {
+                const resolvedThumb = resolvedThumbs[idx];
+                if (resolvedThumb) {
+                    hydratedThumbs[imgRef] = resolvedThumb;
+                    const imgObjPath = typeof extractStorageObjectPath === 'function' ? extractStorageObjectPath(imgRef) : '';
+                    if (imgObjPath) {
+                        hydratedThumbs[imgObjPath] = resolvedThumb;
+                    }
+                }
+            });
+            parsed.image_thumbnails = hydratedThumbs;
+        }
+
         return JSON.stringify(parsed);
     } catch (_error) {
         return rawContent;
@@ -304,6 +322,12 @@ async function batchHydrateMomentMediaRecords(records) {
                             if (p) allMediaValues.push(p);
                         });
                     }
+                    if (parsed.image_thumbnails && typeof parsed.image_thumbnails === 'object') {
+                        Object.values(parsed.image_thumbnails).forEach(t => {
+                            if (t) allMediaValues.push(t);
+                        });
+                    }
+
                 }
             } catch (_e) {}
         }
@@ -350,6 +374,7 @@ function parseMomentPayload(rawContent, type) {
                 text: typeof parsed.text === 'string' ? parsed.text : '',
                 images: Array.isArray(parsed.images) ? parsed.images.filter(Boolean) : [],
                 video_posters: (parsed.video_posters && typeof parsed.video_posters === 'object') ? parsed.video_posters : {},
+                image_thumbnails: (parsed.image_thumbnails && typeof parsed.image_thumbnails === 'object') ? parsed.image_thumbnails : {},
                 audio: typeof parsed.audio === 'string' ? parsed.audio : null,
                 is_milestone: Boolean(parsed.is_milestone)
             };
@@ -582,12 +607,15 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.95';
+const APP_VERSION = 'v3.9.96';
 const CONFIG = {
-    version: 'v3.9.95',
+    version: 'v3.9.96',
     date: '2026-10-24',
-    title: '全量视频智能前置抽帧与云端转码双重自愈保障 🎬🛡️✨',
+    title: '「玫瑰瓷 × 香槟金」高级质感视觉升级 🌹✨',
     features: [
+        '视觉质感升级：玫瑰瓷柔和配色、香槟金点缀、胶片颗粒纸感背景与多层真实光影，昼夜双主题同步焕新 🌹',
+        '九宫格缩略图与视频流零耗损海报化：上传多图生成轻量微缩图、列表零拉取视频流与全屏秒开 ⚡📸',
+        '排版精修：衬线数字计时器、发丝线区块标题、印章式锁定卡片与更克制细腻的交互动效 ✨',
         '视频播放修复：恢复原生首帧嗅探与 Range 分段流畅播放，彻底根除九宫格黑屏假死与未登录媒体洗空缺陷 🎬⚡',
         '边缘流媒体适配：全量兼容 .mov/.mp4 双模式，无缝降级原片下载与移动端防阻断自动静音起播 🛡️',
         '存储架构平稳运行：基于 Cloudflare R2 全球边缘存储，零出口流量费用、离线秒开 ☁️💖',
