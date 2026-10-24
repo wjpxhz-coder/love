@@ -1,7 +1,9 @@
 const CACHE_PREFIX = 'love-diary-';
-const CACHE_NAME = 'love-diary-v3.9.91';
+const CACHE_NAME = 'love-diary-v3.9.92';
 const MEDIA_CACHE_NAME = 'love-diary-media-v1';
 const MAX_MEDIA_CACHE_ENTRIES = 160;
+const R2_MEDIA_HOST = 'media.xiaoxi666.kdns.fr';
+const LEGACY_SUPABASE_HOST = 'tveiegolbotlqpjpwpes.supabase.co';
 
 // Only application-shell files are cached in CACHE_NAME.
 const PRECACHE_ASSETS = [
@@ -101,7 +103,7 @@ async function cacheFirstShell(request, canonicalUrl) {
 }
 
 function isCacheableStorageImage(request, url) {
-    if (url.hostname !== 'tveiegolbotlqpjpwpes.supabase.co') return false;
+    if (url.hostname !== R2_MEDIA_HOST && url.hostname !== LEGACY_SUPABASE_HOST) return false;
     if (!url.pathname.startsWith('/storage/v1/object/')) return false;
 
     // 严禁缓存带 Range 头的分段请求（视频/音频流式播放必定携带），避免 206 状态码导致 Cache.put 报错或播放器卡死
@@ -117,10 +119,10 @@ function isCacheableStorageImage(request, url) {
 }
 
 function getCanonicalMediaKey(url) {
-    // 规范化路径并剥离短期鉴权 token 参数，以持久化命中本地缓存
+    // 规范化路径并剥离短期鉴权 token 参数，统一归一化到 R2 媒体域名以持久化命中本地缓存
     const normalizedPath = url.pathname
         .replace(/^\/storage\/v1\/object\/(?:sign|public)\/photos\//, '/storage/v1/object/photos/');
-    return `https://${url.hostname}${normalizedPath}`;
+    return `https://${R2_MEDIA_HOST}${normalizedPath}`;
 }
 
 async function emergencyEvictMediaCache(cache) {
@@ -196,7 +198,7 @@ self.addEventListener('fetch', event => {
 
     const url = new URL(request.url);
 
-    // 针对 Supabase 静态图片执行 Cache-First 极速缓存，音视频与流媒体直连放行
+    // 针对 Cloudflare R2 / Supabase 静态图片执行 Cache-First 极速缓存，音视频与流媒体直连放行
     if (isCacheableStorageImage(request, url)) {
         event.respondWith(cacheFirstStorageMedia(request));
         return;

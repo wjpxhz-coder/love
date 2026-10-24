@@ -9,3 +9,9 @@ check_profiles.py
 supabase/.temp/
 diff.txt
 gitlog.txt
+
+# Cloudflare CLI and Worker local artifacts
+.cloudflare/
+cloudflare/*/.cloudflare/
+cloudflare/*/node_modules/
+cloudflare/*/.secrets.env
