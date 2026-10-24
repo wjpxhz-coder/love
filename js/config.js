@@ -582,11 +582,11 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.94';
+const APP_VERSION = 'v3.9.95';
 const CONFIG = {
-    version: 'v3.9.94',
+    version: 'v3.9.95',
     date: '2026-10-24',
-    title: '全量视频流式播放与首帧智能感知修复 🎬⚡💖',
+    title: '全量视频智能前置抽帧与云端转码双重自愈保障 🎬🛡️✨',
     features: [
         '视频播放修复：恢复原生首帧嗅探与 Range 分段流畅播放，彻底根除九宫格黑屏假死与未登录媒体洗空缺陷 🎬⚡',
         '边缘流媒体适配：全量兼容 .mov/.mp4 双模式，无缝降级原片下载与移动端防阻断自动静音起播 🛡️',

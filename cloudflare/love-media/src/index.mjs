@@ -376,6 +376,21 @@ export default {
 
         return jsonResponse({ results }, 200, request);
       }
+
+      if (pathname === "/_admin/upload" && (request.method === "POST" || request.method === "PUT")) {
+        const key = sanitizeObjectPath(url.searchParams.get("key") || "");
+        if (!key) {
+          return jsonResponse({ error: "Missing key" }, 400, request);
+        }
+        const contentType = request.headers.get("content-type") || inferMimeTypeFromPath(key);
+        const putRes = await env.PHOTOS_BUCKET.put(key, request.body, {
+          httpMetadata: {
+            contentType,
+            cacheControl: "public, max-age=31536000, immutable",
+          },
+        });
+        return jsonResponse({ name: key, status: "uploaded", size: putRes.size }, 200, request);
+      }
     }
 
     // 2. Batch Signed URLs: POST /storage/v1/object/sign/photos
