@@ -1079,19 +1079,22 @@ async function submitMomentPost() {
             for (let i = 0; i < totalFiles; i++) {
                 let file = momentSelectedFiles[i];
                 if (isMomentVideoFile(file)) {
-                    const needCompress = await isMomentVideoNeedsTranscode(file);
-                    if (needCompress) {
-                        btn.textContent = `⏳ 准备优化视频 (${i + 1}/${totalFiles})...`;
-                        file = await compressVideoFile(file, (progress) => {
-                            btn.textContent = `⏳ 视频兼容性转码 ${progress}% (${i + 1}/${totalFiles})...`;
-                        });
-                    }
+                    // 1. 优先提取高清首帧海报（利用当前设备原生硬解能力，确保即使转码耗时或弱网降级，九宫格也 100% 具备海报封面）
                     btn.textContent = `⏳ 提取视频海报 (${i + 1}/${totalFiles})...`;
                     let posterFile = null;
                     try {
                         posterFile = await captureVideoFrame(file);
                     } catch (frameErr) {
                         console.warn('提取视频海报失败，降级为无封面:', frameErr);
+                    }
+
+                    // 2. 检查并执行客户端全平台兼容性转码
+                    const needCompress = await isMomentVideoNeedsTranscode(file);
+                    if (needCompress) {
+                        btn.textContent = `⏳ 准备优化视频 (${i + 1}/${totalFiles})...`;
+                        file = await compressVideoFile(file, (progress) => {
+                            btn.textContent = `⏳ 视频兼容性转码 ${progress}% (${i + 1}/${totalFiles})...`;
+                        });
                     }
                     processedItems.push({ file, isVideo: true, posterFile });
                 } else if (file.type.startsWith('image/')) {
