@@ -17,6 +17,8 @@ let editingExistingMedia = []; // Array of { ref: string, url: string, isVideo: 
 let editingOriginalMediaRefs = [];
 let editingExistingVideoPosters = {};
 let editingOriginalVideoPosters = {};
+let editingExistingImageThumbnails = {};
+let editingOriginalImageThumbnails = {};
 let editingAudioRef = null;
 let editingAudioUrl = null;
 let editingOriginalAudioRef = null;
@@ -329,6 +331,9 @@ function renderExistingMediaPreviews(existingList) {
                 if (item.ref && editingExistingVideoPosters[item.ref]) {
                     delete editingExistingVideoPosters[item.ref];
                 }
+                if (item.ref && editingExistingImageThumbnails[item.ref]) {
+                    delete editingExistingImageThumbnails[item.ref];
+                }
             }
             if (media.tagName === 'VIDEO') releaseMomentVideo(media, true);
             previewItem.remove();
@@ -438,6 +443,10 @@ async function enterMomentPage(route) {
                     if (parsed.video_posters && typeof parsed.video_posters === 'object') {
                         editingExistingVideoPosters = { ...parsed.video_posters };
                         editingOriginalVideoPosters = { ...parsed.video_posters };
+                    }
+                    if (parsed.image_thumbnails && typeof parsed.image_thumbnails === 'object') {
+                        editingExistingImageThumbnails = { ...parsed.image_thumbnails };
+                        editingOriginalImageThumbnails = { ...parsed.image_thumbnails };
                     }
                 }
             } catch (e) {
@@ -606,6 +615,75 @@ let ffmpegInstance = null;
  * 3. 动图（GIF）自动跳过压缩，保护完整帧动效。
  * 4. 2K 超清分辨率自适应（最大边长 1920px，完美适配 Retina 视网膜屏与桌面端）。
  */
+
+/**
+ * 生成轻量九宫格缩略图（宽/高最大 360px，WebP 质量 0.65）
+ * 体积通常在 15KB~35KB，比 1920px 高清大图小 85%~95%，大幅释放滚动带宽。
+ */
+async function generateImageThumbnail(file, maxDim = 360, quality = 0.65) {
+    if (!file || !file.type.startsWith('image/')) return null;
+    if (file.type === 'image/gif' || (typeof file.name === 'string' && file.name.toLowerCase().endsWith('.gif'))) {
+        return null;
+    }
+    try {
+        const image = await new Promise((resolve, reject) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                resolve(img);
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('THUMB_IMAGE_DECODE_FAILED'));
+            };
+            img.src = url;
+        });
+
+        let { naturalWidth: width, naturalHeight: height } = image;
+        if (!width || !height) return null;
+
+        if (width <= maxDim && height <= maxDim && file.size <= 50 * 1024) {
+            return null;
+        }
+
+        if (width > maxDim || height > maxDim) {
+            const ratio = Math.min(maxDim / width, maxDim / height);
+            width = Math.max(1, Math.round(width * ratio));
+            height = Math.max(1, Math.round(height * ratio));
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+
+        const isPng = file.type === 'image/png';
+        if (!isPng) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+        }
+        ctx.drawImage(image, 0, 0, width, height);
+
+        let blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
+        let targetMime = 'image/webp';
+        let ext = 'webp';
+        if (!blob || blob.type !== 'image/webp') {
+            targetMime = isPng ? 'image/png' : 'image/jpeg';
+            ext = isPng ? 'png' : 'jpg';
+            blob = await new Promise(resolve => canvas.toBlob(resolve, targetMime, quality));
+        }
+
+        if (!blob) return null;
+        const baseName = (file.name || 'thumb').replace(/\.[^/.]+$/, '');
+        return new File([blob], `thumb_${baseName}.${ext}`, { type: targetMime });
+    } catch (err) {
+        console.warn('生成图片缩略图失败，降级使用原图:', err);
+        return null;
+    }
+}
+
 async function compressImageFile(file, maxWidth = 1920, maxHeight = 1920, quality = 0.80) {
     if (!file || !file.type.startsWith('image/')) return file;
     // GIF 动图不进行有损压缩
@@ -865,21 +943,24 @@ async function compressVideoFile(file, onProgress) {
         ffmpeg.FS('writeFile', inputName, fileBuffer);
 
         // 转码优化参数：
-        // 1. scale='min(1280,iw)':-2 限制最大宽度 1280px 并保持宽高比与偶数尺寸
-        // 2. -vcodec libx264 -pix_fmt yuv420p -crf 28 超清画质兼顾高压缩比与全端（Windows/Mac/iOS/Android）硬解兼容
-        // 3. -preset ultrafast 极速编码
-        // 4. -movflags +faststart 把元数据移至文件头部，实现边下边播秒开
-        // 5. -c:a aac -b:a 128k 高保真音频压缩
+        // 1. scale='min(960,iw)':-2 限制最大宽度 960px（适配移动端 720p/540p 视网膜高清），显著减小码率与文件体积
+        // 2. -vcodec libx264 -pix_fmt yuv420p -crf 29 超清画质兼顾极高压缩比与全端（Windows/Mac/iOS/Android）硬解兼容
+        // 3. -maxrate 1200k -bufsize 2400k 限制峰值码率，防止突发流量卡顿
+        // 4. -preset ultrafast 极速编码保护移动端内存
+        // 5. -movflags +faststart 把元数据移至文件头部，实现边下边播秒开
+        // 6. -c:a aac -b:a 96k 高保真音频压缩
         await ffmpeg.run(
             '-i', inputName,
-            '-vf', "scale='min(1280,iw)':-2",
+            '-vf', "scale='min(960,iw)':-2",
             '-vcodec', 'libx264',
             '-pix_fmt', 'yuv420p',
-            '-crf', '28',
+            '-crf', '29',
+            '-maxrate', '1200k',
+            '-bufsize', '2400k',
             '-preset', 'ultrafast',
             '-movflags', '+faststart',
             '-c:a', 'aac',
-            '-b:a', '128k',
+            '-b:a', '96k',
             outputName
         );
 
@@ -1099,8 +1180,12 @@ async function submitMomentPost() {
                     processedItems.push({ file, isVideo: true, posterFile });
                 } else if (file.type.startsWith('image/')) {
                     btn.textContent = `⏳ 正在优化画质 (${i + 1}/${totalFiles})...`;
+                    let thumbFile = null;
+                    try {
+                        thumbFile = await generateImageThumbnail(file);
+                    } catch (_) {}
                     file = await compressImageFile(file);
-                    processedItems.push({ file, isVideo: false });
+                    processedItems.push({ file, isVideo: false, thumbFile });
                 } else {
                     processedItems.push({ file, isVideo: false });
                 }
@@ -1109,6 +1194,7 @@ async function submitMomentPost() {
             // 第二阶段：并行极速上传
             let finishedUploads = 0;
             const videoPostersMap = {};
+            const imageThumbnailsMap = {};
             btn.textContent = totalFiles > 1 ? `⏳ 正在极速上传 (0/${totalFiles})…` : '⏳ 正在极速上传…';
             const uploadTasks = processedItems.map(async (item, index) => {
                 const fileExt = getMomentFileExtension(item.file);
@@ -1132,6 +1218,17 @@ async function submitMomentPost() {
                         videoPostersMap[mediaRef] = posterRef;
                     } catch (posterErr) {
                         console.warn('上传视频海报失败:', posterErr);
+                    }
+                } else if (!item.isVideo && item.thumbFile) {
+                    const thumbExt = item.thumbFile.type.includes('webp') ? 'webp' : 'jpg';
+                    const thumbFileName = `${storageDirectory}/thumb_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 9)}.${thumbExt}`;
+                    try {
+                        await uploadStorageFileWithTimeout('photos', thumbFileName, item.thumbFile, { contentType: item.thumbFile.type, upsert: false });
+                        uploadedObjectPaths.push(thumbFileName);
+                        const thumbRef = createStorageReference(thumbFileName);
+                        imageThumbnailsMap[mediaRef] = thumbRef;
+                    } catch (thumbErr) {
+                        console.warn('上传图片缩略图失败:', thumbErr);
                     }
                 }
 
@@ -1173,6 +1270,10 @@ async function submitMomentPost() {
             ...(editingExistingVideoPosters || {}),
             ...videoPostersMap
         };
+        const finalImageThumbnails = {
+            ...(editingExistingImageThumbnails || {}),
+            ...imageThumbnailsMap
+        };
 
         const momentPayload = {
             text: text,
@@ -1182,6 +1283,9 @@ async function submitMomentPost() {
         };
         if (Object.keys(finalVideoPosters).length > 0) {
             momentPayload.video_posters = finalVideoPosters;
+        }
+        if (Object.keys(finalImageThumbnails).length > 0) {
+            momentPayload.image_thumbnails = finalImageThumbnails;
         }
         if (isEditing) {
             momentPayload.updated_at = new Date().toISOString();
@@ -1238,6 +1342,9 @@ async function submitMomentPost() {
             removedMediaRefs.forEach(ref => {
                 if (editingOriginalVideoPosters && editingOriginalVideoPosters[ref]) {
                     removedMediaRefs.push(editingOriginalVideoPosters[ref]);
+                }
+                if (editingOriginalImageThumbnails && editingOriginalImageThumbnails[ref]) {
+                    removedMediaRefs.push(editingOriginalImageThumbnails[ref]);
                 }
             });
             if (removedMediaRefs.length > 0) {
@@ -1916,6 +2023,61 @@ function createMomentMedia(rawUrl, className, options = {}) {
     return media;
 }
 
+
+function getThumbnailForImage(imageUrlOrRef, thumbnailsMap) {
+    if (!imageUrlOrRef || !thumbnailsMap || typeof thumbnailsMap !== 'object') return '';
+    if (thumbnailsMap[imageUrlOrRef]) return thumbnailsMap[imageUrlOrRef];
+    const objPath = typeof extractStorageObjectPath === 'function' ? extractStorageObjectPath(imageUrlOrRef) : '';
+    if (objPath && thumbnailsMap[objPath]) return thumbnailsMap[objPath];
+    for (const [k, v] of Object.entries(thumbnailsMap)) {
+        const kPath = typeof extractStorageObjectPath === 'function' ? extractStorageObjectPath(k) : '';
+        if (kPath && kPath === objPath) return v;
+    }
+    return '';
+}
+
+function createMomentSingleVideoCard(videoUrl, posterUrl) {
+    const safeVideoUrl = sanitizeMediaUrl(videoUrl);
+    if (!safeVideoUrl) return null;
+    const safePosterUrl = sanitizeMediaUrl(posterUrl);
+
+    const card = createMomentNode('div', 'moment-single-video-card');
+    card.dataset.momentAction = 'open-lightbox';
+    card.dataset.mediaSrc = safeVideoUrl;
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', '播放视频');
+    card.title = '点击全屏播放视频';
+
+    if (safePosterUrl) {
+        const img = document.createElement('img');
+        img.className = 'moment-single-video-poster';
+        img.alt = '视频封面';
+        img.crossOrigin = 'anonymous';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.src = safePosterUrl;
+        card.appendChild(img);
+    } else {
+        const placeholder = createMomentNode('div', 'moment-single-video-placeholder');
+        const iconSpan = createMomentNode('span', 'moment-single-video-placeholder-icon', '🎬');
+        const textSpan = createMomentNode('span', 'moment-single-video-placeholder-text', '甜蜜回忆视频');
+        placeholder.append(iconSpan, textSpan);
+        card.appendChild(placeholder);
+    }
+
+    const overlay = createMomentNode('div', 'moment-single-video-overlay');
+    const playBtn = createMomentNode('div', 'moment-single-video-play-btn');
+    playBtn.innerHTML = '<svg class="moment-single-video-play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    overlay.appendChild(playBtn);
+
+    const pill = createMomentNode('div', 'moment-single-video-pill', '▶ 视频');
+    overlay.appendChild(pill);
+
+    card.appendChild(overlay);
+    return card;
+}
+
 function getPosterForVideo(videoUrlOrRef, postersMap) {
     if (!videoUrlOrRef || !postersMap || typeof postersMap !== 'object') return '';
     if (postersMap[videoUrlOrRef]) return postersMap[videoUrlOrRef];
@@ -2108,21 +2270,21 @@ function createMomentCardElement(item, options = {}) {
         if (images.length === 1) {
             const isVid = isVideoMediaUrl(images[0]);
             const posterUrl = isVid ? getPosterForVideo(images[0], parsedMoment?.video_posters) : '';
-            const single = createMomentMedia(images[0], 'moment-single-image', {
-                controls: isVid,
-                lightbox: !isVid,
-                priority: isPriorityCard,
-                poster: posterUrl,
-                preload: posterUrl ? 'none' : 'metadata'
-            });
-            if (single) {
-                if (single.tagName === 'VIDEO') {
-                    Object.assign(single.style, { width: '100%', borderRadius: '12px', marginTop: '10px' });
-                    single.addEventListener('error', () => {
-                        single.title = '若此视频在当前浏览器无法直接播放，可点击视频打开灯箱查看下载/原片选项';
-                    }, { once: true });
-                }
-                card.appendChild(single);
+            if (isVid) {
+                // 视频信息流纯海报化：卡片绝不挂载任何 <video> 标签，纯图片展示 + 居中发光播放按钮，点击全屏秒开
+                const videoCard = createMomentSingleVideoCard(images[0], posterUrl);
+                if (videoCard) card.appendChild(videoCard);
+            } else {
+                // 单图：如果有缩略图则列表展示缩略图，点开灯箱查看 1920px 高清原图
+                const thumbUrl = getThumbnailForImage(images[0], parsedMoment?.image_thumbnails);
+                const displaySrc = thumbUrl || images[0];
+                const single = createMomentMedia(displaySrc, 'moment-single-image', {
+                    controls: false,
+                    lightbox: true,
+                    originalSrc: images[0],
+                    priority: isPriorityCard
+                });
+                if (single) card.appendChild(single);
             }
         } else if (images.length > 1) {
             const grid = createMomentNode('div', 'moment-grid');
@@ -2134,19 +2296,9 @@ function createMomentCardElement(item, options = {}) {
             images.forEach((url, index) => {
                 const isHidden = index >= INITIAL_DISPLAY_COUNT;
                 const isVid = isVideoMediaUrl(url);
-                const posterUrl = isVid ? getPosterForVideo(url, parsedMoment?.video_posters) : '';
-                const media = createMomentMedia(url, `moment-grid-item${isHidden ? ' hidden-image' : ''}`, {
-                    autoplay: false, // 九宫格中不自动并发全量拉取，节省流量与带宽
-                    preload: isHidden ? 'none' : (posterUrl ? 'none' : 'metadata'),
-                    deferLoad: isHidden, // 超过 9 张的折叠项延迟拉取
-                    lightbox: true,
-                    priority: isPriorityCard && index < 4,
-                    poster: posterUrl
-                });
-                if (!media) return;
-                media.dataset.mediaIndex = String(index);
-                if (isHidden) media.style.display = 'none';
                 if (isVid) {
+                    // 九宫格视频纯海报化：绝不塞入 <video src="#t=0.001">，彻底根除静默拉取视频流导致的卡顿与黑屏假死
+                    const posterUrl = getPosterForVideo(url, parsedMoment?.video_posters);
                     const wrap = createMomentNode('div', `moment-grid-video-wrap${isHidden ? ' hidden-image' : ''}`);
                     wrap.dataset.momentAction = 'open-lightbox';
                     wrap.dataset.mediaSrc = url;
@@ -2155,11 +2307,37 @@ function createMomentCardElement(item, options = {}) {
                     wrap.setAttribute('role', 'button');
                     wrap.setAttribute('aria-label', '打开视频预览');
                     if (isHidden) wrap.style.display = 'none';
-                    wrap.appendChild(media);
+
+                    if (posterUrl) {
+                        const img = document.createElement('img');
+                        img.className = 'moment-grid-item';
+                        img.alt = '视频封面';
+                        img.crossOrigin = 'anonymous';
+                        img.loading = isHidden ? 'lazy' : (index < 4 ? 'eager' : 'lazy');
+                        img.decoding = 'async';
+                        img.src = posterUrl;
+                        wrap.appendChild(img);
+                    } else {
+                        const placeholder = createMomentNode('div', 'moment-grid-video-placeholder', '🎬');
+                        wrap.appendChild(placeholder);
+                    }
                     const badge = createMomentNode('span', 'moment-video-badge', '▶');
                     wrap.appendChild(badge);
                     grid.appendChild(wrap);
                 } else {
+                    // 九宫格图片：优先加载轻量缩略图（15~35KB），点击灯箱拉取高清大图，瞬间节省 90% 滚动流量
+                    const thumbUrl = getThumbnailForImage(url, parsedMoment?.image_thumbnails);
+                    const displaySrc = thumbUrl || url;
+                    const media = createMomentMedia(displaySrc, `moment-grid-item${isHidden ? ' hidden-image' : ''}`, {
+                        preload: isHidden ? 'none' : 'metadata',
+                        deferLoad: isHidden,
+                        lightbox: true,
+                        originalSrc: url,
+                        priority: isPriorityCard && index < 4
+                    });
+                    if (!media) return;
+                    media.dataset.mediaIndex = String(index);
+                    if (isHidden) media.style.display = 'none';
                     grid.appendChild(media);
                 }
             });
@@ -3339,6 +3517,9 @@ async function deleteMoment(id) {
                         if (parsed.audio) mediaToDelete.push(parsed.audio);
                         if (parsed.video_posters && typeof parsed.video_posters === 'object') {
                             mediaToDelete.push(...Object.values(parsed.video_posters));
+                        }
+                        if (parsed.image_thumbnails && typeof parsed.image_thumbnails === 'object') {
+                            mediaToDelete.push(...Object.values(parsed.image_thumbnails));
                         }
                     }
                 } catch (_) {
