@@ -1936,8 +1936,10 @@ function createMomentMedia(rawUrl, className, options = {}) {
         } else {
             img.src = posterUrl;
         }
+        const hdVideoUrl = options.originalSrc ? sanitizeMediaUrl(options.originalSrc) : url;
         img.dataset.momentAction = 'open-lightbox';
-        img.dataset.mediaSrc = url;
+        img.dataset.mediaSrc = hdVideoUrl || url;
+        if (hdVideoUrl && hdVideoUrl !== url) img.dataset.originalSrc = hdVideoUrl;
         img.tabIndex = 0;
         img.setAttribute('role', 'button');
         img.setAttribute('aria-label', '打开视频预览');
@@ -2017,8 +2019,10 @@ function createMomentMedia(rawUrl, className, options = {}) {
     }
     if (isVideo && options.autoplay && !options.deferLoad) setupMomentVideoPlayback(media, true);
     if (options.lightbox) {
+        const hdUrl = options.originalSrc ? sanitizeMediaUrl(options.originalSrc) : url;
         media.dataset.momentAction = 'open-lightbox';
-        media.dataset.mediaSrc = url;
+        media.dataset.mediaSrc = hdUrl || url;
+        if (hdUrl && hdUrl !== url) media.dataset.originalSrc = hdUrl;
         media.tabIndex = 0;
         media.setAttribute('role', 'button');
         media.setAttribute('aria-label', isVideo ? '打开视频预览' : '打开图片预览');
@@ -2705,7 +2709,7 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
         spinSpan.className = 'ai-spin';
         spinSpan.textContent = '🌸';
         badge.append(spinSpan, document.createTextNode(' 感情助手正在品读分析动态… ✨'));
-        const cardHeader = card.querySelector('.moment-header');
+        const cardHeader = card.querySelector('.card-header');
         if (cardHeader && cardHeader.nextSibling) {
             card.insertBefore(badge, cardHeader.nextSibling);
         } else {
@@ -2762,7 +2766,8 @@ function runMomentAction(actionElement) {
     }
     else if (action === 'open-profile' && typeof openProfilePage === 'function') openProfilePage(actionElement.dataset.author || '');
     else if (action === 'open-lightbox' && typeof openLightbox === 'function') {
-        const targetSrc = actionElement.dataset.mediaSrc
+        const targetSrc = actionElement.dataset.originalSrc
+            || actionElement.dataset.mediaSrc
             || actionElement.currentSrc
             || actionElement.src
             || actionElement.querySelector('img, video')?.currentSrc
@@ -3209,7 +3214,17 @@ async function fetchMoments(append = false, options = {}) {
             else if (item.type === 'moment' && typeof item.content === 'string') {
                 try {
                     const parsed = JSON.parse(item.content);
-                    if (Array.isArray(parsed.images)) topUrls.push(...parsed.images.slice(0, 4));
+                    if (Array.isArray(parsed.images)) {
+                        parsed.images.slice(0, 4).forEach(u => {
+                            if (isVideoMediaUrl(u)) {
+                                const poster = getPosterForVideo(u, parsed.video_posters);
+                                if (poster) topUrls.push(poster);
+                            } else {
+                                const thumb = getThumbnailForImage(u, parsed.image_thumbnails);
+                                topUrls.push(thumb || u);
+                            }
+                        });
+                    }
                 } catch (_e) {}
             }
         });

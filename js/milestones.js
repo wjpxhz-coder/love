@@ -105,8 +105,9 @@ async function loadMomentStars(options = {}) {
 function setMomentStarButtonState(button, isStarred) {
     if (button) {
         button.classList.toggle('starred', isStarred);
-        const icon = '<svg class="svg-icon" aria-hidden="true"><use href="#icon-star"/></svg>';
-        button.innerHTML = `${icon}<span>${isStarred ? '已收藏' : '收藏'}</span>`;
+        button.setAttribute('aria-label', isStarred ? '取消收藏' : '收藏此动态');
+        const icon = '<span class="star-btn-icon"><svg class="svg-icon" aria-hidden="true"><use href="#icon-star"/></svg></span>';
+        button.innerHTML = `${icon}<span class="star-btn-text">${isStarred ? '已收藏' : '收藏'}</span>`;
     }
 }
 

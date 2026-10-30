@@ -158,7 +158,7 @@ async function clearPhotoCache() {
             const sessionKeysToRemove = [];
             for (let i = 0; i < sessionStorage.length; i++) {
                 const k = sessionStorage.key(i);
-                if (k && (k.startsWith('love_signed_media_') || k.startsWith('signed_media_url_'))) {
+                if (k && (k.startsWith('love_r2_signed_media_') || k.startsWith('love_signed_media_') || k.startsWith('signed_media_url_'))) {
                     sessionKeysToRemove.push(k);
                 }
             }
