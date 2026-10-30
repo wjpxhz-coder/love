@@ -169,6 +169,7 @@ function clearMomentPhotoPreviews() {
     momentSelectedFiles = [];
     editingExistingMedia = [];
     editingExistingVideoPosters = {};
+    editingExistingImageThumbnails = {};
 
     if (!previewContainer) return;
     previewContainer.querySelectorAll('.moment-preview-item').forEach(item => item.remove());
@@ -222,6 +223,8 @@ function resetMomentComposer(options = {}) {
     editingOriginalAudioRef = null;
     editingExistingVideoPosters = {};
     editingOriginalVideoPosters = {};
+    editingExistingImageThumbnails = {};
+    editingOriginalImageThumbnails = {};
 
     if (clearPhotos) clearMomentPhotoPreviews();
     if (clearAudio) {
@@ -1151,6 +1154,8 @@ async function submitMomentPost() {
 
     try {
         let uploadedUrls = [];
+        const videoPostersMap = {};
+        const imageThumbnailsMap = {};
         if (momentSelectedFiles.length > 0) {
             const totalFiles = momentSelectedFiles.length;
             const processedFiles = [];
@@ -1193,8 +1198,6 @@ async function submitMomentPost() {
 
             // 第二阶段：并行极速上传
             let finishedUploads = 0;
-            const videoPostersMap = {};
-            const imageThumbnailsMap = {};
             btn.textContent = totalFiles > 1 ? `⏳ 正在极速上传 (0/${totalFiles})…` : '⏳ 正在极速上传…';
             const uploadTasks = processedItems.map(async (item, index) => {
                 const fileExt = getMomentFileExtension(item.file);
