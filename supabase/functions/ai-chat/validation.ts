@@ -40,6 +40,8 @@ const MAX_STORAGE_PATH_CHARACTERS = 1_024;
 const MAX_POSTGRES_BIGINT = 9_223_372_036_854_775_807n;
 const STORAGE_REFERENCE_PREFIX = "storage://photos/";
 const PUBLIC_PHOTO_PATH_PREFIX = "/storage/v1/object/public/photos/";
+const DIRECT_PHOTO_PATH_PREFIX = "/storage/v1/object/photos/";
+const R2_MEDIA_ORIGIN = "https://media.xiaoxi666.kdns.fr";
 const ALLOWED_ROLES = new Set<ChatRole>(["system", "user", "assistant"]);
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
@@ -334,17 +336,26 @@ export function parseTrustedPhotoReference(
     throw new InputValidationError("IMAGE_UNAVAILABLE", 422);
   }
 
+  const isAllowedOrigin =
+    mediaUrl.origin === projectUrl.origin ||
+    mediaUrl.origin === R2_MEDIA_ORIGIN;
+  const matchedPrefix = mediaUrl.pathname.startsWith(PUBLIC_PHOTO_PATH_PREFIX)
+    ? PUBLIC_PHOTO_PATH_PREFIX
+    : mediaUrl.pathname.startsWith(DIRECT_PHOTO_PATH_PREFIX)
+    ? DIRECT_PHOTO_PATH_PREFIX
+    : "";
+
   if (
     mediaUrl.protocol !== "https:" ||
-    mediaUrl.origin !== projectUrl.origin ||
+    !isAllowedOrigin ||
     mediaUrl.search ||
     mediaUrl.hash ||
-    !mediaUrl.pathname.startsWith(PUBLIC_PHOTO_PATH_PREFIX)
+    !matchedPrefix
   ) {
     throw new InputValidationError("IMAGE_UNAVAILABLE", 422);
   }
 
-  const encodedPath = mediaUrl.pathname.slice(PUBLIC_PHOTO_PATH_PREFIX.length);
+  const encodedPath = mediaUrl.pathname.slice(matchedPrefix.length);
   let decodedPath: string;
   try {
     decodedPath = encodedPath

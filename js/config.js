@@ -625,12 +625,13 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v4.0.0';
+const APP_VERSION = 'v4.0.1';
 const CONFIG = {
-    version: 'v4.0.0',
-    date: '2026-10-24',
-    title: '全量视频智能前置抽帧与云端转码双重自愈保障 🎬🛡️✨',
+    version: 'v4.0.1',
+    date: '2026-10-30',
+    title: '感情助手 AI 读图分析与 Cloudflare R2 存储无缝联通 🌸✨',
     features: [
+        'AI 读图全面修复：打通 Cloudflare R2 动态图片与 AI 临时输入桶桥接，彻底解决新动态 AI 分析及日记选图报「图片不存在」问题 🌸📸',
         '九宫格缩略图与视频流零耗损海报化：上传多图生成轻量微缩图、列表零拉取视频流与全屏秒开 ⚡📸',
         '视频播放修复：恢复原生首帧嗅探与 Range 分段流畅播放，彻底根除九宫格黑屏假死与未登录媒体洗空缺陷 🎬⚡',
         '边缘流媒体适配：全量兼容 .mov/.mp4 双模式，无缝降级原片下载与移动端防阻断自动静音起播 🛡️',
