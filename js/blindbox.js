@@ -171,6 +171,15 @@ function appendBlindBoxMedia(container, rawUrl, className, options = {}) {
 function renderBlindBoxMoment(moment) {
     const content = document.getElementById('blindBoxContent');
     if (!content) return;
+    if (!content.dataset.lightboxBound) {
+        content.dataset.lightboxBound = 'true';
+        content.addEventListener('click', event => {
+            const actionEl = event.target.closest('[data-moment-action="open-lightbox"]');
+            if (actionEl && typeof runMomentAction === 'function') {
+                runMomentAction(actionEl);
+            }
+        });
+    }
     content.classList.remove('blind-box-card-develop');
     void content.offsetWidth;
     content.classList.add('blind-box-card-develop');
@@ -207,7 +216,10 @@ function renderBlindBoxMoment(moment) {
                 } else {
                     const grid = document.createElement('div');
                     grid.className = 'moment-grid blind-box-grid';
-                    parsed.images.slice(0, 9).forEach(rawUrl => {
+                    try {
+                        grid.dataset.momentImages = JSON.stringify(parsed.images.slice(0, 9).map(u => sanitizeMediaUrl(u)).filter(Boolean));
+                    } catch (_e) {}
+                    parsed.images.slice(0, 9).forEach((rawUrl, index) => {
                         const url = sanitizeMediaUrl(rawUrl);
                         const video = typeof isVideoMediaUrl === 'function' && isVideoMediaUrl(url);
                         const posterUrl = (video && parsed.video_posters && (parsed.video_posters[url] || parsed.video_posters[rawUrl])) || '';
@@ -228,8 +240,10 @@ function renderBlindBoxMoment(moment) {
                                 badge.className = 'moment-video-badge';
                                 badge.textContent = '▶';
                                 wrap.appendChild(badge);
+                                wrap.dataset.mediaIndex = String(index);
                                 grid.appendChild(wrap);
                             } else {
+                                media.dataset.mediaIndex = String(index);
                                 grid.appendChild(media);
                             }
                         }

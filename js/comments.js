@@ -135,7 +135,6 @@ function clearAllCommentImageSelections() {
 }
 
 function checkPasswordForComment(momentId, triggerElement = null) {
-    pendingCommentMomentId = momentId;
     if (hasCommentAuthContext()) {
         showCommentInput(momentId, triggerElement);
         return;
@@ -609,8 +608,6 @@ async function loadComments(momentId, targetCard = null) {
 }
 
 function confirmDeleteComment(commentId, momentId) {
-    pendingDeleteCommentId = commentId;
-    pendingDeleteCommentMomentId = momentId;
     if (!confirm('确定要撤回这条评论吗？此操作不可逆哦 💬')) {
         return;
     }

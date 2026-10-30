@@ -243,8 +243,18 @@ async function hydrateStructuredMediaContent(rawContent) {
     try {
         const parsed = JSON.parse(rawContent);
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return rawContent;
-        if (Array.isArray(parsed.images) && parsed.images.length > 0) {
-            parsed.images = (await batchResolveMediaUrls(parsed.images)).filter(Boolean);
+        const rawImagesList = Array.isArray(parsed.images) ? [...parsed.images] : [];
+        const resolvedImagesMap = new Map();
+        if (rawImagesList.length > 0) {
+            const resolvedList = await batchResolveMediaUrls(rawImagesList);
+            rawImagesList.forEach((rawRef, idx) => {
+                if (rawRef && resolvedList[idx]) {
+                    resolvedImagesMap.set(rawRef, resolvedList[idx]);
+                    const objPath = typeof extractStorageObjectPath === 'function' ? extractStorageObjectPath(rawRef) : '';
+                    if (objPath) resolvedImagesMap.set(objPath, resolvedList[idx]);
+                }
+            });
+            parsed.images = resolvedList.filter(Boolean);
         }
         if (parsed.audio) parsed.audio = await resolveMediaUrl(parsed.audio);
         if (parsed.video_posters && typeof parsed.video_posters === 'object') {
@@ -259,6 +269,10 @@ async function hydrateStructuredMediaContent(rawContent) {
                     const videoObjPath = typeof extractStorageObjectPath === 'function' ? extractStorageObjectPath(videoRef) : '';
                     if (videoObjPath) {
                         hydratedPosters[videoObjPath] = resolvedPoster;
+                    }
+                    const mappedVideoUrl = resolvedImagesMap.get(videoRef) || (videoObjPath && resolvedImagesMap.get(videoObjPath));
+                    if (mappedVideoUrl) {
+                        hydratedPosters[mappedVideoUrl] = resolvedPoster;
                     }
                 }
             });
@@ -276,6 +290,10 @@ async function hydrateStructuredMediaContent(rawContent) {
                     const imgObjPath = typeof extractStorageObjectPath === 'function' ? extractStorageObjectPath(imgRef) : '';
                     if (imgObjPath) {
                         hydratedThumbs[imgObjPath] = resolvedThumb;
+                    }
+                    const mappedImgUrl = resolvedImagesMap.get(imgRef) || (imgObjPath && resolvedImagesMap.get(imgObjPath));
+                    if (mappedImgUrl) {
+                        hydratedThumbs[mappedImgUrl] = resolvedThumb;
                     }
                 }
             });
@@ -607,9 +625,9 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.98';
+const APP_VERSION = 'v3.9.99';
 const CONFIG = {
-    version: 'v3.9.98',
+    version: 'v3.9.99',
     date: '2026-10-24',
     title: '全量视频智能前置抽帧与云端转码双重自愈保障 🎬🛡️✨',
     features: [

@@ -387,6 +387,10 @@ function closeTopicsCatalog() {
 let selectedNewTopicCategory = 'reconciliation';
 
 function openNewTopicModal() {
+    if (!currentAuthUser || !currentUserProfile?.space_id) {
+        if (typeof openLoginModal === 'function') openLoginModal('/topics');
+        return;
+    }
     const modal = document.getElementById('newTopicModal');
     const input = document.getElementById('newTopicTitleInput');
     const msg = document.getElementById('newTopicModalMsg');
@@ -421,7 +425,11 @@ async function submitCreateTopic() {
     const msg = document.getElementById('newTopicModalMsg');
     const submitBtn = document.getElementById('btn-submit-new-topic');
 
-    if (!input || !currentAuthUser || !currentUserProfile?.space_id) return;
+    if (!input) return;
+    if (!currentAuthUser || !currentUserProfile?.space_id) {
+        if (msg) msg.textContent = '请先登录后再开启手账～';
+        return;
+    }
     const title = input.value.trim();
     if (!title) {
         if (msg) msg.textContent = '请为这次聊天起一个题目吧～';
@@ -976,7 +984,13 @@ async function startTopicRecording() {
             topicRecordingStream = null;
         }
 
+        const activeTopicBeforePrompt = currentActiveTopicId;
         topicRecordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!currentActiveTopicId || currentActiveTopicId !== activeTopicBeforePrompt) {
+            topicRecordingStream.getTracks().forEach(track => track.stop());
+            topicRecordingStream = null;
+            return;
+        }
         const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
             ? 'audio/webm;codecs=opus'
             : (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '');
