@@ -14,7 +14,10 @@
                 overflow-y: auto;
             }
 
-            .version-modal-box { overflow-y: auto; }
+            .modal-box.version-modal-box {
+                padding: 38px 20px 24px;
+                overflow: visible;
+            }
             .modal-btns { flex-wrap: wrap; }
             .modal-btns button { min-height: 44px; }
 

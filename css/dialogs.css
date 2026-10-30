@@ -251,16 +251,22 @@ dialog.native-dialog::backdrop {
         .filter-active-indicator.show { display: block; }
 
         /* ── 版本更新弹窗专属样式 ── */
-        .version-modal-box {
+        dialog.native-dialog.version-dialog {
+            overflow: visible;
+            padding: 34px 0 16px;
+        }
+
+        .modal-box.version-modal-box {
             position: relative;
             background: rgba(255, 252, 252, 0.94);
             border: 2px solid rgba(255, 180, 190, 0.4);
             box-shadow: 0 20px 60px rgba(212, 107, 122, 0.25);
             max-width: 360px;
+            padding: 40px 28px 30px;
             overflow: visible;
         }
 
-        [data-theme='dark'] .version-modal-box {
+        [data-theme='dark'] .modal-box.version-modal-box {
             background: rgba(30, 25, 25, 0.95);
             border-color: rgba(255, 154, 158, 0.3);
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
@@ -268,8 +274,9 @@ dialog.native-dialog::backdrop {
 
         .version-decor-heart {
             font-size: 2.2em;
+            line-height: 1;
             position: absolute;
-            top: -24px;
+            top: -27px;
             left: 50%;
             transform: translateX(-50%);
             background: var(--bg);
@@ -281,7 +288,13 @@ dialog.native-dialog::backdrop {
             justify-content: center;
             border-radius: 50%;
             box-shadow: 0 4px 15px rgba(212, 107, 122, 0.15);
+            z-index: 2;
             animation: pulseHeart 2s infinite ease-in-out;
+        }
+
+        [data-theme='dark'] .version-decor-heart {
+            background: rgba(34, 26, 30, 0.98);
+            border-color: rgba(255, 154, 158, 0.35);
         }
 
         @keyframes pulseHeart {
@@ -305,7 +318,7 @@ dialog.native-dialog::backdrop {
         .version-body {
             text-align: left;
             margin: 20px 0;
-            max-height: 240px;
+            max-height: min(240px, 42dvh);
             overflow-y: auto;
             padding-right: 4px;
         }
