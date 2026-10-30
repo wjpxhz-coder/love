@@ -300,6 +300,13 @@ Deno.test("photo references accept storage refs and exact project public URLs", 
     ),
     "legacy-root-photo.jpg",
   );
+  assertEquals(
+    parseTrustedPhotoReference(
+      `https://media.xiaoxi666.kdns.fr/storage/v1/object/photos/${SPACE_ID}/${USER_ID}/moments/r2.webp`,
+      SUPABASE_URL,
+    ),
+    `${SPACE_ID}/${USER_ID}/moments/r2.webp`,
+  );
   assertThrowsCode(
     () =>
       parseTrustedPhotoReference(

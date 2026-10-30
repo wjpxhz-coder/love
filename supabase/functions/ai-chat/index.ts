@@ -34,6 +34,7 @@ const IMAGE_SIGNATURE_BYTES = 12;
 
 const AI_INPUT_BUCKET = "ai-inputs";
 const PHOTO_BUCKET = "photos";
+const R2_STORAGE_URL = "https://media.xiaoxi666.kdns.fr";
 const AGNES_ENDPOINT = "https://apihub.agnes-ai.com/v1/chat/completions";
 const AGNES_MODEL = "agnes-2.0-flash";
 const AGNES_MAX_TOKENS = 800;
@@ -328,6 +329,30 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+async function fetchPhotoFromR2Gateway(
+  objectPath: string,
+): Promise<{ blob: Blob; contentType: string; size: number } | null> {
+  const encodedPath = objectPath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  const url = `${R2_STORAGE_URL}/storage/v1/object/photos/${encodedPath}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    if (!blob || blob.size < 1) return null;
+    const contentType = response.headers.get("content-type") || blob.type || "";
+    return {
+      blob,
+      contentType,
+      size: blob.size,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function createValidatedSignedUrls(
   supabase: SupabaseClient,
   objects: ResolvedStorageObject[],
@@ -336,21 +361,38 @@ async function createValidatedSignedUrls(
   const dataUrls: string[] = [];
 
   for (const object of objects) {
+    let imageInfo: ValidatedImageInfo | null = null;
+    let blob: Blob | null = null;
+
     const { data: fileInfo, error: infoErr } = await supabase.storage
       .from(object.bucket)
       .info(object.path);
-    if (infoErr || !fileInfo) {
-      throw new InputValidationError("IMAGE_UNAVAILABLE", 422);
+    if (!infoErr && fileInfo) {
+      imageInfo = validateImageFileInfo(fileInfo);
+      const { data: downloadedBlob, error: downloadErr } = await supabase.storage
+        .from(object.bucket)
+        .download(object.path);
+      if (!downloadErr && downloadedBlob) {
+        blob = downloadedBlob;
+      }
     }
-    const imageInfo = validateImageFileInfo(fileInfo);
-    totalBytes = addImageBytes(totalBytes, imageInfo.size);
 
-    const { data: blob, error: downloadErr } = await supabase.storage
-      .from(object.bucket)
-      .download(object.path);
-    if (downloadErr || !blob) {
+    if ((!imageInfo || !blob) && object.bucket === PHOTO_BUCKET) {
+      const r2Photo = await fetchPhotoFromR2Gateway(object.path);
+      if (r2Photo) {
+        imageInfo = validateImageFileInfo({
+          size: r2Photo.size,
+          contentType: r2Photo.contentType,
+        });
+        blob = r2Photo.blob;
+      }
+    }
+
+    if (!imageInfo || !blob) {
       throw new InputValidationError("IMAGE_UNAVAILABLE", 422);
     }
+
+    totalBytes = addImageBytes(totalBytes, imageInfo.size);
 
     const arrayBuffer = await blob.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
