@@ -170,6 +170,23 @@ function createAIError(code, cause = null) {
     return error;
 }
 
+async function withAITimeout(promise, timeoutMs, timeoutCode = 'PROVIDER_TIMEOUT') {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return await promise;
+    let timer = null;
+    try {
+        return await Promise.race([
+            promise,
+            new Promise((_, reject) => {
+                timer = setTimeout(() => {
+                    reject(createAIError(timeoutCode));
+                }, timeoutMs);
+            })
+        ]);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+}
+
 function getAIErrorCodeFromPayload(payload) {
     if (!payload || typeof payload !== 'object') return '';
     for (const key of ['error', 'code', 'error_code']) {
@@ -205,30 +222,40 @@ async function getAIInvocationErrorCode(error) {
     return /^[A-Z][A-Z0-9_]{2,80}$/.test(message) ? message : '';
 }
 
-async function invokeAI(messages, attachments = [], overrideModel = null) {
+async function invokeAI(messages, attachments = [], overrideModel = null, options = {}) {
     assertAIAuthenticated();
     assertAIConsent();
     const chosenModel = overrideModel || getStoredAIModel();
+    const timeoutMs = Number(options?.timeoutMs) > 0 ? Number(options.timeoutMs) : 45000;
     const body = { messages };
     if (attachments.length > 0) body.attachments = attachments;
     if (chosenModel && chosenModel !== AGNES_MODEL) {
         body.model = chosenModel;
     }
 
-    const { data, error } = await supabaseClient.functions.invoke('ai-chat', {
-        headers: { 'x-agnes-consent-version': AGNES_CONSENT_VERSION },
-        body
-    });
+    const { data, error } = await withAITimeout(
+        supabaseClient.functions.invoke('ai-chat', {
+            headers: { 'x-agnes-consent-version': AGNES_CONSENT_VERSION },
+            body
+        }),
+        timeoutMs,
+        'PROVIDER_TIMEOUT'
+    );
     if (error) {
         console.error('[感情助手] 请求出现异常:', error);
         const code = await getAIInvocationErrorCode(error);
-        if ((code === 'INVALID_REQUEST_FIELDS' || code === 'INVALID_MODEL') && body.model) {
+        // 仅当无临时附件时才在同次调用内自动降级模型重试（因为后端 finally 会立即清理临时附件）
+        if ((code === 'INVALID_REQUEST_FIELDS' || code === 'INVALID_MODEL') && body.model && attachments.length === 0) {
             console.warn('当前后端服务尚未支持自定义模型参数，自动降级为默认模型重试:', code);
             delete body.model;
-            const retryRes = await supabaseClient.functions.invoke('ai-chat', {
-                headers: { 'x-agnes-consent-version': AGNES_CONSENT_VERSION },
-                body
-            });
+            const retryRes = await withAITimeout(
+                supabaseClient.functions.invoke('ai-chat', {
+                    headers: { 'x-agnes-consent-version': AGNES_CONSENT_VERSION },
+                    body
+                }),
+                timeoutMs,
+                'PROVIDER_TIMEOUT'
+            );
             if (retryRes.error) {
                 console.error('[感情助手] 降级重试依然失败:', retryRes.error);
                 const retryCode = await getAIInvocationErrorCode(retryRes.error);
@@ -809,13 +836,10 @@ function detectAIImageMimeFromBytes(bytes) {
     return '';
 }
 
-async function inlineCompressAIImage(file, maxWidth = 1280, maxHeight = 1280, quality = 0.80, forceReencode = false) {
+async function inlineCompressAIImage(file, maxWidth = 1024, maxHeight = 1024, quality = 0.78, forceReencode = false) {
     if (!file || (!forceReencode && !file.type?.startsWith('image/'))) return file;
-    if (!forceReencode && file.size <= 150 * 1024 && (file.type === 'image/webp' || file.type === 'image/jpeg')) {
-        return file;
-    }
     try {
-        const image = await new Promise((resolve, reject) => {
+        const image = await withAITimeout(new Promise((resolve, reject) => {
             const img = new Image();
             const url = URL.createObjectURL(file);
             img.onload = () => {
@@ -827,12 +851,20 @@ async function inlineCompressAIImage(file, maxWidth = 1280, maxHeight = 1280, qu
                 reject(new Error('IMAGE_DECODE_FAILED'));
             };
             img.src = url;
-        });
+        }), 5000, 'IMAGE_DECODE_TIMEOUT');
 
         let { naturalWidth: width, naturalHeight: height } = image;
         if (!width || !height) return file;
 
-        if (width > maxWidth || height > maxHeight) {
+        const wasResized = width > maxWidth || height > maxHeight;
+        if (!forceReencode
+            && !wasResized
+            && file.size <= 140 * 1024
+            && (file.type === 'image/jpeg' || file.type === 'image/webp')) {
+            return file;
+        }
+
+        if (wasResized) {
             const ratio = Math.min(maxWidth / width, maxHeight / height);
             width = Math.max(1, Math.round(width * ratio));
             height = Math.max(1, Math.round(height * ratio));
@@ -844,24 +876,27 @@ async function inlineCompressAIImage(file, maxWidth = 1280, maxHeight = 1280, qu
         const ctx = canvas.getContext('2d');
         if (!ctx) return file;
 
-        const isPng = file.type === 'image/png';
-        if (!isPng) {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, width, height);
-        }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
         ctx.drawImage(image, 0, 0, width, height);
 
-        let blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
-        let targetMime = 'image/webp';
-        let ext = 'webp';
+        let blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+        let targetMime = 'image/jpeg';
+        let ext = 'jpg';
 
-        if (!blob || blob.type !== 'image/webp') {
-            targetMime = isPng ? 'image/png' : 'image/jpeg';
-            ext = isPng ? 'png' : 'jpg';
+        if (!blob || blob.type !== 'image/jpeg') {
+            targetMime = 'image/webp';
+            ext = 'webp';
             blob = await new Promise(resolve => canvas.toBlob(resolve, targetMime, quality));
         }
+        if (!blob || blob.type !== targetMime) {
+            targetMime = 'image/png';
+            ext = 'png';
+            blob = await new Promise(resolve => canvas.toBlob(resolve, targetMime));
+        }
 
-        if (!blob || (!forceReencode && blob.size >= file.size && file.type === targetMime)) {
+        if (!blob) return file;
+        if (!forceReencode && !wasResized && blob.size >= file.size && file.type === targetMime) {
             return file;
         }
 
@@ -873,20 +908,15 @@ async function inlineCompressAIImage(file, maxWidth = 1280, maxHeight = 1280, qu
     }
 }
 
-async function normalizeBlobToAIImageFile(blob, maxEdge = 1024, quality = 0.78) {
+async function normalizeBlobToAIImageFile(blob, maxEdge = 960, quality = 0.76, forceJpeg = false) {
     if (!blob || !Number.isFinite(blob.size) || blob.size <= 0) {
         throw createAIError('IMAGE_UNAVAILABLE');
     }
     const headerBytes = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
     const detectedMime = detectAIImageMimeFromBytes(headerBytes);
-    if (detectedMime && AI_IMAGE_EXTENSIONS.has(detectedMime) && blob.size <= 220 * 1024) {
-        const ext = AI_IMAGE_EXTENSIONS.get(detectedMime);
-        return new File([blob], `ai_image.${ext}`, { type: detectedMime });
-    }
-
     const initialMime = detectedMime || (blob.type && blob.type.startsWith('image/') ? blob.type : 'image/jpeg');
     const sourceFile = new File([blob], 'ai_source.img', { type: initialMime });
-    const forceReencode = !detectedMime || !AI_IMAGE_EXTENSIONS.has(detectedMime);
+    const forceReencode = forceJpeg || !detectedMime || !AI_IMAGE_EXTENSIONS.has(detectedMime);
     const compressed = await inlineCompressAIImage(sourceFile, maxEdge, maxEdge, quality, forceReencode);
 
     if (compressed && compressed.size > 0 && compressed.size <= AI_MAX_IMAGE_BYTES) {
@@ -906,6 +936,49 @@ async function normalizeBlobToAIImageFile(blob, maxEdge = 1024, quality = 0.78) 
     }
 
     throw createAIError('UNSUPPORTED_IMAGE_TYPE');
+}
+
+async function tryExtractLoadedCardImageFile(momentId, imageIndex = 0, maxEdge = 640, quality = 0.74) {
+    if (!momentId || typeof document === 'undefined') return null;
+    try {
+        const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
+        for (const card of cards) {
+            const gridImg = card.querySelector(`.moment-grid-item[data-gallery-index="${imageIndex}"] img.moment-grid-img`);
+            const singleImg = Number(imageIndex) === 0 ? card.querySelector('img.moment-single-media') : null;
+            const imgEl = gridImg || singleImg;
+            if (!imgEl || !imgEl.complete || !imgEl.naturalWidth || !imgEl.naturalHeight) continue;
+
+            let width = imgEl.naturalWidth;
+            let height = imgEl.naturalHeight;
+            if (width > maxEdge || height > maxEdge) {
+                const ratio = Math.min(maxEdge / width, maxEdge / height);
+                width = Math.max(1, Math.round(width * ratio));
+                height = Math.max(1, Math.round(height * ratio));
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) continue;
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(imgEl, 0, 0, width, height);
+
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+            if (!blob || blob.size <= 0 || blob.size > AI_MAX_IMAGE_BYTES) continue;
+            const outHeader = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+            const outMime = detectAIImageMimeFromBytes(outHeader);
+            if (outMime && AI_IMAGE_EXTENSIONS.has(outMime)) {
+                const ext = AI_IMAGE_EXTENSIONS.get(outMime);
+                return new File([blob], `ai_card_${momentId}_${imageIndex}.${ext}`, { type: outMime });
+            }
+        }
+    } catch (_err) {
+        // Canvas security or image state fallback to fetchMomentImageAsAIFile
+    }
+    return null;
 }
 
 async function compressAIImageFile(file, maxEdge = AI_IMAGE_MAX_DIMENSION, quality = AI_IMAGE_QUALITY) {
@@ -1375,9 +1448,15 @@ async function fetchMomentImageAsAIFile({
     thumbnailRef = '',
     momentId = '',
     imageIndex = 0,
-    maxEdge = 1024,
-    quality = 0.78
+    maxEdge = 960,
+    quality = 0.76,
+    preferThumbnail = false
 } = {}) {
+    if (preferThumbnail && momentId) {
+        const extractedFromDom = await tryExtractLoadedCardImageFile(momentId, imageIndex, maxEdge, quality);
+        if (extractedFromDom) return extractedFromDom;
+    }
+
     let resolvedReference = reference;
     let resolvedThumbRef = thumbnailRef;
 
@@ -1409,37 +1488,40 @@ async function fetchMomentImageAsAIFile({
         }
     };
 
+    const pushRefUrls = async ref => {
+        if (!ref) return;
+        if (typeof resolveMediaUrl === 'function') {
+            try {
+                pushUrl(await resolveMediaUrl(ref));
+            } catch (_err) {}
+        }
+        pushUrl(buildDirectR2PhotoUrl(ref));
+    };
+
     if (previewUrl) pushUrl(previewUrl);
-    if (resolvedReference && typeof resolveMediaUrl === 'function') {
-        try {
-            pushUrl(await resolveMediaUrl(resolvedReference));
-        } catch (_err) {}
-    }
-    if (resolvedReference) {
-        pushUrl(buildDirectR2PhotoUrl(resolvedReference));
-    }
-    if (resolvedThumbRef && typeof resolveMediaUrl === 'function') {
-        try {
-            pushUrl(await resolveMediaUrl(resolvedThumbRef));
-        } catch (_err) {}
-    }
-    if (resolvedThumbRef) {
-        pushUrl(buildDirectR2PhotoUrl(resolvedThumbRef));
+    if (preferThumbnail) {
+        await pushRefUrls(resolvedThumbRef);
+        await pushRefUrls(resolvedReference);
+    } else {
+        await pushRefUrls(resolvedReference);
+        await pushRefUrls(resolvedThumbRef);
     }
 
     let lastError = null;
     for (const url of candidateUrls) {
         try {
-            let response;
-            try {
-                response = await fetch(url, { mode: 'cors', credentials: 'omit' });
-            } catch (_corsErr) {
-                response = await fetch(url);
-            }
-            if (!response || !response.ok) continue;
-            const blob = await response.blob();
+            const blob = await withAITimeout((async () => {
+                let response;
+                try {
+                    response = await fetch(url, { mode: 'cors', credentials: 'omit' });
+                } catch (_corsErr) {
+                    response = await fetch(url);
+                }
+                if (!response || !response.ok) return null;
+                return await response.blob();
+            })(), 6000, 'IMAGE_FETCH_TIMEOUT');
             if (!blob || blob.size <= 0) continue;
-            return await normalizeBlobToAIImageFile(blob, maxEdge, quality);
+            return await normalizeBlobToAIImageFile(blob, maxEdge, quality, preferThumbnail);
         } catch (err) {
             lastError = err;
         }
@@ -1475,7 +1557,7 @@ async function uploadSingleTemporaryAIFile(
     activeAIUploadTasks.add(uploadTask);
     let error;
     try {
-        ({ error } = await uploadTask);
+        ({ error } = await withAITimeout(uploadTask, 10000, 'AI_UPLOAD_TIMEOUT'));
     } finally {
         activeAIUploadTasks.delete(uploadTask);
     }
@@ -1496,7 +1578,7 @@ async function buildAIAttachmentPayload(
     uploadGeneration
 ) {
     const context = getAIUploadContext();
-    const maxEdge = attachments.length > 4 ? 960 : 1024;
+    const maxEdge = attachments.length > 4 ? 800 : 960;
 
     const preparedFiles = await Promise.all(attachments.map(async attachment => {
         if (uploadGeneration !== aiUploadGeneration
@@ -1512,25 +1594,23 @@ async function buildAIAttachmentPayload(
                 momentId: attachment.moment_id,
                 imageIndex: Number(attachment.image_index),
                 maxEdge,
-                quality: 0.78
+                quality: 0.76,
+                preferThumbnail: attachments.length > 3
             });
         }
         return attachment.file;
     }));
 
-    const payload = [];
-    for (const file of preparedFiles) {
-        const uploaded = await uploadSingleTemporaryAIFile(
+    return await Promise.all(preparedFiles.map(file =>
+        uploadSingleTemporaryAIFile(
             file,
             context,
             uploadedPaths,
             epoch,
             userId,
             uploadGeneration
-        );
-        payload.push(uploaded);
-    }
-    return payload;
+        )
+    ));
 }
 
 async function removeTemporaryAIInputs(paths) {
@@ -1712,8 +1792,41 @@ function clearPrivateFeatureState() {
 window.addEventListener('pagehide', clearPendingChatAttachments, { passive: true });
 
 const activeMomentAnalysisIds = new Set();
+const AI_MOMENT_ANALYSIS_MAX_IMAGES = 4;
+const NON_FALLBACK_AI_ERROR_CODES = new Set([
+    'AUTH_REQUIRED',
+    'AUTH_INVALID',
+    'INVALID_TOKEN',
+    'UNAUTHORIZED',
+    'AI_CONSENT_REQUIRED',
+    'AGNES_CONSENT_VERSION_REQUIRED',
+    'QUOTA_EXCEEDED',
+    'RATE_LIMITED',
+    'FORBIDDEN',
+    'ORIGIN_NOT_ALLOWED',
+    'MEMBERSHIP_REQUIRED',
+    'PROFILE_NOT_FOUND',
+    'PROFILE_UNMAPPED'
+]);
 
-async function analyzeMomentWithAI(momentId) {
+function selectRepresentativeMomentImages(items, maxCount = AI_MOMENT_ANALYSIS_MAX_IMAGES) {
+    if (!Array.isArray(items) || items.length <= maxCount) return Array.isArray(items) ? items.slice() : [];
+    const selected = [];
+    const usedIndices = new Set();
+    for (let i = 0; i < maxCount; i++) {
+        const idx = Math.min(
+            items.length - 1,
+            Math.round((i * (items.length - 1)) / Math.max(1, maxCount - 1))
+        );
+        if (!usedIndices.has(idx)) {
+            usedIndices.add(idx);
+            selected.push(items[idx]);
+        }
+    }
+    return selected;
+}
+
+async function analyzeMomentWithAI(momentId, options = {}) {
     const rawId = typeof normalizeMomentId === 'function'
         ? normalizeMomentId(momentId)
         : momentId;
@@ -1730,17 +1843,30 @@ async function analyzeMomentWithAI(momentId) {
     assertAIAuthenticated();
     assertAIConsent();
 
+    const notifyProgress = text => {
+        if (typeof options?.onProgress === 'function') {
+            try {
+                options.onProgress(text);
+            } catch (_err) {}
+        }
+    };
+
     activeMomentAnalysisIds.add(normalizedId);
     const uploadedPaths = [];
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
     const uploadGeneration = aiUploadGeneration;
     try {
-        const { data: momentRow, error: fetchErr } = await supabaseClient
-            .from('moments')
-            .select('*')
-            .eq('id', normalizedId)
-            .maybeSingle();
+        notifyProgress('正在读取动态内容… ✨');
+        const { data: momentRow, error: fetchErr } = await withAITimeout(
+            supabaseClient
+                .from('moments')
+                .select('*')
+                .eq('id', normalizedId)
+                .maybeSingle(),
+            10000,
+            'MOMENT_LOOKUP_FAILED'
+        );
 
         if (fetchErr || !momentRow) {
             console.error('[感情助手] 读取动态记录失败:', fetchErr, { normalizedId });
@@ -1791,34 +1917,26 @@ async function analyzeMomentWithAI(momentId) {
             }
         }
 
-        // 将 Cloudflare R2 动态图片读取并压缩暂存至 ai-inputs 临时桶，彻底解决后端 Edge Function 无法直接读取 R2 新增图片的问题
+        // 多图动态均匀抽样最多 4 张代表性照片，并并行读取/压缩/上传至 ai-inputs 临时桶，大幅提升多图视觉推理响应速度
+        const selectedCandidates = selectRepresentativeMomentImages(candidateItems, AI_MOMENT_ANALYSIS_MAX_IMAGES);
         const attachments = [];
-        if (candidateItems.length > 0) {
+        if (selectedCandidates.length > 0) {
+            notifyProgress(`正在提取动态画面（${selectedCandidates.length} 张代表照片）… ✨`);
             const context = getAIUploadContext();
-            const maxEdge = candidateItems.length > 4 ? 960 : 1024;
-            const preparedFiles = await Promise.all(candidateItems.map(async candidate => {
+            const maxEdge = 640;
+            const uploadedItems = await Promise.all(selectedCandidates.map(async candidate => {
                 try {
-                    return await fetchMomentImageAsAIFile({
+                    const file = await fetchMomentImageAsAIFile({
                         reference: candidate.reference,
                         thumbnailRef: candidate.thumbnailRef,
                         momentId: candidate.moment_id,
                         imageIndex: candidate.image_index,
                         maxEdge,
-                        quality: 0.78
+                        quality: 0.74,
+                        preferThumbnail: true
                     });
-                } catch (imgErr) {
-                    console.warn('[感情助手] 跳过单张无法读取的动态图片:', candidate.reference, imgErr);
-                    return null;
-                }
-            }));
-
-            for (const file of preparedFiles) {
-                if (!file) {
-                    skippedNonImageCount++;
-                    continue;
-                }
-                try {
-                    const uploaded = await uploadSingleTemporaryAIFile(
+                    if (!file) return null;
+                    return await uploadSingleTemporaryAIFile(
                         file,
                         context,
                         uploadedPaths,
@@ -1826,80 +1944,105 @@ async function analyzeMomentWithAI(momentId) {
                         userId,
                         uploadGeneration
                     );
-                    attachments.push(uploaded);
-                } catch (upErr) {
-                    console.warn('[感情助手] 暂存单张动态图片至 AI 临时桶失败，已跳过:', upErr);
+                } catch (imgErr) {
+                    console.warn('[感情助手] 跳过单张无法读取或上传的动态图片:', candidate.reference, imgErr);
+                    return null;
+                }
+            }));
+
+            for (const item of uploadedItems) {
+                if (item) {
+                    attachments.push(item);
+                } else {
                     skippedNonImageCount++;
                 }
             }
         }
 
+        const totalPhotoCount = candidateItems.length;
         const validImageCount = attachments.length;
         const hasValidImages = validImageCount > 0;
 
-        let displayMomentText = momentText;
-        if (!displayMomentText && !hasValidImages && (skippedNonImageCount > 0 || parsed.audio)) {
-            displayMomentText = '记录了一段美好的视频/日常时光';
-        }
+        const isAuthorXi = author === '小奚';
+        const isAuthorSnake = author === '小蛇';
+        const authorRole = isAuthorXi ? '（男方/老公/小浩浩）' : (isAuthorSnake ? '（女方/欣欣宝宝/老婆）' : '');
 
-        let mediaDescription = '【动态类型】纯文字日常记录。';
-        if (hasValidImages) {
-            mediaDescription = `【动态照片】共附带了 ${validImageCount} 张照片（已随本轮请求上传，非图片文件如视频已自动跳过）。请结合照片画面中的生动细节、场景与人物互动，感受两人的爱意与默契。`;
-        } else if (skippedNonImageCount > 0 || parsed.audio) {
-            mediaDescription = `【动态类型】生活随拍记录（动态附带了视频或音频记录，本轮已自动跳过非图片文件，专注于日常场景与文字进行感情点评）。`;
-        }
+        const buildPromptMessages = (withImages, attachedCount) => {
+            let displayMomentText = momentText;
+            if (!displayMomentText && !withImages && (totalPhotoCount > 0 || skippedNonImageCount > 0 || parsed.audio)) {
+                displayMomentText = '记录了一组甜蜜美好的日常画面与时光';
+            }
+
+            let mediaDescription = '【动态类型】纯文字日常记录。';
+            if (withImages && attachedCount > 0) {
+                const sampleNote = totalPhotoCount > attachedCount
+                    ? `（原动态共 ${totalPhotoCount} 张照片，已精选 ${attachedCount} 张代表画面随本轮请求上传）`
+                    : `（共附带 ${attachedCount} 张照片随本轮请求上传）`;
+                mediaDescription = `【动态照片】${sampleNote}。请结合照片画面中的生动细节、场景与人物互动，感受两人的爱意与默契。`;
+            } else if (totalPhotoCount > 0 || skippedNonImageCount > 0 || parsed.audio) {
+                mediaDescription = `【动态配图/媒体】动态附带了 ${Math.max(totalPhotoCount, rawImages.length)} 项生活随拍画面记录，请结合动态文字描述的日常场景与两人互动进行走心点评。`;
+            }
+
+            const visualSubjectRule = withImages
+                ? (isAuthorXi
+                    ? '【画中主角绝对铁律】动态附带的照片中，可爱长发、捂嘴笑的女生 100% 必定是女方【小蛇（欣欣宝宝）】！当前动态是男方【小奚（小浩浩/老公）】发布的，这是老公在深情晒老婆美照炫妻！切勿把照片中的女孩子误认成小奚！'
+                    : '【画中主角绝对铁律】动态附带的照片中，可爱女生 100% 必定是女方【小蛇（欣欣宝宝）】本人的绝美自拍营业！请尽情夸奖小蛇的灵动甜美！')
+                : '';
+
+            const promptLines = [
+                `你是“我们的感情助手”，小奚与小蛇的专属恋爱助手、闺蜜红娘和感情见证官。`,
+                `请对他们发布的这条动态进行细腻温暖、浪漫共鸣的感情分析点评：`,
+                AI_COUPLE_IDENTITY_RULES,
+                `【动态作者】${author}${authorRole}`,
+                `【动态文字】${displayMomentText || '(未配文字)'}`,
+                mediaDescription,
+                visualSubjectRule,
+                `【点评要求】`,
+                `1. 语气必须温暖甜蜜、灵动俏皮，像深知他们日常的贴心红娘；`,
+                `2. 严格遵循情侣身份设定：小奚是男生/老公/小浩浩，小蛇是女生/欣欣宝宝/老婆！绝对禁止颠倒男女身份或主谓语；`,
+                `3. 照片里若有漂亮女孩子，那是小蛇（欣欣宝宝/小公主），绝不能称她为小奚！小奚是负责宠爱心动的老公；`,
+                `4. 捕捉图文里的恋爱闪光点与默契瞬间，送上走心甜蜜的祝福或幽默调侃；`,
+                `5. 字数严格控制在 60~120 字之间，精炼动人，适合直接作为评论；`,
+                `6. 请直接输出点评正文内容，不要包含“【分析】”等生硬标题或开场白客套话。`
+            ].filter(Boolean);
+
+            return [
+                { role: 'user', content: promptLines.join('\n') }
+            ];
+        };
 
         console.log('[感情助手] 准备分析动态图文:', {
             momentId: normalizedId,
             author,
             totalMediaCount: rawImages.length,
+            totalPhotoCount,
             validImageCount,
             skippedNonImageCount,
             hasValidImages
         });
 
-        const isAuthorXi = author === '小奚';
-        const isAuthorSnake = author === '小蛇';
-        const authorRole = isAuthorXi ? '（男方/老公/小浩浩）' : (isAuthorSnake ? '（女方/欣欣宝宝/老婆）' : '');
-        const visualSubjectRule = hasValidImages
-            ? (isAuthorXi
-                ? '【画中主角绝对铁律】动态附带的照片中，可爱长发、捂嘴笑的女生 100% 必定是女方【小蛇（欣欣宝宝）】！当前动态是男方【小奚（小浩浩/老公）】发布的，这是老公在深情晒老婆美照炫妻！切勿把照片中的女孩子误认成小奚！'
-                : '【画中主角绝对铁律】动态附带的照片中，可爱女生 100% 必定是女方【小蛇（欣欣宝宝）】本人的绝美自拍营业！请尽情夸奖小蛇的灵动甜美！')
-            : '';
-
-        const promptLines = [
-            `你是“我们的感情助手”，小奚与小蛇的专属恋爱助手、闺蜜红娘和感情见证官。`,
-            `请对他们发布的这条动态进行细腻温暖、浪漫共鸣的感情分析点评：`,
-            AI_COUPLE_IDENTITY_RULES,
-            `【动态作者】${author}${authorRole}`,
-            `【动态文字】${displayMomentText || '(未配文字)'}`,
-            mediaDescription,
-            visualSubjectRule,
-            `【点评要求】`,
-            `1. 语气必须温暖甜蜜、灵动俏皮，像深知他们日常的贴心红娘；`,
-            `2. 严格遵循情侣身份设定：小奚是男生/老公/小浩浩，小蛇是女生/欣欣宝宝/老婆！绝对禁止颠倒男女身份或主谓语；`,
-            `3. 照片里若有漂亮女孩子，那是小蛇（欣欣宝宝/小公主），绝不能称她为小奚！小奚是负责宠爱心动的老公；`,
-            `4. 捕捉图文里的恋爱闪光点与默契瞬间，送上走心甜蜜的祝福或幽默调侃；`,
-            `5. 字数严格控制在 60~120 字之间，精炼动人，适合直接作为评论；`,
-            `6. 请直接输出点评正文内容，不要包含“【分析】”等生硬标题或开场白客套话。`
-        ].filter(Boolean);
-
-        const messages = [
-            { role: 'user', content: promptLines.join('\n') }
-        ];
-
+        notifyProgress('感情助手正在品读并撰写点评… 💖');
         let analysisResult;
         try {
-            analysisResult = await invokeAI(messages, attachments);
+            const messages = buildPromptMessages(hasValidImages, validImageCount);
+            analysisResult = await invokeAI(messages, attachments, null, {
+                timeoutMs: hasValidImages ? 28000 : 25000
+            });
         } catch (invokeErr) {
-            if (attachments.length > 0 && shouldDiscardFailedAIAttachments(invokeErr)) {
-                console.warn('[感情助手] 附图分析被拒绝，自动降级为纯文本动态点评:', invokeErr);
-                analysisResult = await invokeAI(messages, []);
+            const errCode = normalizeAIErrorCode(invokeErr);
+            if (attachments.length > 0 && !NON_FALLBACK_AI_ERROR_CODES.has(errCode)) {
+                console.warn('[感情助手] 附图视觉分析异常或超时，自动降级为纯文本动态点评:', errCode, invokeErr);
+                notifyProgress('正在根据动态文字生成温暖点评… ✨');
+                const fallbackMessages = buildPromptMessages(false, 0);
+                analysisResult = await invokeAI(fallbackMessages, [], DEFAULT_AI_MODEL, {
+                    timeoutMs: 25000
+                });
             } else {
                 throw invokeErr;
             }
         }
 
+        notifyProgress('正在发布点评到评论区… 🎉');
         if (typeof submitAIAnalysisComment === 'function') {
             await submitAIAnalysisComment(normalizedId, analysisResult);
         } else {
@@ -1912,8 +2055,8 @@ async function analyzeMomentWithAI(momentId) {
                 })
             }]);
             if (insertErr) throw insertErr;
-            if (typeof loadComments === 'function') loadComments(normalizedId);
-            if (typeof loadCommentCounts === 'function') loadCommentCounts([normalizedId]);
+            if (typeof loadComments === 'function') await loadComments(normalizedId);
+            if (typeof loadCommentCounts === 'function') await loadCommentCounts([normalizedId]);
         }
 
         return analysisResult;

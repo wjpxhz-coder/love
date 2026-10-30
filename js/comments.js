@@ -1022,25 +1022,55 @@ async function submitAIAnalysisComment(momentId, commentText) {
         ai_helper: 'love_assistant'
     });
 
-    const { error } = await supabaseClient.from('comments').insert([{
-        moment_id: momentId,
-        content: payload
-    }]);
+    const { data: insertedRows, error } = await supabaseClient
+        .from('comments')
+        .insert([{
+            moment_id: momentId,
+            content: payload
+        }])
+        .select('id');
 
     if (error) throw error;
+    const newCommentId = Array.isArray(insertedRows) && insertedRows[0]?.id
+        ? Number(insertedRows[0].id)
+        : null;
 
-    // 成功后自动展开评论列表，并刷新评论数据和计数
-    const card = document.getElementById(`card-${momentId}`);
-    const section = card ? card.querySelector('.comment-section') : document.getElementById(`comments-${momentId}`);
-    if (section) {
-        section.style.display = 'block';
-        section.setAttribute('aria-hidden', 'false');
-        const toggleBtn = card ? card.querySelector('.comment-toggle-btn') : document.getElementById(`comment-toggle-${momentId}`);
-        toggleBtn?.setAttribute('aria-expanded', 'true');
+    // 成功后自动展开所有同 ID 卡片的评论列表，并刷新评论数据和计数
+    const cards = Array.from(document.querySelectorAll(`[id="card-${momentId}"]`));
+    if (cards.length > 0) {
+        cards.forEach(card => {
+            const section = card.querySelector('.comment-section');
+            if (section) {
+                section.style.display = 'block';
+                section.setAttribute('aria-hidden', 'false');
+            }
+            const toggleBtn = card.querySelector('.comment-toggle-btn');
+            toggleBtn?.setAttribute('aria-expanded', 'true');
+        });
+    } else {
+        const section = document.getElementById(`comments-${momentId}`);
+        if (section) {
+            section.style.display = 'block';
+            section.setAttribute('aria-hidden', 'false');
+            const toggleBtn = document.getElementById(`comment-toggle-${momentId}`);
+            toggleBtn?.setAttribute('aria-expanded', 'true');
+        }
     }
 
-    await loadComments(momentId, card);
+    await loadComments(momentId);
     await loadCommentCounts([momentId]);
+
+    // 定位并高亮最新生成的 AI 评论，确保用户在长图文卡片中立即感知到结果
+    const targetItem = (newCommentId && document.getElementById(`comment-item-${newCommentId}`))
+        || document.querySelector(`[id="card-${momentId}"] .comment-list .comment-item:last-child`);
+    if (targetItem) {
+        targetItem.classList.remove('comment-item--highlight');
+        void targetItem.offsetWidth;
+        targetItem.classList.add('comment-item--highlight');
+        if (typeof targetItem.scrollIntoView === 'function') {
+            targetItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
 }
 
 window.submitAIAnalysisComment = submitAIAnalysisComment;

@@ -625,12 +625,13 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v4.0.1';
+const APP_VERSION = 'v4.0.2';
 const CONFIG = {
-    version: 'v4.0.1',
+    version: 'v4.0.2',
     date: '2026-10-30',
-    title: '感情助手 AI 读图分析与 Cloudflare R2 存储无缝联通 🌸✨',
+    title: '感情助手 AI 动态极速点评与全流程进度反馈升级 🌸⚡',
     features: [
+        'AI 动态分析极速响应：支持卡片已加载画面零延迟直取、多图智能均匀抽样与并行上传，评论区实时展示分析进度并自动高亮定位最新 AI 点评 🤖💖',
         'AI 读图全面修复：打通 Cloudflare R2 动态图片与 AI 临时输入桶桥接，彻底解决新动态 AI 分析及日记选图报「图片不存在」问题 🌸📸',
         '九宫格缩略图与视频流零耗损海报化：上传多图生成轻量微缩图、列表零拉取视频流与全屏秒开 ⚡📸',
         '视频播放修复：恢复原生首帧嗅探与 Range 分段流畅播放，彻底根除九宫格黑屏假死与未登录媒体洗空缺陷 🎬⚡',

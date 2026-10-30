@@ -31,10 +31,21 @@ if (document.readyState === 'loading') {
 // Service Worker 更新监听 (PWA)
 // ==========================================
 if ('serviceWorker' in navigator) {
+    const hadControllerOnLoad = Boolean(navigator.serviceWorker.controller);
+    let hasReloadedForSwUpdate = false;
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadControllerOnLoad || hasReloadedForSwUpdate) return;
+        hasReloadedForSwUpdate = true;
+        window.location.reload();
+    });
+
     window.addEventListener('load', async () => {
         try {
             const registration = await navigator.serviceWorker.getRegistration();
             if (!registration) return;
+
+            registration.update().catch(() => {});
 
             const activateUpdate = worker => {
                 if (!worker || !navigator.serviceWorker.controller) return;

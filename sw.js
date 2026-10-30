@@ -1,5 +1,6 @@
 const CACHE_PREFIX = 'love-diary-';
-const CACHE_NAME = 'love-diary-v4.0.1';
+const APP_SHELL_VERSION = '4.0.2';
+const CACHE_NAME = `love-diary-v${APP_SHELL_VERSION}`;
 const MEDIA_CACHE_NAME = 'love-diary-media-v1';
 const MAX_MEDIA_CACHE_ENTRIES = 160;
 const R2_MEDIA_HOST = 'media.xiaoxi666.kdns.fr';
@@ -84,6 +85,20 @@ async function networkFirstNavigation(request) {
 
 async function cacheFirstShell(request, canonicalUrl) {
     const cache = await caches.open(CACHE_NAME);
+    const reqUrl = new URL(request.url);
+    const requestedVersion = reqUrl.searchParams.get('v') || '';
+
+    // 当页面请求的 ?v= 版本与当前 SW 外壳版本不一致时，优先走网络拉取最新资源，防止旧 SW 锁定旧脚本
+    if (requestedVersion && requestedVersion !== APP_SHELL_VERSION) {
+        try {
+            const freshResponse = await fetch(new Request(request.url, { cache: 'no-cache', credentials: 'same-origin' }));
+            if (freshResponse && freshResponse.ok && freshResponse.type === 'basic') {
+                await cache.put(canonicalUrl, freshResponse.clone());
+                return freshResponse;
+            }
+        } catch (_err) {}
+    }
+
     const cached = await cache.match(canonicalUrl);
     if (cached) {
         // Stale-While-Revalidate：立即返回本地缓存保证首屏秒开，同时后台静默刷新最新外壳资源
