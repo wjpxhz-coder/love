@@ -625,9 +625,9 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v3.9.99';
+const APP_VERSION = 'v4.0.0';
 const CONFIG = {
-    version: 'v3.9.99',
+    version: 'v4.0.0',
     date: '2026-10-24',
     title: '全量视频智能前置抽帧与云端转码双重自愈保障 🎬🛡️✨',
     features: [
