@@ -2692,44 +2692,114 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
         return;
     }
 
-    const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
-    if (!card) return;
+    const primaryCard = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
+    if (!primaryCard) return;
 
-    if (card.classList.contains('is-ai-analyzing')) {
+    if (primaryCard.classList.contains('is-ai-analyzing')) {
         if (typeof showToast === 'function') showToast('感情助手正在分析这条动态，请稍候… 💖');
         return;
     }
 
-    card.classList.add('is-ai-analyzing');
-    let badge = card.querySelector('.moment-ai-analyzing-badge');
-    if (!badge) {
-        badge = document.createElement('div');
-        badge.className = 'moment-ai-analyzing-badge';
-        const spinSpan = document.createElement('span');
-        spinSpan.className = 'ai-spin';
-        spinSpan.textContent = '🌸';
-        badge.append(spinSpan, document.createTextNode(' 感情助手正在品读分析动态… ✨'));
-        const cardHeader = card.querySelector('.card-header');
-        if (cardHeader && cardHeader.nextSibling) {
-            card.insertBefore(badge, cardHeader.nextSibling);
+    const matchingCards = Array.from(new Set([
+        primaryCard,
+        ...Array.from(document.querySelectorAll(`[id="card-${momentId}"]`))
+    ])).filter(Boolean);
+
+    const badgeTextNodes = [];
+    const thinkingLabelNodes = [];
+    const createdBadges = [];
+    const createdThinkingEls = [];
+
+    matchingCards.forEach(card => {
+        card.classList.add('is-ai-analyzing');
+
+        let badge = card.querySelector('.moment-ai-analyzing-badge');
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.className = 'moment-ai-analyzing-badge';
+            const spinSpan = document.createElement('span');
+            spinSpan.className = 'ai-spin';
+            spinSpan.textContent = '🌸';
+            const textSpan = document.createElement('span');
+            textSpan.className = 'moment-ai-analyzing-text';
+            textSpan.textContent = ' 感情助手正在品读分析动态… ✨';
+            badge.append(spinSpan, textSpan);
+            const cardHeader = card.querySelector('.card-header');
+            if (cardHeader && cardHeader.nextSibling) {
+                card.insertBefore(badge, cardHeader.nextSibling);
+            } else {
+                card.prepend(badge);
+            }
+            createdBadges.push(badge);
+            badgeTextNodes.push(textSpan);
         } else {
-            card.prepend(badge);
+            badge.style.display = 'flex';
+            const existingText = badge.querySelector('.moment-ai-analyzing-text');
+            if (existingText) badgeTextNodes.push(existingText);
         }
-    } else {
-        badge.style.display = 'flex';
-    }
+
+        const section = card.querySelector('.comment-section');
+        if (section) {
+            const wasHidden = section.style.display === 'none';
+            if (wasHidden) {
+                section.style.display = 'block';
+                section.setAttribute('aria-hidden', 'false');
+                const toggleBtn = card.querySelector('.comment-toggle-btn');
+                toggleBtn?.setAttribute('aria-expanded', 'true');
+                if (typeof loadComments === 'function') {
+                    loadComments(momentId, card);
+                }
+            }
+
+            let thinkingEl = section.querySelector('.comment-ai-thinking--analysis');
+            if (!thinkingEl) {
+                thinkingEl = document.createElement('div');
+                thinkingEl.className = 'comment-ai-thinking comment-ai-thinking--analysis';
+                const icon = document.createElement('span');
+                icon.textContent = '🤖';
+                const label = document.createElement('span');
+                label.className = 'comment-ai-thinking-label';
+                label.textContent = '感情助手正在品读动态与照片… ✨';
+                const dots = document.createElement('span');
+                dots.className = 'comment-ai-thinking-dots';
+                dots.innerHTML = '<span></span><span></span><span></span>';
+                thinkingEl.append(icon, label, dots);
+
+                const listEl = section.querySelector('.comment-list');
+                if (listEl && listEl.nextSibling) {
+                    section.insertBefore(thinkingEl, listEl.nextSibling);
+                } else {
+                    section.prepend(thinkingEl);
+                }
+                createdThinkingEls.push(thinkingEl);
+                thinkingLabelNodes.push(label);
+            }
+        }
+    });
+
+    const updateProgressText = text => {
+        if (!text) return;
+        badgeTextNodes.forEach(node => {
+            node.textContent = ` ${text}`;
+        });
+        thinkingLabelNodes.forEach(node => {
+            node.textContent = text;
+        });
+    };
 
     if (typeof showToast === 'function') {
-        showToast('感情助手正在品读你们的动态… 💖');
+        showToast('感情助手正在品读你们的动态… 💖', 4000);
     }
 
     try {
         if (typeof window.analyzeMomentWithAI !== 'function') {
             throw new Error('AI_FUNCTION_UNAVAILABLE');
         }
-        await window.analyzeMomentWithAI(momentId);
+        await window.analyzeMomentWithAI(momentId, {
+            onProgress: updateProgressText
+        });
         if (typeof showToast === 'function') {
-            showToast('感情助手分析完成，已发布到评论区！🎉💖');
+            showToast('感情助手分析完成，已发布到评论区！🎉💖', 4000);
         }
     } catch (error) {
         console.error('动态 AI 分析失败:', error);
@@ -2738,13 +2808,14 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
             errorMsg = getFriendlyAIError(error);
         }
         if (typeof showToast === 'function') {
-            showToast(errorMsg);
+            showToast(errorMsg, 4500);
         } else {
             alert(errorMsg);
         }
     } finally {
-        card.classList.remove('is-ai-analyzing');
-        if (badge) badge.remove();
+        matchingCards.forEach(card => card.classList.remove('is-ai-analyzing'));
+        createdBadges.forEach(el => el.remove());
+        createdThinkingEls.forEach(el => el.remove());
     }
 }
 
@@ -2806,23 +2877,29 @@ function runMomentAction(actionElement) {
 }
 
 document.addEventListener('click', event => {
-    if (!event.target.closest('.moment-actions-menu')) {
+    const targetEl = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (!targetEl) return;
+    if (!targetEl.closest('.moment-actions-menu')) {
         closeAllMomentActionMenus();
     }
-    const actionElement = event.target.closest('[data-moment-action]');
+    const actionElement = targetEl.closest('[data-moment-action]');
     if (actionElement) runMomentAction(actionElement);
 });
 
 document.addEventListener('keydown', event => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
-    const actionElement = event.target.closest('[data-moment-action="open-profile"], [data-moment-action="open-lightbox"]');
+    const targetEl = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (!targetEl) return;
+    const actionElement = targetEl.closest('[data-moment-action="open-profile"], [data-moment-action="open-lightbox"]');
     if (!actionElement) return;
     event.preventDefault();
     runMomentAction(actionElement);
 });
 
 document.addEventListener('change', event => {
-    const input = event.target.closest('[data-moment-action="comment-images-selected"]');
+    const targetEl = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (!targetEl) return;
+    const input = targetEl.closest('[data-moment-action="comment-images-selected"]');
     if (!input || typeof handleCommentImgSelect !== 'function') return;
     const momentId = normalizeMomentId(input.dataset.momentId);
     if (momentId) handleCommentImgSelect(event, momentId);
