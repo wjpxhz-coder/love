@@ -421,7 +421,7 @@ async function loadComments(momentId, targetCard = null) {
                 authorBadge.appendChild(document.createTextNode('🤖 我们的感情助手'));
             } else {
                 authorBadge.className = `comment-author-badge author-badge ${badgeClass}`;
-                authorBadge.style.cursor = 'pointer';
+                authorBadge.style.cursor = 'var(--cursor-pointer)';
                 authorBadge.title = '点击查看主页';
                 authorBadge.tabIndex = 0;
                 authorBadge.setAttribute('role', 'button');

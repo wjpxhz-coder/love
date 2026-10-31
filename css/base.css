@@ -2,6 +2,7 @@ html {
     scrollbar-color: var(--primary-light) transparent;
     scrollbar-width: thin;
     background-color: var(--bg-1);
+    cursor: var(--cursor-default);
 }
 
 ::-webkit-scrollbar {
@@ -200,7 +201,7 @@ body, #bg-layer {
     border-radius: 22px;
     font-size: 0.9em;
     font-weight: 600;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     box-shadow: 0 4px 16px var(--primary-glow);
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     outline: none;
@@ -231,3 +232,53 @@ body, #bg-layer {
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* ── 全站语义交互元素专属光标基线 ── */
+a[href],
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+label[for],
+select:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="button"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+input[type="range"]:not(:disabled) {
+    cursor: var(--cursor-pointer);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="color"]):not(:disabled),
+textarea:not(:disabled),
+[contenteditable="true"] {
+    cursor: var(--cursor-text);
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[aria-disabled="true"] {
+    cursor: var(--cursor-not-allowed) !important;
+}
+
+/* 仅在支持鼠标悬停的设备展示专属鼠标样式设置项 */
+.cursor-settings-subgroup {
+    display: none;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+}
+
+.cursor-settings-subgroup .settings-sublabel {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text);
+    margin-bottom: 10px;
+}
+
+@media (any-hover: hover) and (any-pointer: fine) {
+    .cursor-settings-subgroup {
+        display: block;
+    }
+}

@@ -8,7 +8,7 @@
             border-radius: 50%;
             border: 1px solid var(--border);
             background: var(--card);
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -32,7 +32,7 @@
             border-radius: 50%;
             border: 1px solid var(--border);
             background: var(--card);
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -57,7 +57,7 @@
             border-radius: 50%;
             border: 2px solid var(--primary-light);
             background: var(--card);
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             display: none;
             align-items: center;
             justify-content: center;
@@ -111,7 +111,7 @@
             padding: 10px 16px;
             font-size: 0.9em;
             color: var(--text);
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             transition: background 0.2s;
             white-space: nowrap;
             width: 100%;
@@ -291,7 +291,7 @@
             background: none;
             border: none;
             color: rgba(255,200,220,0.8);
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             font-size: 1em;
             padding: 0;
             box-shadow: none;
@@ -328,7 +328,7 @@
             font-family: 'ZCOOL KuaiLe',cursive;
             font-size: 1.1em;
             letter-spacing: 4px;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             box-shadow: 0 6px 24px rgba(232,67,147,0.55), 0 0 20px rgba(255,80,130,0.3);
             transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
             margin-top: 8px;
@@ -361,7 +361,7 @@
             width: 36px; height: 36px;
             border-radius: 50%;
             font-size: 0.9em;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             display: flex; align-items: center; justify-content: center;
             padding: 0;
             box-shadow: none;

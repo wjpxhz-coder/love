@@ -945,7 +945,7 @@ async function handleTopicPhotoSelect(event) {
             imgWrap.style.cssText = 'position:relative; width:56px; height:56px; border-radius:8px; overflow:hidden; display:inline-block; margin-right:6px;';
             imgWrap.innerHTML = `
                 <img src="${escapeHtml(objUrl)}" style="width:100%; height:100%; object-fit:cover;">
-                <button type="button" style="position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%; width:18px; height:18px; font-size:12px; cursor:pointer;" onclick="removeTopicPhotoPreview(this, '${escapeHtml(objUrl)}')">×</button>
+                <button type="button" style="position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%; width:18px; height:18px; font-size:12px; cursor:var(--cursor-pointer);" onclick="removeTopicPhotoPreview(this, '${escapeHtml(objUrl)}')">×</button>
             `;
             previewContainer.appendChild(imgWrap);
         }

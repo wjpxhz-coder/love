@@ -76,7 +76,7 @@
             width: 34px; height: 34px;
             border-radius: 50%;
             font-size: 1em;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             box-shadow: none;
             display: flex;
             align-items: center;
@@ -158,7 +158,7 @@
             width: 32px; height: 32px;
             border-radius: 50%;
             font-size: 1em;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             box-shadow: none;
             display: flex;
             align-items: center;
@@ -281,7 +281,7 @@
             font: inherit;
             font-size: 0.8em;
             padding: 7px 10px;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
         }
         .ai-attachment-btn:hover,
         .ai-diary-load-more:hover {
@@ -293,7 +293,7 @@
         }
         .ai-attachment-btn:disabled,
         .ai-diary-load-more:disabled {
-            cursor: not-allowed;
+            cursor: var(--cursor-not-allowed);
             opacity: 0.5;
         }
         .ai-attachment-count {
@@ -364,7 +364,7 @@
             background: rgba(40, 36, 38, 0.78);
             box-shadow: none;
             font: 700 13px/1 system-ui, sans-serif;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
         }
         .ai-attachment-remove:hover {
             background: rgba(181, 89, 103, 0.92);
@@ -424,7 +424,7 @@
             border-radius: 12px;
             background: var(--surface-subtle);
             box-shadow: none;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
         }
         .ai-diary-image-option:hover,
         .ai-diary-image-option.selected {
@@ -433,7 +433,7 @@
             box-shadow: 0 0 0 2px rgba(212, 160, 168, 0.16);
         }
         .ai-diary-image-option:disabled {
-            cursor: not-allowed;
+            cursor: var(--cursor-not-allowed);
             opacity: 0.48;
         }
         .ai-diary-image-option img {

@@ -45,27 +45,30 @@
             var saved = localStorage.getItem('theme_preference');
             var theme = saved === 'dark' ? 'dark' : 'light';
             document.documentElement.setAttribute('data-theme', theme);
+            if (localStorage.getItem('cursor_preference') === 'system') {
+                document.documentElement.setAttribute('data-cursor', 'system');
+            }
         })();
     </script>
-    <link rel="stylesheet" href="css/variables.css?v=4.1.0">
-    <link rel="stylesheet" href="css/refresh.css?v=4.1.0">
-    <link rel="stylesheet" href="css/base.css?v=4.1.0">
-    <link rel="stylesheet" href="css/header.css?v=4.1.0">
-    <link rel="stylesheet" href="css/timer.css?v=4.1.0">
-    <link rel="stylesheet" href="css/timeline.css?v=4.1.0">
-    <link rel="stylesheet" href="css/dialogs.css?v=4.1.0">
-    <link rel="stylesheet" href="css/comments.css?v=4.1.0">
-    <link rel="stylesheet" href="css/ai-panel.css?v=4.1.0">
-    <link rel="stylesheet" href="css/fab.css?v=4.1.0">
-    <link rel="stylesheet" href="css/auth.css?v=4.1.0">
-    <link rel="stylesheet" href="css/profile.css?v=4.1.0">
-    <link rel="stylesheet" href="css/notifications.css?v=4.1.0">
-    <link rel="stylesheet" href="css/mood.css?v=4.1.0">
-    <link rel="stylesheet" href="css/anniversary.css?v=4.1.0">
-    <link rel="stylesheet" href="css/effects.css?v=4.1.0">
-    <link rel="stylesheet" href="css/responsive.css?v=4.1.0">
-    <link rel="stylesheet" href="css/pages.css?v=4.1.0">
-    <link rel="stylesheet" href="css/topics.css?v=4.1.0">
+    <link rel="stylesheet" href="css/variables.css?v=4.2.0">
+    <link rel="stylesheet" href="css/refresh.css?v=4.2.0">
+    <link rel="stylesheet" href="css/base.css?v=4.2.0">
+    <link rel="stylesheet" href="css/header.css?v=4.2.0">
+    <link rel="stylesheet" href="css/timer.css?v=4.2.0">
+    <link rel="stylesheet" href="css/timeline.css?v=4.2.0">
+    <link rel="stylesheet" href="css/dialogs.css?v=4.2.0">
+    <link rel="stylesheet" href="css/comments.css?v=4.2.0">
+    <link rel="stylesheet" href="css/ai-panel.css?v=4.2.0">
+    <link rel="stylesheet" href="css/fab.css?v=4.2.0">
+    <link rel="stylesheet" href="css/auth.css?v=4.2.0">
+    <link rel="stylesheet" href="css/profile.css?v=4.2.0">
+    <link rel="stylesheet" href="css/notifications.css?v=4.2.0">
+    <link rel="stylesheet" href="css/mood.css?v=4.2.0">
+    <link rel="stylesheet" href="css/anniversary.css?v=4.2.0">
+    <link rel="stylesheet" href="css/effects.css?v=4.2.0">
+    <link rel="stylesheet" href="css/responsive.css?v=4.2.0">
+    <link rel="stylesheet" href="css/pages.css?v=4.2.0">
+    <link rel="stylesheet" href="css/topics.css?v=4.2.0">
 </head>
 <body class="auth-pending">
 <!-- 内联矢量微光 SVG 图标库 -->
@@ -917,6 +920,13 @@
                 <button class="theme-opt-btn" id="theme-btn-light" type="button" onclick="setThemeDirect('light')" aria-pressed="true">☀️ 浅色</button>
                 <button class="theme-opt-btn" id="theme-btn-dark" type="button" onclick="setThemeDirect('dark')" aria-pressed="false">🌙 深色</button>
             </div>
+            <div class="settings-subgroup cursor-settings-subgroup">
+                <div class="settings-sublabel">🐍 专属鼠标样式</div>
+                <div class="theme-options cursor-options">
+                    <button class="theme-opt-btn active" id="cursor-btn-cute" type="button" onclick="setCursorDirect('cute')" aria-pressed="true">🌸 樱花奶蛇团</button>
+                    <button class="theme-opt-btn" id="cursor-btn-system" type="button" onclick="setCursorDirect('system')" aria-pressed="false">🖱️ 系统默认</button>
+                </div>
+            </div>
         </div>
 
         <div class="settings-group">
@@ -977,7 +987,7 @@
         </div>
         
         <div class="settings-footer">
-            <span id="settingsVersion">当前版本：v4.0.1</span>
+            <span id="settingsVersion">当前版本：v4.2.0</span>
         </div>
 
         
@@ -1071,12 +1081,12 @@
                     <span>正在录音中…</span>
                     <span id="topicAudioRecordingTime">00:00</span>
                 </div>
-                <button type="button" style="background:transparent; border:none; color:#e11d48; font-weight:700; cursor:pointer;" onclick="stopTopicRecording()">完成</button>
+                <button type="button" style="background:transparent; border:none; color:#e11d48; font-weight:700; cursor:var(--cursor-pointer);" onclick="stopTopicRecording()">完成</button>
             </div>
             <!-- 录音预览条 -->
             <div id="topicAudioPreviewWrap" style="margin-bottom:8px; display:flex; align-items:center; gap:8px;" hidden>
                 <audio id="topicAudioPlayer" controls style="height:36px; flex:1;"></audio>
-                <button type="button" class="topic-audio-remove-btn" style="background:rgba(0,0,0,0.06); border:none; border-radius:50%; width:28px; height:28px; cursor:pointer;" onclick="deleteTopicAudioPreview()">×</button>
+                <button type="button" class="topic-audio-remove-btn" style="background:rgba(0,0,0,0.06); border:none; border-radius:50%; width:28px; height:28px; cursor:var(--cursor-pointer);" onclick="deleteTopicAudioPreview()">×</button>
             </div>
             <!-- 图片预览横滑容器 -->
             <div class="topic-composer-photo-previews" id="topicComposerPhotoPreviews" style="margin-bottom:8px; overflow-x:auto; white-space:nowrap;" hidden></div>
@@ -1198,28 +1208,28 @@
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"
         integrity="sha384-nWa0WrJ8Dl90YqhjSU0vNB8IxSO54t6AmEmV83LMTb/Img+Af2MfK7XJE54mwpSR"
         crossorigin="anonymous"></script>
-<script defer src="js/config.js?v=4.1.0"></script>
-<script defer src="js/animations.js?v=4.1.0"></script>
-<script defer src="js/timer.js?v=4.1.0"></script>
-<script defer src="js/auth.js?v=4.1.0"></script>
-<script defer src="js/profile.js?v=4.1.0"></script>
-<script defer src="js/moments.js?v=4.1.0"></script>
-<script defer src="js/milestones.js?v=4.1.0"></script>
-<script defer src="js/comments.js?v=4.1.0"></script>
-<script defer src="js/likes.js?v=4.1.0"></script>
-<script defer src="js/mood.js?v=4.1.0"></script>
-<script defer src="js/anniversary.js?v=4.1.0"></script>
-<script defer src="js/lightbox.js?v=4.1.0"></script>
-<script defer src="js/ai.js?v=4.1.0"></script>
-<script defer src="js/blindbox.js?v=4.1.0"></script>
-<script defer src="js/presence.js?v=4.1.0"></script>
-<script defer src="js/theme.js?v=4.1.0"></script>
-<script defer src="js/notifications.js?v=4.1.0"></script>
-<script defer src="js/topics.js?v=4.1.0"></script>
-<script defer src="js/effects.js?v=4.1.0"></script>
-<script defer src="js/settings.js?v=4.1.0"></script>
-<script defer src="js/router.js?v=4.1.0"></script>
-<script defer src="js/app.js?v=4.1.0"></script>
+<script defer src="js/config.js?v=4.2.0"></script>
+<script defer src="js/animations.js?v=4.2.0"></script>
+<script defer src="js/timer.js?v=4.2.0"></script>
+<script defer src="js/auth.js?v=4.2.0"></script>
+<script defer src="js/profile.js?v=4.2.0"></script>
+<script defer src="js/moments.js?v=4.2.0"></script>
+<script defer src="js/milestones.js?v=4.2.0"></script>
+<script defer src="js/comments.js?v=4.2.0"></script>
+<script defer src="js/likes.js?v=4.2.0"></script>
+<script defer src="js/mood.js?v=4.2.0"></script>
+<script defer src="js/anniversary.js?v=4.2.0"></script>
+<script defer src="js/lightbox.js?v=4.2.0"></script>
+<script defer src="js/ai.js?v=4.2.0"></script>
+<script defer src="js/blindbox.js?v=4.2.0"></script>
+<script defer src="js/presence.js?v=4.2.0"></script>
+<script defer src="js/theme.js?v=4.2.0"></script>
+<script defer src="js/notifications.js?v=4.2.0"></script>
+<script defer src="js/topics.js?v=4.2.0"></script>
+<script defer src="js/effects.js?v=4.2.0"></script>
+<script defer src="js/settings.js?v=4.2.0"></script>
+<script defer src="js/router.js?v=4.2.0"></script>
+<script defer src="js/app.js?v=4.2.0"></script>
 
 </body>
 </html>

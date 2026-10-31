@@ -111,7 +111,7 @@ dialog.native-dialog.app-page::backdrop {
     font: 600 0.9rem/1 'Nunito', 'PingFang SC', system-ui, sans-serif;
     letter-spacing: 0;
     white-space: nowrap;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
 }
 
 .app-page-back:hover {
@@ -162,7 +162,7 @@ dialog.native-dialog.app-page::backdrop {
     font-family: inherit;
     font-size: 0.88rem;
     font-weight: 600;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     box-shadow: 0 3px 10px rgba(181, 115, 122, 0.25);
     transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
@@ -700,7 +700,7 @@ dialog.native-dialog.app-page::backdrop {
     font-size: 0.92rem;
     font-weight: 600;
     box-shadow: 0 8px 24px rgba(255, 117, 140, 0.42);
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
 }
 
