@@ -2685,9 +2685,9 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
     }
     if (typeof hasAIServiceConsent === 'function' && !hasAIServiceConsent()) {
         if (typeof showToast === 'function') {
-            showToast('请先在“设置 → 我们的感情助手”中开启服务 ✨');
+            showToast('请先在“设置 → 感情小助手”中开启服务 ✨');
         } else {
-            alert('请先在系统设置中开启感情助手 AI 服务');
+            alert('请先在系统设置中开启感情小助手 AI 服务');
         }
         return;
     }
@@ -2696,7 +2696,7 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
     if (!primaryCard) return;
 
     if (primaryCard.classList.contains('is-ai-analyzing')) {
-        if (typeof showToast === 'function') showToast('感情助手正在分析这条动态，请稍候… 💖');
+        if (typeof showToast === 'function') showToast('感情小助手正在分析这条动态，请稍候… 💖');
         return;
     }
 
@@ -2722,7 +2722,7 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
             spinSpan.textContent = '🌸';
             const textSpan = document.createElement('span');
             textSpan.className = 'moment-ai-analyzing-text';
-            textSpan.textContent = ' 感情助手正在品读分析动态… ✨';
+            textSpan.textContent = ' 感情小助手正在品读分析动态… ✨';
             badge.append(spinSpan, textSpan);
             const cardHeader = card.querySelector('.card-header');
             if (cardHeader && cardHeader.nextSibling) {
@@ -2759,7 +2759,7 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
                 icon.textContent = '🤖';
                 const label = document.createElement('span');
                 label.className = 'comment-ai-thinking-label';
-                label.textContent = '感情助手正在品读动态与照片… ✨';
+                label.textContent = '感情小助手正在品读动态与照片… ✨';
                 const dots = document.createElement('span');
                 dots.className = 'comment-ai-thinking-dots';
                 dots.innerHTML = '<span></span><span></span><span></span>';
@@ -2788,7 +2788,7 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
     };
 
     if (typeof showToast === 'function') {
-        showToast('感情助手正在品读你们的动态… 💖', 4000);
+        showToast('感情小助手正在品读你们的动态… 💖', 4000);
     }
 
     try {
@@ -2799,11 +2799,11 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
             onProgress: updateProgressText
         });
         if (typeof showToast === 'function') {
-            showToast('感情助手分析完成，已发布到评论区！🎉💖', 4000);
+            showToast('感情小助手分析完成，已发布到评论区！🎉💖', 4000);
         }
     } catch (error) {
         console.error('动态 AI 分析失败:', error);
-        let errorMsg = '感情助手分析失败，请稍后重试。';
+        let errorMsg = '感情小助手分析失败，请稍后重试。';
         if (typeof getFriendlyAIError === 'function') {
             errorMsg = getFriendlyAIError(error);
         }

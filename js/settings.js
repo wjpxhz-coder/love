@@ -188,7 +188,7 @@ function doSettingsLogout() {
     if (typeof doLogout === 'function') doLogout();
 }
 
-// --- 感情助手模型选择与动态拉取 ---
+// --- 感情小助手模型选择与动态拉取 ---
 let isFetchingModels = false;
 
 function syncAIModelSetting() {
@@ -275,7 +275,7 @@ async function loadSupportedModelsList(forceRefresh = false) {
         syncAIModelSetting();
 
         if (forceRefresh && typeof showToast === 'function') {
-            showToast('已更新感情助手支持的模型列表 ✨');
+            showToast('已更新感情小助手支持的模型列表 ✨');
         }
     } catch (e) {
         console.warn('拉取模型列表异常:', e);

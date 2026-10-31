@@ -338,12 +338,12 @@ function createNotificationItem(notification) {
     if (isAIComment) {
         const aiActor = document.createElement('strong');
         aiActor.className = 'ai-notification-actor';
-        aiActor.textContent = '🤖 我们的感情助手';
+        aiActor.textContent = '🤖 感情小助手';
         headline.append(aiActor, document.createTextNode(' 发表了评论'));
     } else if (isLikeAIComment) {
         const actor = document.createElement('strong');
         actor.textContent = notification.actor || '成员';
-        headline.append(actor, document.createTextNode(' 点赞了感情助手的评论'));
+        headline.append(actor, document.createTextNode(' 点赞了感情小助手的评论'));
     } else {
         const actor = document.createElement('strong');
         actor.textContent = notification.actor || '成员';
