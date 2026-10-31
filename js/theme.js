@@ -8,6 +8,7 @@ function initTheme() {
     const saved = localStorage.getItem('theme_preference');
     const theme = saved === 'dark' ? 'dark' : 'light';
     applyTheme(theme);
+    initCursorStyle();
 }
 
 function applyTheme(theme) {
@@ -58,3 +59,38 @@ function setThemeDirect(theme) {
     updateSettingsThemeButtons(theme);
 }
 
+// --- 专属萌系鼠标样式（樱花奶蛇团 / 系统默认） ---
+function getStoredCursorStyle() {
+    return localStorage.getItem('cursor_preference') === 'system' ? 'system' : 'cute';
+}
+
+function initCursorStyle() {
+    applyCursorStyle(getStoredCursorStyle());
+}
+
+function applyCursorStyle(mode) {
+    if (mode === 'system') {
+        document.documentElement.setAttribute('data-cursor', 'system');
+    } else {
+        document.documentElement.removeAttribute('data-cursor');
+    }
+    updateSettingsCursorButtons(mode === 'system' ? 'system' : 'cute');
+}
+
+function updateSettingsCursorButtons(mode) {
+    const cuteBtn = document.getElementById('cursor-btn-cute');
+    const sysBtn = document.getElementById('cursor-btn-system');
+    if (!cuteBtn || !sysBtn) return;
+
+    const isCute = mode !== 'system';
+    cuteBtn.classList.toggle('active', isCute);
+    sysBtn.classList.toggle('active', !isCute);
+    cuteBtn.setAttribute('aria-pressed', String(isCute));
+    sysBtn.setAttribute('aria-pressed', String(!isCute));
+}
+
+function setCursorDirect(mode) {
+    if (!['cute', 'system'].includes(mode)) return;
+    localStorage.setItem('cursor_preference', mode);
+    applyCursorStyle(mode);
+}

@@ -625,12 +625,13 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v4.1.0';
+const APP_VERSION = 'v4.2.0';
 const CONFIG = {
-    version: 'v4.1.0',
+    version: 'v4.2.0',
     date: '2026-10-31',
-    title: '全站通知智能已读与零延迟联动体验升级 🔔✨',
+    title: '专属「樱花奶蛇团」萌系鼠标上线 🐍🌸',
     features: [
+        '专属「樱花奶蛇团」原生硬件鼠标：桌面端全站适配日常指路、捧心点击、樱花嫩芽选字、看图放大/拖拽与委屈禁用全套贴纸光标，0 延迟且 0 性能消耗，支持在系统设置随时切换 🐍🌸',
         '全站内容智能已读联动：交互查看动态、展开评论区、打开某天心情或进入话题手账时，关联通知自动标记为已读，不必再逐条手动点击 🔔✨',
         '零延迟乐观消红点：浏览互动瞬间即刻消除铃铛未读红点与列表高亮，后台静默无感同步数据库，告别冗余 Toast 打扰 ⚡🌸',
         '手账聊天实时静默消红：在手账详情页实时聊天时，对方新发来的手账留言自动静默标为已读，保持界面清爽清净 💬💖',

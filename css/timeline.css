@@ -16,7 +16,7 @@ button {
     border-radius: 40px;
     font-size: 0.95em;
     font-weight: 700;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     letter-spacing: 1px;
     box-shadow: 0 6px 22px var(--shadow);
     transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -33,7 +33,7 @@ button:hover {
 }
 
 button:active { transform: scale(0.96); }
-button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; transform: none; }
+button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-shadow: none; transform: none; }
 
 /* ── 时光轴 ── */
 /* ── 时光轴 ── */
@@ -142,7 +142,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
     height: 40px;
     border-radius: 50%;
     flex-shrink: 0;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     overflow: hidden;
     display: flex;
     align-items: center;
@@ -199,7 +199,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
     font-size: 0.95em;
     font-weight: 700;
     color: var(--text);
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     line-height: 1.3;
     transition: color 0.2s ease;
 }
@@ -284,7 +284,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
     padding: 3px 12px;
     border-radius: 20px;
     font-size: 0.74em;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     box-shadow: none;
     transition: all 0.2s;
     letter-spacing: 0.5px;
@@ -316,7 +316,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             width: 28px;
             height: 28px;
             border-radius: 50%;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             font-size: 1.1em;
             font-weight: 700;
             line-height: 1;
@@ -377,7 +377,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             border-radius: 8px;
             font-size: 0.82em;
             color: var(--text);
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             text-align: left;
             transition: background 0.15s ease, color 0.15s ease;
             box-shadow: none;
@@ -478,7 +478,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             max-width: 100%;
             border-radius: 12px;
             margin-top: 10px;
-            cursor: zoom-in;
+            cursor: var(--cursor-zoom-in);
             display: block;
             background-color: rgba(220, 200, 205, 0.2);
             background-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
@@ -515,7 +515,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
             padding: 0;
             box-shadow: none;
@@ -551,7 +551,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             align-items: center;
             justify-content: center;
             font-size: 14px;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             line-height: 1;
         }
         .moment-grid {
@@ -570,7 +570,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             aspect-ratio: 1;
             border-radius: 8px;
             object-fit: cover;
-            cursor: zoom-in;
+            cursor: var(--cursor-zoom-in);
             box-shadow: 0 2px 6px rgba(0,0,0,0.08);
             background-color: rgba(220, 200, 205, 0.2);
             background-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
@@ -595,7 +595,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             aspect-ratio: 1;
             border-radius: 8px;
             overflow: hidden;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             box-shadow: 0 2px 6px rgba(0,0,0,0.08);
             background-color: rgba(40, 30, 35, 0.15);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -645,7 +645,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             min-height: 100px;
             border-radius: 12px;
             margin-top: 10px;
-            cursor: zoom-in;
+            cursor: var(--cursor-zoom-in);
             display: block;
             max-height: 360px;
             object-fit: contain;
@@ -664,7 +664,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             background-color: #1a1518;
             background-image: none;
             animation: none;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
         }
         [data-theme='dark'] video.moment-single-image {
@@ -689,7 +689,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             border-radius: 20px;
             font-size: 0.85em;
             margin-top: 10px;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             width: 100%;
             transition: all 0.2s;
             box-shadow: none;
@@ -802,7 +802,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             color: var(--text-muted);
             font-size: 0.85em;
             font-weight: 600;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             display: inline-flex;
             align-items: center;
             gap: 4px;
@@ -843,7 +843,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             border-radius: 999px;
             border: 1.5px solid rgba(255, 255, 255, 0.85);
             box-shadow: 0 4px 18px var(--primary-glow);
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -953,7 +953,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             background: rgba(255, 255, 255, 0.76);
             border: 1px solid rgba(245, 158, 11, 0.22);
             box-shadow: 0 3px 10px rgba(245, 158, 11, 0.08);
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
         }
 
@@ -1069,7 +1069,7 @@ button:disabled { background: #d6c8c8; cursor: not-allowed; box-shadow: none; tr
             margin-top: 10px;
             border-radius: 12px;
             overflow: hidden;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             background-color: #1a1518;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
             aspect-ratio: 16 / 9;

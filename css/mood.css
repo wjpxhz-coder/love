@@ -68,7 +68,7 @@
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 240, 246, 0.9));
     color: var(--primary);
     box-shadow: 0 4px 14px rgba(255, 105, 140, 0.15);
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     padding: 8px 18px;
     border-radius: 20px;
     font-size: 0.85em;
@@ -123,7 +123,7 @@
     font: inherit;
     font-weight: 700;
     letter-spacing: 0;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     box-shadow: 0 2px 6px var(--shadow);
     transition: all 0.2s ease;
     text-align: left;
@@ -161,7 +161,7 @@
     background: var(--surface);
     color: var(--primary);
     box-shadow: 0 2px 6px var(--shadow);
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
     position: relative;
     user-select: none;
@@ -217,7 +217,7 @@
 
 .mood-month-nav:disabled {
     opacity: 0.28;
-    cursor: not-allowed;
+    cursor: var(--cursor-not-allowed);
     box-shadow: none;
     pointer-events: none;
     transform: none;
@@ -260,7 +260,7 @@
     background: rgba(255, 182, 193, 0.1);
     border: 1px solid rgba(255, 182, 193, 0.18);
     box-shadow: none;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -378,7 +378,7 @@
     background: rgba(255, 182, 193, 0.12);
     box-shadow: none;
     font-size: 1.45em;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -481,7 +481,7 @@
     font-size: 0.78rem;
     font-weight: 700;
     box-shadow: 0 3px 12px rgba(244, 63, 94, 0.14), inset 0 1px 1px rgba(255, 255, 255, 0.9);
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -655,7 +655,7 @@
     border: 1.5px solid var(--glass-border);
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.4);
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     user-select: none;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -827,7 +827,7 @@
     font: 600 0.88rem/1 'Nunito', 'PingFang SC', system-ui, sans-serif;
     letter-spacing: 0;
     white-space: nowrap;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     box-shadow: none;
     transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -899,7 +899,7 @@
     border: 1px solid var(--glass-border);
     font-size: 0.86em;
     font-weight: 700;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -957,7 +957,7 @@
     -webkit-backdrop-filter: blur(10px);
     color: var(--primary);
     font: 700 0.88rem/1.2 'Nunito', 'PingFang SC', system-ui, sans-serif;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
     transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -997,7 +997,7 @@
     gap: 8px;
     margin: 8px 0 10px;
     color: var(--text);
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
 }
 
 .mood-reminder-toggle input { accent-color: var(--primary); }
@@ -1133,7 +1133,7 @@
     justify-content: center;
     font-size: 13px;
     font-weight: bold;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     line-height: 1;
     padding: 0;
     transition: transform 0.2s ease, background-color 0.2s ease;
@@ -1157,7 +1157,7 @@
     border-radius: 12px;
     background: rgba(255, 240, 246, 0.5);
     color: var(--primary);
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
     padding: 0;
 }
@@ -1247,7 +1247,7 @@
     aspect-ratio: 1;
     border-radius: 10px;
     overflow: hidden;
-    cursor: zoom-in;
+    cursor: var(--cursor-zoom-in);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
     background-color: rgba(220, 200, 205, 0.2);
     background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0) 100%);

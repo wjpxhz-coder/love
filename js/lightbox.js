@@ -33,7 +33,7 @@ function applyLightboxTransform(animate = false) {
     if (!img) return;
     img.style.transition = animate ? 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)' : 'none';
     img.style.transform = `translate3d(${zoomTranslateX}px, ${zoomTranslateY}px, 0) scale(${zoomScale})`;
-    img.style.cursor = zoomScale > 1.05 ? (zoomIsDragging ? 'grabbing' : 'grab') : 'zoom-in';
+    img.style.cursor = zoomScale > 1.05 ? (zoomIsDragging ? 'var(--cursor-grabbing)' : 'var(--cursor-grab)') : 'var(--cursor-zoom-in)';
 }
 
 function resetLightboxZoom(animate = false) {

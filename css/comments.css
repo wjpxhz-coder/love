@@ -6,7 +6,7 @@
     color: var(--text-muted);
     padding: 5px 12px;
     font-size: 0.82rem;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     box-shadow: none !important;
     letter-spacing: 0.02em;
     display: inline-flex;
@@ -124,7 +124,7 @@
     border-radius: 999px;
     font-size: 0.82em;
     font-weight: 500;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     box-shadow: none !important;
     margin-top: 10px;
     transition: all 0.22s ease;
@@ -203,7 +203,7 @@
             padding: 7px 16px;
             border-radius: 20px;
             font-size: 0.82em;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             box-shadow: none;
             margin-right: 8px;
             transition: all 0.2s;
@@ -231,7 +231,7 @@
             border-radius: 999px;
             font-size: 0.88em;
             font-weight: 500;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             box-shadow: none !important;
             margin: 0;
             transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
@@ -349,7 +349,7 @@
             color: var(--text-muted);
             padding: 5px 12px;
             font-size: 0.82rem;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             box-shadow: none !important;
             display: inline-flex;
             align-items: center;
@@ -456,7 +456,7 @@
             padding: 5px 10px;
             border-radius: 20px;
             font-size: 0.75em;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             box-shadow: none;
             transition: all 0.2s;
             display: inline-flex;
@@ -499,7 +499,7 @@
             width: 16px; height: 16px;
             display: flex; align-items: center; justify-content: center;
             font-size: 11px;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             line-height: 1;
             border: none;
             padding: 0;
@@ -511,7 +511,7 @@
             border-radius: 8px;
             margin-top: 6px;
             display: block;
-            cursor: zoom-in;
+            cursor: var(--cursor-zoom-in);
             background-color: rgba(220, 200, 205, 0.2);
             background-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
             background-size: 200% 100%;
@@ -596,7 +596,7 @@
             font-size: 0.82em;
             color: var(--text-muted);
             line-height: 1.45;
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             transition: background 0.2s, border-color 0.2s;
             display: flex;
             align-items: baseline;
@@ -679,7 +679,7 @@
             background: none;
             border: none;
             color: var(--text-muted);
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             font-size: 1.15em;
             padding: 0 4px;
             line-height: 1;

@@ -22,6 +22,10 @@ function enterSettingsPage() {
     if (typeof updateSettingsThemeButtons === 'function') {
         updateSettingsThemeButtons(currentTheme);
     }
+    if (typeof updateSettingsCursorButtons === 'function') {
+        const currentCursor = document.documentElement.getAttribute('data-cursor') === 'system' ? 'system' : 'cute';
+        updateSettingsCursorButtons(currentCursor);
+    }
     if (typeof syncAIPrivacySetting === 'function') syncAIPrivacySetting();
     if (typeof syncAIModelSetting === 'function') syncAIModelSetting();
     if (typeof loadSupportedModelsList === 'function') loadSupportedModelsList(false);

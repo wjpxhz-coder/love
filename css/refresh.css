@@ -144,7 +144,7 @@ body.app-page-active .status-bar-shield {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     font-size: 1.1em;
     line-height: 1;
     box-sizing: border-box;
@@ -1140,7 +1140,7 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
     border-radius: 18px;
     background: var(--surface-elevated);
     color: var(--text);
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     font-weight: 600;
 }
 
@@ -1633,7 +1633,7 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     font-size: 2rem;
     line-height: 1;
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     user-select: none;
     -webkit-user-select: none;
     transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;

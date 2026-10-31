@@ -10,7 +10,7 @@
     background: var(--glass-bg);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -91,7 +91,7 @@
         .notification-read-all {
             font-size: 0.8em;
             color: var(--text-muted);
-            cursor: pointer;
+            cursor: var(--cursor-pointer);
             font-weight: 400;
             transition: color 0.2s;
             min-height: 44px;
