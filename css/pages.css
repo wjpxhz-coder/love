@@ -294,18 +294,18 @@ dialog.native-dialog.app-page::backdrop {
 }
 
 /* Agnes 对话页 */
-#aiChatOverlay.app-page,
+:is(#aiModal, #aiChatOverlay).app-page,
 .app-page.ai-chat-dialog {
     padding: 0;
 }
 
-#aiChatOverlay.app-page .app-page-scroll {
+:is(#aiModal, #aiChatOverlay).app-page .app-page-scroll {
     overflow: hidden;
     padding-top: clamp(14px, 2vh, 24px);
     padding-bottom: max(clamp(14px, 2vh, 24px), env(safe-area-inset-bottom));
 }
 
-#aiChatOverlay.app-page .app-page-content {
+:is(#aiModal, #aiChatOverlay).app-page .app-page-content {
     display: flex;
     flex: 1 1 auto;
     width: 100%;
@@ -314,8 +314,8 @@ dialog.native-dialog.app-page::backdrop {
     max-width: 960px;
 }
 
-#aiChatOverlay.app-page .ai-chat-box,
-#aiChatOverlay.app-page > .ai-chat-box {
+:is(#aiModal, #aiChatOverlay).app-page .ai-chat-box,
+:is(#aiModal, #aiChatOverlay).app-page > .ai-chat-box {
     display: flex;
     flex: 1 1 auto;
     width: 100%;
@@ -329,19 +329,19 @@ dialog.native-dialog.app-page::backdrop {
     transform: none;
 }
 
-#aiChatOverlay.app-page .ai-chat-messages {
+:is(#aiModal, #aiChatOverlay).app-page .ai-chat-messages {
     padding: clamp(14px, 2.5vw, 24px);
 }
 
-#aiChatOverlay.app-page .chat-msg {
+:is(#aiModal, #aiChatOverlay).app-page .chat-msg {
     max-width: min(82%, 700px);
 }
 
-#aiChatOverlay.app-page .ai-chat-input {
+:is(#aiModal, #aiChatOverlay).app-page .ai-chat-input {
     max-height: 140px;
 }
 
-#aiChatOverlay.app-page .ai-diary-picker {
+:is(#aiModal, #aiChatOverlay).app-page .ai-diary-picker {
     position: absolute;
     z-index: 12;
     inset: 0;
@@ -351,7 +351,7 @@ dialog.native-dialog.app-page::backdrop {
     overflow: hidden;
 }
 
-#aiChatOverlay.app-page .ai-diary-picker-grid {
+:is(#aiModal, #aiChatOverlay).app-page .ai-diary-picker-grid {
     grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
 }
 
@@ -437,7 +437,7 @@ dialog.native-dialog.app-page::backdrop {
 
 [data-theme='dark'] .app-page-card,
 [data-theme='dark'] .app-page .modal-box,
-[data-theme='dark'] #aiChatOverlay.app-page .ai-chat-box {
+[data-theme='dark'] :is(#aiModal, #aiChatOverlay).app-page .ai-chat-box {
     color: var(--text);
     background: var(--surface-elevated);
     border-color: var(--border);
@@ -502,23 +502,23 @@ dialog.native-dialog.app-page::backdrop {
         min-height: clamp(260px, 46dvh, 500px);
     }
 
-    #aiChatOverlay.app-page .app-page-scroll {
+    :is(#aiModal, #aiChatOverlay).app-page .app-page-scroll {
         padding: 10px max(10px, env(safe-area-inset-right))
             max(10px, env(safe-area-inset-bottom))
             max(10px, env(safe-area-inset-left));
     }
 
-    #aiChatOverlay.app-page .ai-chat-box,
-    #aiChatOverlay.app-page > .ai-chat-box {
+    :is(#aiModal, #aiChatOverlay).app-page .ai-chat-box,
+    :is(#aiModal, #aiChatOverlay).app-page > .ai-chat-box {
         border-radius: 18px;
     }
 
-    #aiChatOverlay.app-page .ai-chat-header {
+    :is(#aiModal, #aiChatOverlay).app-page .ai-chat-header {
         padding-right: max(16px, env(safe-area-inset-right));
         padding-left: max(16px, env(safe-area-inset-left));
     }
 
-    #aiChatOverlay.app-page .ai-chat-composer {
+    :is(#aiModal, #aiChatOverlay).app-page .ai-chat-composer {
         padding-right: max(10px, env(safe-area-inset-right));
         padding-bottom: max(12px, env(safe-area-inset-bottom));
         padding-left: max(10px, env(safe-area-inset-left));
@@ -571,23 +571,23 @@ dialog.native-dialog.app-page::backdrop {
         flex: 1 1 120px;
     }
 
-    #aiChatOverlay.app-page .app-page-scroll {
+    :is(#aiModal, #aiChatOverlay).app-page .app-page-scroll {
         padding: 0;
     }
 
-    #aiChatOverlay.app-page .ai-chat-box,
-    #aiChatOverlay.app-page > .ai-chat-box {
+    :is(#aiModal, #aiChatOverlay).app-page .ai-chat-box,
+    :is(#aiModal, #aiChatOverlay).app-page > .ai-chat-box {
         max-width: none;
         border-width: 0;
         border-radius: 0;
         box-shadow: none;
     }
 
-    #aiChatOverlay.app-page .ai-diary-picker {
+    :is(#aiModal, #aiChatOverlay).app-page .ai-diary-picker {
         border-radius: 0;
     }
 
-    #aiChatOverlay.app-page .ai-diary-picker-grid {
+    :is(#aiModal, #aiChatOverlay).app-page .ai-diary-picker-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 

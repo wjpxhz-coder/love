@@ -122,7 +122,7 @@
 .fab-item-miss       { background: linear-gradient(135deg, #fb7185, #e11d48); } /* 一键想你：心动粉红 */
 .fab-item-topics     { background: linear-gradient(135deg, #fb7185, #e11d48); } /* 恋爱小本本：山茶粉红 */
 .fab-item-chat       { background: linear-gradient(135deg, #c084fc, #9333ea); } /* 感情助手聊天：静谧紫 */
-.fab-item-ai         { background: linear-gradient(135deg, #f472b6, #db2777); } /* 感情助手：浪漫洋红 */
+.fab-item-ai         { background: linear-gradient(135deg, #f472b6, #db2777); } /* 感情小助手：浪漫洋红 */
 .fab-item-filter     { background: linear-gradient(135deg, #818cf8, #6366f1); } /* 检索回忆：晨曦蓝紫 */
 .fab-item-milestones { background: linear-gradient(135deg, #fbbf24, #d97706); } /* 大事记：典雅金黄 */
 @keyframes pulseHW {

@@ -1388,7 +1388,7 @@ async function submitResolveTopic() {
 }
 
 // ==========================================================================
-// 7. 召唤 Agnes AI 感情助手（温柔智囊）
+// 7. 召唤 Agnes AI 感情小助手（温柔智囊）
 // ==========================================================================
 
 async function requestAITopicAdvice() {
@@ -1402,12 +1402,12 @@ async function requestAITopicAdvice() {
     showTopicModal(modal);
 
     if (typeof hasAIServiceConsent === 'function' && !hasAIServiceConsent()) {
-        contentArea.innerHTML = `<div class="empty-state">请先在「头像 → 设置 → 我们的感情助手」中开启服务后再召唤 Agnes 哦 🌸</div>`;
+        contentArea.innerHTML = `<div class="empty-state">请先在「头像 → 设置 → 感情小助手」中开启服务后再召唤 Agnes 哦 🌸</div>`;
         return;
     }
 
     isTopicAIRequesting = true;
-    contentArea.innerHTML = `<div class="ai-loading">🌸 正在请教感情助手 Agnes，请稍候… ✨</div>`;
+    contentArea.innerHTML = `<div class="ai-loading">🌸 正在请教感情小助手 Agnes，请稍候… ✨</div>`;
 
     try {
         const catInfo = TOPIC_CATEGORIES[currentTopicDetail.category] || TOPIC_CATEGORIES.general;
@@ -1417,7 +1417,7 @@ async function requestAITopicAdvice() {
             .join('\n');
 
         const systemPrompt = [
-            '你是“我们的感情助手” Agnes，小奚和小蛇专属的温柔恋爱智囊与沟通调解官。',
+            '你是“感情小助手” Agnes，小奚和小蛇专属的温柔恋爱智囊与沟通调解官。',
             typeof AI_COUPLE_IDENTITY_RULES === 'string' ? AI_COUPLE_IDENTITY_RULES : '',
             '请始终保持温暖、客观、充满爱意与同理心的语气，帮助两人互相理解、化解分歧或共同规划未来。'
         ].filter(Boolean).join('\n');

@@ -99,7 +99,7 @@ async function resolveCommentContent(rawContent) {
         text = String(rawContent || '');
     }
 
-    if (!isAI && text.startsWith('🤖【我们的感情助手】')) {
+    if (!isAI && text.startsWith('🤖【感情小助手】')) {
         isAI = true;
     }
 
@@ -416,9 +416,9 @@ async function loadComments(momentId, targetCard = null) {
 
             if (isAIComment) {
                 authorBadge.className = 'comment-author-badge author-badge author-ai';
-                authorBadge.title = `${displayName} 请求感情助手智能点评 ✨`;
+                authorBadge.title = `${displayName} 请求感情小助手智能点评 ✨`;
                 authorBadge.tabIndex = 0;
-                authorBadge.appendChild(document.createTextNode('🤖 我们的感情助手'));
+                authorBadge.appendChild(document.createTextNode('🤖 感情小助手'));
             } else {
                 authorBadge.className = `comment-author-badge author-badge ${badgeClass}`;
                 authorBadge.style.cursor = 'var(--cursor-pointer)';
@@ -463,7 +463,7 @@ async function loadComments(momentId, targetCard = null) {
             if (isAIComment) {
                 const aiHeader = document.createElement('div');
                 aiHeader.className = 'ai-comment-tag';
-                aiHeader.textContent = commentResolved.replyTo ? '✨ 感情助手互动回复' : '✨ 动态智能分析点评';
+                aiHeader.textContent = commentResolved.replyTo ? '✨ 感情小助手互动回复' : '✨ 动态智能分析点评';
                 bubble.appendChild(aiHeader);
             }
 
@@ -572,11 +572,11 @@ async function loadComments(momentId, targetCard = null) {
             replyText.className = 'reply-btn-text';
             replyText.textContent = '回复';
             replyButton.append(replyIcon, replyText);
-            replyButton.setAttribute('aria-label', `回复 ${isAIComment ? '感情助手' : displayName}`);
+            replyButton.setAttribute('aria-label', `回复 ${isAIComment ? '感情小助手' : displayName}`);
             replyButton.addEventListener('click', () => {
                 startReplyToComment(momentId, {
                     commentId,
-                    author: isAIComment ? '我们的感情助手' : displayName,
+                    author: isAIComment ? '感情小助手' : displayName,
                     snippet: textContent || (imageUrls.length ? '[图片]' : ''),
                     isAI: isAIComment
                 }, item);
@@ -930,7 +930,7 @@ async function handleAICommentContinuation({ momentId, userCommentId, userCommen
         icon.textContent = '🤖';
 
         const label = document.createElement('span');
-        label.textContent = '感情助手正在思考回复…';
+        label.textContent = '感情小助手正在思考回复…';
 
         const dots = document.createElement('span');
         dots.className = 'comment-ai-thinking-dots';
@@ -955,7 +955,7 @@ async function handleAICommentContinuation({ momentId, userCommentId, userCommen
     } catch (err) {
         console.error('[感情助手] 评论继续对话失败:', err);
         if (typeof showToast === 'function') {
-            showToast('感情助手走神啦，稍后再试试回复它吧～');
+            showToast('感情小助手走神啦，稍后再试试回复它吧～');
         }
     } finally {
         activeAICommentReplies.delete(momentId);

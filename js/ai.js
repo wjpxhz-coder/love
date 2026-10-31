@@ -1,7 +1,7 @@
 // ==========================================
 // AI 专属助手
 // ==========================================
-const AI_TABS = new Set(['topic', 'anniversary', 'summary']);
+const AI_TABS = new Set(['chat', 'topic', 'anniversary', 'summary']);
 const AI_COUPLE_IDENTITY_RULES = [
     '【情侣专属身份档案与绝对防呆红线（违规将被严厉惩罚）】',
     '1. 👦 男方身份：账号名为【小奚】。',
@@ -22,7 +22,7 @@ const AI_COUPLE_IDENTITY_RULES = [
     '   - ❌ 禁忌错误：“看到小奚这只害羞的小兔子…小蛇一定觉得你很可爱”（男女身份严重颠倒，扣分！）。',
     '   - ✅ 正确范例：“小蛇（欣欣宝宝）捂嘴偷笑也太甜太萌了！难怪小奚（小浩浩）快被迷死啦，被老公宠上天的小公主连发呆都透着幸福！”'
 ].join('\n');
-const CHAT_SYSTEM_PROMPT = `你是“我们的感情助手”，也是小奚和小蛇的专属恋爱小助理，语气温暖、俏皮、可爱。帮助他们聊天解闷、提供恋爱建议、推荐约会点子、化解小矛盾或分析本轮附带的图片。回答简洁温馨，每次不超过200字。
+const CHAT_SYSTEM_PROMPT = `你是“感情小助手”，也是小奚和小蛇的专属恋爱小助理，语气温暖、俏皮、可爱。帮助他们聊天解闷、提供恋爱建议、推荐约会点子、化解小矛盾或分析本轮附带的图片。回答简洁温馨，每次不超过200字。
 ${AI_COUPLE_IDENTITY_RULES}
 图片不会在轮次之间保留；当前请求没有附图却追问图片时，请明确提醒用户重新选择图片，不要猜测。`;
 const AI_SERVICE_CONSENT_PREFIX = 'ai_service_consent_agnes_2_0_v1_';
@@ -90,7 +90,7 @@ const AI_IMAGE_EXTENSIONS = new Map([
     ['image/png', 'png'],
     ['image/webp', 'webp']
 ]);
-let currentAITab = 'topic';
+let currentAITab = 'chat';
 let chatHistory = [];
 let isChatSending = false;
 let isCompressingAIImages = false;
@@ -141,7 +141,7 @@ function setAIServiceConsent(enabled) {
     }
     syncAIPrivacySetting();
     if (typeof showToast === 'function') {
-        showToast(enabled ? '感情助手服务已开启。' : '感情助手服务已关闭。');
+        showToast(enabled ? '感情小助手服务已开启。' : '感情小助手服务已关闭。');
     }
 }
 
@@ -291,7 +291,7 @@ function normalizeAIErrorCode(error) {
 function getFriendlyAIError(error) {
     const code = normalizeAIErrorCode(error);
     const messages = {
-        AI_CONSENT_REQUIRED: '请先在“头像 → 设置 → 我们的感情助手”中开启服务。',
+        AI_CONSENT_REQUIRED: '请先在“头像 → 设置 → 感情小助手”中开启服务。',
         AGNES_CONSENT_VERSION_REQUIRED: '请刷新或重新打开网站后再试。',
         AUTH_REQUIRED: '登录状态已失效，请重新登录后再试。',
         AUTH_INVALID: '登录状态已失效，请重新登录后再试。',
@@ -302,8 +302,8 @@ function getFriendlyAIError(error) {
         MEMBERSHIP_REQUIRED: '你目前无权访问这个共享空间。',
         FORBIDDEN: '你目前无权访问所选内容。',
         ORIGIN_NOT_ALLOWED: '当前页面来源未获授权，请从正式网站打开。',
-        SERVICE_MAINTENANCE: '感情助手正在安全维护中，请稍后再试。',
-        SERVICE_MISCONFIGURED: '感情助手服务尚未配置完成，请联系管理员。',
+        SERVICE_MAINTENANCE: '感情小助手正在安全维护中，请稍后再试。',
+        SERVICE_MISCONFIGURED: '感情小助手服务尚未配置完成，请联系管理员。',
         INVALID_REQUEST: '请求内容格式不正确，请重新选择后再试。',
         INVALID_REQUEST_FIELDS: '请求内容格式不正确，请刷新页面后重试。',
         INVALID_JSON: '请求内容格式不正确，请刷新页面后重试。',
@@ -340,31 +340,31 @@ function getFriendlyAIError(error) {
         TEMPORARY_PATH_FORBIDDEN: '临时图片不属于当前账号，请重新选择。',
         REQUEST_TOO_LARGE: '本次请求太大，请减少文字或图片后再试。',
         RATE_LIMITED: '请求有点频繁，请稍后再试。',
-        QUOTA_EXCEEDED: '今天的感情助手使用次数已达上限，明天再来吧。',
+        QUOTA_EXCEEDED: '今天的感情小助手使用次数已达上限，明天再来吧。',
         QUOTA_CHECK_FAILED: '暂时无法检查使用次数，请稍后再试。',
-        PROVIDER_TIMEOUT: '感情助手响应超时，请稍后再试。',
+        PROVIDER_TIMEOUT: '感情小助手响应超时，请稍后再试。',
         CLIENT_CLOSED_REQUEST: '本次请求已取消，请重新发送。',
-        PROVIDER_AUTH_FAILED: '感情助手服务密钥无效或无权调用当前模型，请在控制台更新密钥。',
-        PROVIDER_KEY_INVALID_FORMAT: '感情助手服务密钥格式不正确。',
-        PROVIDER_BILLING_REQUIRED: '感情助手当前账号尚未开通所需额度。',
+        PROVIDER_AUTH_FAILED: '感情小助手服务密钥无效或无权调用当前模型，请在控制台更新密钥。',
+        PROVIDER_KEY_INVALID_FORMAT: '感情小助手服务密钥格式不正确。',
+        PROVIDER_BILLING_REQUIRED: '感情小助手当前账号尚未开通所需额度。',
         PROVIDER_RATE_LIMITED: '请求过于频繁，请稍后再试。',
-        PROVIDER_REQUEST_REJECTED: '感情助手拒绝了当前请求，请稍后重试或减少图片数量。',
-        PROVIDER_DNS_ERROR: '无法解析感情助手服务地址，请稍后再试。',
-        PROVIDER_TLS_ERROR: '与感情助手的安全连接失败，请稍后再试。',
-        PROVIDER_CONNECT_ERROR: '暂时无法连接感情助手服务，请稍后再试。',
+        PROVIDER_REQUEST_REJECTED: '感情小助手拒绝了当前请求，请稍后重试或减少图片数量。',
+        PROVIDER_DNS_ERROR: '感情小助手无法解析服务地址，请稍后再试。',
+        PROVIDER_TLS_ERROR: '与感情小助手的安全连接失败，请稍后再试。',
+        PROVIDER_CONNECT_ERROR: '暂时无法连接感情小助手服务，请稍后再试。',
         PROVIDER_NETWORK_ERROR: '网络请求失败，请稍后再试。',
-        PROVIDER_UNAVAILABLE: '感情助手暂时不可用，请稍后再试。',
-        PROVIDER_ERROR: '感情助手暂时没有成功处理请求，请稍后再试。',
-        INVALID_PROVIDER_RESPONSE: '感情助手返回了无法读取的内容，请稍后重试。',
-        EMPTY_PROVIDER_RESPONSE: '感情助手没有返回有效内容，请稍后重试。',
-        PROVIDER_MISCONFIGURED: '感情助手服务尚未配置完成，请联系管理员。',
+        PROVIDER_UNAVAILABLE: '感情小助手暂时不可用，请稍后再试。',
+        PROVIDER_ERROR: '感情小助手暂时没有成功处理请求，请稍后再试。',
+        INVALID_PROVIDER_RESPONSE: '感情小助手返回了无法读取的内容，请稍后重试。',
+        EMPTY_PROVIDER_RESPONSE: '感情小助手没有返回有效内容，请稍后重试。',
+        PROVIDER_MISCONFIGURED: '感情小助手服务尚未配置完成，请联系管理员。',
         SERVER_MISCONFIGURED: 'AI 服务尚未配置完成，请联系管理员。',
         INTERNAL_ERROR: 'AI 服务暂时发生内部错误，请稍后重试。',
         AI_UPLOAD_FAILED: '图片上传失败，请检查网络后重试。',
-        AI_EMPTY_RESPONSE: '感情助手没有返回有效内容，请稍后重试。',
-        AI_REQUEST_FAILED: '暂时无法连接感情助手，请稍后重试。'
+        AI_EMPTY_RESPONSE: '感情小助手没有返回有效内容，请稍后重试。',
+        AI_REQUEST_FAILED: '暂时无法连接感情小助手，请稍后重试。'
     };
-    return messages[code] || '我们的感情助手暂时开小差了，请稍后再试。';
+    return messages[code] || '感情小助手暂时开小差了，请稍后再试。';
 }
 
 function shouldDiscardFailedAIAttachments(error) {
@@ -399,6 +399,34 @@ function setAIContent(message, state = '') {
     content.className = state === 'loading' ? 'ai-loading' : `ai-result${state ? ` ${state}` : ''}`;
     content.textContent = message;
     contentArea.appendChild(content);
+
+    const featureActions = document.getElementById('aiFeatureActions');
+    if (featureActions) {
+        const isReady = !state && Boolean(message && message.trim());
+        featureActions.hidden = !isReady;
+    }
+}
+
+function discussCurrentFeature() {
+    const contentArea = document.getElementById('aiContentArea');
+    const resultEl = contentArea?.querySelector('.ai-result');
+    const text = resultEl?.textContent?.trim() || '';
+    if (!text) return;
+
+    let tabLabel = '今日话题';
+    if (currentAITab === 'anniversary') tabLabel = '纪念日倒计时';
+    else if (currentAITab === 'summary') tabLabel = '回忆总结';
+
+    switchAITab('chat');
+
+    const input = document.getElementById('aiChatInput');
+    if (input) {
+        const quoteText = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+        input.value = `关于${tabLabel}“${quoteText}”，小助手来聊聊吧~`;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+    }
 }
 
 function openAIModal() {
@@ -411,11 +439,15 @@ function openAIModal() {
 
 function enterAIPage() {
     if (!isAuthenticated()) return;
-    switchAITab('topic');
+    bindAIChatModalLifecycle();
+    ensureAIChatWelcome();
+    renderPendingChatAttachments();
+    switchAITab('chat');
 }
 
 function leaveAIPage() {
     aiInteractionGeneration += 1;
+    leaveAIChatPage();
 }
 
 function closeAIModal() {
@@ -549,6 +581,33 @@ async function switchAITab(tabName, forceRefresh = false) {
 
     currentAITab = tabName;
     updateAITabState(tabName);
+
+    const chatMessages = document.getElementById('aiChatMessages');
+    const chatComposer = document.getElementById('aiChatComposer');
+    const featurePanel = document.getElementById('aiFeaturePanel');
+    const refreshButton = document.getElementById('aiRefreshBtn');
+    const spacer = document.getElementById('aiTopbarSpacer');
+
+    if (tabName === 'chat') {
+        if (chatMessages) chatMessages.hidden = false;
+        if (chatComposer) chatComposer.hidden = false;
+        if (featurePanel) featurePanel.hidden = true;
+        if (refreshButton) refreshButton.hidden = true;
+        if (spacer) spacer.hidden = false;
+
+        document.getElementById('aiChatInput')?.focus();
+        return;
+    }
+
+    if (chatMessages) chatMessages.hidden = true;
+    if (chatComposer) chatComposer.hidden = true;
+    if (featurePanel) featurePanel.hidden = false;
+    if (refreshButton) {
+        refreshButton.hidden = false;
+        refreshButton.setAttribute('title', '重新生成');
+    }
+    if (spacer) spacer.hidden = true;
+
     setAIContent('思考中，请稍候... ✨', 'loading');
 
     const epoch = authEpoch;
@@ -626,9 +685,9 @@ function createAIChatWelcome() {
     const welcome = document.createElement('div');
     welcome.className = 'ai-chat-welcome';
     const lines = [
-        '🌸 嗨~ 我是我们的感情助手，你们的专属恋爱小助理！',
+        '🌸 嗨~ 我是感情小助手，你们的专属恋爱小助理！',
         '可以聊日常，也可以选择图片让我帮你分析。',
-        '图片只用于当前这一轮，继续追问时需要重新选择。',
+        '上方还可以随时查看今日话题、纪念日与回忆总结哦~',
         '💕 随时为你们服务！'
     ];
     lines.forEach((line, index) => {
@@ -650,28 +709,15 @@ function resetAIChatMessages() {
 }
 
 function openAIChatModal() {
-    if (typeof appNavigate === 'function') {
-        appNavigate('/agnes/chat');
-        return;
-    }
-    window.location.hash = '#/agnes/chat';
+    openAIModal();
 }
 
 function enterAIChatPage() {
-    if (!isAuthenticated()) return;
-    bindAIChatModalLifecycle();
-    ensureAIChatWelcome();
-    renderPendingChatAttachments();
-    document.getElementById('aiChatInput')?.focus();
+    enterAIPage();
 }
 
 function closeAIChatModal() {
-    if (typeof appBack === 'function') {
-        appBack('/');
-        return;
-    }
-    leaveAIChatPage();
-    window.location.hash = '#/';
+    closeAIModal();
 }
 
 function leaveAIChatPage() {
@@ -681,7 +727,7 @@ function leaveAIChatPage() {
 }
 
 function bindAIChatModalLifecycle() {
-    const page = document.getElementById('aiChatOverlay');
+    const page = document.getElementById('aiModal') || document.getElementById('aiChatOverlay');
     if (!page || page.dataset.aiLifecycleBound === 'true') return;
     page.dataset.aiLifecycleBound = 'true';
 }
@@ -1726,7 +1772,7 @@ async function sendChatMessage() {
     isChatSending = true;
     setAIChatComposerBusy(true);
     appendChatMessage('user', effectiveMessage, selectedAttachments.length);
-    const typingMessage = appendChatMessage('ai', '我们的感情助手正在思考… ✨');
+    const typingMessage = appendChatMessage('ai', '感情小助手正在思考… ✨');
     typingMessage?.classList.add('typing');
 
     try {
@@ -1773,7 +1819,7 @@ function clearPrivateFeatureState() {
     activeAIUploadTasks.clear();
     aiInteractionGeneration += 1;
     activeChatRequestId += 1;
-    currentAITab = 'topic';
+    currentAITab = 'chat';
     chatHistory = [];
     isChatSending = false;
     clearPendingChatAttachments();
@@ -1836,7 +1882,7 @@ async function analyzeMomentWithAI(momentId, options = {}) {
     }
 
     if (activeMomentAnalysisIds.has(normalizedId)) {
-        if (typeof showToast === 'function') showToast('感情助手正在分析这条动态，请稍候… 💖');
+        if (typeof showToast === 'function') showToast('感情小助手正在分析这条动态，请稍候… 💖');
         return null;
     }
 
@@ -1990,7 +2036,7 @@ async function analyzeMomentWithAI(momentId, options = {}) {
                 : '';
 
             const promptLines = [
-                `你是“我们的感情助手”，小奚与小蛇的专属恋爱助手、闺蜜红娘和感情见证官。`,
+                `你是“感情小助手”，小奚与小蛇的专属恋爱助手、闺蜜红娘和感情见证官。`,
                 `请对他们发布的这条动态进行细腻温暖、浪漫共鸣的感情分析点评：`,
                 AI_COUPLE_IDENTITY_RULES,
                 `【动态作者】${author}${authorRole}`,
@@ -2021,7 +2067,7 @@ async function analyzeMomentWithAI(momentId, options = {}) {
             hasValidImages
         });
 
-        notifyProgress('感情助手正在品读并撰写点评… 💖');
+        notifyProgress('感情小助手正在品读并撰写点评… 💖');
         let analysisResult;
         try {
             const messages = buildPromptMessages(hasValidImages, validImageCount);
@@ -2072,7 +2118,7 @@ async function continueAICommentConversation({ momentId, userCommentId, userComm
     }
     if (typeof hasAIServiceConsent === 'function' && !hasAIServiceConsent()) {
         if (typeof showToast === 'function') {
-            showToast('感情助手服务已关闭，可在设置中开启以继续对话 ✨');
+            showToast('感情小助手服务已关闭，可在设置中开启以继续对话 ✨');
         }
         return null;
     }
@@ -2157,7 +2203,7 @@ async function continueAICommentConversation({ momentId, userCommentId, userComm
     // 3. 构造 Prompt 与上下文
     const momentAuthorRole = momentAuthor === '小奚' ? '（男方/老公/小浩浩）' : (momentAuthor === '小蛇' ? '（女方/欣欣宝宝/老婆）' : '');
     const systemPromptLines = [
-        '你是“我们的感情助手”，也是小奚和小蛇的专属恋爱小助理、闺蜜红娘和感情见证官。',
+        '你是“感情小助手”，也是小奚和小蛇的专属恋爱小助理、闺蜜红娘和感情见证官。',
         '语气温暖甜蜜、灵动俏皮、风趣幽默，极懂情调。',
         '你正在这条动态下方的评论区与他们进行多轮互动对话。',
         AI_COUPLE_IDENTITY_RULES,

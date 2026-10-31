@@ -1348,12 +1348,12 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
     font-weight: 700;
 }
 
-#aiChatOverlay.app-page .app-page-scroll {
+:is(#aiModal, #aiChatOverlay).app-page .app-page-scroll {
     padding-top: 20px;
     padding-bottom: max(20px, env(safe-area-inset-bottom));
 }
 
-#aiChatOverlay.app-page .ai-chat-box {
+:is(#aiModal, #aiChatOverlay).app-page .ai-chat-box {
     border: 1.5px solid var(--border);
     border-radius: 26px;
     background: var(--surface-elevated);
@@ -2060,11 +2060,11 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
         padding: 20px;
     }
 
-    #aiChatOverlay.app-page .app-page-scroll {
+    :is(#aiModal, #aiChatOverlay).app-page .app-page-scroll {
         padding: 0;
     }
 
-    #aiChatOverlay.app-page .ai-chat-box {
+    :is(#aiModal, #aiChatOverlay).app-page .ai-chat-box {
         border-width: 0;
         border-radius: 0;
         box-shadow: none;

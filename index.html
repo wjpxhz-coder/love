@@ -551,12 +551,8 @@
             <button class="fab-item fab-item-miss" type="button" onclick="sendMissYou(); toggleFabMenu();" aria-label="一键想你">💓</button>
         </div>
         <div class="fab-item-wrapper">
-            <span class="fab-label">感情助手聊天</span>
-            <button class="fab-item fab-item-chat" type="button" onclick="openAIChatModal(); toggleFabMenu();" aria-label="感情助手聊天">💬</button>
-        </div>
-        <div class="fab-item-wrapper">
-            <span class="fab-label">我们的感情助手</span>
-            <button class="fab-item fab-item-ai" type="button" onclick="openAIModal(); toggleFabMenu();" aria-label="我们的感情助手">🤖</button>
+            <span class="fab-label">感情小助手</span>
+            <button class="fab-item fab-item-ai" type="button" onclick="openAIModal(); toggleFabMenu();" aria-label="感情小助手">🤖</button>
         </div>
         <div class="fab-item-wrapper">
             <span class="fab-label">检索回忆</span>
@@ -575,56 +571,45 @@
             aria-controls="fab-menu" aria-expanded="false">✨</button>
 </div>
 
-<!-- 我们的感情助手页面 -->
-<section class="app-page feature-page" id="aiModal" data-page-id="ai" aria-labelledby="ai-modal-title" aria-hidden="true" hidden inert>
+<!-- 感情小助手页面 -->
+<section class="app-page feature-page ai-chat-dialog" id="aiModal" data-page-id="ai" aria-labelledby="ai-modal-title" aria-hidden="true" hidden inert>
     <div class="app-page-shell">
         <header class="app-page-topbar">
             <button class="app-page-back" type="button" onclick="closeAIModal()">← 返回</button>
-            <h1 class="app-page-topbar-title" id="ai-modal-title" data-page-focus tabindex="-1">我们的感情助手</h1>
-            <span class="app-page-topbar-spacer" aria-hidden="true"></span>
-        </header>
-        <div class="app-page-scroll">
-            <div class="app-page-content app-page-content--wide">
-    <div class="modal-box app-page-card ai-modal-box">
-        <div class="ai-header-row">
-            <div class="ai-action-btns">
-                <button class="ai-refresh-btn" id="aiRefreshBtn" type="button" onclick="refreshAIContent()" aria-label="刷新内容">🔄</button>
+            <h1 class="app-page-topbar-title" id="ai-modal-title" data-page-focus tabindex="-1">感情小助手</h1>
+            <div class="ai-topbar-actions" style="display:flex; align-items:center; min-width:60px; justify-content:flex-end;">
+                <button class="ai-refresh-btn" id="aiRefreshBtn" type="button" onclick="refreshAIContent()" aria-label="重新生成内容" title="重新生成内容" hidden>🔄</button>
+                <span class="app-page-topbar-spacer" id="aiTopbarSpacer" aria-hidden="true"></span>
             </div>
-        </div>
-        <div class="ai-tabs" role="tablist" aria-label="感情助手内容">
-            <button class="ai-tab active" id="ai-tab-topic" type="button" role="tab" aria-selected="true" aria-controls="aiContentArea" onclick="switchAITab('topic')">今日话题</button>
-            <button class="ai-tab" id="ai-tab-anniversary" type="button" role="tab" aria-selected="false" aria-controls="aiContentArea" onclick="switchAITab('anniversary')">纪念日</button>
-            <button class="ai-tab" id="ai-tab-summary" type="button" role="tab" aria-selected="false" aria-controls="aiContentArea" onclick="switchAITab('summary')">回忆总结</button>
-        </div>
-        <div class="ai-content-area" id="aiContentArea" role="tabpanel" aria-live="polite">
-            <div class="ai-loading">思考中，请稍候... ✨</div>
-        </div>
-    </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- 感情助手聊天页面 -->
-<section class="app-page feature-page ai-chat-dialog" id="aiChatOverlay" data-page-id="ai-chat" aria-labelledby="ai-chat-title" aria-hidden="true" hidden inert>
-    <div class="app-page-shell">
-        <header class="app-page-topbar">
-            <button class="app-page-back" type="button" onclick="closeAIChatModal()">← 返回</button>
-            <h1 class="app-page-topbar-title" id="ai-chat-title" data-page-focus tabindex="-1">感情助手聊天</h1>
-            <span class="app-page-topbar-spacer" aria-hidden="true"></span>
         </header>
         <div class="app-page-scroll app-page-scroll--chat">
             <div class="app-page-content app-page-content--wide app-page-content--chat">
     <div class="ai-chat-box">
+        <div class="ai-tabs-bar">
+            <div class="ai-tabs" role="tablist" aria-label="感情小助手功能">
+                <button class="ai-tab active" id="ai-tab-chat" type="button" role="tab" aria-selected="true" onclick="switchAITab('chat')">💬 聊天陪伴</button>
+                <button class="ai-tab" id="ai-tab-topic" type="button" role="tab" aria-selected="false" onclick="switchAITab('topic')">💡 今日话题</button>
+                <button class="ai-tab" id="ai-tab-anniversary" type="button" role="tab" aria-selected="false" onclick="switchAITab('anniversary')">🎉 纪念日</button>
+                <button class="ai-tab" id="ai-tab-summary" type="button" role="tab" aria-selected="false" onclick="switchAITab('summary')">📖 回忆总结</button>
+            </div>
+        </div>
         <div class="ai-chat-messages" id="aiChatMessages" role="log" aria-live="polite" aria-relevant="additions text">
             <div class="ai-chat-welcome">
-                🌸 嗨~ 我是我们的感情助手，你们的专属恋爱小助理！<br>
+                🌸 嗨~ 我是感情小助手，你们的专属恋爱小助理！<br>
                 可以聊日常，也可以选择图片让我帮你分析。<br>
-                图片只用于当前这一轮，继续追问时需要重新选择。<br>
+                上方还可以随时查看今日话题、纪念日与回忆总结哦~<br>
                 💕 随时为你们服务！
             </div>
         </div>
-        <div class="ai-chat-composer">
+        <div class="ai-feature-panel" id="aiFeaturePanel" role="tabpanel" aria-live="polite" hidden>
+            <div class="ai-content-area" id="aiContentArea">
+                <div class="ai-loading">思考中，请稍候... ✨</div>
+            </div>
+            <div class="ai-feature-actions" id="aiFeatureActions" hidden>
+                <button class="ai-discuss-btn" id="aiDiscussBtn" type="button" onclick="discussCurrentFeature()">💬 聊聊这个</button>
+            </div>
+        </div>
+        <div class="ai-chat-composer" id="aiChatComposer">
             <div class="ai-attachment-preview" id="aiAttachmentPreview" aria-live="polite" hidden></div>
             <div class="ai-chat-attachment-actions">
                 <button class="ai-attachment-btn" id="aiLocalImageBtn" type="button" onclick="openAILocalImagePicker()">🖼️ 本地图片</button>
@@ -633,7 +618,7 @@
                 <span class="ai-attachment-count" id="aiAttachmentCount">0 / 9</span>
             </div>
             <div class="ai-chat-input-row">
-                <label class="visually-hidden" for="aiChatInput">发送给 Agnes 2.0 的消息</label>
+                <label class="visually-hidden" for="aiChatInput">发送给感情小助手的消息</label>
                 <textarea class="ai-chat-input" id="aiChatInput" maxlength="500" placeholder="说点什么，或只选择图片..." rows="1" onkeydown="handleChatKeyDown(event)"></textarea>
                 <button class="ai-chat-send-btn" id="aiChatSendBtn" type="button" onclick="sendChatMessage()" aria-label="发送消息">💌</button>
             </div>
@@ -930,10 +915,10 @@
         </div>
 
         <div class="settings-group">
-            <div class="settings-label">🤖 我们的感情助手</div>
+            <div class="settings-label">🤖 感情小助手</div>
             <label class="ai-privacy-toggle" for="ai-service-consent">
                 <input type="checkbox" id="ai-service-consent" onchange="setAIServiceConsent(this.checked)" aria-describedby="ai-privacy-tip">
-                <span>启用感情助手 AI 服务</span>
+                <span>启用感情小助手 AI 服务</span>
             </label>
             <div class="settings-tip" id="ai-privacy-tip">默认开启。用于动态智能分析、聊天互动与回忆生成，可随时在此关闭。</div>
             <div class="settings-subgroup model-settings-group">
@@ -1196,7 +1181,7 @@
 <!-- Agnes 感情助手调解/建议弹窗 -->
 <dialog class="native-dialog topic-modal-dialog" id="aiTopicAdviceModal" aria-labelledby="aiTopicAdviceTitle">
     <div class="topic-modal-box" onclick="event.stopPropagation()">
-        <h2 class="modal-title" id="aiTopicAdviceTitle">🤖 感情助手 Agnes 的温柔建议</h2>
+        <h2 class="modal-title" id="aiTopicAdviceTitle">🤖 感情小助手 Agnes 的温柔建议</h2>
         <div id="aiTopicAdviceContent" style="margin: 14px 0; max-height: 55vh; overflow-y: auto; font-size: 0.92rem; color: var(--text);"></div>
         <div class="modal-btns">
             <button class="btn-cancel" type="button" onclick="closeAITopicAdviceModal()">关闭</button>
