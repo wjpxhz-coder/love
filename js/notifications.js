@@ -13,6 +13,23 @@ const NOTIFICATION_ACTIONS = {
 };
 let processedMissIds = new Set();
 let missEffectTimer = null;
+let currentLoadedNotifications = [];
+let currentMoodReminder = null;
+const processedMomentReadSet = new Set();
+const processedCommentReadSet = new Set();
+const processedMoodReadSet = new Set();
+const processedTopicReadSet = new Set();
+const inFlightMarkReadIds = new Set();
+
+function updateNotificationBadge() {
+    const badge = document.getElementById('notification-badge');
+    if (!badge) return;
+    const hasUnread = Boolean(currentMoodReminder && !currentMoodReminder.isRead)
+        || currentLoadedNotifications.some(notification => !isNotificationRead(notification));
+    badge.classList.toggle('show', hasUnread);
+    badge.setAttribute('aria-hidden', String(!hasUnread));
+}
+
 const DEFAULT_MOOD_REMINDER_SETTINGS = Object.freeze({
     enabled: true,
     reminderTime: '21:00',
@@ -25,6 +42,13 @@ let moodReminderRequestId = 0;
 
 function resetNotificationState() {
     processedMissIds.clear();
+    currentLoadedNotifications = [];
+    currentMoodReminder = null;
+    processedMomentReadSet.clear();
+    processedCommentReadSet.clear();
+    processedMoodReadSet.clear();
+    processedTopicReadSet.clear();
+    inFlightMarkReadIds.clear();
     moodReminderRequestId += 1;
     moodReminderSettings = null;
     moodReminderSettingsUserId = null;
@@ -304,6 +328,9 @@ function createNotificationItem(notification) {
 
     const item = document.createElement('li');
     item.className = `notification-item${isRead ? '' : ' unread'}${isAIComment ? ' ai-notification-item' : ''}`;
+    item.dataset.notificationId = notification.id;
+    if (notification.type) item.dataset.notificationType = notification.type;
+    if (notification.related_id) item.dataset.relatedId = String(notification.related_id);
     item.tabIndex = 0;
     item.setAttribute('role', 'button');
 
@@ -362,6 +389,7 @@ function createNotificationItem(notification) {
 function createMoodReminderItem(reminder) {
     const item = document.createElement('li');
     item.className = `notification-item mood-reminder-notification${reminder.isRead ? '' : ' unread'}`;
+    item.dataset.notificationId = reminder.id;
     item.tabIndex = 0;
     item.setAttribute('role', 'button');
 
@@ -458,6 +486,8 @@ async function loadNotifications() {
     if (!list || !badge) return;
 
     const notifications = data || [];
+    currentLoadedNotifications = notifications;
+    currentMoodReminder = moodReminder;
     const unreadMisses = notifications.filter(notification => (
         notification.type === 'miss'
         && !isNotificationRead(notification)
@@ -481,10 +511,7 @@ async function loadNotifications() {
     notifications.forEach(notification => fragment.appendChild(createNotificationItem(notification)));
     list.appendChild(fragment);
 
-    const hasUnread = Boolean(moodReminder && !moodReminder.isRead)
-        || notifications.some(notification => !isNotificationRead(notification));
-    badge.classList.toggle('show', hasUnread);
-    badge.setAttribute('aria-hidden', String(!hasUnread));
+    updateNotificationBadge();
 }
 
 function toggleNotificationPanel() {
@@ -507,6 +534,18 @@ async function markAllNotificationsRead() {
     if (!isAuthenticated()) return;
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
+
+    // 乐观立即将前端所有未读通知标记为已读
+    currentLoadedNotifications.forEach(n => {
+        if (!Array.isArray(n.read_by)) n.read_by = [];
+        if (!n.read_by.includes(currentAuthor)) n.read_by.push(currentAuthor);
+    });
+    if (currentMoodReminder) currentMoodReminder.isRead = true;
+    document.querySelectorAll('#notification-list .notification-item.unread').forEach(el => {
+        el.classList.remove('unread');
+    });
+    updateNotificationBadge();
+
     const [notificationResult] = await Promise.all([
         supabaseClient.rpc('mark_all_notifications_read'),
         acknowledgeMoodReminder()
@@ -527,6 +566,17 @@ async function handleNotificationClick(notificationId, type, relatedId) {
     panel?.classList.remove('show');
     panel?.setAttribute('aria-hidden', 'true');
     document.getElementById('notification-bell')?.setAttribute('aria-expanded', 'false');
+
+    // 乐观消除单条通知未读状态
+    const matched = currentLoadedNotifications.find(n => n.id === notificationId);
+    if (matched) {
+        if (!Array.isArray(matched.read_by)) matched.read_by = [];
+        if (!matched.read_by.includes(currentAuthor)) matched.read_by.push(currentAuthor);
+        const itemEl = document.querySelector(`li.notification-item[data-notification-id="${notificationId}"]`);
+        if (itemEl) itemEl.classList.remove('unread');
+        updateNotificationBadge();
+    }
+
     await markSingleNotificationRead(notificationId);
     if (!isCurrentAuthSnapshot(epoch, userId)) return;
 
@@ -651,3 +701,154 @@ document.addEventListener('visibilitychange', () => {
     loadNotifications();
     scheduleMoodReminderCheck();
 });
+
+// ==========================================
+// 自动标记通知已读功能（全站内容联动）
+// ==========================================
+async function autoMarkNotificationsReadByCondition(conditionFn, remoteQueryBuilder = null) {
+    if (!isAuthenticated() || !currentAuthor) return;
+    const epoch = authEpoch;
+    const userId = currentAuthUser?.id;
+    if (!userId) return;
+
+    // 1. 本地乐观即时消红点：内存状态与 DOM 立即更新（零网络延迟响应）
+    const idsToMark = new Set();
+    currentLoadedNotifications.forEach(n => {
+        if (!isNotificationRead(n) && conditionFn(n)) {
+            if (!Array.isArray(n.read_by)) n.read_by = [];
+            if (!n.read_by.includes(currentAuthor)) {
+                n.read_by.push(currentAuthor);
+            }
+            idsToMark.add(n.id);
+            const itemEl = document.querySelector(`li.notification-item[data-notification-id="${n.id}"]`);
+            if (itemEl) {
+                itemEl.classList.remove('unread');
+            }
+        }
+    });
+
+    if (idsToMark.size > 0) {
+        updateNotificationBadge();
+    }
+
+    // 2. 后台远程检索是否存在尚未拉取至前端内存的匹配未读通知
+    if (typeof remoteQueryBuilder === 'function') {
+        try {
+            let query = supabaseClient
+                .from('notifications')
+                .select('id, read_by')
+                .eq('recipient_id', userId);
+            query = remoteQueryBuilder(query);
+            const { data, error } = await query;
+            if (!error && isCurrentAuthSnapshot(epoch, userId) && Array.isArray(data)) {
+                data.forEach(item => {
+                    const isRead = Array.isArray(item.read_by) && item.read_by.includes(currentAuthor);
+                    if (!isRead) {
+                        idsToMark.add(item.id);
+                    }
+                });
+            }
+        } catch (err) {
+            console.warn('查询未读通知失败:', err);
+        }
+    }
+
+    // 3. 后台静默调用 RPC 标已读，不弹打扰性 Toast
+    const uncommittedIds = [...idsToMark].filter(id => !inFlightMarkReadIds.has(id));
+    if (uncommittedIds.length === 0) return;
+
+    uncommittedIds.forEach(id => inFlightMarkReadIds.add(id));
+    try {
+        await Promise.allSettled(uncommittedIds.map(id => markSingleNotificationRead(id)));
+    } finally {
+        uncommittedIds.forEach(id => inFlightMarkReadIds.delete(id));
+    }
+}
+
+window.autoMarkMomentNotificationRead = function(momentId) {
+    if (!isAuthenticated() || !momentId) return;
+    const strId = String(momentId).trim();
+    if (!strId) return;
+
+    const hasUnread = currentLoadedNotifications.some(n => 
+        n.type === 'moment' && String(n.related_id) === strId && !isNotificationRead(n)
+    );
+    if (!hasUnread && processedMomentReadSet.has(strId)) return;
+    processedMomentReadSet.add(strId);
+
+    autoMarkNotificationsReadByCondition(
+        n => n.type === 'moment' && String(n.related_id) === strId,
+        q => q.eq('type', 'moment').eq('related_id', strId)
+    );
+};
+
+window.autoMarkCommentsNotificationRead = function(momentId, commentIds = []) {
+    if (!isAuthenticated() || !momentId) return;
+    const strMomentId = String(momentId).trim();
+    if (strMomentId) {
+        window.autoMarkMomentNotificationRead(strMomentId);
+    }
+    if (!Array.isArray(commentIds) || commentIds.length === 0) return;
+
+    const strCommentIds = commentIds.map(id => String(id).trim()).filter(Boolean);
+    if (strCommentIds.length === 0) return;
+    const commentIdSet = new Set(strCommentIds);
+
+    const hasUnread = currentLoadedNotifications.some(n =>
+        (n.type === 'comment' || n.type === 'like') && commentIdSet.has(String(n.related_id)) && !isNotificationRead(n)
+    );
+    const unreadKey = `${strMomentId}_${strCommentIds.slice().sort().join(',')}`;
+    if (!hasUnread && processedCommentReadSet.has(unreadKey)) return;
+    processedCommentReadSet.add(unreadKey);
+
+    autoMarkNotificationsReadByCondition(
+        n => (n.type === 'comment' || n.type === 'like') && commentIdSet.has(String(n.related_id)),
+        q => q.in('type', ['comment', 'like']).in('related_id', strCommentIds)
+    );
+};
+
+window.autoMarkMoodNotificationRead = function(dateKey) {
+    if (!isAuthenticated() || !dateKey) return;
+    const strDate = String(dateKey).trim();
+    if (!strDate) return;
+
+    // 如果查看的是今天的日期，同步将今日心情提醒设为已读
+    const today = typeof getAppDateKey === 'function' ? getAppDateKey() : new Date().toISOString().slice(0, 10);
+    if (strDate === today && currentMoodReminder && !currentMoodReminder.isRead) {
+        currentMoodReminder.isRead = true;
+        const reminderEl = document.querySelector('.mood-reminder-notification');
+        if (reminderEl) reminderEl.classList.remove('unread');
+        updateNotificationBadge();
+        if (typeof acknowledgeMoodReminder === 'function') {
+            acknowledgeMoodReminder();
+        }
+    }
+
+    const hasUnread = currentLoadedNotifications.some(n =>
+        n.type === 'mood' && String(n.related_id) === strDate && !isNotificationRead(n)
+    );
+    if (!hasUnread && processedMoodReadSet.has(strDate)) return;
+    processedMoodReadSet.add(strDate);
+
+    autoMarkNotificationsReadByCondition(
+        n => n.type === 'mood' && String(n.related_id) === strDate,
+        q => q.eq('type', 'mood').eq('related_id', strDate)
+    );
+};
+
+window.autoMarkTopicNotificationRead = function(topicId, { bypassCache = false } = {}) {
+    if (!isAuthenticated() || !topicId) return;
+    const strTopicId = String(topicId).trim();
+    if (!strTopicId) return;
+
+    const hasUnread = currentLoadedNotifications.some(n =>
+        (n.type === 'topic' || n.type === 'topic_message') && String(n.related_id) === strTopicId && !isNotificationRead(n)
+    );
+    if (!bypassCache && !hasUnread && processedTopicReadSet.has(strTopicId)) return;
+    processedTopicReadSet.add(strTopicId);
+
+    autoMarkNotificationsReadByCondition(
+        n => (n.type === 'topic' || n.type === 'topic_message') && String(n.related_id) === strTopicId,
+        q => q.in('type', ['topic', 'topic_message']).eq('related_id', strTopicId)
+    );
+};

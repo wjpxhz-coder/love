@@ -547,6 +547,11 @@ async function loadTopicDetail(topicId) {
 
         // 滚动到底部最新消息
         scrollTopicToBottom();
+
+        // 自动标为已读
+        if (typeof window.autoMarkTopicNotificationRead === 'function') {
+            window.autoMarkTopicNotificationRead(topicId, { bypassCache: true });
+        }
     } catch (err) {
         if (reqId !== topicDetailReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
         console.error('加载话题详情异常:', err);
@@ -802,6 +807,11 @@ function initTopicRealtimeSubscription(topicId) {
                     await appendSingleTopicMessageToFlow(payload.new);
                     scrollTopicToBottom();
                 }
+                // 前台正停留在此话题实时聊天，对方发来的新消息通知静默标已读
+                if (typeof window.autoMarkTopicNotificationRead === 'function') {
+                    setTimeout(() => window.autoMarkTopicNotificationRead(topicId, { bypassCache: true }), 300);
+                    setTimeout(() => window.autoMarkTopicNotificationRead(topicId, { bypassCache: true }), 1200);
+                }
             }
         )
         .on(
@@ -831,6 +841,9 @@ function initTopicRealtimeSubscription(topicId) {
                     currentTopicDetail = payload.new;
                     window.currentTopicDetail = payload.new;
                     renderTopicDetailShell(payload.new);
+                    if (typeof window.autoMarkTopicNotificationRead === 'function') {
+                        setTimeout(() => window.autoMarkTopicNotificationRead(topicId, { bypassCache: true }), 300);
+                    }
                 }
             }
         )
@@ -1882,6 +1895,9 @@ function enterTopicsPage(_route) {
 function enterTopicDetailPage(route) {
     const topicId = route?.params?.id;
     if (topicId) {
+        if (typeof window.autoMarkTopicNotificationRead === 'function') {
+            window.autoMarkTopicNotificationRead(topicId, { bypassCache: true });
+        }
         loadTopicDetail(topicId);
     }
 }

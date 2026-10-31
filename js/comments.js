@@ -605,6 +605,13 @@ async function loadComments(momentId, targetCard = null) {
         });
         listEl.replaceChildren(fragment);
     });
+
+    if (Array.isArray(data) && data.length > 0) {
+        const commentIds = data.map(c => c.id);
+        if (typeof window.autoMarkCommentsNotificationRead === 'function') {
+            window.autoMarkCommentsNotificationRead(momentId, commentIds);
+        }
+    }
 }
 
 function confirmDeleteComment(commentId, momentId) {
