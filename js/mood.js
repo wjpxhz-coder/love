@@ -1201,6 +1201,9 @@ function createMoodDayEntry(entry) {
 
 function openMoodDayModal(dateKey) {
     if (!dateKey) return;
+    if (typeof window.autoMarkMoodNotificationRead === 'function') {
+        window.autoMarkMoodNotificationRead(dateKey);
+    }
     const target = `/mood/day/${encodeURIComponent(String(dateKey))}`;
     if (typeof appNavigate === 'function') {
         appNavigate(target);
@@ -1228,6 +1231,9 @@ async function enterMoodDayPage(route) {
     if (!dateKey) {
         if (typeof appBack === 'function') appBack('/');
         return;
+    }
+    if (typeof window.autoMarkMoodNotificationRead === 'function') {
+        window.autoMarkMoodNotificationRead(dateKey);
     }
     let entries = moodEntriesByDate[dateKey] || [];
     if (!entries.length && /^\d{4}-\d{2}-\d{2}$/.test(dateKey) && isAuthenticated()) {

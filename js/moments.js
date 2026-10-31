@@ -2823,6 +2823,9 @@ function runMomentAction(actionElement) {
     const momentId = normalizeMomentId(actionElement.dataset.momentId);
     const action = actionElement.dataset.momentAction;
     if (action !== 'open-profile' && action !== 'open-lightbox' && !momentId) return;
+    if (momentId && typeof window.autoMarkMomentNotificationRead === 'function') {
+        window.autoMarkMomentNotificationRead(momentId);
+    }
     if (action === 'toggle-menu') {
         toggleMomentActionMenu(momentId, actionElement);
     } else if (action === 'edit') {
@@ -2882,6 +2885,13 @@ document.addEventListener('click', event => {
     if (!targetEl.closest('.moment-actions-menu')) {
         closeAllMomentActionMenus();
     }
+    const cardEl = targetEl.closest('.moment-card');
+    if (cardEl) {
+        const momentId = normalizeMomentId(cardEl.id.replace(/^card-/, ''));
+        if (momentId && typeof window.autoMarkMomentNotificationRead === 'function') {
+            window.autoMarkMomentNotificationRead(momentId);
+        }
+    }
     const actionElement = targetEl.closest('[data-moment-action]');
     if (actionElement) runMomentAction(actionElement);
 });
@@ -2890,6 +2900,13 @@ document.addEventListener('keydown', event => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     const targetEl = event.target instanceof Element ? event.target : event.target?.parentElement;
     if (!targetEl) return;
+    const cardEl = targetEl.closest('.moment-card');
+    if (cardEl) {
+        const momentId = normalizeMomentId(cardEl.id.replace(/^card-/, ''));
+        if (momentId && typeof window.autoMarkMomentNotificationRead === 'function') {
+            window.autoMarkMomentNotificationRead(momentId);
+        }
+    }
     const actionElement = targetEl.closest('[data-moment-action="open-profile"], [data-moment-action="open-lightbox"]');
     if (!actionElement) return;
     event.preventDefault();
