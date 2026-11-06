@@ -1383,6 +1383,7 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
     box-shadow: 0 6px 18px var(--shadow);
 }
 
+.settings-group:nth-child(1),
 .settings-group:nth-child(2),
 .settings-group:nth-child(3) {
     grid-column: 1 / -1;
@@ -2074,6 +2075,7 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
         grid-template-columns: 1fr;
     }
 
+    .settings-group:nth-child(1),
     .settings-group:nth-child(2),
     .settings-group:nth-child(3),
     .settings-footer {

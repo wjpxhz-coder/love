@@ -23,7 +23,10 @@ function enterSettingsPage() {
         updateSettingsThemeButtons(currentTheme);
     }
     if (typeof updateSettingsCursorButtons === 'function') {
-        const currentCursor = document.documentElement.getAttribute('data-cursor') === 'system' ? 'system' : 'cute';
+        const rawCursor = document.documentElement.getAttribute('data-cursor');
+        const currentCursor = typeof normalizeCursorStyle === 'function'
+            ? normalizeCursorStyle(rawCursor)
+            : (rawCursor === 'paw' || rawCursor === 'wand' || rawCursor === 'system' ? rawCursor : 'snake');
         updateSettingsCursorButtons(currentCursor);
     }
     if (typeof syncAIPrivacySetting === 'function') syncAIPrivacySetting();

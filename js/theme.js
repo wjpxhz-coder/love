@@ -59,9 +59,16 @@ function setThemeDirect(theme) {
     updateSettingsThemeButtons(theme);
 }
 
-// --- 专属萌系鼠标样式（樱花奶蛇团 / 系统默认） ---
+// --- 专属萌系鼠标样式（樱花奶蛇团 / 草莓奶芙猫爪 / 甜心樱花仙女棒 / 系统默认） ---
+const CURSOR_STYLE_MODES = ['snake', 'paw', 'wand', 'system'];
+
+function normalizeCursorStyle(raw) {
+    if (raw === 'paw' || raw === 'wand' || raw === 'system') return raw;
+    return 'snake';
+}
+
 function getStoredCursorStyle() {
-    return localStorage.getItem('cursor_preference') === 'system' ? 'system' : 'cute';
+    return normalizeCursorStyle(localStorage.getItem('cursor_preference'));
 }
 
 function initCursorStyle() {
@@ -69,28 +76,35 @@ function initCursorStyle() {
 }
 
 function applyCursorStyle(mode) {
-    if (mode === 'system') {
-        document.documentElement.setAttribute('data-cursor', 'system');
-    } else {
+    const normalized = normalizeCursorStyle(mode);
+    if (normalized === 'snake') {
         document.documentElement.removeAttribute('data-cursor');
+    } else {
+        document.documentElement.setAttribute('data-cursor', normalized);
     }
-    updateSettingsCursorButtons(mode === 'system' ? 'system' : 'cute');
+    updateSettingsCursorButtons(normalized);
 }
 
 function updateSettingsCursorButtons(mode) {
-    const cuteBtn = document.getElementById('cursor-btn-cute');
-    const sysBtn = document.getElementById('cursor-btn-system');
-    if (!cuteBtn || !sysBtn) return;
+    const normalized = normalizeCursorStyle(mode);
+    const buttonMap = {
+        snake: document.getElementById('cursor-btn-snake'),
+        paw: document.getElementById('cursor-btn-paw'),
+        wand: document.getElementById('cursor-btn-wand'),
+        system: document.getElementById('cursor-btn-system')
+    };
 
-    const isCute = mode !== 'system';
-    cuteBtn.classList.toggle('active', isCute);
-    sysBtn.classList.toggle('active', !isCute);
-    cuteBtn.setAttribute('aria-pressed', String(isCute));
-    sysBtn.setAttribute('aria-pressed', String(!isCute));
+    Object.entries(buttonMap).forEach(([key, btn]) => {
+        if (!btn) return;
+        const isActive = key === normalized;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', String(isActive));
+    });
 }
 
 function setCursorDirect(mode) {
-    if (!['cute', 'system'].includes(mode)) return;
+    if (mode === 'cute') mode = 'snake';
+    if (!CURSOR_STYLE_MODES.includes(mode)) return;
     localStorage.setItem('cursor_preference', mode);
     applyCursorStyle(mode);
 }
