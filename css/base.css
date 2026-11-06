@@ -277,6 +277,12 @@ textarea:disabled,
     margin-bottom: 10px;
 }
 
+.theme-options.cursor-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
 @media (any-hover: hover) and (any-pointer: fine) {
     .cursor-settings-subgroup {
         display: block;
