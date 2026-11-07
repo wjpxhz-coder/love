@@ -488,6 +488,7 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             line-height: 1.8;
             color: var(--text);
             white-space: pre-wrap;
+            cursor: var(--cursor-text);
         }
 
         /* ── 微光流光骨架屏动效 ── */

@@ -609,6 +609,7 @@
     border-radius: 18px 18px 18px 4px;
     padding: 10px 14px;
     font-size: 0.95rem;
+    cursor: var(--cursor-text);
     line-height: 1.55;
     color: var(--text-color, #332729);
     word-break: break-word;

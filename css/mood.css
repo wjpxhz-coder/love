@@ -336,6 +336,7 @@
 .mood-calendar-preview + .mood-calendar-preview { margin-left: -2px; }
 
 .mood-calendar-note-preview {
+    cursor: var(--cursor-text);
     display: -webkit-box;
     width: 100%;
     overflow: hidden;
@@ -469,6 +470,7 @@
     line-height: 1.6;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+    cursor: var(--cursor-text);
 }
 
 .mood-day-entry-note.empty { color: var(--text-muted); font-style: italic; }
