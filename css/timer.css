@@ -63,9 +63,16 @@
 }
 
 .timer-card:hover {
-    transform: translateY(-3px);
+    transform: translateY(-4px) translateZ(0);
     box-shadow: var(--shadow-hover);
     border-color: rgba(253, 164, 175, 0.6);
+}
+.timer-card:hover .num {
+    transform: scale(1.05);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.timer-card:active {
+    transform: scale(0.98) translateZ(0);
 }
 
 .timer-card .num {

@@ -99,6 +99,21 @@
     transform: translateY(-3px) scale(1.08);
     box-shadow: 0 12px 34px var(--primary-glow);
 }
+
+.fab-container:has(.fab-menu.show) .fab-main,
+.fab-main[aria-expanded='true'] {
+    transform: rotate(135deg) scale(1.04);
+    background: linear-gradient(135deg, #f43f5e, #e11d48);
+}
+
+.fab-main:active {
+    transform: scale(0.92) !important;
+}
+
+.fab-container:has(.fab-menu.show) .fab-main:active,
+.fab-main[aria-expanded='true']:active {
+    transform: rotate(135deg) scale(0.92) !important;
+}
 .fab-item {
     width: 48px;
     height: 48px;
@@ -115,8 +130,12 @@
     color: #fff;
 }
 .fab-item:hover {
-    transform: scale(1.15);
-    box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+    transform: scale(1.15) rotate(6deg);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+}
+
+.fab-item:active {
+    transform: scale(0.92) !important;
 }
 /* 柔和晚霞暮光色相体系 */
 .fab-item-miss       { background: linear-gradient(135deg, #fb7185, #e11d48); } /* 一键想你：心动粉红 */

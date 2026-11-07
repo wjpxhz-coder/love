@@ -54,9 +54,12 @@
 }
 
 .anniv-card:hover {
-    transform: translateY(-3px);
+    transform: translateY(-4px) translateZ(0);
     box-shadow: var(--shadow-hover);
     border-color: rgba(253, 164, 175, 0.6);
+}
+.anniv-card:active {
+    transform: scale(0.98) translateZ(0);
 }
 
 /* 今天是纪念日时的暖金特别光晕 */
@@ -88,7 +91,12 @@
 }
 
 .anniv-card:hover .anniv-icon {
-    transform: scale(1.15) rotate(-6deg);
+    transform: scale(1.18) rotate(-10deg) translateZ(0);
+    box-shadow: 0 4px 14px var(--primary-glow);
+}
+.anniv-card:hover .anniv-days {
+    transform: scale(1.06);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .anniv-card .anniv-name {

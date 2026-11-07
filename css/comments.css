@@ -374,10 +374,11 @@
             justify-content: center;
             gap: 6px;
             border-radius: var(--radius-pill);
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
             letter-spacing: 0;
             font-weight: 600;
             outline: none;
+            position: relative;
         }
 
         .moment-like-btn::after,
@@ -385,11 +386,35 @@
             display: none !important;
         }
 
+        /* 纯 GPU 微涟漪扩散光环 */
+        .moment-like-btn::before,
+        .moment-star-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0;
+        }
+        .moment-like-btn.liked::before {
+            background: radial-gradient(circle, rgba(244, 63, 94, 0.45) 0%, rgba(244, 63, 94, 0) 70%);
+            animation: touchRipple 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        .moment-star-btn.starred::before {
+            background: radial-gradient(circle, rgba(245, 158, 11, 0.48) 0%, rgba(245, 158, 11, 0) 70%);
+            animation: touchRipple 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
         .moment-like-btn:hover {
             background: rgba(244, 63, 94, 0.12);
             border-color: rgba(244, 63, 94, 0.25);
             color: var(--primary);
-            transform: translateY(-1px);
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 4px 12px rgba(244, 63, 94, 0.15) !important;
         }
         .moment-like-btn.liked {
             color: var(--primary);
@@ -398,25 +423,44 @@
             font-weight: 700;
         }
         .moment-like-btn .ml-heart {
-            transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             display: inline-flex;
             align-items: center;
+            will-change: transform;
         }
         .moment-like-btn.liked .ml-heart {
-            animation: likePopIn 0.35s ease;
+            animation: likePopIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+        .moment-like-btn.liked .ml-count {
+            animation: countBump 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+            display: inline-block;
         }
 
         .moment-star-btn:hover {
             background: rgba(245, 158, 11, 0.12);
             border-color: rgba(245, 158, 11, 0.25);
             color: var(--gold);
-            transform: translateY(-1px);
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15) !important;
         }
         .moment-star-btn.starred {
             color: var(--gold);
             background: rgba(245, 158, 11, 0.16);
             border-color: rgba(245, 158, 11, 0.35);
             font-weight: 700;
+        }
+        .moment-star-btn .star-btn-icon {
+            transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: inline-flex;
+            align-items: center;
+            will-change: transform;
+        }
+        .moment-star-btn.starred .star-btn-icon {
+            animation: starPopIn 0.48s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+        .moment-star-btn.starred .star-btn-text {
+            animation: countBump 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+            display: inline-block;
         }
 
         .moment-like-btn:active,

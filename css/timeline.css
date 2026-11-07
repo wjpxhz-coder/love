@@ -168,7 +168,7 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
     user-select: none;
 }
 .card-author-avatar-wrap:hover {
-    transform: scale(1.08);
+    transform: scale(1.08) rotate(3deg);
     box-shadow: 0 4px 14px rgba(255, 101, 132, 0.22);
 }
 .card-author-avatar-wrap:active {
@@ -338,7 +338,7 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             font-weight: 700;
             line-height: 1;
             letter-spacing: 0;
-            transition: all 0.2s ease;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -351,8 +351,12 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             background: rgba(200, 155, 155, 0.15);
             color: var(--primary);
             border-color: var(--border);
-            transform: none;
+            transform: rotate(90deg) scale(1.08);
             box-shadow: none;
+        }
+
+        .moment-menu-trigger:active {
+            transform: rotate(90deg) scale(0.92);
         }
 
         .moment-menu-dropdown {
@@ -406,7 +410,7 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
         .moment-menu-item:focus-visible {
             background: rgba(200, 155, 155, 0.12);
             color: var(--primary);
-            transform: none;
+            transform: translateX(3px);
             box-shadow: none;
         }
 
@@ -608,7 +612,8 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             background-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
             background-size: 200% 100%;
             animation: mediaShimmer 1.8s ease-in-out infinite;
-            transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1), transform 0.2s ease;
+            transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1), transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease;
+            will-change: transform;
         }
         [data-theme='dark'] .moment-grid-item {
             background-color: rgba(60, 45, 50, 0.4);
@@ -619,7 +624,12 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             animation: none;
         }
         .moment-grid-item:hover {
-            opacity: 0.92;
+            transform: scale(1.035) translateZ(0);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+            z-index: 2;
+        }
+        .moment-grid-item:active {
+            transform: scale(0.97) translateZ(0);
         }
         .moment-grid-video-wrap {
             position: relative;
@@ -685,7 +695,14 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             background-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
             background-size: 200% 100%;
             animation: mediaShimmer 1.8s ease-in-out infinite;
-            transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1), transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease;
+        }
+        .moment-single-image:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+        .moment-single-image:active {
+            transform: scale(0.985);
         }
         [data-theme='dark'] .moment-single-image {
             background-color: rgba(60, 45, 50, 0.4);
@@ -782,7 +799,14 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
         }
 
         /* 大事记标签徽章 */
+        .moment-card.milestone:hover .milestone-badge-timeline {
+            transform: scale(1.05) rotate(2deg);
+        }
+        .moment-card.milestone:hover .milestone-days-badge {
+            transform: scale(1.04);
+        }
         .milestone-badge-timeline {
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
             display: inline-flex;
             align-items: center;
             height: 22px;
@@ -1138,12 +1162,15 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             justify-content: center;
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
             color: #d84572;
-            transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.4, 1.2), background 0.2s ease, box-shadow 0.2s ease;
+            transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease, box-shadow 0.3s ease;
         }
         .moment-single-video-card:hover .moment-single-video-play-btn {
-            transform: scale(1.12);
+            transform: scale(1.14) translateZ(0);
             background: #ffffff;
-            box-shadow: 0 8px 26px rgba(216, 69, 114, 0.4);
+            box-shadow: 0 8px 26px rgba(216, 69, 114, 0.45), 0 0 0 6px rgba(255, 255, 255, 0.28);
+        }
+        .moment-single-video-card:active .moment-single-video-play-btn {
+            transform: scale(0.94) translateZ(0);
         }
         .moment-single-video-play-icon {
             width: 24px;
