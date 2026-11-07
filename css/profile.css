@@ -77,12 +77,12 @@
     background: #ffffff;
     border-color: #ff5277;
     color: #e63964;
-    transform: translateY(-1px);
+    transform: translateX(-3px) scale(1.04);
     box-shadow: 0 4px 14px rgba(255, 105, 135, 0.25);
 }
 
 .profile-back-btn:active {
-    transform: scale(0.96);
+    transform: scale(0.93) !important;
 }
 
 .profile-topbar-title {
@@ -144,6 +144,10 @@
     color: #ff5277;
     transform: rotate(60deg) scale(1.05);
     box-shadow: 0 4px 14px rgba(255, 105, 135, 0.25);
+}
+
+.profile-settings-btn:active {
+    transform: rotate(90deg) scale(0.92) !important;
 }
 
 .profile-edit-btn {
