@@ -3,7 +3,8 @@
    ========================================================================== */
 
 .anniv-section {
-    margin-bottom: 24px;
+    margin: 0;
+    text-align: center;
 }
 
 .section-label {
@@ -35,15 +36,21 @@
     background: var(--glass-surface);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
+    border: 1.5px solid var(--glass-border);
     outline: none !important;
-    border-radius: var(--radius-md);
-    padding: 16px 8px 14px;
+    border-radius: var(--jelly-radius-md, 22px);
+    padding: 18px 8px 14px;
     text-align: center;
-    box-shadow: var(--shadow-soft);
+    box-shadow: var(--shadow-soft), inset 0 1.5px 1px var(--glass-highlight);
     position: relative;
     overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+        transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+        border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+        background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+        color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .anniv-card:hover {
@@ -103,21 +110,24 @@
 
 .anniv-card.today .anniv-days {
     color: var(--gold);
-    font-size: 1.35rem;
+    font-size: 1.65rem;
 }
 
 .anniv-card .anniv-unit {
     display: inline-block;
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     color: var(--primary);
     background: var(--primary-subtle);
+    border: 1px solid rgba(244, 63, 94, 0.12);
     border-radius: var(--radius-pill);
-    padding: 2px 8px;
-    margin-top: 4px;
+    padding: 2px 9px;
+    margin-top: 6px;
     font-weight: 700;
+    letter-spacing: 0.05em;
 }
 
 [data-theme='dark'] .anniv-card .anniv-unit {
     color: var(--primary-light);
     background: var(--primary-subtle);
+    border-color: rgba(251, 113, 133, 0.25);
 }

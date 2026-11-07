@@ -4,7 +4,7 @@
 
 .site-header {
     text-align: center;
-    padding: 24px 0 16px;
+    padding: 12px 0 4px;
     position: relative;
 }
 
@@ -14,6 +14,7 @@
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.28em;
+    text-indent: 0.28em;
     color: var(--primary);
     opacity: 0.85;
     margin-bottom: 8px;
@@ -32,7 +33,7 @@
     line-height: 1.25;
     filter: drop-shadow(0 3px 12px var(--primary-glow));
     margin: 0;
-    animation: titleAppear 1.2s cubic-bezier(0.4, 0, 0.2, 1) both, shimmerText 4s ease 1.2s infinite;
+    animation: titleAppear 1.2s cubic-bezier(0.4, 0, 0.2, 1) both, shimmerText 6s ease-in-out 1.2s 2;
     text-wrap: balance;
     display: inline-flex;
     align-items: center;
@@ -59,6 +60,7 @@
     font-family: 'Songti SC', 'Noto Serif SC', 'Source Han Serif SC', serif;
     font-size: 0.95rem;
     letter-spacing: 0.24em;
+    text-indent: 0.24em;
     color: var(--text-main);
     background: rgba(255, 255, 255, 0.65);
     backdrop-filter: blur(12px);
@@ -90,8 +92,11 @@
 .header-divider span {
     flex: 1;
     height: 1.5px;
-    background: linear-gradient(to right, transparent, var(--primary-light), transparent);
+    background: linear-gradient(to right, transparent, var(--primary-light));
     border-radius: 2px;
+}
+.header-divider span:last-child {
+    background: linear-gradient(to left, transparent, var(--primary-light));
 }
 .header-divider i {
     color: var(--primary);

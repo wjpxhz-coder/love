@@ -2084,28 +2084,33 @@ function renderTimelineFromSnapshot(snapshot) {
     return true;
 }
 
-function isMomentVideoDisplayed(video) {
+function isMomentVideoDisplayed(video, precomputedRect = null) {
     if (!video?.isConnected || video.hidden) return false;
-    const rect = video.getBoundingClientRect();
+    const rect = precomputedRect || video.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return false;
     const style = window.getComputedStyle(video);
     return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
 }
 
-function isMomentVideoInViewport(video) {
-    const rect = video.getBoundingClientRect();
+function isMomentVideoInViewport(video, precomputedRect = null) {
+    const rect = precomputedRect || video.getBoundingClientRect();
     return rect.bottom > 0
         && rect.right > 0
         && rect.top < window.innerHeight
         && rect.left < window.innerWidth;
 }
 
-function updateMomentVideoPlayback(video) {
+function updateMomentVideoPlayback(video, observerEntry = null, precomputedDisplayed = null) {
     if (!(video instanceof HTMLVideoElement)) return;
     const isAutoVideo = video.dataset.momentAutoplay === 'true';
+    const isDisplayed = observerEntry
+        ? (video.isConnected && !video.hidden
+            && observerEntry.boundingClientRect.width > 0
+            && observerEntry.boundingClientRect.height > 0)
+        : (typeof precomputedDisplayed === 'boolean' ? precomputedDisplayed : isMomentVideoDisplayed(video));
     const canPlay = document.visibilityState !== 'hidden'
         && video.dataset.momentIntersecting === 'true'
-        && isMomentVideoDisplayed(video);
+        && isDisplayed;
     const reduceMotion = momentVideoMotionPreference?.matches === true;
 
     if (!canPlay || (isAutoVideo && reduceMotion)) {
@@ -2126,18 +2131,23 @@ function ensureMomentVideoObserver() {
     momentVideoObserver = new IntersectionObserver(entries => {
         entries.forEach(entry => {
             const video = entry.target;
-            video.dataset.momentIntersecting = entry.isIntersecting ? 'true' : 'false';
-            updateMomentVideoPlayback(video);
+            const rect = entry.boundingClientRect;
+            const isIntersecting = entry.isIntersecting
+                && Boolean(rect && rect.width > 0 && rect.height > 0);
+            video.dataset.momentIntersecting = isIntersecting ? 'true' : 'false';
+            updateMomentVideoPlayback(video, entry);
         });
     }, { threshold: 0.01 });
 }
 
 function refreshMomentVideoPlayback(video) {
     if (!(video instanceof HTMLVideoElement)) return;
-    video.dataset.momentIntersecting = isMomentVideoDisplayed(video) && isMomentVideoInViewport(video)
+    const rect = (video.isConnected && !video.hidden) ? video.getBoundingClientRect() : null;
+    const displayed = rect ? isMomentVideoDisplayed(video, rect) : false;
+    video.dataset.momentIntersecting = displayed && isMomentVideoInViewport(video, rect)
         ? 'true'
         : 'false';
-    updateMomentVideoPlayback(video);
+    updateMomentVideoPlayback(video, null, displayed);
 }
 
 function setupMomentVideoPlayback(video, autoplay = false) {
@@ -3513,7 +3523,7 @@ async function fetchMoments(append = false, options = {}) {
             if (restored) {
                 const topId = snapshot.moments[0]?.id;
                 checkNewMomentsInBackground(topId);
-                checkAndRenderOnThisDay();
+                setTimeout(() => checkAndRenderOnThisDay(), 0);
                 return;
             }
         }
@@ -3532,7 +3542,16 @@ async function fetchMoments(append = false, options = {}) {
         return;
     }
 
+    let markDomReady = null;
+    const domReadyPromise = new Promise(resolve => {
+        markDomReady = resolve;
+    });
+
     const finishRequest = () => {
+        if (markDomReady) {
+            markDomReady(false);
+            markDomReady = null;
+        }
         if (requestId === activeMomentFetchRequest) {
             isLoading = false;
             momentLoadingAuthEpoch = null;
@@ -3643,6 +3662,11 @@ async function fetchMoments(append = false, options = {}) {
         renderedMomentIds.add(itemId);
         return true;
     });
+    const pageMomentIds = uniquePageData.map(item => item.id).filter(Boolean);
+    if (pageMomentIds.length > 0) {
+        if (typeof loadCommentCounts === 'function') loadCommentCounts(pageMomentIds, { domReadyPromise });
+        if (typeof loadMomentLikes === 'function') loadMomentLikes(pageMomentIds, { domReadyPromise });
+    }
     // 并行化媒体地址解析与收藏星标查询，消除串行网络等待瀑布
     const hydratePromise = typeof batchHydrateMomentMediaRecords === 'function'
         ? batchHydrateMomentMediaRecords(uniquePageData)
@@ -3715,6 +3739,10 @@ async function fetchMoments(append = false, options = {}) {
     });
     const newVideos = Array.from(fragment.querySelectorAll('video'));
     contentDiv.appendChild(fragment);
+    if (markDomReady) {
+        markDomReady(true);
+        markDomReady = null;
+    }
     newVideos.forEach(video => refreshMomentVideoPlayback(video));
 
     // 触发滚动入场
@@ -3735,18 +3763,12 @@ async function fetchMoments(append = false, options = {}) {
     if (!append) {
         currentRenderedMomentsList = [...renderData];
         if (isDefaultFilter()) {
-            checkAndRenderOnThisDay();
+            setTimeout(() => checkAndRenderOnThisDay(), 0);
         }
     } else {
         currentRenderedMomentsList = currentRenderedMomentsList.concat(renderData).slice(0, MAX_SNAPSHOT_MOMENTS);
     }
     saveTimelineSnapshot();
-
-    // 批量加载评论计数
-    loadCommentCounts(renderData.map(item => item.id));
-
-    // 批量加载动态点赞
-    loadMomentLikes(renderData.map(item => item.id));
 
     // 设置滚动观察器
     setupScrollObserver();
@@ -3755,10 +3777,24 @@ async function fetchMoments(append = false, options = {}) {
 
 let lastOnThisDayAuthEpoch = -1;
 let lastOnThisDayDateKey = '';
+let onThisDayMemoryCache = {
+    cacheKey: '',
+    isYearly: false,
+    chosenEntries: [],
+    hydratedItems: []
+};
 
-function clearOnThisDaySection() {
+function clearOnThisDaySection(invalidateCache = false) {
     lastOnThisDayAuthEpoch = -1;
     lastOnThisDayDateKey = '';
+    if (invalidateCache) {
+        onThisDayMemoryCache = {
+            cacheKey: '',
+            isYearly: false,
+            chosenEntries: [],
+            hydratedItems: []
+        };
+    }
     const section = document.getElementById('on-this-day-section');
     if (section) {
         section.hidden = true;
@@ -3787,7 +3823,10 @@ function extractMomentPreviewSummary(item) {
                         const clean = sanitizeMediaUrl(u);
                         return clean && !isVideoMediaUrl(clean);
                     });
-                    if (firstImg) thumbUrl = sanitizeMediaUrl(firstImg);
+                    if (firstImg) {
+                        const thumb = getThumbnailForImage(firstImg, parsed.image_thumbnails);
+                        thumbUrl = sanitizeMediaUrl(thumb || firstImg);
+                    }
                 }
                 if (!text) {
                     if (parsed.audio) text = '🎙️ 语音心情动态';
@@ -3806,29 +3845,115 @@ function extractMomentPreviewSummary(item) {
     return { text, thumbUrl };
 }
 
+function renderOnThisDayCards(section, chosenEntries, hydratedItems, isYearly) {
+    if (!section) return;
+    if (!Array.isArray(chosenEntries) || chosenEntries.length === 0) {
+        section.hidden = true;
+        section.replaceChildren();
+        return;
+    }
+
+    section.replaceChildren();
+    const cardWrap = createMomentNode('div', 'on-this-day-card');
+
+    const header = createMomentNode('div', 'on-this-day-header');
+    const badge = createMomentNode(
+        'span',
+        'on-this-day-badge',
+        isYearly
+            ? `🕰️ 那年今日 · ${chosenEntries[0].yearsAgo} 年前的今天`
+            : `💌 往月今日 · ${chosenEntries[0].monthsAgo} 个月前的今天`
+    );
+    const subTitle = createMomentNode(
+        'span',
+        'on-this-day-subtitle',
+        `在时光长河里重逢 ${chosenEntries.length} 段心动记忆 ✨`
+    );
+    header.append(badge, subTitle);
+    cardWrap.appendChild(header);
+
+    const list = createMomentNode('div', 'on-this-day-list');
+    hydratedItems.forEach((hydratedItem, idx) => {
+        const metaInfo = chosenEntries[idx];
+        const itemRow = createMomentNode('button', 'on-this-day-item');
+        itemRow.type = 'button';
+
+        const { text, thumbUrl } = extractMomentPreviewSummary(hydratedItem);
+        if (thumbUrl) {
+            const thumb = document.createElement('img');
+            thumb.className = 'on-this-day-thumb';
+            thumb.src = thumbUrl;
+            thumb.alt = '那年今日回忆配图';
+            thumb.loading = 'lazy';
+            thumb.decoding = 'async';
+            itemRow.appendChild(thumb);
+        }
+
+        const body = createMomentNode('div', 'on-this-day-item-body');
+        const metaLine = createMomentNode('div', 'on-this-day-item-meta');
+        const d = metaInfo.dateObj;
+        const dateLabel = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+        const tagText = isYearly ? `${metaInfo.yearsAgo}年前` : `${metaInfo.monthsAgo}个月前`;
+        const profile = (typeof allProfilesCache === 'object' && allProfilesCache?.[hydratedItem.author]) || {};
+        const authorLabel = profile.nickname || hydratedItem.author || '成员';
+        metaLine.textContent = `${dateLabel}（${tagText}） · ${authorLabel}`;
+
+        const excerpt = createMomentNode('div', 'on-this-day-item-text', text);
+        body.append(metaLine, excerpt);
+        itemRow.appendChild(body);
+
+        const arrow = createMomentNode('span', 'on-this-day-item-arrow', '📍 回看');
+        itemRow.appendChild(arrow);
+
+        itemRow.addEventListener('click', () => {
+            if (typeof locateMomentOnTimeline === 'function') {
+                locateMomentOnTimeline(hydratedItem, { backLabel: '🔙 返回全部回忆' });
+            }
+        });
+        list.appendChild(itemRow);
+    });
+
+    cardWrap.appendChild(list);
+    section.appendChild(cardWrap);
+    section.hidden = false;
+}
+
 async function checkAndRenderOnThisDay() {
     const section = document.getElementById('on-this-day-section');
     if (!section) return;
     if (!hasMomentAuthContext() || !supabaseClient) {
-        clearOnThisDaySection();
+        clearOnThisDaySection(true);
         return;
     }
 
     const requestAuthEpoch = getMomentAuthEpoch();
+    const spaceKey = String(currentUserProfile?.space_id || currentAuthUser?.id || '');
     const now = new Date();
     const todayYear = now.getFullYear();
     const todayMonth = now.getMonth() + 1;
     const todayDate = now.getDate();
     const dateKey = `${todayYear}-${String(todayMonth).padStart(2, '0')}-${String(todayDate).padStart(2, '0')}`;
+    const cacheKey = `${requestAuthEpoch}_${spaceKey}_${dateKey}`;
 
-    if (lastOnThisDayAuthEpoch === requestAuthEpoch && lastOnThisDayDateKey === dateKey && !section.hidden && section.childElementCount > 0) {
+    if (onThisDayMemoryCache.cacheKey === cacheKey) {
+        if (onThisDayMemoryCache.chosenEntries.length === 0) {
+            section.hidden = true;
+            section.replaceChildren();
+            return;
+        }
+        if (lastOnThisDayAuthEpoch === requestAuthEpoch && lastOnThisDayDateKey === dateKey && !section.hidden && section.childElementCount > 0) {
+            return;
+        }
+        lastOnThisDayAuthEpoch = requestAuthEpoch;
+        lastOnThisDayDateKey = dateKey;
+        renderOnThisDayCards(section, onThisDayMemoryCache.chosenEntries, onThisDayMemoryCache.hydratedItems, onThisDayMemoryCache.isYearly);
         return;
     }
 
     try {
         const { data, error } = await supabaseClient
             .from('moments')
-            .select('*')
+            .select('id, user_id, author, type, content, created_at')
             .order('created_at', { ascending: false })
             .order('id', { ascending: false })
             .limit(400);
@@ -3862,6 +3987,14 @@ async function checkAndRenderOnThisDay() {
         const isYearly = yearlyMatches.length > 0;
         const chosenEntries = (isYearly ? yearlyMatches : monthlyMatches).slice(0, 3);
         if (chosenEntries.length === 0) {
+            onThisDayMemoryCache = {
+                cacheKey,
+                isYearly: false,
+                chosenEntries: [],
+                hydratedItems: []
+            };
+            lastOnThisDayAuthEpoch = requestAuthEpoch;
+            lastOnThisDayDateKey = dateKey;
             section.hidden = true;
             section.replaceChildren();
             return;
@@ -3876,72 +4009,16 @@ async function checkAndRenderOnThisDay() {
 
         if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
 
+        onThisDayMemoryCache = {
+            cacheKey,
+            isYearly,
+            chosenEntries,
+            hydratedItems
+        };
         lastOnThisDayAuthEpoch = requestAuthEpoch;
         lastOnThisDayDateKey = dateKey;
 
-        section.replaceChildren();
-        const cardWrap = createMomentNode('div', 'on-this-day-card');
-
-        const header = createMomentNode('div', 'on-this-day-header');
-        const badge = createMomentNode(
-            'span',
-            'on-this-day-badge',
-            isYearly
-                ? `🕰️ 那年今日 · ${chosenEntries[0].yearsAgo} 年前的今天`
-                : `💌 往月今日 · ${chosenEntries[0].monthsAgo} 个月前的今天`
-        );
-        const subTitle = createMomentNode(
-            'span',
-            'on-this-day-subtitle',
-            `在时光长河里重逢 ${chosenEntries.length} 段心动记忆 ✨`
-        );
-        header.append(badge, subTitle);
-        cardWrap.appendChild(header);
-
-        const list = createMomentNode('div', 'on-this-day-list');
-        hydratedItems.forEach((hydratedItem, idx) => {
-            const metaInfo = chosenEntries[idx];
-            const itemRow = createMomentNode('button', 'on-this-day-item');
-            itemRow.type = 'button';
-
-            const { text, thumbUrl } = extractMomentPreviewSummary(hydratedItem);
-            if (thumbUrl) {
-                const thumb = document.createElement('img');
-                thumb.className = 'on-this-day-thumb';
-                thumb.src = thumbUrl;
-                thumb.alt = '那年今日回忆配图';
-                thumb.loading = 'lazy';
-                thumb.decoding = 'async';
-                itemRow.appendChild(thumb);
-            }
-
-            const body = createMomentNode('div', 'on-this-day-item-body');
-            const metaLine = createMomentNode('div', 'on-this-day-item-meta');
-            const d = metaInfo.dateObj;
-            const dateLabel = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
-            const tagText = isYearly ? `${metaInfo.yearsAgo}年前` : `${metaInfo.monthsAgo}个月前`;
-            const profile = (typeof allProfilesCache === 'object' && allProfilesCache?.[hydratedItem.author]) || {};
-            const authorLabel = profile.nickname || hydratedItem.author || '成员';
-            metaLine.textContent = `${dateLabel}（${tagText}） · ${authorLabel}`;
-
-            const excerpt = createMomentNode('div', 'on-this-day-item-text', text);
-            body.append(metaLine, excerpt);
-            itemRow.appendChild(body);
-
-            const arrow = createMomentNode('span', 'on-this-day-item-arrow', '📍 回看');
-            itemRow.appendChild(arrow);
-
-            itemRow.addEventListener('click', () => {
-                if (typeof locateMomentOnTimeline === 'function') {
-                    locateMomentOnTimeline(hydratedItem, { backLabel: '🔙 返回全部回忆' });
-                }
-            });
-            list.appendChild(itemRow);
-        });
-
-        cardWrap.appendChild(list);
-        section.appendChild(cardWrap);
-        section.hidden = false;
+        renderOnThisDayCards(section, chosenEntries, hydratedItems, isYearly);
     } catch (err) {
         console.warn('加载那年今日回忆失败:', err);
     }
@@ -4051,6 +4128,7 @@ async function deleteMoment(id) {
             if (typeof invalidateProfileMomentsCache === 'function') {
                 invalidateProfileMomentsCache();
             }
+            onThisDayMemoryCache.cacheKey = '';
 
             const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
             if (cards.length > 0) {

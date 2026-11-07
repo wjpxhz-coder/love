@@ -142,6 +142,7 @@ async function renderMoodPhotoPreviews() {
     const fragment = document.createDocumentFragment();
 
     // 1. 渲染编辑时已存在的照片
+    const pendingPreviewImgs = [];
     if (moodExistingPhotos.length > 0) {
         for (let i = 0; i < moodExistingPhotos.length; i++) {
             const photoRef = moodExistingPhotos[i];
@@ -158,10 +159,8 @@ async function renderMoodPhotoPreviews() {
             
             if (directUrl || cachedUrl) {
                 img.src = directUrl || cachedUrl;
-            } else if (typeof resolveMediaUrl === 'function') {
-                resolveMediaUrl(photoRef).then(resolved => {
-                    if (resolved) img.src = resolved;
-                });
+            } else {
+                pendingPreviewImgs.push({ img, photoRef });
             }
 
             const removeBtn = document.createElement('button');
@@ -237,6 +236,19 @@ async function renderMoodPhotoPreviews() {
     }
 
     container.replaceChildren(fragment);
+
+    if (pendingPreviewImgs.length > 0) {
+        const refs = pendingPreviewImgs.map(entry => entry.photoRef);
+        if (typeof batchResolveMediaUrls === 'function' && refs.length > 1) {
+            await batchResolveMediaUrls(refs);
+        }
+        if (typeof resolveMediaUrl === 'function') {
+            const resolvedUrls = await Promise.all(refs.map(ref => resolveMediaUrl(ref)));
+            pendingPreviewImgs.forEach((entry, idx) => {
+                if (resolvedUrls[idx]) entry.img.src = resolvedUrls[idx];
+            });
+        }
+    }
 }
 
 function removeMoodExistingPhoto(index) {

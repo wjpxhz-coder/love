@@ -39,7 +39,7 @@ function isCurrentAuthSnapshot(epoch, userId) {
 
 
 async function fetchAllProfiles() {
-    if (!currentAuthUser) return;
+    if (!currentAuthUser) return [];
 
     const epoch = authEpoch;
     try {
@@ -48,23 +48,38 @@ async function fetchAllProfiles() {
             .select('user_id, space_id, username, nickname, bio, avatar_url, avatar_path, updated_at');
 
         if (error) throw error;
+        const rows = data || [];
+        if (typeof batchResolveMediaUrls === 'function' && rows.length > 0) {
+            const avatarRefs = rows
+                .map(p => (typeof toAvatarMediaRef === 'function' ? toAvatarMediaRef(p?.avatar_path) : ''))
+                .filter(Boolean);
+            if (avatarRefs.length > 1) {
+                await batchResolveMediaUrls(avatarRefs);
+            }
+        }
         if (typeof hydrateProfileAvatar === 'function') {
-            await Promise.all((data || []).map(profile => {
-                if (currentUserProfile && profile.user_id === currentUserProfile.user_id && currentUserProfile._avatarResolvedUrl) {
+            await Promise.all(rows.map(profile => {
+                if (currentUserProfile
+                    && profile.user_id === currentUserProfile.user_id
+                    && profile.avatar_path === currentUserProfile.avatar_path
+                    && currentUserProfile._avatarResolvedUrl) {
                     profile._avatarResolvedUrl = currentUserProfile._avatarResolvedUrl;
+                    profile._avatarResolvedPath = currentUserProfile.avatar_path;
                     return Promise.resolve(profile);
                 }
                 return hydrateProfileAvatar(profile);
             }));
         }
-        if (epoch !== authEpoch || !currentAuthUser) return;
+        if (epoch !== authEpoch || !currentAuthUser) return [];
 
         allProfilesCache = {};
-        (data || []).forEach(profile => {
+        rows.forEach(profile => {
             if (profile.username) allProfilesCache[profile.username] = profile;
         });
+        return rows;
     } catch (error) {
         console.error('加载成员资料失败:', error);
+        return [];
     }
 }
 
@@ -103,14 +118,20 @@ async function establishAuthenticatedUser(user, isNewLogin = false) {
 
     const hydrationPromise = (async () => {
         try {
-            const profile = await resolveAuthenticatedProfile(user);
+            const profilesList = await fetchAllProfiles();
             if (epoch !== authEpoch || currentAuthUser?.id !== user.id) return;
+
+            let profile = Array.isArray(profilesList)
+                ? profilesList.find(p => p && p.user_id === user.id && p.username)
+                : null;
+            if (!profile) {
+                profile = await resolveAuthenticatedProfile(user);
+                if (epoch !== authEpoch || currentAuthUser?.id !== user.id) return;
+                allProfilesCache[profile.username] = profile;
+            }
 
             currentAuthor = profile.username;
             currentUserProfile = profile;
-            allProfilesCache = { [profile.username]: profile };
-            await fetchAllProfiles();
-            if (epoch !== authEpoch) return;
 
             await onLoginSuccess(currentAuthor, isNewLogin);
         } catch (error) {
@@ -659,9 +680,14 @@ function startLoginCanvas() {
         });
     }
 
-    loginCanvasAnim = { running: true, requestId: null, lastTime: 0 };
+    loginCanvasAnim = { running: true, requestId: null, lastTime: 0, animate: null };
     const animate = (timestamp) => {
         if (!loginCanvasAnim?.running) return;
+        if (document.hidden || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+            loginCanvasAnim.requestId = null;
+            loginCanvasAnim.lastTime = 0;
+            return;
+        }
         const dtSec = loginCanvasAnim.lastTime > 0
             ? Math.min((timestamp - loginCanvasAnim.lastTime) / 1000, 0.05)
             : 0.016;
@@ -698,7 +724,10 @@ function startLoginCanvas() {
         });
         if (loginCanvasAnim) loginCanvasAnim.requestId = requestAnimationFrame(animate);
     };
-    loginCanvasAnim.requestId = requestAnimationFrame(animate);
+    loginCanvasAnim.animate = animate;
+    if (!document.hidden) {
+        loginCanvasAnim.requestId = requestAnimationFrame(animate);
+    }
 }
 
 function stopLoginCanvas() {
@@ -707,6 +736,27 @@ function stopLoginCanvas() {
     if (loginCanvasAnim.requestId) cancelAnimationFrame(loginCanvasAnim.requestId);
     loginCanvasAnim = null;
 }
+
+document.addEventListener('visibilitychange', () => {
+    if (!loginCanvasAnim?.running) return;
+    if (document.hidden) {
+        if (loginCanvasAnim.requestId) {
+            cancelAnimationFrame(loginCanvasAnim.requestId);
+            loginCanvasAnim.requestId = null;
+        }
+        loginCanvasAnim.lastTime = 0;
+    } else if (!loginCanvasAnim.requestId && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        const loginModal = document.getElementById('login-modal');
+        const isActive = (typeof isAppRouteActive === 'function' && isAppRouteActive('login'))
+            || loginModal?.classList.contains('is-active')
+            || loginModal?.classList.contains('active')
+            || loginModal?.open;
+        if (isActive && typeof loginCanvasAnim.animate === 'function') {
+            loginCanvasAnim.lastTime = 0;
+            loginCanvasAnim.requestId = requestAnimationFrame(loginCanvasAnim.animate);
+        }
+    }
+});
 
 // ── 受保护动作 ──
 function checkPassword(actionType) {

@@ -3,7 +3,7 @@
     display: flex;
     gap: 14px;
     justify-content: center;
-    margin-bottom: 24px;
+    margin: 0;
     flex-wrap: wrap;
 }
 
@@ -19,9 +19,16 @@ button {
     cursor: var(--cursor-pointer);
     letter-spacing: 1px;
     box-shadow: 0 6px 22px var(--shadow);
-    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition:
+        transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+        box-shadow 0.3s ease,
+        border-color 0.25s ease,
+        background-color 0.25s ease,
+        color 0.25s ease,
+        opacity 0.25s ease;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 7px;
     position: relative;
     overflow: hidden;
@@ -29,46 +36,47 @@ button {
 
 button:hover {
     transform: translateY(-4px) scale(1.035);
-    box-shadow: 0 12px 32px var(--shadow-hover);
+    box-shadow: var(--shadow-hover);
 }
 
 button:active { transform: scale(0.96); }
 button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-shadow: none; transform: none; }
 
 /* ── 时光轴 ── */
-/* ── 时光轴 ── */
 .timeline-section {
     background: var(--glass-surface);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
+    border: 1.5px solid var(--border);
     outline: none !important;
-    border-radius: var(--radius-lg);
-    padding: 26px 22px;
-    box-shadow: var(--shadow-soft);
+    border-radius: var(--jelly-radius-lg, 28px);
+    padding: 24px 22px;
+    margin: 0;
+    box-shadow: var(--shadow-soft), inset 0 1.5px 1px var(--glass-highlight);
     transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .timeline-section:hover {
-    box-shadow: var(--shadow-hover);
-    border-color: rgba(253, 164, 175, 0.6);
+    box-shadow: var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
+    border-color: rgba(253, 164, 175, 0.65);
 }
 
 [data-theme='dark'] .timeline-section {
-    border-color: var(--glass-border);
-    box-shadow: var(--shadow-soft);
+    background: var(--glass-surface);
+    border-color: var(--border);
+    box-shadow: var(--shadow-soft), inset 0 1.5px 1px var(--glass-highlight);
 }
 
 .timeline-title {
-    font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
-    font-weight: 700;
+    font-family: 'ZCOOL KuaiLe', cursive;
+    font-weight: normal;
     font-size: 1.35rem;
     color: var(--primary);
     text-align: center;
-    letter-spacing: 0.08em;
-    margin-bottom: 22px;
+    letter-spacing: 1.5px;
+    margin-bottom: 18px;
     padding-bottom: 14px;
-    border-bottom: 1px solid rgba(244, 63, 94, 0.12);
+    border-bottom: 1.5px solid var(--border);
     filter: drop-shadow(0 2px 4px var(--primary-glow));
 }
 
@@ -100,7 +108,13 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
     contain: layout style paint;
     content-visibility: auto;
     contain-intrinsic-size: auto 240px;
-    transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+        transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+        border-color 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+        background-color 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+        color 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme='dark'] .moment-card {
@@ -208,11 +222,14 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
 }
 
 .card-author-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
     font-size: 0.72em;
     font-weight: 600;
-    padding: 1px 7px;
-    border-radius: 10px;
-    line-height: 1.4;
+    padding: 0 8px;
+    border-radius: var(--radius-pill, 999px);
+    line-height: 1;
     letter-spacing: 0.3px;
 }
 .card-author-tag.author-snake {
@@ -313,13 +330,14 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             background: none;
             border: 1px solid transparent;
             color: var(--text-muted);
-            width: 28px;
-            height: 28px;
+            width: 30px;
+            height: 30px;
             border-radius: 50%;
             cursor: var(--cursor-pointer);
             font-size: 1.1em;
             font-weight: 700;
             line-height: 1;
+            letter-spacing: 0;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
@@ -451,12 +469,16 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
         }
 
         .moment-edited-badge {
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
             font-size: 0.7em;
+            line-height: 1;
             color: var(--text-muted);
             background: rgba(180, 150, 160, 0.1);
             border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 1px 6px;
+            border-radius: var(--radius-pill, 999px);
+            padding: 0 8px;
             letter-spacing: 0.3px;
             user-select: none;
         }
@@ -542,17 +564,26 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             position: absolute;
             top: 4px;
             right: 4px;
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.65);
             color: white;
+            border: none;
             border-radius: 50%;
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
+            padding: 0;
+            letter-spacing: 0;
+            box-shadow: none;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
+            font-size: 13px;
             cursor: var(--cursor-pointer);
             line-height: 1;
+        }
+        .moment-preview-item .remove-btn:hover {
+            background: rgba(225, 29, 72, 0.9);
+            transform: scale(1.1);
+            box-shadow: none;
         }
         .moment-grid {
             display: grid;
@@ -688,12 +719,15 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             padding: 8px 12px;
             border-radius: 20px;
             font-size: 0.85em;
+            letter-spacing: 0;
             margin-top: 10px;
             cursor: var(--cursor-pointer);
             width: 100%;
             transition: all 0.2s;
             box-shadow: none;
-            display: block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .show-all-images-btn:hover {
             background: rgba(200, 155, 155, 0.2);
@@ -748,17 +782,18 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
 
         /* 大事记标签徽章 */
         .milestone-badge-timeline {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
+            line-height: 1;
             background: linear-gradient(135deg, #ffd861, #f5a623);
             color: #fff;
             font-size: 0.72em;
             font-weight: bold;
-            padding: 2px 8px;
-            border-radius: 10px;
+            padding: 0 8px;
+            border-radius: var(--radius-pill, 999px);
             box-shadow: 0 2px 6px rgba(245, 166, 35, 0.25);
-            vertical-align: middle;
-            margin-left: 6px;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.4px;
             text-shadow: none;
         }
 
@@ -776,16 +811,17 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
 
         /* 已过天数纪念徽章 */
         .milestone-days-badge {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
+            line-height: 1;
             background: rgba(255, 107, 129, 0.1);
             color: var(--primary);
-            font-size: 0.75em;
+            font-size: 0.74em;
             font-weight: 600;
-            padding: 2px 10px;
-            border-radius: 999px;
+            padding: 0 9px;
+            border-radius: var(--radius-pill, 999px);
             border: 1px solid rgba(255, 107, 129, 0.25);
-            margin-left: 6px;
-            vertical-align: middle;
             white-space: nowrap;
         }
 
@@ -793,37 +829,6 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             background: rgba(255, 107, 129, 0.16);
             border-color: rgba(255, 107, 129, 0.3);
             color: #ff9fb2;
-        }
-
-        /* 收藏按钮 */
-        .moment-star-btn {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            font-size: 0.85em;
-            font-weight: 600;
-            cursor: var(--cursor-pointer);
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 10px;
-            border-radius: 12px;
-            transition: all 0.2s ease;
-            outline: none;
-            box-shadow: none;
-        }
-
-        .moment-star-btn:hover {
-            background: rgba(245, 166, 35, 0.08);
-            color: #f5a623;
-        }
-
-        .moment-star-btn.starred {
-            color: #f5a623;
-        }
-        
-        .moment-star-btn.starred:hover {
-            background: rgba(245, 166, 35, 0.15);
         }
 
         /* ── 智能新动态浮动提示胶囊 ── */
@@ -873,7 +878,7 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
 
         /* ── [20] 那年今日 · 时光回响横幅 (On This Day Banner) ── */
         .on-this-day-section {
-            margin: 0 0 24px;
+            margin: 0;
         }
 
         .on-this-day-card,
@@ -945,9 +950,11 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
         .on-this-day-item {
             display: flex;
             align-items: center;
+            justify-content: flex-start;
             gap: 12px;
             width: 100%;
             text-align: left;
+            letter-spacing: 0;
             padding: 10px 14px;
             border-radius: 16px;
             background: rgba(255, 255, 255, 0.76);

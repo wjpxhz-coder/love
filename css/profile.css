@@ -477,13 +477,13 @@
 .profile-anniv-item {
     background: #ffffff;
     border: 1px solid #ffdce4;
-    border-radius: 14px;
-    padding: 10px 4px;
+    border-radius: 16px;
+    padding: 12px 8px 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 3px;
+    gap: 4px;
     box-shadow: 0 2px 8px rgba(255, 120, 145, 0.06);
     transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
@@ -515,13 +515,16 @@
 }
 
 .profile-anniv-item .anniv-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     font-size: 0.72em;
     font-weight: 700;
     color: #ff5277;
     background: #fff0f3;
-    padding: 2px 6px;
+    padding: 2px 8px;
     border-radius: 999px;
-    margin-top: 2px;
+    margin-top: auto;
     white-space: nowrap;
 }
 
@@ -575,9 +578,10 @@
 }
 
 .edit-topbar {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(64px, 1fr) auto minmax(64px, 1fr);
     align-items: center;
-    justify-content: space-between;
+    gap: 10px;
     padding: 16px 20px;
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(12px);
@@ -589,6 +593,7 @@
 }
 
 .edit-cancel-btn {
+    justify-self: start;
     background: rgba(255, 255, 255, 0.9);
     border: 1px solid rgba(255, 182, 193, 0.6);
     color: #7d6b70;
@@ -596,6 +601,7 @@
     border-radius: 999px;
     font-size: 0.88em;
     font-weight: 600;
+    letter-spacing: 0;
     cursor: var(--cursor-pointer);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     display: inline-flex;
@@ -612,6 +618,8 @@
 }
 
 .edit-profile-title {
+    justify-self: center;
+    text-align: center;
     font-family: 'ZCOOL KuaiLe', 'Nunito', 'PingFang SC', cursive, sans-serif;
     font-size: 1.15em;
     color: #4a3237;
@@ -619,6 +627,7 @@
 }
 
 .edit-save-btn {
+    justify-self: end;
     background: linear-gradient(135deg, #ff849d 0%, #ff5277 100%);
     color: #ffffff;
     border: none;
@@ -626,6 +635,7 @@
     border-radius: 999px;
     font-size: 0.88em;
     font-weight: 600;
+    letter-spacing: 0.5px;
     cursor: var(--cursor-pointer);
     box-shadow: 0 4px 14px rgba(255, 82, 119, 0.35);
     transition: all 0.3s ease;
@@ -769,121 +779,122 @@
 /* ── 暗色模式适配 ── */
 [data-theme='dark'] .profile-page,
 [data-theme='dark'] .edit-profile-page {
-    background: linear-gradient(145deg, #2b1f24 0%, #3a222c 40%, #462534 100%);
+    background: linear-gradient(145deg, var(--bg-1) 0%, var(--bg-2) 50%, var(--bg-3) 100%);
 }
 
 [data-theme='dark'] .profile-content-card,
 [data-theme='dark'] .edit-profile-content-card {
-    background: rgba(38, 28, 33, 0.95);
-    border-color: rgba(255, 140, 160, 0.15);
-    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.4);
+    background: var(--surface-elevated);
+    border-color: var(--border);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
 }
 
 [data-theme='dark'] .profile-topbar-title,
 [data-theme='dark'] .edit-profile-title {
-    color: #fce4ec;
+    color: var(--text);
     text-shadow: none;
 }
 
 [data-theme='dark'] .profile-back-btn,
 [data-theme='dark'] .edit-cancel-btn,
 [data-theme='dark'] .profile-settings-btn {
-    background: rgba(55, 40, 48, 0.9);
-    border-color: rgba(255, 140, 160, 0.25);
-    color: #ff8fad;
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--primary-light);
 }
 
 [data-theme='dark'] .profile-back-btn:hover,
 [data-theme='dark'] .edit-cancel-btn:hover,
 [data-theme='dark'] .profile-settings-btn:hover {
-    background: #46333d;
-    color: #ffaec0;
+    background: var(--surface-subtle);
+    color: #ffffff;
+    border-color: var(--primary);
 }
 
 [data-theme='dark'] .profile-together-pill {
-    background: rgba(255, 82, 119, 0.15);
-    border-color: rgba(255, 82, 119, 0.3);
-    color: #ff8fad;
+    background: var(--primary-subtle);
+    border-color: rgba(251, 113, 133, 0.3);
+    color: var(--primary-light);
 }
 
 [data-theme='dark'] .profile-together-pill .pill-days {
-    color: #ffaec0;
+    color: #fda4af;
 }
 
 [data-theme='dark'] .profile-stat-card {
-    background: rgba(48, 36, 42, 0.9);
-    border-color: rgba(255, 140, 160, 0.12);
+    background: var(--surface-subtle);
+    border-color: var(--border);
 }
 
 [data-theme='dark'] .profile-stat-icon-wrap.icon-posts {
-    background: rgba(255, 82, 119, 0.2);
+    background: rgba(251, 113, 133, 0.18);
 }
 
 [data-theme='dark'] .profile-stat-icon-wrap.icon-photos {
-    background: rgba(224, 86, 136, 0.2);
+    background: rgba(192, 132, 252, 0.18);
 }
 
 [data-theme='dark'] .profile-stat-num {
-    color: #fce4ec;
+    color: var(--text);
 }
 
 [data-theme='dark'] .profile-stat-label {
-    color: #b0a0a5;
+    color: var(--text-muted);
 }
 
 [data-theme='dark'] .profile-section-card {
-    background: rgba(48, 36, 42, 0.85);
-    border-color: rgba(255, 140, 160, 0.12);
+    background: var(--surface-subtle);
+    border-color: var(--border);
 }
 
 [data-theme='dark'] .profile-about-item {
-    border-bottom-color: rgba(255, 140, 160, 0.15);
+    border-bottom-color: var(--border);
 }
 
 [data-theme='dark'] .profile-about-item .about-label {
-    color: #bfaab0;
+    color: var(--text-muted);
 }
 
 [data-theme='dark'] .profile-about-item .about-value {
-    color: #fce4ec;
+    color: var(--text);
 }
 
 [data-theme='dark'] .profile-anniv-item {
-    background: rgba(40, 30, 35, 0.9);
-    border-color: rgba(255, 140, 160, 0.15);
+    background: var(--surface);
+    border-color: var(--border);
 }
 
 [data-theme='dark'] .profile-anniv-item .anniv-title {
-    color: #fce4ec;
+    color: var(--text);
 }
 
 [data-theme='dark'] .profile-anniv-item .anniv-date {
-    color: #b0a0a5;
+    color: var(--text-muted);
 }
 
 [data-theme='dark'] .profile-anniv-item .anniv-badge {
-    background: rgba(255, 82, 119, 0.2);
-    color: #ff8fad;
+    background: var(--primary-subtle);
+    color: var(--primary-light);
 }
 
 [data-theme='dark'] .edit-input {
-    background: rgba(30, 22, 26, 0.8);
-    border-color: rgba(255, 140, 160, 0.2);
-    color: #fce4ec;
+    background: var(--field-bg);
+    border-color: var(--border);
+    color: var(--text);
 }
 
 [data-theme='dark'] .edit-input:focus {
-    background: rgba(30, 22, 26, 0.95);
-    border-color: #ff5277;
+    background: var(--surface-elevated);
+    border-color: var(--primary);
 }
 
 [data-theme='dark'] .edit-field label {
-    color: #bfaab0;
+    color: var(--text-muted);
 }
 
 [data-theme='dark'] .edit-topbar {
-    background: rgba(38, 28, 33, 0.9);
-    border-bottom-color: rgba(255, 140, 160, 0.15);
+    background: var(--surface-elevated);
+    border-bottom-color: var(--border);
 }
 
 /* 响应式微调 */
@@ -1081,6 +1092,8 @@
     border: 1px solid rgba(255, 225, 235, 0.9);
     transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.4, 1), box-shadow 0.24s ease;
     -webkit-tap-highlight-color: transparent;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 120px;
 }
 
 .profile-photo-item:hover {
