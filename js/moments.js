@@ -543,8 +543,31 @@ function restoreMomentRecordedAudioPreview(blob) {
     resetMomentAudioBtn();
 }
 
+function initMomentDropZone() {
+    if (typeof window.registerDropAndPasteZone !== 'function') return;
+    const target = document.querySelector('#momentModal .moment-page-card') || document.querySelector('#momentModal');
+    if (!target || target.dataset.dropZoneBound === 'true') return;
+    target.dataset.dropZoneBound = 'true';
+    window.registerDropAndPasteZone({
+        target,
+        accept: 'image/*,video/*',
+        promptText: '松开即可添加图片或视频 ✨',
+        promptIcon: '📸',
+        isEnabled: () => {
+            const modal = document.getElementById('momentModal');
+            return !!(modal && (modal.classList.contains('is-active') || modal.style.display !== 'none' || !modal.hidden));
+        },
+        onFiles: (files) => {
+            if (typeof window.handleMomentFiles === 'function') {
+                window.handleMomentFiles(files);
+            }
+        }
+    });
+}
+
 function bindMomentModalLifecycle() {
     const page = document.getElementById('momentModal');
+    initMomentDropZone();
     if (!page || page.dataset.lifecycleBound === 'true') return;
     page.dataset.lifecycleBound = 'true';
 
@@ -953,21 +976,32 @@ function leaveMomentPage() {
     resetMomentComposer();
 }
 
-function handleMomentPhotoSelect(event) {
-    const files = Array.from(event.target.files);
-    if (!files.length) return;
+function handleMomentFiles(files) {
+    const fileList = Array.from(files || []);
+    if (!fileList.length) return;
     
     const previewContainer = document.getElementById('momentImagePreviewContainer');
     if (!previewContainer) return;
-    const validFiles = files.filter(file => isAllowedMomentMedia(file) && file.size <= MAX_MOMENT_MEDIA_BYTES);
-    if (validFiles.length !== files.length) {
+    const validFiles = fileList.filter(file => isAllowedMomentMedia(file) && file.size <= MAX_MOMENT_MEDIA_BYTES);
+    if (validFiles.length !== fileList.length) {
         const msgEl = document.getElementById('momentModalMsg');
-        if (msgEl) msgEl.textContent = '单个文件不超过 100MB，仅支持常见图文或视频。';
+        if (msgEl) {
+            msgEl.textContent = '单个文件不超过 100MB，仅支持常见图文或视频。';
+        } else if (typeof showToast === 'function') {
+            showToast('单个文件不超过 100MB，仅支持常见图文或视频。');
+        }
     }
     validFiles.forEach(file => {
         appendMomentSelectedFilePreview(file);
     });
     saveMomentDraftNow({ includeMedia: true });
+}
+window.handleMomentFiles = handleMomentFiles;
+
+function handleMomentPhotoSelect(event) {
+    const files = Array.from(event?.target?.files || []);
+    if (!files.length) return;
+    handleMomentFiles(files);
     
     // 清空 input 使得重复选择相同文件能触发 change
     const photoInput = document.getElementById('momentPhotoInput');
@@ -4161,5 +4195,13 @@ async function deleteMoment(id) {
         }
     } finally {
         deletingMomentIds.delete(momentId);
+    }
+}
+
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initMomentDropZone);
+    } else {
+        initMomentDropZone();
     }
 }

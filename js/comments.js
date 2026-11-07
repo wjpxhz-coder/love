@@ -236,6 +236,21 @@ function showCommentInput(momentId, triggerElement = null, { isReply = false } =
     if (writeBtn) writeBtn.style.display = 'none';
     if (inputArea) {
         inputArea.style.display = 'block';
+        if (!inputArea.dataset.dropZoneBound && typeof window.registerDropAndPasteZone === 'function') {
+            inputArea.dataset.dropZoneBound = 'true';
+            window.registerDropAndPasteZone({
+                target: inputArea,
+                accept: 'image/*',
+                promptText: '松开即可添加评论图片 🌸',
+                promptIcon: '📸',
+                isEnabled: () => inputArea.style.display !== 'none',
+                onFiles: (files) => {
+                    if (typeof window.handleCommentImgFiles === 'function') {
+                        window.handleCommentImgFiles(files, momentId, card);
+                    }
+                }
+            });
+        }
         
         const avatarContainer = inputArea.querySelector('[id^="comment-input-avatar-"]') || inputArea.querySelector('div:first-child');
         if (avatarContainer) {
@@ -967,19 +982,19 @@ async function handleAICommentContinuation({ momentId, userCommentId, userCommen
     }
 }
 
-window.handleCommentImgSelect = function(event, momentId) {
+window.handleCommentImgFiles = function(files, momentId, card = null) {
     if (!hasCommentAuthContext()) return;
-    const files = Array.from(event.target.files);
-    if (!files.length) return;
+    const fileList = Array.from(files || []);
+    if (!fileList.length) return;
     if (!commentImgFiles[momentId]) commentImgFiles[momentId] = [];
-    const card = event.target.closest('.moment-card');
-    const previewEl = card ? card.querySelector('.comment-img-previews') : document.getElementById(`comment-img-previews-${momentId}`);
+    const targetCard = card || document.getElementById(`card-${momentId}`);
+    const previewEl = targetCard ? targetCard.querySelector('.comment-img-previews') : document.getElementById(`comment-img-previews-${momentId}`);
     if (!previewEl) return;
     const availableSlots = Math.max(0, MAX_COMMENT_IMAGE_COUNT - commentImgFiles[momentId].length);
-    const validFiles = files.filter(file => ALLOWED_COMMENT_IMAGE_TYPES.has(file.type)
+    const validFiles = fileList.filter(file => ALLOWED_COMMENT_IMAGE_TYPES.has(file.type)
         && file.size <= MAX_COMMENT_IMAGE_BYTES);
     const acceptedFiles = validFiles.slice(0, availableSlots);
-    if (acceptedFiles.length !== files.length) {
+    if (acceptedFiles.length !== fileList.length) {
         alert('评论最多 4 张图片；单张不超过 10MB，仅支持 JPG/PNG/WebP/GIF。');
     }
     acceptedFiles.forEach(file => {
@@ -1000,6 +1015,14 @@ window.handleCommentImgSelect = function(event, momentId) {
         item.append(image, removeButton);
         previewEl.appendChild(item);
     });
+};
+
+window.handleCommentImgSelect = function(event, momentId) {
+    if (!hasCommentAuthContext()) return;
+    const files = Array.from(event?.target?.files || []);
+    if (!files.length) return;
+    const card = event.target.closest('.moment-card');
+    window.handleCommentImgFiles(files, momentId, card);
     event.target.value = '';
 };
 

@@ -270,26 +270,25 @@ function removeMoodSelectedFile(index) {
     }
 }
 
-function handleMoodPhotoSelect(event) {
-    const files = Array.from(event?.target?.files || []);
-    if (!files.length) return;
+function handleMoodPhotoFiles(files) {
+    const fileList = Array.from(files || []);
+    if (!fileList.length) return;
 
     const currentTotal = moodExistingPhotos.length + moodSelectedFiles.length;
     const remainingSlots = MAX_MOOD_PHOTOS - currentTotal;
     if (remainingSlots <= 0) {
         if (typeof showToast === 'function') showToast(`最多只能添加 ${MAX_MOOD_PHOTOS} 张照片哦`);
-        if (event.target) event.target.value = '';
         return;
     }
 
-    let filesToAdd = files;
-    if (files.length > remainingSlots) {
-        filesToAdd = files.slice(0, remainingSlots);
+    let filesToAdd = fileList;
+    if (fileList.length > remainingSlots) {
+        filesToAdd = fileList.slice(0, remainingSlots);
         if (typeof showToast === 'function') showToast(`最多只能添加 ${MAX_MOOD_PHOTOS} 张照片，已选取前 ${remainingSlots} 张`);
     }
 
     for (const file of filesToAdd) {
-        if (!file.type.startsWith('image/')) {
+        if (!file.type || !file.type.startsWith('image/')) {
             if (typeof showToast === 'function') showToast('请选择图片格式文件');
             continue;
         }
@@ -301,7 +300,36 @@ function handleMoodPhotoSelect(event) {
     }
 
     renderMoodPhotoPreviews();
-    if (event.target) event.target.value = '';
+}
+window.handleMoodPhotoFiles = handleMoodPhotoFiles;
+
+function handleMoodPhotoSelect(event) {
+    const files = Array.from(event?.target?.files || []);
+    if (!files.length) return;
+    handleMoodPhotoFiles(files);
+    if (event?.target) event.target.value = '';
+}
+
+function initMoodDropZone() {
+    if (typeof window.registerDropAndPasteZone !== 'function') return;
+    const target = document.querySelector('#moodModal .app-page-card') || document.querySelector('#moodModal');
+    if (!target || target.dataset.dropZoneBound === 'true') return;
+    target.dataset.dropZoneBound = 'true';
+    window.registerDropAndPasteZone({
+        target,
+        accept: 'image/*',
+        promptText: '松开即可添加心情照片 🌸',
+        promptIcon: '📸',
+        isEnabled: () => {
+            const modal = document.getElementById('moodModal');
+            return !!(modal && (modal.classList.contains('is-active') || modal.style.display !== 'none' || !modal.hidden));
+        },
+        onFiles: (files) => {
+            if (typeof window.handleMoodPhotoFiles === 'function') {
+                window.handleMoodPhotoFiles(files);
+            }
+        }
+    });
 }
 
 
@@ -555,6 +583,7 @@ async function loadMoodEntryForRoute(entryId) {
 }
 
 async function enterMoodPage(route) {
+    initMoodDropZone();
     if (!isAuthenticated()) return;
     const entryId = route?.id === 'mood' && route?.params?.id
         ? route.params.id
@@ -1580,3 +1609,11 @@ function resetMoodState() {
 }
 
 
+
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initMoodDropZone);
+    } else {
+        initMoodDropZone();
+    }
+}

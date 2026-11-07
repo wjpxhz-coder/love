@@ -625,12 +625,13 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v4.4.1';
+const APP_VERSION = 'v4.4.3';
 const CONFIG = {
-    version: 'v4.4.1',
+    version: 'v4.4.3',
     date: '2026-11-07',
-    title: '动态编辑防丢守护与草稿自动恢复 ✨📝',
+    title: '全场景拖拽与剪贴板 Ctrl+V 媒体上传 📸✨',
     features: [
+        '支持在动态、心情、手账、AI助手及评论区直接拖拽与粘贴（Ctrl+V）上传图片与视频 📸🌸',
         '修复编辑或发布动态时切换后台再切回导致已编辑内容被清空的问题，新增实时草稿自动保存与恢复守护 📝🛡️',
         '新增「草莓奶芙猫爪」与「甜心樱花仙女棒」两套全场景 8 态原生矢量鼠标，可在系统设置与「樱花奶蛇团」、系统默认之间零延迟自由切换 🐾🎀',
         '专属「樱花奶蛇团」原生硬件鼠标：桌面端全站适配日常指路、捧心点击、樱花嫩芽选字、看图放大/拖拽与委屈禁用全套贴纸光标，0 延迟且 0 性能消耗，支持在系统设置随时切换 🐍🌸',

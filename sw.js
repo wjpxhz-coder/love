@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'love-diary-';
-const APP_SHELL_VERSION = '4.4.2';
+const APP_SHELL_VERSION = '4.4.3';
 const CACHE_NAME = `love-diary-v${APP_SHELL_VERSION}`;
 const MEDIA_CACHE_NAME = 'love-diary-media-v1';
 const MAX_MEDIA_CACHE_ENTRIES = 160;
@@ -16,7 +16,7 @@ const PRECACHE_ASSETS = [
     './css/dialogs.css', './css/comments.css', './css/ai-panel.css', './css/fab.css', './css/auth.css',
     './css/profile.css', './css/notifications.css', './css/mood.css', './css/anniversary.css',
     './css/effects.css', './css/responsive.css', './css/pages.css', './css/refresh.css', './css/topics.css',
-    './js/config.js', './js/animations.js', './js/timer.js', './js/auth.js', './js/profile.js',
+    './js/config.js', './js/animations.js', './js/timer.js', './js/auth.js', './js/profile.js', './js/drop-zone.js',
     './js/moments.js', './js/milestones.js', './js/comments.js', './js/likes.js', './js/mood.js', './js/anniversary.js',
     './js/lightbox.js', './js/ai.js', './js/blindbox.js', './js/presence.js', './js/theme.js',
     './js/notifications.js', './js/topics.js', './js/effects.js', './js/settings.js', './js/router.js', './js/app.js'

@@ -908,23 +908,22 @@ function openTopicPhotoPicker() {
     if (input) input.click();
 }
 
-async function handleTopicPhotoSelect(event) {
-    const files = Array.from(event.target.files || []);
-    if (!files.length) return;
+function handleTopicPhotoFiles(files) {
+    const fileList = Array.from(files || []);
+    if (!fileList.length) return;
 
-    if (topicSelectedPhotos.length + files.length > 9) {
+    if (topicSelectedPhotos.length + fileList.length > 9) {
         if (typeof showToast === 'function') {
             showToast('最多只能选择 9 张照片哦～ 🌸');
         } else {
             alert('最多只能选择 9 张照片哦～');
         }
-        event.target.value = '';
         return;
     }
 
     const previewContainer = document.getElementById('topicComposerPhotoPreviews');
 
-    for (const file of files) {
+    for (const file of fileList) {
         if (!file.type || !file.type.startsWith('image/')) {
             if (typeof showToast === 'function') {
                 showToast('仅支持选择图片格式的文件哦 🌸');
@@ -957,8 +956,52 @@ async function handleTopicPhotoSelect(event) {
             previewContainer.appendChild(imgWrap);
         }
     }
+}
+window.handleTopicPhotoFiles = handleTopicPhotoFiles;
+
+async function handleTopicPhotoSelect(event) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    handleTopicPhotoFiles(files);
     event.target.value = '';
 }
+
+function initTopicDropZone() {
+    if (typeof window.registerDropAndPasteZone !== 'function') return;
+    const selectors = [
+        '#topicDetailModal .topic-composer-bar',
+        '#topicDetailModal footer',
+        '#topicModal .topic-composer',
+        '#topicModal footer',
+        '.topic-composer-bar'
+    ];
+    let target = null;
+    for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el) {
+            target = el;
+            break;
+        }
+    }
+    if (!target || target.dataset.dropZoneBound === 'true') return;
+    target.dataset.dropZoneBound = 'true';
+    window.registerDropAndPasteZone({
+        target,
+        accept: 'image/*',
+        promptText: '松开即可添加手账照片 🌸',
+        promptIcon: '📸',
+        isEnabled: () => {
+            const page = document.getElementById('topicDetailModal') || document.getElementById('topicModal');
+            return !!(page && (page.classList.contains('is-active') || page.style.display !== 'none' || !page.hidden));
+        },
+        onFiles: (files) => {
+            if (typeof window.handleTopicPhotoFiles === 'function') {
+                window.handleTopicPhotoFiles(files);
+            }
+        }
+    });
+}
+window.initTopicDropZone = initTopicDropZone;
 
 function removeTopicPhotoPreview(btn, url) {
     const targetUrl = url || btn?.parentElement?.dataset?.previewUrl || '';
@@ -1900,6 +1943,7 @@ function enterTopicsPage(_route) {
 }
 
 function enterTopicDetailPage(route) {
+    initTopicDropZone();
     const topicId = route?.params?.id;
     if (topicId) {
         if (typeof window.autoMarkTopicNotificationRead === 'function') {
@@ -1931,4 +1975,12 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initTopicModalBackdropHandlers);
 } else {
     initTopicModalBackdropHandlers();
+}
+
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTopicDropZone);
+    } else {
+        initTopicDropZone();
+    }
 }
