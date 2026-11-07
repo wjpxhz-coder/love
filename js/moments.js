@@ -22,6 +22,16 @@ let editingOriginalImageThumbnails = {};
 let editingAudioRef = null;
 let editingAudioUrl = null;
 let editingOriginalAudioRef = null;
+let editingOriginalText = '';
+let editingOriginalIsMilestone = false;
+let momentComposerActiveKey = null;
+let isMomentEditorReady = false;
+let isRestoringMomentDraft = false;
+const MOMENT_DRAFT_STORAGE_PREFIX = 'sweet_diary_moment_draft_';
+const MOMENT_DRAFT_IDB_NAME = 'sweet_diary_moment_drafts_db';
+const MOMENT_DRAFT_IDB_STORE = 'draft_media';
+const MOMENT_DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+let momentDraftIdbPromise = null;
 const MAX_MOMENT_MEDIA_BYTES = 100 * 1024 * 1024;
 function isAllowedMomentMedia(file) {
     if (file.type.startsWith('image/') || file.type.startsWith('video/')) return true;
@@ -221,6 +231,8 @@ function resetMomentComposer(options = {}) {
     editingAudioRef = null;
     editingAudioUrl = null;
     editingOriginalAudioRef = null;
+    editingOriginalText = '';
+    editingOriginalIsMilestone = false;
     editingExistingVideoPosters = {};
     editingOriginalVideoPosters = {};
     editingExistingImageThumbnails = {};
@@ -253,11 +265,309 @@ function resetMomentComposer(options = {}) {
     }
 }
 
+function getMomentDraftStorageKey(draftKey) {
+    const key = draftKey || momentComposerActiveKey;
+    if (!key) return '';
+    const uid = (currentAuthUser && currentAuthUser.id) || currentAuthor || 'default';
+    return `${MOMENT_DRAFT_STORAGE_PREFIX}${uid}_${key}`;
+}
+
+function openMomentDraftIdb() {
+    if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+    if (momentDraftIdbPromise) return momentDraftIdbPromise;
+    momentDraftIdbPromise = new Promise(resolve => {
+        try {
+            const req = indexedDB.open(MOMENT_DRAFT_IDB_NAME, 1);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(MOMENT_DRAFT_IDB_STORE)) {
+                    db.createObjectStore(MOMENT_DRAFT_IDB_STORE);
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => {
+                momentDraftIdbPromise = null;
+                resolve(null);
+            };
+        } catch (_err) {
+            momentDraftIdbPromise = null;
+            resolve(null);
+        }
+    });
+    return momentDraftIdbPromise;
+}
+
+async function writeMomentDraftMedia(storageKey, files, audioBlob) {
+    if (!storageKey) return;
+    const hasFiles = Array.isArray(files) && files.length > 0;
+    const hasAudio = audioBlob instanceof Blob;
+    if (!hasFiles && !hasAudio) {
+        await deleteMomentDraftMedia(storageKey);
+        return;
+    }
+    const db = await openMomentDraftIdb();
+    if (!db) return;
+    await new Promise(resolve => {
+        try {
+            const tx = db.transaction(MOMENT_DRAFT_IDB_STORE, 'readwrite');
+            const store = tx.objectStore(MOMENT_DRAFT_IDB_STORE);
+            store.put({
+                files: hasFiles ? [...files] : [],
+                audioBlob: hasAudio ? audioBlob : null,
+                updatedAt: Date.now()
+            }, storageKey);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+            tx.onabort = () => resolve();
+        } catch (_err) {
+            resolve();
+        }
+    });
+}
+
+async function readMomentDraftMedia(storageKey) {
+    if (!storageKey) return null;
+    const db = await openMomentDraftIdb();
+    if (!db) return null;
+    return new Promise(resolve => {
+        try {
+            const tx = db.transaction(MOMENT_DRAFT_IDB_STORE, 'readonly');
+            const store = tx.objectStore(MOMENT_DRAFT_IDB_STORE);
+            const req = store.get(storageKey);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+        } catch (_err) {
+            resolve(null);
+        }
+    });
+}
+
+async function deleteMomentDraftMedia(storageKey) {
+    if (!storageKey) return;
+    const db = await openMomentDraftIdb();
+    if (!db) return;
+    await new Promise(resolve => {
+        try {
+            const tx = db.transaction(MOMENT_DRAFT_IDB_STORE, 'readwrite');
+            const store = tx.objectStore(MOMENT_DRAFT_IDB_STORE);
+            store.delete(storageKey);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+            tx.onabort = () => resolve();
+        } catch (_err) {
+            resolve();
+        }
+    });
+}
+
+function readMomentDraftMeta(draftKey) {
+    const storageKey = getMomentDraftStorageKey(draftKey);
+    if (!storageKey) return null;
+    try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return null;
+        if (!parsed.updatedAt || (Date.now() - Number(parsed.updatedAt)) > MOMENT_DRAFT_MAX_AGE_MS) {
+            clearMomentDraft(draftKey);
+            return null;
+        }
+        return parsed;
+    } catch (_err) {
+        return null;
+    }
+}
+
+function clearMomentDraft(draftKey) {
+    const storageKey = getMomentDraftStorageKey(draftKey);
+    if (!storageKey) return;
+    try {
+        localStorage.removeItem(storageKey);
+    } catch (_err) {}
+    deleteMomentDraftMedia(storageKey).catch(() => {});
+}
+
+function clearAllMomentDrafts() {
+    try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i += 1) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(MOMENT_DRAFT_STORAGE_PREFIX)) {
+                keysToRemove.push(key);
+            }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+    } catch (_err) {}
+    openMomentDraftIdb().then(db => {
+        if (!db) return;
+        try {
+            const tx = db.transaction(MOMENT_DRAFT_IDB_STORE, 'readwrite');
+            tx.objectStore(MOMENT_DRAFT_IDB_STORE).clear();
+        } catch (_err) {}
+    }).catch(() => {});
+}
+
+function saveMomentDraftNow(options = {}) {
+    if (!momentComposerActiveKey || !isMomentEditorReady || isRestoringMomentDraft || isMomentSubmitting) {
+        return;
+    }
+    const storageKey = getMomentDraftStorageKey(momentComposerActiveKey);
+    if (!storageKey) return;
+
+    const textInput = document.getElementById('momentTextInput');
+    const milestoneCheckbox = document.getElementById('momentIsMilestone');
+    const text = textInput ? textInput.value : '';
+    const isMilestone = Boolean(milestoneCheckbox && milestoneCheckbox.checked);
+    const hasNewFiles = momentSelectedFiles.length > 0;
+    const hasNewAudio = Boolean(momentAudioBlob);
+
+    if (!editingMomentId) {
+        if (!text.trim() && !isMilestone && !hasNewFiles && !hasNewAudio) {
+            clearMomentDraft('new');
+            return;
+        }
+        const meta = {
+            version: 1,
+            draftKey: 'new',
+            mode: 'new',
+            editId: null,
+            text,
+            isMilestone,
+            hasNewFiles,
+            hasNewAudio,
+            updatedAt: Date.now()
+        };
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(meta));
+        } catch (_err) {}
+        if (options.includeMedia) {
+            writeMomentDraftMedia(storageKey, momentSelectedFiles, momentAudioBlob).catch(() => {});
+        }
+        return;
+    }
+
+    const retainedMediaRefs = editingExistingMedia.map(item => item.ref).filter(Boolean);
+    const audioDeleted = Boolean(editingOriginalAudioRef && !editingAudioRef && !momentAudioBlob);
+    const mediaListChanged = retainedMediaRefs.length !== editingOriginalMediaRefs.length
+        || retainedMediaRefs.some((ref, idx) => ref !== editingOriginalMediaRefs[idx]);
+    const hasChanges = text !== editingOriginalText
+        || isMilestone !== editingOriginalIsMilestone
+        || hasNewFiles
+        || hasNewAudio
+        || mediaListChanged
+        || audioDeleted;
+
+    if (!hasChanges) {
+        clearMomentDraft(momentComposerActiveKey);
+        return;
+    }
+
+    const meta = {
+        version: 1,
+        draftKey: momentComposerActiveKey,
+        mode: 'edit',
+        editId: editingMomentId,
+        text,
+        isMilestone,
+        retainedMediaRefs,
+        audioDeleted,
+        hasNewFiles,
+        hasNewAudio,
+        updatedAt: Date.now()
+    };
+    try {
+        localStorage.setItem(storageKey, JSON.stringify(meta));
+    } catch (_err) {}
+    if (options.includeMedia) {
+        writeMomentDraftMedia(storageKey, momentSelectedFiles, momentAudioBlob).catch(() => {});
+    }
+}
+
+function appendMomentSelectedFilePreview(file) {
+    if (!file) return;
+    const previewContainer = document.getElementById('momentImagePreviewContainer');
+    if (!previewContainer) return;
+    const addBtn = previewContainer.querySelector('.moment-image-add-btn');
+
+    momentSelectedFiles.push(file);
+    const objectUrl = URL.createObjectURL(file);
+    momentPhotoPreviewUrls.add(objectUrl);
+    const previewItem = document.createElement('div');
+    previewItem.className = 'moment-preview-item';
+    let media;
+    if ((file.type && file.type.startsWith('video/')) || isMomentVideoFile(file)) {
+        media = document.createElement('video');
+        media.muted = true;
+        media.loop = true;
+        media.playsInline = true;
+        media.preload = 'none';
+        Object.assign(media.style, { width: '100%', height: '100%', objectFit: 'cover' });
+    } else {
+        media = document.createElement('img');
+        media.alt = '预览';
+    }
+    media.src = objectUrl;
+    if (media.tagName === 'VIDEO') setupMomentVideoPlayback(media, true);
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'remove-btn';
+    removeBtn.textContent = '×';
+    removeBtn.setAttribute('aria-label', `移除 ${file.name || '媒体'}`);
+    Object.assign(removeBtn.style, { border: '0', padding: '0' });
+    removeBtn.addEventListener('click', () => {
+        const fileIndex = momentSelectedFiles.indexOf(file);
+        if (fileIndex >= 0) momentSelectedFiles.splice(fileIndex, 1);
+        if (media.tagName === 'VIDEO') releaseMomentVideo(media, true);
+        revokeMomentObjectUrl(objectUrl);
+        previewItem.remove();
+        saveMomentDraftNow({ includeMedia: true });
+    });
+    previewItem.append(media, removeBtn);
+    previewContainer.insertBefore(previewItem, addBtn);
+    if (media.tagName === 'VIDEO') refreshMomentVideoPlayback(media);
+}
+
+function restoreMomentRecordedAudioPreview(blob) {
+    if (!(blob instanceof Blob)) return;
+    momentAudioBlob = blob;
+    const previewEl = document.getElementById('momentAudioPreview');
+    const playerEl = document.getElementById('momentAudioPlayer');
+    const btn = document.getElementById('btn-moment-audio');
+    if (playerEl) {
+        clearMomentAudioPreview();
+        momentAudioPreviewUrl = URL.createObjectURL(momentAudioBlob);
+        playerEl.src = momentAudioPreviewUrl;
+    }
+    if (previewEl) previewEl.style.display = 'flex';
+    if (btn) btn.style.display = 'none';
+    resetMomentAudioBtn();
+}
+
 function bindMomentModalLifecycle() {
     const page = document.getElementById('momentModal');
     if (!page || page.dataset.lifecycleBound === 'true') return;
     page.dataset.lifecycleBound = 'true';
-    window.addEventListener('pagehide', () => resetMomentComposer());
+
+    const textInput = document.getElementById('momentTextInput');
+    if (textInput) {
+        textInput.addEventListener('input', () => {
+            saveMomentDraftNow();
+        });
+    }
+    const milestoneCheckbox = document.getElementById('momentIsMilestone');
+    if (milestoneCheckbox) {
+        milestoneCheckbox.addEventListener('change', () => {
+            saveMomentDraftNow();
+        });
+    }
+    window.addEventListener('pagehide', event => {
+        if (momentComposerActiveKey && isMomentEditorReady) {
+            saveMomentDraftNow({ includeMedia: true });
+        }
+        if (!event?.persisted && isMomentRecording) {
+            stopMomentMediaStream();
+        }
+    });
 }
 
 function openMomentModal(options = {}) {
@@ -340,6 +650,7 @@ function renderExistingMediaPreviews(existingList) {
             }
             if (media.tagName === 'VIDEO') releaseMomentVideo(media, true);
             previewItem.remove();
+            saveMomentDraftNow();
         });
 
         previewItem.append(media, removeBtn);
@@ -354,10 +665,19 @@ async function enterMomentPage(route) {
     const previewContainer = document.getElementById('momentImagePreviewContainer');
     if (!page || !input || !previewContainer || !hasMomentAuthContext()) return;
     bindMomentModalLifecycle();
+
+    const editId = route?.params?.id ? normalizeMomentId(route.params.id) : null;
+    const targetDraftKey = editId ? `edit_${editId}` : 'new';
+
+    if (momentComposerActiveKey === targetDraftKey && isMomentEditorReady && page.classList.contains('is-active')) {
+        return;
+    }
+
+    isMomentEditorReady = false;
     resetMomentComposer();
+    momentComposerActiveKey = targetDraftKey;
 
     const requestAuthEpoch = getMomentAuthEpoch();
-    const editId = route?.params?.id ? normalizeMomentId(route.params.id) : null;
 
     const titleEl = document.getElementById('moment-modal-title') || page.querySelector('.modal-title');
     const submitBtn = document.getElementById('btn-submit-moment');
@@ -399,8 +719,33 @@ async function enterMomentPage(route) {
     if (previewAudio) previewAudio.style.display = 'none';
 
     if (!editId) {
-        input.value = '';
-        if (milestoneCheckbox) milestoneCheckbox.checked = route?.query?.milestone === '1';
+        const draftMeta = readMomentDraftMeta('new');
+        isRestoringMomentDraft = true;
+        try {
+            input.value = draftMeta && typeof draftMeta.text === 'string' ? draftMeta.text : '';
+            if (milestoneCheckbox) {
+                milestoneCheckbox.checked = route?.query?.milestone === '1'
+                    ? true
+                    : Boolean(draftMeta && draftMeta.isMilestone);
+            }
+            if (draftMeta && (draftMeta.hasNewFiles || draftMeta.hasNewAudio)) {
+                const draftMedia = await readMomentDraftMedia(getMomentDraftStorageKey('new'));
+                if (!isMomentAuthEpochCurrent(requestAuthEpoch) || momentComposerActiveKey !== 'new') return;
+                if (Array.isArray(draftMedia?.files)) {
+                    draftMedia.files.forEach(file => {
+                        if (file && isAllowedMomentMedia(file) && file.size <= MAX_MOMENT_MEDIA_BYTES) {
+                            appendMomentSelectedFilePreview(file);
+                        }
+                    });
+                }
+                if (draftMedia?.audioBlob instanceof Blob && draftMedia.audioBlob.size <= MAX_MOMENT_MEDIA_BYTES) {
+                    restoreMomentRecordedAudioPreview(draftMedia.audioBlob);
+                }
+            }
+        } finally {
+            isRestoringMomentDraft = false;
+        }
+        isMomentEditorReady = true;
         setTimeout(() => input.focus(), 100);
         return;
     }
@@ -417,7 +762,7 @@ async function enterMomentPage(route) {
             .eq('id', editId)
             .maybeSingle();
 
-        if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
+        if (!isMomentAuthEpochCurrent(requestAuthEpoch) || momentComposerActiveKey !== targetDraftKey) return;
         if (error || !data) {
             console.error('加载待编辑动态失败:', error);
             if (typeof showToast === 'function') showToast('无法读取该动态，可能已被删除。');
@@ -463,26 +808,47 @@ async function enterMomentPage(route) {
             rawAudio = data.content || null;
         }
 
+        editingOriginalText = rawText;
+        editingOriginalIsMilestone = isMilestone;
         editingOriginalMediaRefs = [...rawImages];
         editingOriginalAudioRef = rawAudio || null;
 
-        input.value = rawText;
-        if (milestoneCheckbox) milestoneCheckbox.checked = isMilestone;
+        const draftMeta = readMomentDraftMeta(targetDraftKey);
+        isRestoringMomentDraft = true;
+
+        input.value = draftMeta && typeof draftMeta.text === 'string' ? draftMeta.text : rawText;
+        if (milestoneCheckbox) {
+            milestoneCheckbox.checked = draftMeta && typeof draftMeta.isMilestone === 'boolean'
+                ? draftMeta.isMilestone
+                : isMilestone;
+        }
         if (msgEl) msgEl.textContent = '';
 
-        if (rawImages.length > 0) {
+        let imagesToDisplay = rawImages;
+        if (draftMeta && Array.isArray(draftMeta.retainedMediaRefs)) {
+            const retainedSet = new Set(draftMeta.retainedMediaRefs);
+            imagesToDisplay = rawImages.filter(ref => retainedSet.has(ref));
+            Object.keys(editingExistingVideoPosters).forEach(ref => {
+                if (!retainedSet.has(ref)) delete editingExistingVideoPosters[ref];
+            });
+            Object.keys(editingExistingImageThumbnails).forEach(ref => {
+                if (!retainedSet.has(ref)) delete editingExistingImageThumbnails[ref];
+            });
+        }
+
+        if (imagesToDisplay.length > 0) {
             let resolvedImages = [];
             try {
                 resolvedImages = typeof batchResolveMediaUrls === 'function'
-                    ? await batchResolveMediaUrls(rawImages)
+                    ? await batchResolveMediaUrls(imagesToDisplay)
                     : [];
             } catch (e) {
                 console.warn('批量解析媒体地址失败:', e);
             }
 
-            if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
+            if (!isMomentAuthEpochCurrent(requestAuthEpoch) || momentComposerActiveKey !== targetDraftKey) return;
 
-            editingExistingMedia = await Promise.all(rawImages.map(async (ref, i) => {
+            editingExistingMedia = await Promise.all(imagesToDisplay.map(async (ref, i) => {
                 let resolved = (resolvedImages && resolvedImages[i]) || '';
                 if (!resolved && typeof resolveMediaUrl === 'function') {
                     try {
@@ -502,12 +868,13 @@ async function enterMomentPage(route) {
             renderExistingMediaPreviews(editingExistingMedia);
         }
 
-        if (rawAudio) {
+        const shouldSkipOriginalAudio = Boolean(draftMeta && (draftMeta.audioDeleted || draftMeta.hasNewAudio));
+        if (rawAudio && !shouldSkipOriginalAudio) {
             const resolvedAudio = typeof resolveMediaUrl === 'function'
                 ? await resolveMediaUrl(rawAudio)
                 : sanitizeMediaUrl(rawAudio);
 
-            if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
+            if (!isMomentAuthEpochCurrent(requestAuthEpoch) || momentComposerActiveKey !== targetDraftKey) return;
 
             if (resolvedAudio) {
                 editingAudioRef = rawAudio;
@@ -521,6 +888,23 @@ async function enterMomentPage(route) {
                 if (btnAudio) btnAudio.style.display = 'none';
             }
         }
+
+        if (draftMeta && (draftMeta.hasNewFiles || draftMeta.hasNewAudio)) {
+            const draftMedia = await readMomentDraftMedia(getMomentDraftStorageKey(targetDraftKey));
+            if (!isMomentAuthEpochCurrent(requestAuthEpoch) || momentComposerActiveKey !== targetDraftKey) return;
+            if (Array.isArray(draftMedia?.files)) {
+                draftMedia.files.forEach(file => {
+                    if (file && isAllowedMomentMedia(file) && file.size <= MAX_MOMENT_MEDIA_BYTES) {
+                        appendMomentSelectedFilePreview(file);
+                    }
+                });
+            }
+            if (draftMedia?.audioBlob instanceof Blob && draftMedia.audioBlob.size <= MAX_MOMENT_MEDIA_BYTES) {
+                editingAudioRef = null;
+                editingAudioUrl = null;
+                restoreMomentRecordedAudioPreview(draftMedia.audioBlob);
+            }
+        }
     } catch (err) {
         console.error('加载待编辑动态异常:', err);
         if (isMomentAuthEpochCurrent(requestAuthEpoch)) {
@@ -528,7 +912,9 @@ async function enterMomentPage(route) {
             closeMomentModal(true);
         }
     } finally {
-        if (isMomentAuthEpochCurrent(requestAuthEpoch)) {
+        isRestoringMomentDraft = false;
+        if (isMomentAuthEpochCurrent(requestAuthEpoch) && momentComposerActiveKey === targetDraftKey) {
+            isMomentEditorReady = true;
             input.disabled = false;
             setTimeout(() => input.focus(), 100);
         }
@@ -541,15 +927,29 @@ function closeMomentModal(force = false) {
         if (message) message.textContent = editingMomentId ? '正在保存，请稍候…' : '正在发布，请稍候…';
         return;
     }
+    if (!force && editingMomentId) {
+        clearMomentDraft(`edit_${editingMomentId}`);
+        isMomentEditorReady = false;
+        momentComposerActiveKey = null;
+    } else if (!force && momentComposerActiveKey === 'new' && isMomentEditorReady) {
+        saveMomentDraftNow({ includeMedia: true });
+    }
     if (typeof appBack === 'function') {
         appBack('/', { force });
         return;
     }
+    isMomentEditorReady = false;
+    momentComposerActiveKey = null;
     resetMomentComposer();
     window.location.hash = '#/';
 }
 
 function leaveMomentPage() {
+    if (isMomentEditorReady && momentComposerActiveKey) {
+        saveMomentDraftNow({ includeMedia: true });
+    }
+    isMomentEditorReady = false;
+    momentComposerActiveKey = null;
     resetMomentComposer();
 }
 
@@ -559,49 +959,15 @@ function handleMomentPhotoSelect(event) {
     
     const previewContainer = document.getElementById('momentImagePreviewContainer');
     if (!previewContainer) return;
-    const addBtn = previewContainer.querySelector('.moment-image-add-btn');
     const validFiles = files.filter(file => isAllowedMomentMedia(file) && file.size <= MAX_MOMENT_MEDIA_BYTES);
     if (validFiles.length !== files.length) {
         const msgEl = document.getElementById('momentModalMsg');
         if (msgEl) msgEl.textContent = '单个文件不超过 100MB，仅支持常见图文或视频。';
     }
     validFiles.forEach(file => {
-        momentSelectedFiles.push(file);
-        const objectUrl = URL.createObjectURL(file);
-        momentPhotoPreviewUrls.add(objectUrl);
-        const previewItem = document.createElement('div');
-        previewItem.className = 'moment-preview-item';
-        let media;
-        if (file.type.startsWith('video/')) {
-            media = document.createElement('video');
-            media.muted = true;
-            media.loop = true;
-            media.playsInline = true;
-            media.preload = 'none';
-            Object.assign(media.style, { width: '100%', height: '100%', objectFit: 'cover' });
-        } else {
-            media = document.createElement('img');
-            media.alt = '预览';
-        }
-        media.src = objectUrl;
-        if (media.tagName === 'VIDEO') setupMomentVideoPlayback(media, true);
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'remove-btn';
-        removeBtn.textContent = '×';
-        removeBtn.setAttribute('aria-label', `移除 ${file.name}`);
-        Object.assign(removeBtn.style, { border: '0', padding: '0' });
-        removeBtn.addEventListener('click', () => {
-            const fileIndex = momentSelectedFiles.indexOf(file);
-            if (fileIndex >= 0) momentSelectedFiles.splice(fileIndex, 1);
-            if (media.tagName === 'VIDEO') releaseMomentVideo(media, true);
-            revokeMomentObjectUrl(objectUrl);
-            previewItem.remove();
-        });
-        previewItem.append(media, removeBtn);
-        previewContainer.insertBefore(previewItem, addBtn);
-        if (media.tagName === 'VIDEO') refreshMomentVideoPlayback(media);
+        appendMomentSelectedFilePreview(file);
     });
+    saveMomentDraftNow({ includeMedia: true });
     
     // 清空 input 使得重复选择相同文件能触发 change
     const photoInput = document.getElementById('momentPhotoInput');
@@ -1357,6 +1723,10 @@ async function submitMomentPost() {
 
         if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
         
+        const submittedDraftKey = isEditing ? `edit_${editingMomentId}` : 'new';
+        isMomentEditorReady = false;
+        momentComposerActiveKey = null;
+        clearMomentDraft(submittedDraftKey);
         closeMomentModal(true);
         clearTimelineSnapshot();
         if (typeof invalidateProfileMomentsCache === 'function') {
@@ -1476,6 +1846,7 @@ async function executeMomentRecording() {
                 btn.style.display = 'none';
             }
             resetMomentAudioBtn();
+            saveMomentDraftNow({ includeMedia: true });
         };
 
         recorder.start();
@@ -1524,6 +1895,7 @@ function deleteRecordedAudio() {
     clearMomentAudioPreview();
     if (previewEl) previewEl.style.display = 'none';
     if (btn) btn.style.display = 'flex';
+    saveMomentDraftNow({ includeMedia: true });
 }
 // --- 时光轴（无限滚动与智能会话快照） ---
 const MOMENTS_SNAPSHOT_KEY = 'sweet_diary_timeline_snapshot';
@@ -1812,6 +2184,9 @@ document.addEventListener('visibilitychange', () => {
     });
 
     if (document.hidden) {
+        if (momentComposerActiveKey && isMomentEditorReady) {
+            saveMomentDraftNow({ includeMedia: true });
+        }
         saveTimelineSnapshot();
     } else {
         // 切回应用时，若在主页且处于下滚位置但被浏览器置0，立即补偿恢复
