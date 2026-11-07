@@ -3,18 +3,22 @@
 // ==========================================
 const pendingMomentLikes = new Set();
 
-async function loadMomentLikes(momentIds) {
+async function loadMomentLikes(momentIds, options = {}) {
     if (!isAuthenticated() || !Array.isArray(momentIds) || !momentIds.length) return;
     const uniqueIds = [...new Set(momentIds)].slice(0, 100);
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
 
-    const { data, error } = await supabaseClient
+    const queryPromise = supabaseClient
         .from('moment_likes')
         .select('moment_id, user_id, author')
         .in('moment_id', uniqueIds);
+    const [{ data, error }, domReady] = await Promise.all([
+        queryPromise,
+        options?.domReadyPromise ? options.domReadyPromise : Promise.resolve(true)
+    ]);
 
-    if (!isCurrentAuthSnapshot(epoch, userId)) return;
+    if (!domReady || !isCurrentAuthSnapshot(epoch, userId)) return;
     if (error) {
         console.error('加载动态点赞失败:', error);
         return;

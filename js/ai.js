@@ -1207,8 +1207,9 @@ function extractAIDiaryImages(moment) {
 }
 
 async function resolveAIDiaryPreview(candidate) {
+    const previewRef = candidate.thumbnailRef || candidate.reference;
     const previewUrl = typeof resolveMediaUrl === 'function'
-        ? await resolveMediaUrl(candidate.reference)
+        ? await resolveMediaUrl(previewRef)
         : '';
     if (!previewUrl) return null;
     const safeUrl = typeof sanitizeMediaUrl === 'function'
@@ -1367,6 +1368,10 @@ async function loadAIDiaryImages(reset = false) {
         aiDiaryPickerOffset += rows.length;
         aiDiaryPickerHasMore = rows.length === AI_DIARY_PAGE_SIZE;
         const candidates = rows.flatMap(extractAIDiaryImages);
+        if (candidates.length > 1 && typeof batchResolveMediaUrls === 'function') {
+            const previewRefs = candidates.map(c => c.thumbnailRef || c.reference).filter(Boolean);
+            await batchResolveMediaUrls(previewRefs);
+        }
         const resolved = (await Promise.all(candidates.map(resolveAIDiaryPreview))).filter(Boolean);
         if (requestId !== aiDiaryPickerRequestId
             || !isCurrentAuthSnapshot(epoch, userId)
@@ -2128,15 +2133,33 @@ async function continueAICommentConversation({ momentId, userCommentId, userComm
         throw new Error('INVALID_MOMENT_ID');
     }
 
-    // 1. 获取动态背景信息
+    // 1 & 2. 并行获取动态背景信息与该动态下的所有评论以回溯对话链
     let momentAuthor = '我们';
     let momentText = '';
-    try {
-        const { data: momentRow } = await supabaseClient
+    let threadHistory = [];
+    const [momentRes, commentsRes] = await Promise.all([
+        supabaseClient
             .from('moments')
             .select('author, content, type')
             .eq('id', normalizedMomentId)
-            .maybeSingle();
+            .maybeSingle()
+            .catch(e => {
+                console.warn('[感情助手] 读取动态背景失败，将使用精简上下文:', e);
+                return { data: null };
+            }),
+        supabaseClient
+            .from('comments')
+            .select('id, author, content, created_at')
+            .eq('moment_id', normalizedMomentId)
+            .order('created_at', { ascending: true })
+            .catch(err => {
+                console.warn('[感情助手] 读取评论对话链失败:', err);
+                return { data: null };
+            })
+    ]);
+
+    try {
+        const momentRow = momentRes?.data;
         if (momentRow) {
             momentAuthor = momentRow.author || '我们';
             const parsed = typeof parseMomentPayload === 'function'
@@ -2148,15 +2171,8 @@ async function continueAICommentConversation({ momentId, userCommentId, userComm
         console.warn('[感情助手] 读取动态背景失败，将使用精简上下文:', e);
     }
 
-    // 2. 读取该动态下的所有评论以回溯对话链
-    let threadHistory = [];
     try {
-        const { data: commentsList } = await supabaseClient
-            .from('comments')
-            .select('id, author, content, created_at')
-            .eq('moment_id', normalizedMomentId)
-            .order('created_at', { ascending: true });
-
+        const commentsList = commentsRes?.data;
         if (Array.isArray(commentsList) && commentsList.length > 0) {
             const commentMap = new Map();
             commentsList.forEach(c => {

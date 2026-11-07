@@ -14,6 +14,11 @@ function flipUpdate(id, newVal) {
 }
 
 function updateTimer() {
+    const daysEl = document.getElementById('t-days');
+    const isInitialRender = !daysEl || daysEl.textContent === '0';
+    if (!isInitialRender && (document.hidden || document.body?.classList.contains('app-page-active'))) {
+        return;
+    }
     const now = new Date();
     const diff = Math.floor((now - startDate) / 1000);
     const days    = Math.floor(diff / 86400);
@@ -35,4 +40,5 @@ document.addEventListener('visibilitychange', () => {
         timerInterval = setInterval(updateTimer, 1000);
     }
 });
+window.addEventListener('hashchange', updateTimer);
 updateTimer();

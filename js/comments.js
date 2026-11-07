@@ -342,22 +342,8 @@ async function loadComments(momentId, targetCard = null) {
         return;
     }
 
-    // 获取点赞数据（处理表不存在的情况）
+    // 并行获取评论点赞与批量签名评论图片，消除串行等待
     const commentIds = data.map(c => c.id);
-    const { data: likesData, error: likesError } = await supabaseClient.from('comment_likes')
-        .select('comment_id, user_id')
-        .in('comment_id', commentIds);
-    if (!isCommentAuthEpochCurrent(requestAuthEpoch) || commentLoadRequests.get(momentId) !== requestId) return;
-
-    const likesMap = {};
-    const userLikedMap = {};
-    if (!likesError && likesData) {
-        likesData.forEach(l => {
-            likesMap[l.comment_id] = (likesMap[l.comment_id] || 0) + 1;
-            if (currentAuthUser && l.user_id === currentAuthUser.id) userLikedMap[l.comment_id] = true;
-        });
-    }
-
     const allCommentImageRefs = [];
     data.forEach(comment => {
         if (!comment || typeof comment.content !== 'string') return;
@@ -374,10 +360,24 @@ async function loadComments(momentId, targetCard = null) {
             }
         } catch (_e) {}
     });
-    if (allCommentImageRefs.length > 0 && typeof batchResolveMediaUrls === 'function') {
-        try {
-            await batchResolveMediaUrls(allCommentImageRefs);
-        } catch (_e) {}
+
+    const [{ data: likesData, error: likesError }] = await Promise.all([
+        supabaseClient.from('comment_likes')
+            .select('comment_id, user_id')
+            .in('comment_id', commentIds),
+        (allCommentImageRefs.length > 0 && typeof batchResolveMediaUrls === 'function')
+            ? batchResolveMediaUrls(allCommentImageRefs).catch(() => {})
+            : Promise.resolve()
+    ]);
+    if (!isCommentAuthEpochCurrent(requestAuthEpoch) || commentLoadRequests.get(momentId) !== requestId) return;
+
+    const likesMap = {};
+    const userLikedMap = {};
+    if (!likesError && likesData) {
+        likesData.forEach(l => {
+            likesMap[l.comment_id] = (likesMap[l.comment_id] || 0) + 1;
+            if (currentAuthUser && l.user_id === currentAuthUser.id) userLikedMap[l.comment_id] = true;
+        });
     }
 
     const resolvedContents = await Promise.all(data.map(comment => resolveCommentContent(comment.content)));
@@ -763,14 +763,18 @@ async function deleteComment(commentId, momentId) {
     }
 }
 
-async function loadCommentCounts(momentIds) {
+async function loadCommentCounts(momentIds, options = {}) {
     if (!hasCommentAuthContext() || !momentIds.length) return;
     const requestAuthEpoch = getCommentAuthEpoch();
-    const { data, error } = await supabaseClient.from('comments')
+    const queryPromise = supabaseClient.from('comments')
         .select('moment_id')
         .in('moment_id', momentIds);
+    const [{ data, error }, domReady] = await Promise.all([
+        queryPromise,
+        options?.domReadyPromise ? options.domReadyPromise : Promise.resolve(true)
+    ]);
 
-    if (error || !isCommentAuthEpochCurrent(requestAuthEpoch)) return;
+    if (!domReady || error || !isCommentAuthEpochCurrent(requestAuthEpoch)) return;
 
     const counts = {};
     data.forEach(c => { counts[c.moment_id] = (counts[c.moment_id] || 0) + 1; });

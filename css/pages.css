@@ -475,6 +475,7 @@ dialog.native-dialog.app-page::backdrop {
 
     .app-page :is(
         .topic-topbar-action-icon-btn,
+        .ai-refresh-btn,
         .mood-photo-remove-btn,
         .ai-attachment-remove,
         .moment-preview-remove,

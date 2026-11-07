@@ -38,6 +38,7 @@ function sizeAnimationCanvas(canvas, context, width, height) {
     let burstPetals = [];
     let animationFrameId = null;
     let routeActive = isInitialHomeLocation();
+    let isSuspended = false;
     let lastRafTimestamp = 0;
     let simTime = 0;
     let resizeTimer = null;
@@ -70,6 +71,7 @@ function sizeAnimationCanvas(canvas, context, width, height) {
 
     let lastMouseMoveTime = 0;
     window.addEventListener('mousemove', (e) => {
+        if (!routeActive || isSuspended || document.hidden) return;
         const now = performance.now();
         if (now - lastMouseMoveTime < 24) return; // ~40Hz 采样节流
         lastMouseMoveTime = now;
@@ -663,8 +665,6 @@ function sizeAnimationCanvas(canvas, context, width, height) {
         }
     }
 
-    let isSuspended = false;
-
     function shouldRunAnimation() {
         return routeActive
             && !isSuspended
@@ -676,6 +676,11 @@ function sizeAnimationCanvas(canvas, context, width, height) {
         if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
         lastRafTimestamp = 0;
+        if (scrollDebounceTimer) {
+            clearTimeout(scrollDebounceTimer);
+            scrollDebounceTimer = null;
+        }
+        isUserScrolling = false;
         clearAnimationCanvases();
     }
 
@@ -724,6 +729,7 @@ function sizeAnimationCanvas(canvas, context, width, height) {
     let isUserScrolling = false;
     let scrollDebounceTimer = null;
     window.addEventListener('scroll', () => {
+        if (!routeActive || isSuspended || document.hidden) return;
         isUserScrolling = true;
         clearTimeout(scrollDebounceTimer);
         scrollDebounceTimer = setTimeout(() => {

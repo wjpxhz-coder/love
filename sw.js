@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'love-diary-';
-const APP_SHELL_VERSION = '4.4.1';
+const APP_SHELL_VERSION = '4.4.2';
 const CACHE_NAME = `love-diary-v${APP_SHELL_VERSION}`;
 const MEDIA_CACHE_NAME = 'love-diary-media-v1';
 const MAX_MEDIA_CACHE_ENTRIES = 160;
@@ -145,9 +145,7 @@ async function emergencyEvictMediaCache(cache) {
         const keys = await cache.keys();
         // 手机端存储配额告警时，主动释放 40% 的旧缓存腾出空间
         const evictCount = Math.max(1, Math.floor(keys.length * 0.4));
-        for (let i = 0; i < evictCount; i++) {
-            await cache.delete(keys[i]);
-        }
+        await Promise.all(keys.slice(0, evictCount).map(k => cache.delete(k)));
     } catch (err) {
         console.warn('Emergency evict media cache failed:', err);
     }
@@ -158,9 +156,7 @@ async function trimMediaCache(cache) {
         const keys = await cache.keys();
         if (keys.length > MAX_MEDIA_CACHE_ENTRIES) {
             const deleteCount = keys.length - MAX_MEDIA_CACHE_ENTRIES;
-            for (let i = 0; i < deleteCount; i++) {
-                await cache.delete(keys[i]);
-            }
+            await Promise.all(keys.slice(0, deleteCount).map(k => cache.delete(k)));
         }
     } catch (err) {
         console.warn('Trim media cache error:', err);

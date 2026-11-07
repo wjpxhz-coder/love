@@ -88,7 +88,7 @@ dialog.native-dialog::backdrop {
     padding: 34px 30px;
     width: 88vw;
     max-width: 340px;
-    box-shadow: 0 20px 60px var(--shadow-hover), inset 0 2px 1px var(--glass-highlight);
+    box-shadow: var(--shadow-hover), inset 0 2px 1px var(--glass-highlight);
     text-align: center;
     border: 1.5px solid var(--border);
     max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
@@ -98,7 +98,7 @@ dialog.native-dialog::backdrop {
 
 
         [data-theme='dark'] .modal-box {
-            box-shadow: 0 20px 55px rgba(0, 0, 0, 0.58);
+            box-shadow: 0 20px 55px rgba(0, 0, 0, 0.58), inset 0 1.5px 1px var(--glass-highlight);
         }
 
 
@@ -117,15 +117,20 @@ dialog.native-dialog::backdrop {
             width: 100%;
             padding: 12px 16px;
             margin: 14px 0;
-            border: 1px solid var(--border);
+            border: 1.5px solid var(--border);
             border-radius: 12px;
             font-size: 1em;
             font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
             outline: none;
             transition: border-color 0.3s, box-shadow 0.3s;
-            text-align: center;
+            text-align: left;
             color: var(--text);
             background: var(--field-bg);
+        }
+
+        #ModalInput,
+        #customConfirmInput {
+            text-align: center;
         }
 
         .modal-input:focus {
@@ -190,9 +195,10 @@ dialog.native-dialog::backdrop {
         }
         .filter-select {
             flex: 1;
+            min-height: 42px;
             padding: 8px 12px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm, 12px);
             font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
             outline: none;
             background: var(--field-bg);
@@ -215,9 +221,10 @@ dialog.native-dialog::backdrop {
         }
         .filter-keyword {
             width: 100%;
+            min-height: 42px;
             padding: 10px 12px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm, 12px);
             font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
             outline: none;
             background: var(--field-bg);
@@ -267,8 +274,8 @@ dialog.native-dialog::backdrop {
         }
 
         [data-theme='dark'] .modal-box.version-modal-box {
-            background: rgba(30, 25, 25, 0.95);
-            border-color: rgba(255, 154, 158, 0.3);
+            background: var(--surface-elevated);
+            border-color: var(--border);
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
         }
 
@@ -293,8 +300,8 @@ dialog.native-dialog::backdrop {
         }
 
         [data-theme='dark'] .version-decor-heart {
-            background: rgba(34, 26, 30, 0.98);
-            border-color: rgba(255, 154, 158, 0.35);
+            background: var(--surface-elevated);
+            border-color: var(--border);
         }
 
         @keyframes pulseHeart {
@@ -397,8 +404,8 @@ dialog.native-dialog::backdrop {
         }
 
         [data-theme='dark'] .settings-modal-box {
-            background: rgba(30, 25, 25, 0.96);
-            border-color: rgba(255, 154, 158, 0.25);
+            background: var(--surface-elevated);
+            border-color: var(--border);
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
         }
 
@@ -408,17 +415,17 @@ dialog.native-dialog::backdrop {
         }
 
         .settings-group {
-            background: rgba(255, 255, 255, 0.6);
-            border: 1px solid rgba(212, 160, 168, 0.15);
-            border-radius: 16px;
-            padding: 16px;
+            background: var(--surface-subtle);
+            border: 1.5px solid var(--border);
+            border-radius: 20px;
+            padding: 20px;
             margin-bottom: 16px;
             transition: background 0.3s;
         }
 
         [data-theme='dark'] .settings-group {
-            background: rgba(45, 35, 35, 0.4);
-            border-color: rgba(255, 154, 158, 0.1);
+            background: var(--surface-subtle);
+            border-color: var(--border);
         }
 
         .settings-label {
@@ -454,8 +461,8 @@ dialog.native-dialog::backdrop {
         }
 
         [data-theme='dark'] .theme-opt-btn {
-            background: rgba(30, 30, 30, 0.8);
-            border-color: rgba(255, 255, 255, 0.1);
+            background: var(--surface);
+            border-color: var(--border);
         }
 
         .theme-opt-btn:hover {
@@ -480,6 +487,7 @@ dialog.native-dialog::backdrop {
         /* 设置操作按钮 */
         .btn-settings-action {
             width: 100%;
+            min-height: 44px;
             background: linear-gradient(135deg, var(--primary-light), var(--primary));
             color: var(--on-primary);
             border: none;
@@ -547,13 +555,13 @@ dialog.native-dialog::backdrop {
             align-items: center;
             justify-content: center;
             padding: 0 12px;
-            min-height: 40px;
+            min-height: 44px;
             font-size: 0.82rem;
             font-weight: 700;
             color: var(--primary);
-            background: var(--surface-subtle);
+            background: var(--surface);
             border: 1.5px solid var(--border);
-            border-radius: 11px;
+            border-radius: 12px;
             white-space: nowrap;
             box-sizing: border-box;
             cursor: var(--cursor-pointer);
@@ -610,8 +618,8 @@ dialog.native-dialog::backdrop {
         }
 
         [data-theme='dark'] .milestones-modal-box {
-            background: rgba(30, 25, 25, 0.96);
-            border-color: rgba(255, 154, 158, 0.25);
+            background: var(--surface-elevated);
+            border-color: var(--border);
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
         }
 
@@ -690,8 +698,8 @@ dialog.native-dialog::backdrop {
         }
 
         [data-theme='dark'] .milestone-item-card {
-            background: rgba(45, 35, 35, 0.4);
-            border-color: rgba(255, 154, 158, 0.1);
+            background: var(--surface-elevated);
+            border-color: var(--border);
         }
 
         .milestone-item-card:hover,

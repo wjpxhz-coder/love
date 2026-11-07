@@ -24,6 +24,7 @@
     border: none;
     box-shadow: none;
     font-size: 0.92em;
+    letter-spacing: 0;
     padding: 7px 16px;
     border-radius: 20px;
     white-space: nowrap;
@@ -58,6 +59,16 @@
     font-weight: 600;
 }
 
+        .ai-topbar-actions {
+            justify-self: end;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .ai-topbar-actions:has(#aiRefreshBtn:not([hidden])) #aiTopbarSpacer {
+            display: none;
+        }
         .ai-header-row {
             display: flex;
             justify-content: space-between;
@@ -70,12 +81,14 @@
         }
         .ai-refresh-btn {
             font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
-            background: none;
+            background: var(--surface-elevated, transparent);
             border: 1px solid var(--border);
             color: var(--text-muted);
-            width: 34px; height: 34px;
+            width: 36px; height: 36px;
+            min-width: 36px; min-height: 36px;
             border-radius: 50%;
             font-size: 1em;
+            letter-spacing: 0;
             cursor: var(--cursor-pointer);
             box-shadow: none;
             display: flex;
@@ -158,6 +171,7 @@
             width: 32px; height: 32px;
             border-radius: 50%;
             font-size: 1em;
+            letter-spacing: 0;
             cursor: var(--cursor-pointer);
             box-shadow: none;
             display: flex;
@@ -273,6 +287,10 @@
         }
         .ai-attachment-btn,
         .ai-diary-load-more {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 32px;
             border: 1px solid var(--border);
             border-radius: 16px;
             background: var(--field-bg);
@@ -280,7 +298,8 @@
             box-shadow: none;
             font: inherit;
             font-size: 0.8em;
-            padding: 7px 10px;
+            letter-spacing: 0;
+            padding: 5px 12px;
             cursor: var(--cursor-pointer);
         }
         .ai-attachment-btn:hover,
@@ -364,6 +383,7 @@
             background: rgba(40, 36, 38, 0.78);
             box-shadow: none;
             font: 700 13px/1 system-ui, sans-serif;
+            letter-spacing: 0;
             cursor: var(--cursor-pointer);
         }
         .ai-attachment-remove:hover {
@@ -532,13 +552,16 @@
 .ai-tabs-bar .ai-tab {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     background: transparent;
     color: var(--text-muted);
     border: 1px solid transparent;
     box-shadow: none;
     font-size: 0.88em;
-    padding: 6px 12px;
+    letter-spacing: 0;
+    min-height: 36px;
+    padding: 6px 14px;
     border-radius: 20px;
     white-space: nowrap;
     font-weight: 500;
@@ -548,6 +571,8 @@
 .ai-tabs-bar .ai-tab:hover {
     color: var(--primary);
     background: rgba(255, 101, 132, 0.08);
+    transform: none;
+    box-shadow: none;
 }
 .ai-tabs-bar .ai-tab.active {
     color: var(--primary);

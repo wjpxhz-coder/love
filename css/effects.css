@@ -30,7 +30,7 @@
     color: var(--primary);
     padding: 11px 22px;
     border-radius: 24px;
-    box-shadow: 0 8px 30px var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
+    box-shadow: var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
     font-weight: 600;
     font-size: 0.92em;
     letter-spacing: 0.5px;
@@ -73,7 +73,7 @@
     padding: 0 20px;
     height: 44px;
     border-radius: 9999px;
-    box-shadow: 0 8px 30px var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
+    box-shadow: var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -99,10 +99,13 @@
     justify-content: center;
     flex-shrink: 0;
     white-space: nowrap;
-    animation: heartbeat 1.2s ease-in-out infinite;
+    animation: none;
     filter: drop-shadow(0 2px 8px rgba(255, 101, 132, 0.35));
     line-height: 1;
     user-select: none;
+}
+.resonance-ui.show .resonance-hearts {
+    animation: heartbeat 1.2s ease-in-out infinite;
 }
 .resonance-hearts .heart-icon {
     display: inline-block;
@@ -192,7 +195,7 @@
     -webkit-backdrop-filter: blur(18px);
     border: 2px solid var(--border);
     border-radius: var(--jelly-radius-lg, 28px);
-    box-shadow: 0 16px 48px var(--shadow-hover);
+    box-shadow: var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
 }
 .blind-box-content {
     margin: 16px 0;
@@ -308,6 +311,10 @@
     0%, 100% { opacity: 0.2; transform: translateZ(0); }
     50% { opacity: 0.92; transform: translateZ(0); }
 }
+body.app-page-active #star-field .star,
+body.app-page-active #star-field .shooting-star {
+    animation-play-state: paused !important;
+}
 
 /* ── 爱心与梦幻粒子 ── */
 .love-particle {
@@ -378,11 +385,11 @@ button:hover::after {
 
 /* ── 纪念日脉冲发光 ── */
 .anniv-card.today {
-    animation: pulseBorder 2.4s ease-in-out infinite;
+    animation: pulseBorder 2.5s ease-in-out 3;
 }
 @keyframes pulseBorder {
     0%, 100% { box-shadow: 0 0 0 0 rgba(245, 175, 95, 0.4), 0 6px 24px var(--shadow); }
-    50% { box-shadow: 0 0 0 10px rgba(245, 175, 95, 0), 0 8px 28px var(--shadow-hover); }
+    50% { box-shadow: 0 0 0 10px rgba(245, 175, 95, 0), var(--shadow-hover); }
 }
 
 /* ── 卡片跟随光晕 (电脑端悬停显现) ── */

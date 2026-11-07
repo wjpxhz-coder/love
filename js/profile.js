@@ -47,18 +47,48 @@ function getProfileAvatarUrl(profile) {
     return sanitizeMediaUrl(profile._avatarResolvedUrl || profile.avatar_url || '');
 }
 
+function toAvatarMediaRef(avatarPath) {
+    if (typeof avatarPath !== 'string' || !avatarPath.trim()) return '';
+    const trimmed = avatarPath.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('storage://')) {
+        return trimmed;
+    }
+    return typeof createStorageReference === 'function'
+        ? createStorageReference(trimmed)
+        : `storage://photos/${trimmed.replace(/^\/+/, '')}`;
+}
+
 async function hydrateProfileAvatar(profile) {
     if (!profile) return profile;
 
     profile._avatarResolvedUrl = sanitizeMediaUrl(profile.avatar_url || '');
     if (!profile.avatar_path || !currentAuthUser) return profile;
 
+    if (profile._avatarResolvedPath === profile.avatar_path && profile._avatarResolvedUrl) {
+        return profile;
+    }
+
+    const mediaRef = toAvatarMediaRef(profile.avatar_path);
+    if (mediaRef && typeof resolveMediaUrl === 'function') {
+        const resolved = await resolveMediaUrl(mediaRef);
+        if (resolved) {
+            profile._avatarResolvedUrl = sanitizeMediaUrl(resolved);
+            profile._avatarResolvedPath = profile.avatar_path;
+            return profile;
+        }
+    }
+
     const { data, error } = await supabaseClient.storage
         .from('photos')
         .createSignedUrl(profile.avatar_path, 60 * 60);
 
     if (!error && data?.signedUrl) {
-        profile._avatarResolvedUrl = sanitizeMediaUrl(data.signedUrl);
+        const signed = sanitizeMediaUrl(data.signedUrl);
+        profile._avatarResolvedUrl = signed;
+        profile._avatarResolvedPath = profile.avatar_path;
+        if (signed && typeof setCachedSignedMediaUrl === 'function') {
+            setCachedSignedMediaUrl(String(profile.avatar_path).replace(/^\/+/, ''), signed);
+        }
     }
     return profile;
 }
@@ -1069,6 +1099,7 @@ async function loadProfilePhotos(targetAuthor) {
                 if (url) {
                     photos.push({
                         url,
+                        thumbUrl: url,
                         momentId,
                         createdAt,
                         author: item.author,
@@ -1084,15 +1115,31 @@ async function loadProfilePhotos(targetAuthor) {
                             if (safeUrl) {
                                 const isVid = typeof isVideoMediaUrl === 'function' ? isVideoMediaUrl(safeUrl) : false;
                                 let poster = '';
+                                let thumbUrl = '';
                                 if (isVid && parsed.video_posters && typeof parsed.video_posters === 'object') {
                                     poster = parsed.video_posters[safeUrl] || parsed.video_posters[imgUrl] || '';
                                     if (!poster && typeof extractStorageObjectPath === 'function') {
                                         const objPath = extractStorageObjectPath(safeUrl) || extractStorageObjectPath(imgUrl);
                                         if (objPath && parsed.video_posters[objPath]) poster = parsed.video_posters[objPath];
                                     }
+                                } else if (!isVid && parsed.image_thumbnails && typeof parsed.image_thumbnails === 'object') {
+                                    if (typeof getThumbnailForImage === 'function') {
+                                        thumbUrl = getThumbnailForImage(safeUrl, parsed.image_thumbnails)
+                                            || getThumbnailForImage(imgUrl, parsed.image_thumbnails);
+                                    } else {
+                                        thumbUrl = parsed.image_thumbnails[safeUrl] || parsed.image_thumbnails[imgUrl] || '';
+                                        if (!thumbUrl && typeof extractStorageObjectPath === 'function') {
+                                            const objPath = extractStorageObjectPath(safeUrl) || extractStorageObjectPath(imgUrl);
+                                            if (objPath && parsed.image_thumbnails[objPath]) thumbUrl = parsed.image_thumbnails[objPath];
+                                        }
+                                    }
+                                    if (thumbUrl && typeof sanitizeMediaUrl === 'function') {
+                                        thumbUrl = sanitizeMediaUrl(thumbUrl);
+                                    }
                                 }
                                 photos.push({
                                     url: safeUrl,
+                                    thumbUrl: thumbUrl || safeUrl,
                                     poster: poster || '',
                                     momentId,
                                     createdAt,
@@ -1152,7 +1199,7 @@ function renderProfilePhotosGrid(photos, container) {
                 img.src = photo.poster;
                 img.alt = photo.textSnippet ? photo.textSnippet.slice(0, 30) : '视频封面';
                 img.className = 'profile-photo-img';
-                img.loading = index < 15 ? 'eager' : 'lazy';
+                img.loading = index < 6 ? 'eager' : 'lazy';
                 img.decoding = 'async';
                 itemEl.appendChild(img);
             } else {
@@ -1172,10 +1219,10 @@ function renderProfilePhotosGrid(photos, container) {
             itemEl.appendChild(playBadge);
         } else {
             const img = document.createElement('img');
-            img.src = photo.url;
+            img.src = photo.thumbUrl || photo.url;
             img.alt = photo.textSnippet ? photo.textSnippet.slice(0, 30) : '照片';
             img.className = 'profile-photo-img';
-            img.loading = index < 15 ? 'eager' : 'lazy';
+            img.loading = index < 6 ? 'eager' : 'lazy';
             img.decoding = 'async';
             itemEl.appendChild(img);
         }

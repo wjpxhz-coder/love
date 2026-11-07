@@ -108,6 +108,12 @@ function getTopicStorageDirectory() {
  */
 async function ensureTopicAuthReady(maxWaitMs = 4000) {
     if (currentUserProfile?.space_id && currentAuthUser) return true;
+    if (typeof authHydrationPromise !== 'undefined' && authHydrationPromise) {
+        try {
+            await authHydrationPromise;
+        } catch (_e) {}
+        if (currentUserProfile?.space_id && currentAuthUser) return true;
+    }
     const start = Date.now();
     while (Date.now() - start < maxWaitMs) {
         if (currentUserProfile?.space_id && currentAuthUser) return true;
@@ -344,7 +350,7 @@ function renderTopicsCatalog(topics) {
             : `<span class="topic-status-badge open">💬 正在交流</span>`;
         
         const summaryHtml = isResolved && topic.summary
-            ? `<div class="home-topic-card-summary" style="margin-top:6px;">🤝 约定：${escapeHtml(topic.summary)}</div>`
+            ? `<div class="home-topic-card-summary">🤝 约定：${escapeHtml(topic.summary)}</div>`
             : '';
 
         const safeId = escapeHtml(String(topic.id));
@@ -501,13 +507,25 @@ async function loadTopicDetail(topicId) {
     const reqEpoch = getTopicCurrentAuthEpoch();
 
     try {
-        // 1. 获取话题基本信息
-        const { data: topic, error: topicErr } = await supabaseClient
-            .from('topics')
-            .select('*')
-            .eq('id', topicId)
-            .eq('space_id', currentUserProfile.space_id)
-            .single();
+        // 1 & 2. 并行获取话题基本信息与该话题的消息记录
+        const spaceId = currentUserProfile.space_id;
+        const [
+            { data: topic, error: topicErr },
+            { data: messages, error: msgErr }
+        ] = await Promise.all([
+            supabaseClient
+                .from('topics')
+                .select('*')
+                .eq('id', topicId)
+                .eq('space_id', spaceId)
+                .single(),
+            supabaseClient
+                .from('topic_messages')
+                .select('*')
+                .eq('topic_id', topicId)
+                .eq('space_id', spaceId)
+                .order('created_at', { ascending: true })
+        ]);
 
         if (reqId !== topicDetailReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
 
@@ -521,16 +539,6 @@ async function loadTopicDetail(topicId) {
         currentTopicDetail = topic;
         window.currentTopicDetail = topic;
         renderTopicDetailShell(topic);
-
-        // 2. 获取该话题的消息记录
-        const { data: messages, error: msgErr } = await supabaseClient
-            .from('topic_messages')
-            .select('*')
-            .eq('topic_id', topicId)
-            .eq('space_id', currentUserProfile.space_id)
-            .order('created_at', { ascending: true });
-
-        if (reqId !== topicDetailReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
 
         if (msgErr) {
             console.error('获取消息失败:', msgErr);
@@ -942,10 +950,9 @@ async function handleTopicPhotoSelect(event) {
             const imgWrap = document.createElement('div');
             imgWrap.className = 'topic-composer-photo-preview-item';
             imgWrap.dataset.previewUrl = objUrl;
-            imgWrap.style.cssText = 'position:relative; width:56px; height:56px; border-radius:8px; overflow:hidden; display:inline-block; margin-right:6px;';
             imgWrap.innerHTML = `
-                <img src="${escapeHtml(objUrl)}" style="width:100%; height:100%; object-fit:cover;">
-                <button type="button" style="position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%; width:18px; height:18px; font-size:12px; cursor:var(--cursor-pointer);" onclick="removeTopicPhotoPreview(this, '${escapeHtml(objUrl)}')">×</button>
+                <img src="${escapeHtml(objUrl)}" alt="预览图片">
+                <button type="button" class="topic-composer-photo-remove-btn" onclick="removeTopicPhotoPreview(this, '${escapeHtml(objUrl)}')" aria-label="移除图片">×</button>
             `;
             previewContainer.appendChild(imgWrap);
         }

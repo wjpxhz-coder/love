@@ -53,25 +53,25 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="css/variables.css?v=4.4.1">
-    <link rel="stylesheet" href="css/refresh.css?v=4.4.1">
-    <link rel="stylesheet" href="css/base.css?v=4.4.1">
-    <link rel="stylesheet" href="css/header.css?v=4.4.1">
-    <link rel="stylesheet" href="css/timer.css?v=4.4.1">
-    <link rel="stylesheet" href="css/timeline.css?v=4.4.1">
-    <link rel="stylesheet" href="css/dialogs.css?v=4.4.1">
-    <link rel="stylesheet" href="css/comments.css?v=4.4.1">
-    <link rel="stylesheet" href="css/ai-panel.css?v=4.4.1">
-    <link rel="stylesheet" href="css/fab.css?v=4.4.1">
-    <link rel="stylesheet" href="css/auth.css?v=4.4.1">
-    <link rel="stylesheet" href="css/profile.css?v=4.4.1">
-    <link rel="stylesheet" href="css/notifications.css?v=4.4.1">
-    <link rel="stylesheet" href="css/mood.css?v=4.4.1">
-    <link rel="stylesheet" href="css/anniversary.css?v=4.4.1">
-    <link rel="stylesheet" href="css/effects.css?v=4.4.1">
-    <link rel="stylesheet" href="css/responsive.css?v=4.4.1">
-    <link rel="stylesheet" href="css/pages.css?v=4.4.1">
-    <link rel="stylesheet" href="css/topics.css?v=4.4.1">
+    <link rel="stylesheet" href="css/variables.css?v=4.4.2">
+    <link rel="stylesheet" href="css/refresh.css?v=4.4.2">
+    <link rel="stylesheet" href="css/base.css?v=4.4.2">
+    <link rel="stylesheet" href="css/header.css?v=4.4.2">
+    <link rel="stylesheet" href="css/timer.css?v=4.4.2">
+    <link rel="stylesheet" href="css/timeline.css?v=4.4.2">
+    <link rel="stylesheet" href="css/dialogs.css?v=4.4.2">
+    <link rel="stylesheet" href="css/comments.css?v=4.4.2">
+    <link rel="stylesheet" href="css/ai-panel.css?v=4.4.2">
+    <link rel="stylesheet" href="css/fab.css?v=4.4.2">
+    <link rel="stylesheet" href="css/auth.css?v=4.4.2">
+    <link rel="stylesheet" href="css/profile.css?v=4.4.2">
+    <link rel="stylesheet" href="css/notifications.css?v=4.4.2">
+    <link rel="stylesheet" href="css/mood.css?v=4.4.2">
+    <link rel="stylesheet" href="css/anniversary.css?v=4.4.2">
+    <link rel="stylesheet" href="css/effects.css?v=4.4.2">
+    <link rel="stylesheet" href="css/responsive.css?v=4.4.2">
+    <link rel="stylesheet" href="css/pages.css?v=4.4.2">
+    <link rel="stylesheet" href="css/topics.css?v=4.4.2">
 </head>
 <body class="auth-pending">
 <!-- 内联矢量微光 SVG 图标库 -->
@@ -105,8 +105,8 @@
   </symbol>
   <!-- 萌系用户主页 -->
   <symbol id="icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M19 20.5v-1.2c0-2.8-2.6-4.8-6.2-4.8s-6.2 2-6.2 4.8v1.2"/>
-    <circle cx="12.8" cy="7.2" r="4"/>
+    <path d="M18.2 20.5v-1.2c0-2.8-2.6-4.8-6.2-4.8s-6.2 2-6.2 4.8v1.2"/>
+    <circle cx="12" cy="7.2" r="4"/>
   </symbol>
   <!-- 闪耀大事记 -->
   <symbol id="icon-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -201,7 +201,7 @@
     </section>
 
     <section class="anniv-section" aria-labelledby="anniversary-label">
-        <h2 class="section-label" id="anniversary-label">✨ 重要纪念日</h2>
+        <h2 class="section-label" id="anniversary-label">重要纪念日</h2>
         <div class="anniv-grid" id="anniv-grid"></div>
     </section>
 
@@ -977,7 +977,7 @@
         </div>
         
         <div class="settings-footer">
-            <span id="settingsVersion">当前版本：v4.4.1</span>
+            <span id="settingsVersion">当前版本：v4.4.2</span>
         </div>
 
         
@@ -1071,15 +1071,15 @@
                     <span>正在录音中…</span>
                     <span id="topicAudioRecordingTime">00:00</span>
                 </div>
-                <button type="button" style="background:transparent; border:none; color:#e11d48; font-weight:700; cursor:var(--cursor-pointer);" onclick="stopTopicRecording()">完成</button>
+                <button type="button" class="topic-recording-stop-btn" onclick="stopTopicRecording()">完成</button>
             </div>
             <!-- 录音预览条 -->
-            <div id="topicAudioPreviewWrap" style="margin-bottom:8px; display:flex; align-items:center; gap:8px;" hidden>
+            <div id="topicAudioPreviewWrap" class="topic-audio-preview-wrap" hidden>
                 <audio id="topicAudioPlayer" controls style="height:36px; flex:1;"></audio>
-                <button type="button" class="topic-audio-remove-btn" style="background:rgba(0,0,0,0.06); border:none; border-radius:50%; width:28px; height:28px; cursor:var(--cursor-pointer);" onclick="deleteTopicAudioPreview()">×</button>
+                <button type="button" class="topic-audio-remove-btn" onclick="deleteTopicAudioPreview()" aria-label="删除录音">×</button>
             </div>
             <!-- 图片预览横滑容器 -->
-            <div class="topic-composer-photo-previews" id="topicComposerPhotoPreviews" style="margin-bottom:8px; overflow-x:auto; white-space:nowrap;" hidden></div>
+            <div class="topic-composer-photo-previews" id="topicComposerPhotoPreviews" hidden></div>
             <!-- 工具快捷栏 -->
             <div class="topic-composer-tools">
                 <button class="topic-tool-btn" type="button" onclick="openTopicPhotoPicker()">
@@ -1198,28 +1198,28 @@
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"
         integrity="sha384-nWa0WrJ8Dl90YqhjSU0vNB8IxSO54t6AmEmV83LMTb/Img+Af2MfK7XJE54mwpSR"
         crossorigin="anonymous"></script>
-<script defer src="js/config.js?v=4.4.1"></script>
-<script defer src="js/animations.js?v=4.4.1"></script>
-<script defer src="js/timer.js?v=4.4.1"></script>
-<script defer src="js/auth.js?v=4.4.1"></script>
-<script defer src="js/profile.js?v=4.4.1"></script>
-<script defer src="js/moments.js?v=4.4.1"></script>
-<script defer src="js/milestones.js?v=4.4.1"></script>
-<script defer src="js/comments.js?v=4.4.1"></script>
-<script defer src="js/likes.js?v=4.4.1"></script>
-<script defer src="js/mood.js?v=4.4.1"></script>
-<script defer src="js/anniversary.js?v=4.4.1"></script>
-<script defer src="js/lightbox.js?v=4.4.1"></script>
-<script defer src="js/ai.js?v=4.4.1"></script>
-<script defer src="js/blindbox.js?v=4.4.1"></script>
-<script defer src="js/presence.js?v=4.4.1"></script>
-<script defer src="js/theme.js?v=4.4.1"></script>
-<script defer src="js/notifications.js?v=4.4.1"></script>
-<script defer src="js/topics.js?v=4.4.1"></script>
-<script defer src="js/effects.js?v=4.4.1"></script>
-<script defer src="js/settings.js?v=4.4.1"></script>
-<script defer src="js/router.js?v=4.4.1"></script>
-<script defer src="js/app.js?v=4.4.1"></script>
+<script defer src="js/config.js?v=4.4.2"></script>
+<script defer src="js/animations.js?v=4.4.2"></script>
+<script defer src="js/timer.js?v=4.4.2"></script>
+<script defer src="js/auth.js?v=4.4.2"></script>
+<script defer src="js/profile.js?v=4.4.2"></script>
+<script defer src="js/moments.js?v=4.4.2"></script>
+<script defer src="js/milestones.js?v=4.4.2"></script>
+<script defer src="js/comments.js?v=4.4.2"></script>
+<script defer src="js/likes.js?v=4.4.2"></script>
+<script defer src="js/mood.js?v=4.4.2"></script>
+<script defer src="js/anniversary.js?v=4.4.2"></script>
+<script defer src="js/lightbox.js?v=4.4.2"></script>
+<script defer src="js/ai.js?v=4.4.2"></script>
+<script defer src="js/blindbox.js?v=4.4.2"></script>
+<script defer src="js/presence.js?v=4.4.2"></script>
+<script defer src="js/theme.js?v=4.4.2"></script>
+<script defer src="js/notifications.js?v=4.4.2"></script>
+<script defer src="js/topics.js?v=4.4.2"></script>
+<script defer src="js/effects.js?v=4.4.2"></script>
+<script defer src="js/settings.js?v=4.4.2"></script>
+<script defer src="js/router.js?v=4.4.2"></script>
+<script defer src="js/app.js?v=4.4.2"></script>
 
 </body>
 </html>

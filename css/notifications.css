@@ -22,7 +22,7 @@
 }
 .notification-bell:hover {
     transform: scale(1.12);
-    box-shadow: 0 6px 20px var(--shadow-hover);
+    box-shadow: var(--shadow-hover);
     border-color: var(--primary-light);
 }
 .notification-badge {
@@ -62,7 +62,7 @@
     -webkit-backdrop-filter: blur(18px);
     border: 1.5px solid var(--border);
     border-radius: var(--jelly-radius-md, 22px);
-    box-shadow: 0 12px 38px var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
+    box-shadow: var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
     display: flex;
     flex-direction: column;
     opacity: 0;
