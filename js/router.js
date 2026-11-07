@@ -289,16 +289,71 @@
         else element.removeAttribute('inert');
     }
 
-    function updatePageVisibility(route) {
+    let activeLeavingTimer = null;
+    let activeLeavingElement = null;
+
+    function cleanupLeavingElement() {
+        if (activeLeavingTimer) {
+            global.clearTimeout(activeLeavingTimer);
+            activeLeavingTimer = null;
+        }
+        if (activeLeavingElement) {
+            activeLeavingElement.classList.remove('is-leaving');
+            if (!activeLeavingElement.classList.contains('is-active')) {
+                activeLeavingElement.hidden = true;
+                setElementInert(activeLeavingElement, true);
+                activeLeavingElement.setAttribute('aria-hidden', 'true');
+            }
+            activeLeavingElement = null;
+        }
+    }
+
+    function updatePageVisibility(route, previousRoute = null, reason = '') {
+        const isReducedMotion = typeof global.matchMedia === 'function'
+            && global.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const skipTransition = isReducedMotion || reason === 'init' || !previousRoute;
+
+        cleanupLeavingElement();
+
+        const prevElementId = previousRoute?.elementId;
+        const nextElementId = route?.elementId;
+
         PAGE_ELEMENT_IDS.forEach(id => {
             const element = document.getElementById(id);
             if (!element) return;
 
-            const active = route.elementId === id;
-            element.classList.toggle('is-active', active);
-            element.hidden = !active;
-            setElementInert(element, !active);
-            element.setAttribute('aria-hidden', String(!active));
+            const isTarget = nextElementId === id;
+            const isLeaving = !skipTransition && prevElementId === id && prevElementId !== nextElementId;
+
+            if (isTarget) {
+                element.classList.remove('is-leaving');
+                element.classList.add('is-active');
+                element.hidden = false;
+                setElementInert(element, false);
+                element.setAttribute('aria-hidden', 'false');
+            } else if (isLeaving) {
+                element.classList.remove('is-active');
+                element.classList.add('is-leaving');
+                element.hidden = false;
+                setElementInert(element, true);
+                element.setAttribute('aria-hidden', 'true');
+                activeLeavingElement = element;
+                activeLeavingTimer = global.setTimeout(() => {
+                    if (activeLeavingElement === element) {
+                        element.classList.remove('is-leaving');
+                        if (!element.classList.contains('is-active')) {
+                            element.hidden = true;
+                        }
+                        activeLeavingElement = null;
+                        activeLeavingTimer = null;
+                    }
+                }, 220);
+            } else {
+                element.classList.remove('is-active', 'is-leaving');
+                element.hidden = true;
+                setElementInert(element, true);
+                element.setAttribute('aria-hidden', 'true');
+            }
         });
     }
 
@@ -507,7 +562,7 @@
         if (changed && previous) rememberRouteFocus(previous);
         if (changed && previous) invokeHook('onAppRouteLeave', previous, route);
 
-        updatePageVisibility(route);
+        updatePageVisibility(route, previous, reason);
         document.body?.classList?.toggle('app-page-active', route.id !== 'home');
         if (route.id === 'home') unlockGlobalChrome();
         else lockGlobalChrome();
