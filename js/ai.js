@@ -438,6 +438,7 @@ function openAIModal() {
 }
 
 function enterAIPage() {
+    initAIDropZone();
     if (!isAuthenticated()) return;
     bindAIChatModalLifecycle();
     ensureAIChatWelcome();
@@ -1059,11 +1060,9 @@ function openAILocalImagePicker() {
     document.getElementById('aiLocalImageInput')?.click();
 }
 
-async function handleAILocalImageSelect(event) {
-    const input = event?.target;
-    const files = Array.from(input?.files || []);
-    if (input) input.value = '';
-    if (files.length === 0 || isChatSending || isCompressingAIImages) return;
+async function handleAILocalImageFiles(files) {
+    const list = Array.from(files || []);
+    if (list.length === 0 || isChatSending || isCompressingAIImages) return;
     if (!isAuthenticated()) {
         openLoginModal();
         return;
@@ -1083,7 +1082,7 @@ async function handleAILocalImageSelect(event) {
     let rejectedCount = false;
 
     try {
-        for (const rawFile of files) {
+        for (const rawFile of list) {
             if (pendingChatAttachments.length >= AI_MAX_ATTACHMENTS) {
                 rejectedCount = true;
                 break;
@@ -1132,6 +1131,37 @@ async function handleAILocalImageSelect(event) {
         setAIChatComposerBusy(false);
     }
 }
+window.handleAILocalImageFiles = handleAILocalImageFiles;
+
+async function handleAILocalImageSelect(event) {
+    const input = event?.target;
+    const files = Array.from(input?.files || []);
+    if (input) input.value = '';
+    await handleAILocalImageFiles(files);
+}
+
+function initAIDropZone() {
+    if (typeof window.registerDropAndPasteZone !== 'function') return;
+    const target = document.getElementById('aiChatComposer');
+    if (!target || target.dataset.dropZoneBound === 'true') return;
+    target.dataset.dropZoneBound = 'true';
+    window.registerDropAndPasteZone({
+        target,
+        accept: 'image/*',
+        promptText: '松开即可发送给 Agnes 🌸',
+        promptIcon: '📸',
+        isEnabled: () => {
+            const composer = document.getElementById('aiChatComposer');
+            return !!(composer && !composer.hidden && composer.offsetParent !== null);
+        },
+        onFiles: (files) => {
+            if (typeof window.handleAILocalImageFiles === 'function') {
+                window.handleAILocalImageFiles(files);
+            }
+        }
+    });
+}
+window.initAIDropZone = initAIDropZone;
 
 function getAIImageReferencePath(value) {
     if (typeof value !== 'string' || !value.trim()) return '';
@@ -2292,3 +2322,11 @@ window.fetchSupportedModels = fetchSupportedModels;
 window.getStoredAIModel = getStoredAIModel;
 window.setStoredAIModel = setStoredAIModel;
 window.FALLBACK_AI_MODELS = FALLBACK_AI_MODELS;
+
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAIDropZone);
+    } else {
+        initAIDropZone();
+    }
+}
