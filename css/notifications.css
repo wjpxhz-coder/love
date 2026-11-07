@@ -38,7 +38,15 @@
 }
 .notification-badge.show {
     display: block;
-    animation: pulse 2s infinite;
+    animation: badgeGlowPulse 2.2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
+
+.notification-bell:has(.notification-badge.show) {
+    animation: bellSwing 0.8s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1.5s 2;
+}
+
+.notification-bell:active {
+    transform: scale(0.92) !important;
 }
 .notification-panel {
     position: fixed;

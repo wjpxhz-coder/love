@@ -302,10 +302,14 @@
 
 .mood-calendar-day:not(:disabled):hover,
 .mood-calendar-day:not(:disabled):focus-visible {
-    transform: translateY(-3px) scale(1.04);
+    transform: translateY(-3px) scale(1.04) translateZ(0);
     background: rgba(255, 182, 193, 0.3);
     border-color: var(--primary);
     box-shadow: 0 6px 16px var(--shadow);
+}
+
+.mood-calendar-day:not(:disabled):active {
+    transform: scale(0.97) translateZ(0);
 }
 
 .mood-calendar-day:disabled { opacity: 1; }
@@ -403,20 +407,25 @@
     box-shadow: none;
     font-size: 1.45em;
     cursor: var(--cursor-pointer);
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    will-change: transform;
 }
 
 .mood-emoji-btn:hover {
-    transform: scale(1.22);
-    background: rgba(255, 182, 193, 0.24);
-    box-shadow: 0 4px 14px var(--shadow);
+    animation: moodWobble 0.75s ease-in-out infinite;
+    background: rgba(255, 182, 193, 0.26);
+    box-shadow: 0 6px 16px var(--primary-glow);
 }
 
 .mood-emoji-btn.selected {
     border-color: var(--primary);
-    background: rgba(255, 101, 132, 0.2);
-    transform: scale(1.25);
-    box-shadow: var(--shadow-hover);
+    background: rgba(255, 101, 132, 0.22);
+    animation: moodSelectJelly 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    box-shadow: 0 0 0 3px rgba(255, 101, 132, 0.25), var(--shadow-hover);
+}
+
+.mood-emoji-btn:active {
+    transform: scale(0.92) !important;
 }
 
 .mood-selected-hint {
@@ -542,6 +551,14 @@
 .mood-hug-partner-btn:active,
 .mood-day-entry-actions .mood-hug-partner-btn:active {
     transform: scale(0.95);
+}
+
+.mood-hug-partner-btn.is-hugged .hug-icon,
+.mood-hug-partner-btn.hugged .hug-icon,
+.mood-day-entry-actions .mood-hug-partner-btn.is-hugged .hug-icon,
+.mood-day-entry-actions .mood-hug-partner-btn.hugged .hug-icon {
+    display: inline-block;
+    animation: likePopIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
 }
 
 .mood-hug-partner-btn.is-hugged,

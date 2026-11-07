@@ -151,9 +151,20 @@
 }
 
 .home-topic-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 26px rgba(255, 107, 139, 0.22);
+    transform: translateY(-4px) translateZ(0);
+    box-shadow: 0 12px 28px rgba(255, 107, 139, 0.24);
     border-color: var(--theme-pink, #ff6b8b);
+}
+
+.home-topic-card:active,
+.topic-list-card:active {
+    transform: scale(0.98) translateZ(0);
+}
+
+.home-topic-card:hover .topic-tag,
+.topic-list-card:hover .topic-tag {
+    transform: scale(1.05);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .home-topic-card-header {
