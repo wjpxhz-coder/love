@@ -258,7 +258,24 @@ input[type="range"]:not(:disabled) {
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="color"]):not(:disabled),
 textarea:not(:disabled),
-[contenteditable="true"] {
+[contenteditable="true"],
+.card-text,
+.card-text-container,
+.comment-bubble,
+.comment-body,
+.reply-quote-text,
+.comment-reply-banner-text,
+.topic-message-bubble,
+.topic-summary-content,
+.topic-card-desc,
+.topic-card-answer,
+.topic-item-desc,
+.chat-msg,
+.mood-day-entry-note,
+.mood-calendar-note-preview,
+.on-this-day-item-text,
+.milestone-card-desc,
+.profile-quote {
     cursor: var(--cursor-text);
 }
 

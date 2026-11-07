@@ -625,9 +625,9 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v4.4.3';
+const APP_VERSION = 'v4.4.4';
 const CONFIG = {
-    version: 'v4.4.3',
+    version: 'v4.4.4',
     date: '2026-11-07',
     title: '全场景拖拽与剪贴板 Ctrl+V 媒体上传 📸✨',
     features: [

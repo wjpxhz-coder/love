@@ -204,6 +204,7 @@
             word-wrap: break-word;
             white-space: pre-wrap;
             animation: chatMsgIn 0.3s ease;
+            cursor: var(--cursor-text);
         }
         @keyframes chatMsgIn {
             0% { opacity: 0; transform: translateY(8px); }
