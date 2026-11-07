@@ -30,12 +30,27 @@ if (document.readyState === 'loading') {
 // ==========================================
 // Service Worker 更新监听 (PWA)
 // ==========================================
+let hasReloadedForSwUpdate = false;
+let pendingSwReloadOnHome = false;
+
+function isUserInActiveEditorRoute() {
+    const route = typeof getCurrentAppRoute === 'function' ? getCurrentAppRoute() : null;
+    if (!route) return false;
+    return ['moment', 'mood', 'edit-profile', 'topic-detail', 'ai-chat'].includes(route.id);
+}
+
 if ('serviceWorker' in navigator) {
     const hadControllerOnLoad = Boolean(navigator.serviceWorker.controller);
-    let hasReloadedForSwUpdate = false;
 
     navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (!hadControllerOnLoad || hasReloadedForSwUpdate) return;
+        if (typeof saveMomentDraftNow === 'function') {
+            try { saveMomentDraftNow({ includeMedia: true }); } catch (_e) {}
+        }
+        if (isUserInActiveEditorRoute()) {
+            pendingSwReloadOnHome = true;
+            return;
+        }
         hasReloadedForSwUpdate = true;
         window.location.reload();
     });
@@ -120,6 +135,12 @@ function initAccessibleUiState() {
 
 function onAppRouteEnter(route) {
     if (!route) return;
+    if (route.id === 'home' && pendingSwReloadOnHome && !hasReloadedForSwUpdate) {
+        pendingSwReloadOnHome = false;
+        hasReloadedForSwUpdate = true;
+        window.location.reload();
+        return;
+    }
     window.homeSakuraEffect?.setRouteActive(route.id === 'home');
     if (typeof updatePresenceRouteActivity === 'function') updatePresenceRouteActivity(route.id);
     if (route.id === 'login' && typeof enterLoginPage === 'function') enterLoginPage(route);

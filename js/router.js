@@ -800,6 +800,10 @@
         });
     }
 
+    function isAppRouterInitialized() {
+        return initialized;
+    }
+
     function isAppRouteActive(id) {
         if (!initialized) initAppRouter();
         return currentRoute?.id === id;
@@ -845,6 +849,7 @@
     }
 
     global.initAppRouter = initAppRouter;
+    global.isAppRouterInitialized = isAppRouterInitialized;
     global.appNavigate = appNavigate;
     global.appBack = appBack;
     global.appReplace = appReplace;

@@ -89,7 +89,10 @@ async function establishAuthenticatedUser(user, isNewLogin = false) {
     if (authHydrationPromise && authHydrationUserId === user.id) {
         return authHydrationPromise;
     }
-    if (currentAuthUser?.id === user.id && currentAuthor && !isNewLogin) return;
+    if (currentAuthUser?.id === user.id && currentAuthor) {
+        currentAuthUser = user;
+        return;
+    }
 
     authResetGeneration += 1;
     authEpoch += 1;
@@ -174,6 +177,11 @@ async function initAuth() {
                     return;
                 }
                 if (['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
+                    const isAlreadySameUser = Boolean(currentAuthUser?.id === session.user.id && currentAuthor);
+                    if (isAlreadySameUser) {
+                        currentAuthUser = session.user;
+                        return;
+                    }
                     establishAuthenticatedUser(session.user, event === 'SIGNED_IN');
                 }
             }, 0);
@@ -304,8 +312,11 @@ async function onLoginSuccess(username, isNewLogin) {
     if (typeof loadHomeTopics === 'function') loaders.push(loadHomeTopics());
     await Promise.allSettled(loaders);
 
+    const routerWasInitialized = typeof isAppRouterInitialized === 'function'
+        ? isAppRouterInitialized()
+        : true;
     const activeRoute = typeof getCurrentAppRoute === 'function' ? getCurrentAppRoute() : null;
-    if (activeRoute && activeRoute.id !== 'home' && typeof onAppRouteEnter === 'function') {
+    if (routerWasInitialized && activeRoute && activeRoute.id !== 'home' && activeRoute.id !== 'login' && typeof onAppRouteEnter === 'function') {
         try {
             onAppRouteEnter(activeRoute);
         } catch (err) {
@@ -362,11 +373,15 @@ function clearUserLocalState() {
             || key === 'all_profiles_cache'
             || key.startsWith('profile_')
             || key.startsWith('starred_moments_local_')
+            || key.startsWith('sweet_diary_moment_draft_')
         ) {
             keysToRemove.push(key);
         }
     }
     keysToRemove.forEach(key => localStorage.removeItem(key));
+    if (typeof clearAllMomentDrafts === 'function') {
+        clearAllMomentDrafts();
+    }
     try {
         sessionStorage.removeItem('sweet_diary_timeline_snapshot');
         sessionStorage.removeItem('sweet_diary_home_scroll_y');
