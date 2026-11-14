@@ -625,12 +625,13 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v4.4.5';
+const APP_VERSION = 'v4.4.6';
 const CONFIG = {
-    version: 'v4.4.5',
+    version: 'v4.4.6',
     date: '2026-11-14',
     title: '双人专属点赞标示上线 💖✨',
     features: [
+        '同频状态精准感知：切后台回微信或页面闲置时自动切换为「暂时切出去了 📱」，超时未归自动收起，切回瞬间秒恢复同频 ✨📱',
         '动态与评论点赞取消人数显示，改为直接展示「小蛇」与「小奚」专属头像昵称标示，一眼看清谁点的赞 ❤️🐍🐟',
         '支持在动态、心情、手账、AI助手及评论区直接拖拽与粘贴（Ctrl+V）上传图片与视频 📸🌸',
         '修复编辑或发布动态时切换后台再切回导致已编辑内容被清空的问题，新增实时草稿自动保存与恢复守护 📝🛡️',
