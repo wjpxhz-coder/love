@@ -625,12 +625,13 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v4.4.4';
+const APP_VERSION = 'v4.4.5';
 const CONFIG = {
-    version: 'v4.4.4',
-    date: '2026-11-07',
-    title: '全场景拖拽与剪贴板 Ctrl+V 媒体上传 📸✨',
+    version: 'v4.4.5',
+    date: '2026-11-14',
+    title: '双人专属点赞标示上线 💖✨',
     features: [
+        '动态与评论点赞取消人数显示，改为直接展示「小蛇」与「小奚」专属头像昵称标示，一眼看清谁点的赞 ❤️🐍🐟',
         '支持在动态、心情、手账、AI助手及评论区直接拖拽与粘贴（Ctrl+V）上传图片与视频 📸🌸',
         '修复编辑或发布动态时切换后台再切回导致已编辑内容被清空的问题，新增实时草稿自动保存与恢复守护 📝🛡️',
         '新增「草莓奶芙猫爪」与「甜心樱花仙女棒」两套全场景 8 态原生矢量鼠标，可在系统设置与「樱花奶蛇团」、系统默认之间零延迟自由切换 🐾🎀',

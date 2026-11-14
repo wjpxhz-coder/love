@@ -2791,7 +2791,8 @@ function createMomentCardElement(item, options = {}) {
     likeButton.id = `moment-like-btn-${momentId}`;
     likeButton.dataset.momentAction = 'toggle-like';
     likeButton.dataset.momentId = String(momentId);
-    likeButton.setAttribute('aria-label', '点赞此动态');
+    likeButton.setAttribute('aria-label', '喜欢此动态');
+    likeButton.setAttribute('aria-pressed', 'false');
     const heartSpan = createMomentNode('span', 'ml-heart');
     heartSpan.innerHTML = '<svg class="svg-icon" aria-hidden="true"><use href="#icon-heart"/></svg>';
     likeButton.append(
