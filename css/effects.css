@@ -107,6 +107,13 @@
 .resonance-ui.show .resonance-hearts {
     animation: heartbeat 1.2s ease-in-out infinite;
 }
+.resonance-ui.show.is-away .resonance-hearts {
+    animation-duration: 2.4s;
+    opacity: 0.78;
+}
+.resonance-ui.is-away .resonance-text {
+    opacity: 0.88;
+}
 .resonance-hearts .heart-icon {
     display: inline-block;
     line-height: 1;
