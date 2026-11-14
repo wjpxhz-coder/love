@@ -300,6 +300,58 @@ function cancelCommentInput(momentId, triggerElement = null) {
     if (fileInput) fileInput.value = '';
 }
 
+function applyCommentLikeButtonState(button, likeActors, isLiked) {
+    if (!button) return;
+    const actors = Array.isArray(likeActors) ? likeActors : [];
+    const hasLikers = actors.length > 0;
+
+    button.classList.toggle('liked', isLiked);
+    button.classList.toggle('has-likers', hasLikers);
+    button.setAttribute('aria-pressed', isLiked ? 'true' : 'false');
+
+    const namesText = actors.map(actor => actor.displayName).join('、');
+    const actionLabel = isLiked ? '取消点赞此评论' : '点赞此评论';
+    button.setAttribute('aria-label', namesText ? `${actionLabel}（${namesText}已赞）` : actionLabel);
+    if (namesText) {
+        button.title = `${namesText} 已赞`;
+    } else {
+        button.removeAttribute('title');
+    }
+
+    const heart = button.querySelector('.like-heart');
+    if (heart) {
+        heart.textContent = isLiked ? '❤️' : '🤍';
+    }
+
+    const contentEl = button.querySelector('.like-count');
+    if (!contentEl) return;
+
+    const fragment = document.createDocumentFragment();
+    if (!hasLikers) {
+        const prompt = document.createElement('span');
+        prompt.className = 'like-action-prompt';
+        prompt.textContent = '赞';
+        fragment.appendChild(prompt);
+    } else {
+        if (!isLiked) {
+            const prompt = document.createElement('span');
+            prompt.className = 'like-action-prompt';
+            prompt.textContent = '赞';
+            const divider = document.createElement('span');
+            divider.className = 'like-actors-divider';
+            divider.setAttribute('aria-hidden', 'true');
+            divider.textContent = '·';
+            fragment.append(prompt, divider);
+        }
+        actors.forEach(actor => {
+            if (typeof window.createLikeActorBadgeElement === 'function') {
+                fragment.appendChild(window.createLikeActorBadgeElement(actor, { variant: 'comment' }));
+            }
+        });
+    }
+    contentEl.replaceChildren(fragment);
+}
+
 function toggleComments(momentId, triggerElement = null) {
     if (!hasCommentAuthContext()) {
         if (typeof openLoginModal === 'function') openLoginModal();
@@ -378,7 +430,7 @@ async function loadComments(momentId, targetCard = null) {
 
     const [{ data: likesData, error: likesError }] = await Promise.all([
         supabaseClient.from('comment_likes')
-            .select('comment_id, user_id')
+            .select('comment_id, user_id, author')
             .in('comment_id', commentIds),
         (allCommentImageRefs.length > 0 && typeof batchResolveMediaUrls === 'function')
             ? batchResolveMediaUrls(allCommentImageRefs).catch(() => {})
@@ -386,11 +438,12 @@ async function loadComments(momentId, targetCard = null) {
     ]);
     if (!isCommentAuthEpochCurrent(requestAuthEpoch) || commentLoadRequests.get(momentId) !== requestId) return;
 
-    const likesMap = {};
+    const likeRowsMap = {};
     const userLikedMap = {};
     if (!likesError && likesData) {
         likesData.forEach(l => {
-            likesMap[l.comment_id] = (likesMap[l.comment_id] || 0) + 1;
+            if (!likeRowsMap[l.comment_id]) likeRowsMap[l.comment_id] = [];
+            likeRowsMap[l.comment_id].push(l);
             if (currentAuthUser && l.user_id === currentAuthUser.id) userLikedMap[l.comment_id] = true;
         });
     }
@@ -416,8 +469,8 @@ async function loadComments(momentId, targetCard = null) {
             const p = allProfilesCache[c.author] || {};
             const displayName = p.nickname || c.author;
             
-            const likeCount = likesMap[c.id] || 0;
-            const isLiked = userLikedMap[c.id] || false;
+            const likeActors = typeof window.resolveLikeActors === 'function' ? window.resolveLikeActors(likeRowsMap[c.id] || []) : [];
+            const isLiked = Boolean(userLikedMap[c.id]);
 
             const textContent = resolvedContents[commentIndex].text;
             const imageUrls = resolvedContents[commentIndex].images;
@@ -562,18 +615,16 @@ async function loadComments(momentId, targetCard = null) {
 
             const likeButton = document.createElement('button');
             likeButton.type = 'button';
-            likeButton.className = `comment-like-btn${isLiked ? ' liked' : ''}`;
+            likeButton.className = 'comment-like-btn';
             likeButton.id = `like-btn-${commentId}`;
-            likeButton.setAttribute('aria-label', `${isLiked ? '取消点赞' : '点赞'}此评论`);
-            likeButton.setAttribute('aria-pressed', isLiked ? 'true' : 'false');
             const heart = document.createElement('span');
             heart.className = 'like-heart';
-            heart.textContent = isLiked ? '❤️' : '🤍';
+            heart.setAttribute('aria-hidden', 'true');
             const count = document.createElement('span');
             count.className = 'like-count';
             count.id = `like-count-${commentId}`;
-            count.textContent = likeCount > 0 ? String(likeCount) : '赞';
             likeButton.append(heart, count);
+            applyCommentLikeButtonState(likeButton, likeActors, isLiked);
             likeButton.addEventListener('click', () => toggleCommentLike(commentId, momentId));
             actionsWrap.appendChild(likeButton);
 
@@ -650,10 +701,11 @@ async function toggleCommentLike(commentId, momentId) {
     if (!lockKey || commentLikeInFlight.has(lockKey)) return;
     commentLikeInFlight.add(lockKey);
 
+    const btns = document.querySelectorAll(`[id="like-btn-${commentId}"]`);
+    btns.forEach(btn => btn.setAttribute('aria-busy', 'true'));
+
     try {
         const requestAuthEpoch = getCommentAuthEpoch();
-
-        const btns = document.querySelectorAll(`[id="like-btn-${commentId}"]`);
         const isLiked = btns.length ? btns[0].classList.contains('liked') : false;
 
         let error = null;
@@ -692,6 +744,7 @@ async function toggleCommentLike(commentId, momentId) {
         await updateSingleLike(commentId);
     } finally {
         commentLikeInFlight.delete(lockKey);
+        document.querySelectorAll(`[id="like-btn-${commentId}"]`).forEach(btn => btn.removeAttribute('aria-busy'));
     }
 }
 
@@ -702,21 +755,16 @@ async function updateSingleLike(commentId) {
     if (!btns.length) return;
 
     const { data, error } = await supabaseClient.from('comment_likes')
-        .select('user_id')
+        .select('user_id, author')
         .eq('comment_id', commentId);
 
     if (error || !isCommentAuthEpochCurrent(requestAuthEpoch)) return;
 
-    const count = data ? data.length : 0;
-    const userLiked = (data && currentAuthUser) ? data.some(l => l.user_id === currentAuthUser.id) : false;
+    const rows = Array.isArray(data) ? data : [];
+    const likeActors = typeof window.resolveLikeActors === 'function' ? window.resolveLikeActors(rows) : [];
+    const userLiked = Boolean(currentAuthUser && rows.some(l => l.user_id === currentAuthUser.id));
 
-    btns.forEach(btn => {
-        const heart = btn.querySelector('.like-heart');
-        const countEl = btn.querySelector('.like-count');
-        if (heart) heart.textContent = userLiked ? '❤️' : '🤍';
-        if (countEl) countEl.textContent = count > 0 ? count : '赞';
-        btn.classList.toggle('liked', userLiked);
-    });
+    btns.forEach(btn => applyCommentLikeButtonState(btn, likeActors, userLiked));
 }
 
 async function deleteComment(commentId, momentId) {
