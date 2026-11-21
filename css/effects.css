@@ -24,9 +24,9 @@
 }
 
 .toast-item {
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: rgba(255, 255, 255, 0.90);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
     color: var(--primary);
     padding: 11px 22px;
     border-radius: 24px;
@@ -35,9 +35,9 @@
     font-size: 0.92em;
     letter-spacing: 0.5px;
     opacity: 0;
-    transform: translateY(-12px) scale(0.92);
-    transition: opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-                transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: translate3d(0, -12px, 0) scale(0.92);
+    transition: opacity 0.28s ease,
+                transform 0.42s var(--ease-spring-snappy);
     border: 1.5px solid var(--border);
     max-width: min(90vw, 420px);
     text-align: center;
@@ -49,16 +49,17 @@
 
 .toast-item.show {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
 }
 
 .toast-item.hide {
     opacity: 0;
-    transform: translateY(-16px) scale(0.92);
+    transform: translate3d(0, -14px, 0) scale(0.94);
+    transition: opacity 0.24s ease, transform 0.24s ease;
 }
 
 [data-theme='dark'] .toast-item {
-    background: rgba(38, 22, 54, 0.88);
+    background: rgba(38, 22, 54, 0.90);
     color: #ff8fab;
     border-color: rgba(255, 143, 171, 0.3);
 }
@@ -297,46 +298,10 @@
     100% { background-position: 0% 50%; }
 }
 
-/* ── 星光粒子层 ── */
-#star-field {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    z-index: 0;
-    overflow: hidden;
-}
-.star {
-    position: absolute;
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 50%;
-    transform: translateZ(0);
-    will-change: transform, opacity;
-    animation: twinkle var(--duration, 3s) ease-in-out infinite;
-}
-@keyframes twinkle {
-    0%, 100% { opacity: 0.2; transform: translateZ(0); }
-    50% { opacity: 0.92; transform: translateZ(0); }
-}
-body.app-page-active #star-field .star,
-body.app-page-active #star-field .shooting-star {
-    animation-play-state: paused !important;
-}
-
-/* ── 爱心与梦幻粒子 ── */
+/* ── 遗留 DOM 星光与 Emoji 粒子兜底（已统一迁移至景深 Canvas 引擎，零冗余合成层） ── */
+#star-field,
 .love-particle {
-    position: fixed;
-    pointer-events: none;
-    z-index: 9999;
-    font-size: 18px;
-    text-shadow: 0 2px 8px rgba(255, 101, 132, 0.45);
-    will-change: transform, opacity;
-    animation: floatUp 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-@keyframes floatUp {
-    0% { opacity: 1; transform: translate3d(0, 0, 0) scale(0.6) rotate(0deg); }
-    30% { transform: translate3d(calc(var(--tx) * 0.4), calc(var(--ty) * 0.4), 0) scale(1.15) rotate(calc(var(--rot) * 0.4)); }
-    100% { opacity: 0; transform: translate3d(var(--tx), var(--ty), 0) scale(0.3) rotate(var(--rot)); }
+    display: none !important;
 }
 
 /* ── 渐变文字 shimmer ── */
@@ -400,28 +365,34 @@ button:hover::after {
     50% { box-shadow: 0 0 0 10px rgba(245, 175, 95, 0), var(--shadow-hover); }
 }
 
-/* ── 卡片跟随光晕 (电脑端悬停显现) ── */
-.anniv-card .glow,
-.timer-card .glow {
-    position: absolute;
-    top: 0; left: 0;
-    width: 140px; height: 140px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255, 163, 181, 0.42), transparent 70%);
-    pointer-events: none;
-    transform: translate3d(0, 0, 0) translate(-50%, -50%);
-    will-change: transform;
-    opacity: 0;
-    transition: opacity 0.35s ease;
-    z-index: 1;
+/* ── 现代卡片漫反射聚光（Linear / Fluent 风格，纯 CSS 变量伪元素，零额外 DOM） ── */
+@media (any-hover: hover) and (any-pointer: fine) {
+    :root:not([data-ambient='calm']) .timer-card::after,
+    :root:not([data-ambient='calm']) .anniv-card::after,
+    :root:not([data-ambient='calm']) .home-topic-card::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0;
+        background: radial-gradient(
+            180px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+            var(--card-spotlight, rgba(244, 63, 94, 0.14)) 0%,
+            transparent 72%
+        );
+        transition: opacity 0.28s ease;
+    }
+
+    :root:not([data-ambient='calm']) .timer-card:hover::after,
+    :root:not([data-ambient='calm']) .anniv-card:hover::after,
+    :root:not([data-ambient='calm']) .home-topic-card:hover::after {
+        opacity: 1;
+    }
 }
 
-.anniv-card:hover .glow,
-.timer-card:hover .glow {
-    opacity: 1;
-}
-
-/* 确保卡片内部文字与图标在光晕上方 */
+/* 确保卡片内部文字与图标在聚光上方 */
 .timer-card .num,
 .timer-card .unit,
 .anniv-card .anniv-icon,
@@ -432,11 +403,25 @@ button:hover::after {
     z-index: 2;
 }
 
-/* 仅在移动端小屏设备上隐藏，彻底杜绝手机端干扰与误触残留 */
-@media (max-width: 768px) {
-    .anniv-card .glow,
-    .timer-card .glow {
-        display: none !important;
+/* ── 现代原生 CSS 滚动驱动入场（零 JS 滚动监听，渐进增强） ── */
+@media (prefers-reduced-motion: no-preference) {
+    @supports ((animation-timeline: view()) and (animation-range: entry)) {
+        @keyframes cardScrollReveal {
+            from {
+                opacity: 0.72;
+                transform: translate3d(0, 18px, 0) scale(0.985);
+            }
+            to {
+                opacity: 1;
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+        }
+
+        :root:not([data-ambient='calm']) .moment-card {
+            animation: cardScrollReveal linear both;
+            animation-timeline: view(block);
+            animation-range: entry 0% entry 24%;
+        }
     }
 }
 
@@ -504,276 +489,64 @@ button:hover::after {
 }
 
 /* ========================================================
-   🦋 一键想你专属：五彩流光发光蝴蝶从底部飞入动效
+   🦋 仪式感爆发画布层（按需挂载，演完即销毁，平时 0 开销）
    ======================================================== */
-#butterfly-miss-container {
+#ceremony-canvas {
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100vw;
     height: 100dvh;
     pointer-events: none;
-    overflow: hidden;
     z-index: 99998;
+    contain: strict;
 }
 
-.butterfly-flight {
-    position: absolute;
-    left: var(--start-x, 50vw);
-    bottom: -70px;
-    width: var(--size, 54px);
-    height: var(--size, 54px);
-    pointer-events: none;
-    will-change: transform, opacity;
-    animation: butterflyFly var(--fly-duration, 5.2s) cubic-bezier(0.25, 0.55, 0.35, 1) var(--fly-delay, 0s) forwards;
-}
-
-.butterfly-body-tilt {
-    width: 100%;
-    height: 100%;
-    transform-style: preserve-3d;
-    perspective: 700px;
-    animation: butterflySway var(--sway-duration, 1.8s) ease-in-out infinite alternate;
-}
-
-.butterfly-model {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    transform-style: preserve-3d;
-    filter: drop-shadow(0 0 6px var(--glow-color, #f472b6));
-    will-change: transform;
-}
-
-/* 优雅呼吸光晕（纯 GPU 合成层，不产生重绘） */
-.butterfly-model::before {
-    content: '';
-    position: absolute;
-    inset: 4%;
-    border-radius: 50%;
-    background: radial-gradient(circle, var(--glow-color, #f472b6) 0%, transparent 72%);
-    opacity: 0.45;
-    pointer-events: none;
-    transform: translateZ(-1px);
-    will-change: opacity, transform;
-    animation: butterflyAuraPulse var(--sway-duration, 1.8s) ease-in-out infinite alternate;
-}
-
-@keyframes butterflyAuraPulse {
-    0% {
-        opacity: 0.32;
-        transform: translateZ(-1px) scale(0.88);
-    }
-    100% {
-        opacity: 0.68;
-        transform: translateZ(-1px) scale(1.16);
-    }
-}
-
-.butterfly-wing {
-    position: absolute;
-    top: 0;
-    width: 50%;
-    height: 100%;
-    transform-style: preserve-3d;
-    backface-visibility: hidden;
-    will-change: transform;
-}
-
-.butterfly-wing.left {
-    right: 50%;
-    transform-origin: right center;
-    animation: flapWingLeft var(--flap-speed, 0.22s) ease-in-out infinite alternate;
-}
-
-.butterfly-wing.right {
-    left: 50%;
-    transform-origin: left center;
-    animation: flapWingRight var(--flap-speed, 0.22s) ease-in-out infinite alternate;
-}
-
-.butterfly-wing svg {
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-    display: block;
-}
-
-.butterfly-wing.right svg {
-    transform: scaleX(-1);
-}
-
-.butterfly-thorax {
-    position: absolute;
-    top: 18%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 4px;
-    height: 64%;
-    background: linear-gradient(to bottom, #ffffff 0%, #ffe4e6 50%, rgba(255, 255, 255, 0.6) 100%);
-    border-radius: 4px;
-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.95);
-    z-index: 5;
-}
-
-/* 灵动微型仙尘拖尾 */
-.butterfly-thorax::after {
-    content: '';
-    position: absolute;
-    top: 75%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 2px;
-    height: 22px;
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95), var(--sparkle-color, #f472b6) 55%, transparent 100%);
-    filter: blur(0.5px);
-    opacity: 0.75;
-    border-radius: 2px;
-    pointer-events: none;
-    animation: bfTrailPulse 0.4s ease-in-out infinite alternate;
-}
-
-@keyframes bfTrailPulse {
-    0% {
-        opacity: 0.5;
-        transform: translateX(-50%) scaleY(0.85);
-    }
-    100% {
-        opacity: 0.85;
-        transform: translateX(-50%) scaleY(1.2);
-    }
-}
-
-.butterfly-antennae {
-    position: absolute;
-    top: 2%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 22px;
-    height: 14px;
-    z-index: 6;
-    pointer-events: none;
-}
-
-@keyframes flapWingLeft {
-    0% { transform: rotateY(0deg) rotateZ(0deg); }
-    100% { transform: rotateY(-72deg) rotateZ(-6deg); }
-}
-
-@keyframes flapWingRight {
-    0% { transform: rotateY(0deg) rotateZ(0deg); }
-    100% { transform: rotateY(72deg) rotateZ(6deg); }
-}
-
-@keyframes butterflySway {
-    0% { transform: rotateZ(calc(var(--base-angle, -6deg) - 16deg)) rotateX(10deg) scale(0.96); }
-    100% { transform: rotateZ(calc(var(--base-angle, -6deg) + 16deg)) rotateX(-6deg) scale(1.04); }
-}
-
-@keyframes butterflyFly {
-    0% {
-        opacity: 0;
-        transform: translate3d(0, 0, 0) scale(0.35);
-    }
-    8% {
-        opacity: 1;
-        transform: translate3d(calc(var(--drift-x1, 35px)), -14vh, 0) scale(0.82);
-    }
-    32% {
-        transform: translate3d(calc(var(--drift-x2, -45px)), -42vh, 0) scale(1);
-    }
-    62% {
-        opacity: 0.96;
-        transform: translate3d(calc(var(--drift-x3, 55px)), -75vh, 0) scale(1.06);
-    }
-    88% {
-        opacity: 0.9;
-    }
-    100% {
-        opacity: 0;
-        transform: translate3d(calc(var(--drift-x4, -30px)), -120vh, 0) scale(0.88);
-    }
-}
-
-/* 纯 GPU 驱动的鳞粉洒落尾迹，零 JS 回流 */
-.butterfly-sparkle-trail {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    pointer-events: none;
-    z-index: 2;
-}
-
-.bf-sparkle {
-    position: absolute;
-    top: 0;
+.ceremony-horizon-glow {
+    position: fixed;
     left: 0;
-    border-radius: 50%;
-    background: radial-gradient(circle, #ffffff 30%, var(--sparkle-color, #f472b6) 80%, transparent 100%);
-    box-shadow: 0 0 5px #ffffff, 0 0 9px var(--sparkle-color, #f472b6);
-    opacity: 0;
+    right: 0;
+    bottom: 0;
+    height: 36vh;
     pointer-events: none;
-    will-change: transform, opacity;
+    z-index: 99997;
+    background: radial-gradient(
+        ellipse 80% 100% at 50% 100%,
+        rgba(244, 114, 182, 0.24) 0%,
+        rgba(251, 191, 36, 0.14) 38%,
+        transparent 74%
+    );
+    opacity: 0;
+    transform: translate3d(0, 12%, 0) scaleY(0.9);
+    animation: ceremonyHorizonPulse 2.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-.bf-sparkle.sp1 {
-    width: 5px;
-    height: 5px;
-    animation: bfSparkleDrop 1.1s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
-    animation-delay: 0s;
-    --sx1: -8px;
-    --sx2: -15px;
+[data-theme='dark'] .ceremony-horizon-glow {
+    background: radial-gradient(
+        ellipse 80% 100% at 50% 100%,
+        rgba(251, 113, 133, 0.28) 0%,
+        rgba(192, 132, 252, 0.18) 42%,
+        transparent 75%
+    );
 }
 
-.bf-sparkle.sp2 {
-    width: 4px;
-    height: 4px;
-    animation: bfSparkleDrop 1.25s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
-    animation-delay: 0.28s;
-    --sx1: 7px;
-    --sx2: 14px;
-}
-
-.bf-sparkle.sp3 {
-    width: 6px;
-    height: 6px;
-    animation: bfSparkleDrop 1.35s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
-    animation-delay: 0.58s;
-    --sx1: -12px;
-    --sx2: -7px;
-}
-
-.bf-sparkle.sp4 {
-    width: 3.5px;
-    height: 3.5px;
-    animation: bfSparkleDrop 1.15s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
-    animation-delay: 0.85s;
-    --sx1: 9px;
-    --sx2: 5px;
-}
-
-@keyframes bfSparkleDrop {
+@keyframes ceremonyHorizonPulse {
     0% {
         opacity: 0;
-        transform: translate3d(0, 0, 0) scale(0.3);
+        transform: translate3d(0, 16%, 0) scaleY(0.85);
     }
-    18% {
-        opacity: 0.95;
-        transform: translate3d(var(--sx1, 0px), 16px, 0) scale(1.15);
-    }
-    65% {
-        opacity: 0.75;
+    24% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scaleY(1);
     }
     100% {
         opacity: 0;
-        transform: translate3d(var(--sx2, 0px), 75px, 0) scale(0.15);
+        transform: translate3d(0, -6%, 0) scaleY(1.06);
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    #butterfly-miss-container {
+    #ceremony-canvas,
+    .ceremony-horizon-glow {
         display: none !important;
     }
 }
@@ -952,14 +725,27 @@ button:hover::after {
     }
 }
 
-/* 11. 减弱动态效果无障碍适配降级 */
+/* 11. 减弱动态效果无障碍适配（仅停用位移/循环动画，保留平滑的色值与透明度状态反馈） */
 @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
+    html {
         scroll-behavior: auto !important;
+    }
+
+    .resonance-ui.show .resonance-hearts,
+    .anniv-card.today,
+    .locked-icon,
+    .recording-active,
+    .moment-card {
+        animation: none !important;
+    }
+
+    .timer-card,
+    .anniv-card,
+    .moment-card,
+    .toast-item,
+    button {
+        transition-property: color, background-color, border-color, opacity !important;
+        transition-duration: 0.16s !important;
+        transition-timing-function: ease !important;
     }
 }

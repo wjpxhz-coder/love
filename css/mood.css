@@ -2,16 +2,14 @@
 .mood-section {
     position: static;
     top: auto;
-    background: var(--glass-surface);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
+    background: var(--card-surface);
     border: 1.5px solid var(--border);
     outline: none;
     border-radius: var(--jelly-radius-lg, 28px);
     padding: 24px 22px;
     box-shadow: var(--shadow-soft), inset 0 1.5px 1px var(--glass-highlight);
     margin: 0;
-    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease, border-color 0.25s ease;
+    transition: transform 0.35s var(--ease-spring-gentle), box-shadow 0.28s ease, border-color 0.25s ease;
 }
 
 .mood-section:hover {

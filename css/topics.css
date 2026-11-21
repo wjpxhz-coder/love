@@ -9,13 +9,11 @@
     padding: 24px 22px;
     position: relative;
     z-index: 2;
-    background: var(--glass-surface);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
+    background: var(--card-surface);
     border: 1.5px solid var(--border);
     border-radius: var(--jelly-radius-lg, 28px);
     box-shadow: var(--shadow-soft), inset 0 1.5px 1px var(--glass-highlight);
-    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease, border-color 0.25s ease;
+    transition: transform 0.35s var(--ease-spring-gentle), box-shadow 0.28s ease, border-color 0.25s ease;
 }
 
 .home-topics-section:hover {
@@ -127,12 +125,11 @@
         opacity 0.25s ease;
     position: relative;
     overflow: hidden;
-    backdrop-filter: blur(10px);
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
     gap: 6px;
-    box-shadow: 0 6px 20px rgba(255, 182, 193, 0.15);
+    box-shadow: 0 6px 20px rgba(255, 182, 193, 0.15), inset 0 1px 0 var(--glass-highlight);
 }
 
 .home-topic-card::before {

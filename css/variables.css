@@ -40,13 +40,23 @@
     --strong-shadow: 0 20px 52px rgba(244, 63, 94, 0.18);
     --soft-shadow: 0 10px 30px rgba(244, 63, 94, 0.10);
 
-    /* 现代毛玻璃表面 */
+    /* 现代毛玻璃表面（小面积浮层专用）与轻奢高透卡片表面（无动态背景模糊冲突） */
     --glass-bg: rgba(255, 255, 255, 0.78);
-    --glass-surface: rgba(255, 255, 255, 0.82);
+    --glass-surface: rgba(255, 255, 255, 0.88);
     --glass-border: rgba(255, 255, 255, 0.92);
-    --glass-highlight: rgba(255, 255, 255, 0.95);
-    --glass-blur: blur(20px) saturate(180%);
-    --moment-bg: rgba(255, 255, 255, 0.88);
+    --glass-highlight: rgba(255, 255, 255, 0.96);
+    --glass-blur: blur(18px) saturate(165%);
+    --card-surface: linear-gradient(155deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 245, 249, 0.88) 100%);
+    --card-surface-border: rgba(255, 255, 255, 0.94);
+    --card-spotlight: rgba(244, 63, 94, 0.14);
+    --card-spotlight-border: rgba(244, 63, 94, 0.42);
+    --moment-bg: rgba(255, 255, 255, 0.90);
+
+    /* 现代物理弹簧缓动令牌（Baseline 广泛支持 linear()，自动降级至 cubic-bezier） */
+    --ease-spring-snappy: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-spring-gentle: cubic-bezier(0.22, 1, 0.36, 1);
+    --in-oklab: ;
+    --in-oklch: ;
 
     --bg-1: #fff2f6;
     --bg-2: #fce7f3;
@@ -103,12 +113,16 @@
     --shadow: rgba(0, 0, 0, 0.45);
     --shadow-strong-color: rgba(0, 0, 0, 0.60);
     
-    --glass-bg: rgba(37, 22, 53, 0.62);
-    --glass-surface: rgba(30, 18, 32, 0.76);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-highlight: rgba(255, 255, 255, 0.12);
-    --glass-blur: blur(24px) saturate(190%);
-    --moment-bg: rgba(40, 24, 58, 0.85);
+    --glass-bg: rgba(37, 22, 53, 0.68);
+    --glass-surface: rgba(34, 21, 49, 0.86);
+    --glass-border: rgba(255, 255, 255, 0.13);
+    --glass-highlight: rgba(255, 255, 255, 0.14);
+    --glass-blur: blur(20px) saturate(175%);
+    --card-surface: linear-gradient(155deg, rgba(44, 27, 63, 0.90) 0%, rgba(28, 17, 42, 0.88) 100%);
+    --card-surface-border: rgba(255, 185, 210, 0.18);
+    --card-spotlight: rgba(251, 113, 133, 0.18);
+    --card-spotlight-border: rgba(251, 180, 200, 0.45);
+    --moment-bg: rgba(40, 24, 58, 0.88);
     
     --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.45);
     --shadow-hover: 0 20px 48px rgba(0, 0, 0, 0.65), 0 0 20px var(--primary-glow);
@@ -136,6 +150,20 @@
     --border-color-light: var(--border);
     --theme-pink: var(--primary);
     --theme-pink-light: var(--primary-subtle);
+}
+
+@supports (background: linear-gradient(in oklab, white, black)) {
+    :root {
+        --in-oklab: in oklab;
+        --in-oklch: in oklch;
+    }
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+    :root {
+        --ease-spring-snappy: linear(0, 0.009, 0.035 2.1%, 0.141, 0.281 6.7%, 0.723 12.9%, 0.938 16.7%, 1.017, 1.077, 1.121, 1.149 24.3%, 1.159, 1.163, 1.161, 1.154 29.9%, 1.129 32.8%, 1.051 39.6%, 1.017 43.1%, 0.991, 0.977 51%, 0.974 53.8%, 0.975 57.1%, 0.997 69.8%, 1.003 76.9%, 1.004 83.8%, 1);
+        --ease-spring-gentle: linear(0, 0.004, 0.016, 0.035, 0.063, 0.098, 0.141 13.6%, 0.25, 0.391, 0.563, 0.765, 0.888, 0.962, 1.008 42.3%, 1.028 48.2%, 1.032 54.4%, 1.025 62.1%, 1.008 75.5%, 1.001 86.2%, 1);
+    }
 }
 
 /* ==========================================================================

@@ -742,18 +742,12 @@ dialog.native-dialog.app-page::backdrop {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .app-page.is-active {
-        animation: none;
-    }
-
     .app-page,
-    .app-page *,
-    .app-page *::before,
-    .app-page *::after {
+    .app-page.is-active,
+    .app-page.is-leaving {
         scroll-behavior: auto !important;
-        transition-duration: 0.01ms !important;
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
+        animation: none !important;
+        transition: opacity 0.15s ease !important;
     }
 
     #login-overlay.app-page .login-canvas,

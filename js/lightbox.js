@@ -519,6 +519,7 @@ function openLightbox(src, options = {}) {
         lightboxPreviousBodyOverflow = document.body.style.overflow;
         setLightboxBackgroundInert(true);
         document.body.style.overflow = 'hidden';
+        window.homeSakuraEffect?.setSuspended?.(true, 'lightbox');
     }
     lightbox.inert = false;
 
@@ -585,6 +586,7 @@ function closeLightbox(event) {
     setLightboxBackgroundInert(false);
     document.body.style.overflow = lightboxPreviousBodyOverflow;
     lightboxPreviousBodyOverflow = '';
+    window.homeSakuraEffect?.setSuspended?.(false, 'lightbox');
 
     if (lightboxPreviousFocus && typeof lightboxPreviousFocus.focus === 'function') {
         lightboxPreviousFocus.focus({ preventScroll: true });

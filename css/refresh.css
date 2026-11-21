@@ -24,33 +24,7 @@ body {
     color: var(--text);
 }
 
-#bg-layer {
-    background:
-        radial-gradient(circle at 15% 15%, rgba(255, 192, 215, 0.65) 0%, transparent 45rem),
-        radial-gradient(circle at 85% 20%, rgba(235, 215, 255, 0.65) 0%, transparent 42rem),
-        radial-gradient(circle at 50% 85%, rgba(255, 225, 238, 0.7) 0%, transparent 48rem),
-        linear-gradient(145deg, #fff0f5 0%, #fce7f3 45%, #f5e8ff 100%);
-}
-
-[data-theme='dark'] #bg-layer {
-    background:
-        radial-gradient(circle at 20% 15%, rgba(255, 143, 171, 0.16) 0%, transparent 40rem),
-        radial-gradient(circle at 80% 30%, rgba(192, 132, 252, 0.18) 0%, transparent 40rem),
-        radial-gradient(circle at 50% 80%, rgba(236, 72, 153, 0.12) 0%, transparent 45rem),
-        linear-gradient(145deg, var(--bg-1), var(--bg-2) 50%, var(--bg-3));
-}
-
-#sakura-canvas,
-#sakura-canvas-foreground {
-    opacity: 1;
-    pointer-events: none;
-    transform: translateZ(0);
-    will-change: transform;
-}
-
-#star-field {
-    opacity: 0.5;
-}
+/* 背景极光流体层与景深粒子画布由 base.css 统一维护 */
 
 button {
     font-weight: 700;
@@ -883,6 +857,8 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
     border-radius: 0;
     color: var(--text);
     background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     box-shadow: none;
     text-align: left;
 }
@@ -1766,15 +1742,6 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
 
     body[data-auth-state='unlocked'] {
         padding-bottom: calc(98px + env(safe-area-inset-bottom));
-    }
-
-    #sakura-canvas,
-    #sakura-canvas-foreground {
-        opacity: 1;
-    }
-
-    #star-field {
-        opacity: 0.12;
     }
 
     .status-bar-shield {

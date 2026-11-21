@@ -1,1028 +1,1268 @@
-// ==========================================
-// 2. 蝴蝶与樱花动画引擎 (高刷丝滑 & 饱满漫天花雨)
-// ==========================================
-const animationsReducedMotionQuery = typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)')
-    : null;
+// ==========================================================================
+// 现代电影景深浮屏水彩桃花雨引擎 (js/animations.js)
+// - 4×3 单张离屏 Texture Atlas 预烘焙（3色水彩单瓣 / 五瓣桃花 / 双瓣并蒂 /
+//   爱心花瓣 / 镜头柔焦虚化大花瓣 Bokeh Petal / 光学星尘）
+// - 全屏单层浮屏 Canvas（浮于卡片之上、严格低于顶栏与弹窗，零毛玻璃冲突）
+// - 薄纱半透明质感 + 矩阵直写 (setTransform) 取代每粒子 save/restore
+// - 对象池零 GC 光学微涟漪与花瓣星屑 + 夜间 lighter 光学叠加 + 掉帧自保护
+// - 支持三档氛围控制：dream(饱满景深桃花雨) / light(稀疏微风落花) / calm(静谧省电)
+// ==========================================================================
 
-function getAnimationDevicePixelRatio() {
-    return Math.min(Math.max(window.devicePixelRatio || 1, 1), 1.25);
-}
+(function initModernPeachRainEngine() {
+    const reducedMotionQuery = typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-reduced-motion: reduce)')
+        : null;
 
-function sizeAnimationCanvas(canvas, context, width, height) {
-    const dpr = getAnimationDevicePixelRatio();
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
-    context.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-
-(function setupHomeSakuraEffect() {
-    const canvasBg = document.getElementById('sakura-canvas');
-    const canvasFg = document.getElementById('sakura-canvas-foreground');
-    if (!canvasBg || !canvasFg) return;
-    const ctxBg = canvasBg.getContext('2d', { alpha: true });
-    const ctxFg = canvasFg.getContext('2d', { alpha: true });
-    if (!ctxBg || !ctxFg) return;
-
+    const ATLAS_CELL = 128;
+    const ATLAS_COLS = 4;
+    const ATLAS_ROWS = 3;
+    const MAX_DELTA_SEC = 0.05;
     const MOBILE_BREAKPOINT = 768;
-    const MAX_DELTA_SEC = 0.05; // 限制单帧最大步长，防后台切回飞跳
 
-    let canvasWidth = Math.max(window.innerWidth, 1);
-    let canvasHeight = Math.max(window.innerHeight, 1);
-    let isMobile = canvasWidth < MOBILE_BREAKPOINT;
-    let baseWind = 1.15;
-    let bgPetals = [];
-    let fgPetals = [];
-    let burstPetals = [];
-    let animationFrameId = null;
-    let routeActive = isInitialHomeLocation();
-    let isSuspended = false;
-    let lastRafTimestamp = 0;
-    let simTime = 0;
-    let resizeTimer = null;
-
-    let appearance = {
-        theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
-        bothOnline: false
-    };
-
-    function isInitialHomeLocation() {
-        const hash = window.location.hash;
-        return !hash
-            || hash === '#'
-            || !hash.startsWith('#/')
-            || hash === '#/'
-            || hash.startsWith('#/?');
+    // ── 工具函数：读取全局氛围档位与硬件能力 ──
+    function getAmbientMode() {
+        const attr = document.documentElement.getAttribute('data-ambient');
+        if (attr === 'dream' || attr === 'light' || attr === 'calm') return attr;
+        try {
+            const saved = localStorage.getItem('ambient_preference');
+            if (saved === 'dream' || saved === 'light' || saved === 'calm') return saved;
+        } catch (_e) {}
+        if (navigator.connection?.saveData) return 'light';
+        return 'dream';
     }
 
-    // 鼠标微风交互状态与平滑衰减 (节流处理，防止高采样率鼠标消耗过多性能)
-    const mouse = {
-        x: -2000,
-        y: -2000,
-        vx: 0,
-        vy: 0,
-        lastX: 0,
-        lastY: 0,
-        lastTime: 0,
-        active: false
-    };
+    function isLowPowerDevice() {
+        const cores = navigator.hardwareConcurrency || 4;
+        const mem = navigator.deviceMemory || 4;
+        return Boolean(navigator.connection?.saveData) || cores <= 2 || mem <= 2;
+    }
 
-    let lastMouseMoveTime = 0;
-    window.addEventListener('mousemove', (e) => {
-        if (!routeActive || isSuspended || document.hidden) return;
-        const now = performance.now();
-        if (now - lastMouseMoveTime < 24) return; // ~40Hz 采样节流
-        lastMouseMoveTime = now;
-        const dt = Math.max(1, now - (mouse.lastTime || now - 16));
-        mouse.vx = Math.max(-15, Math.min(15, (e.clientX - mouse.lastX) / dt * 10));
-        mouse.vy = Math.max(-15, Math.min(15, (e.clientY - mouse.lastY) / dt * 10));
-        mouse.x = e.clientX;
-        mouse.y = e.clientY;
-        mouse.lastX = e.clientX;
-        mouse.lastY = e.clientY;
-        mouse.lastTime = now;
-        mouse.active = true;
-    }, { passive: true });
+    function getCanvasDpr(isMobile) {
+        const raw = Math.max(window.devicePixelRatio || 1, 1);
+        if (isMobile) return Math.min(raw, 1.1);
+        return isLowPowerDevice() ? Math.min(raw, 1.0) : Math.min(raw, 1.25);
+    }
 
-    function getPalette(theme, online) {
+    // ── 轻奢薄纱水彩桃花色盘（低饱和高级通透，昼夜与同频在线自适应） ──
+    function buildPalette(theme, bothOnline) {
         const isDark = theme === 'dark';
         if (isDark) {
             return {
-                shades: [
-                    { c1: '#4a263d', c2: '#d87093', c3: '#ffb6c1', vein: 'rgba(255, 200, 220, 0.55)', aura: 'rgba(255, 182, 193, 0.4)' },
-                    { c1: '#361b3b', c2: '#c7608e', c3: '#f79ac0', vein: 'rgba(247, 154, 192, 0.5)', aura: 'rgba(247, 154, 192, 0.35)' },
-                    { c1: '#421f44', c2: '#e580a8', c3: '#ffd1e0', vein: 'rgba(255, 220, 235, 0.6)', aura: 'rgba(255, 209, 224, 0.45)' }
+                isDark: true,
+                petals: [
+                    { c1: 'rgba(255, 244, 248, 0.94)', c2: 'rgba(248, 168, 196, 0.88)', c3: 'rgba(218, 92, 138, 0.84)', vein: 'rgba(255, 234, 242, 0.56)' },
+                    { c1: 'rgba(255, 238, 246, 0.92)', c2: 'rgba(232, 146, 196, 0.86)', c3: 'rgba(182, 86, 166, 0.82)', vein: 'rgba(252, 224, 244, 0.52)' },
+                    { c1: 'rgba(255, 249, 238, 0.92)', c2: bothOnline ? 'rgba(253, 214, 130, 0.88)' : 'rgba(252, 182, 206, 0.88)', c3: bothOnline ? 'rgba(224, 144, 52, 0.84)' : 'rgba(202, 88, 132, 0.82)', vein: 'rgba(255, 242, 222, 0.54)' }
                 ],
-                butterfly: { wing: '#f09ebb', body: '#9c6f80', cream: '#fcedea' },
-                stardust: online ? 'rgba(255, 223, 100, 0.9)' : 'rgba(255, 192, 203, 0.75)',
-                goldAccent: online ? '#ffd166' : null
+                blossomCore: bothOnline ? '#fcd34d' : '#fda4af',
+                blossomPollen: bothOnline ? '#fef3c7' : '#ffffff',
+                bokeh: [
+                    { inner: 'rgba(251, 132, 166, 0.28)', mid: 'rgba(244, 114, 182, 0.14)', outer: 'rgba(244, 114, 182, 0)' },
+                    { inner: bothOnline ? 'rgba(251, 191, 36, 0.26)' : 'rgba(196, 142, 252, 0.26)', mid: bothOnline ? 'rgba(251, 191, 36, 0.12)' : 'rgba(192, 132, 252, 0.12)', outer: 'rgba(192, 132, 252, 0)' }
+                ],
+                dust: [
+                    { core: '#ffffff', mid: 'rgba(253, 196, 218, 0.78)', outer: 'rgba(244, 114, 182, 0.18)' },
+                    { core: '#fffdf4', mid: bothOnline ? 'rgba(253, 224, 128, 0.88)' : 'rgba(216, 180, 254, 0.76)', outer: bothOnline ? 'rgba(251, 191, 36, 0.20)' : 'rgba(168, 85, 247, 0.18)' },
+                    { core: '#ffffff', mid: 'rgba(255, 228, 236, 0.80)', outer: 'rgba(251, 113, 133, 0.16)' }
+                ],
+                rippleStroke: bothOnline ? 'rgba(253, 214, 138, 0.54)' : 'rgba(253, 164, 175, 0.50)',
+                rippleFill: bothOnline ? 'rgba(251, 191, 36, 0.14)' : 'rgba(244, 114, 182, 0.14)',
+                goldRim: bothOnline ? 'rgba(253, 224, 128, 0.50)' : null
             };
         }
         return {
-            shades: [
-                { c1: '#ffffff', c2: '#ff809b', c3: '#ff4d6d', vein: 'rgba(255, 255, 255, 0.75)', aura: 'rgba(255, 105, 135, 0.3)' },
-                { c1: '#fff2f5', c2: '#ff94b0', c3: '#f72585', vein: 'rgba(255, 255, 255, 0.68)', aura: 'rgba(247, 37, 133, 0.25)' },
-                { c1: '#ffffff', c2: '#ffb3cb', c3: '#e05780', vein: 'rgba(255, 255, 255, 0.85)', aura: 'rgba(224, 87, 128, 0.3)' }
+            isDark: false,
+            petals: [
+                { c1: 'rgba(255, 236, 243, 0.94)', c2: 'rgba(255, 146, 180, 0.90)', c3: 'rgba(238, 72, 118, 0.88)', vein: 'rgba(255, 255, 255, 0.82)', rim: 'rgba(238, 72, 118, 0.16)' },
+                { c1: 'rgba(255, 230, 240, 0.92)', c2: 'rgba(252, 162, 194, 0.90)', c3: 'rgba(224, 82, 138, 0.86)', vein: 'rgba(255, 255, 255, 0.84)', rim: 'rgba(224, 82, 138, 0.15)' },
+                { c1: 'rgba(255, 244, 238, 0.92)', c2: bothOnline ? 'rgba(252, 200, 108, 0.90)' : 'rgba(218, 168, 250, 0.88)', c3: bothOnline ? 'rgba(224, 136, 36, 0.86)' : 'rgba(176, 98, 224, 0.84)', vein: 'rgba(255, 255, 255, 0.80)', rim: bothOnline ? 'rgba(224, 136, 36, 0.16)' : 'rgba(176, 98, 224, 0.15)' }
             ],
-            butterfly: { wing: '#e26d8b', body: '#6e4550', cream: '#ffe5dd' },
-            stardust: online ? 'rgba(255, 215, 60, 0.95)' : 'rgba(255, 182, 193, 0.8)',
-            goldAccent: online ? '#ffd166' : null
+            blossomCore: bothOnline ? '#f59e0b' : '#f43f5e',
+            blossomPollen: bothOnline ? '#fef08a' : '#ffffff',
+            bokeh: [
+                { inner: 'rgba(244, 96, 144, 0.34)', mid: 'rgba(252, 148, 184, 0.16)', outer: 'rgba(252, 148, 184, 0)' },
+                { inner: bothOnline ? 'rgba(245, 166, 48, 0.32)' : 'rgba(186, 128, 246, 0.30)', mid: bothOnline ? 'rgba(252, 204, 114, 0.14)' : 'rgba(208, 168, 250, 0.14)', outer: 'rgba(208, 168, 250, 0)' }
+            ],
+            dust: [
+                { core: '#fff5f8', mid: 'rgba(244, 96, 144, 0.78)', outer: 'rgba(244, 63, 94, 0.18)' },
+                { core: '#fffdf2', mid: bothOnline ? 'rgba(245, 158, 11, 0.84)' : 'rgba(182, 116, 246, 0.76)', outer: bothOnline ? 'rgba(245, 158, 11, 0.20)' : 'rgba(168, 85, 247, 0.16)' },
+                { core: '#ffffff', mid: 'rgba(251, 132, 166, 0.78)', outer: 'rgba(244, 114, 182, 0.16)' }
+            ],
+            rippleStroke: bothOnline ? 'rgba(245, 158, 11, 0.52)' : 'rgba(244, 63, 94, 0.48)',
+            rippleFill: bothOnline ? 'rgba(251, 191, 36, 0.15)' : 'rgba(251, 113, 133, 0.16)',
+            goldRim: bothOnline ? 'rgba(245, 176, 62, 0.46)' : null
         };
     }
 
-    let currentPalette = getPalette(appearance.theme, appearance.bothOnline);
+    // 绘制一片标准水彩桃花单瓣（带顶端温柔微缺口 + 脉纹）
+    function drawWatercolorPetalShape(c, s, shade, goldRim) {
+        c.beginPath();
+        c.moveTo(0, 0);
+        c.bezierCurveTo(-s * 0.88, -s * 0.48, -s * 0.76, -s * 1.44, -s * 0.14, -s * 1.72);
+        c.quadraticCurveTo(0, -s * 1.50, s * 0.14, -s * 1.72);
+        c.bezierCurveTo(s * 0.76, -s * 1.44, s * 0.88, -s * 0.48, 0, 0);
+        c.closePath();
 
-    // ── 离屏高质量纹理预烘焙缓存（完全消除每帧渐变与复杂曲线开销） ──
-    const petalTextures = {
-        petals: [],
-        twinPetals: [],
-        blossoms: [],
-        heartPetals: [],
-        stardust: []
-    };
+        const grad = c.createRadialGradient(0, -s * 0.35, 1, 0, -s * 0.95, s * 1.38);
+        grad.addColorStop(0, shade.c1);
+        grad.addColorStop(0.56, shade.c2);
+        grad.addColorStop(1, shade.c3);
+        c.fillStyle = grad;
+        c.fill();
 
-    function bakeTextures() {
-        const palette = currentPalette;
-        const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
-        const TEX_SIZE = 64;
-        const texDim = Math.round(TEX_SIZE * dpr);
+        // 柔和丝绸内高光
+        c.beginPath();
+        c.moveTo(-s * 0.08, -s * 0.22);
+        c.bezierCurveTo(-s * 0.46, -s * 0.56, -s * 0.40, -s * 1.18, -s * 0.10, -s * 1.36);
+        c.bezierCurveTo(-s * 0.22, -s * 1.02, -s * 0.22, -s * 0.58, -s * 0.08, -s * 0.22);
+        c.fillStyle = 'rgba(255, 255, 255, 0.26)';
+        c.fill();
 
-        petalTextures.petals = [];
-        petalTextures.twinPetals = [];
-        petalTextures.blossoms = [];
-        petalTextures.heartPetals = [];
-        petalTextures.stardust = [];
+        // 纤细中心脉纹
+        c.beginPath();
+        c.moveTo(0, -s * 0.14);
+        c.quadraticCurveTo(s * 0.05, -s * 0.78, 0, -s * 1.34);
+        c.strokeStyle = shade.vein;
+        c.lineWidth = Math.max(0.9, s * 0.032);
+        c.lineCap = 'round';
+        c.stroke();
 
-        // 1. 预烘焙 3 种色调的拟真单瓣桃花 (Petal)
-        for (let i = 0; i < palette.shades.length; i++) {
-            const shade = palette.shades[i];
-            const canvas = document.createElement('canvas');
-            canvas.width = texDim;
-            canvas.height = texDim;
-            const ctx = canvas.getContext('2d');
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-            const cx = 32;
-            const cy = 56;
-            const s = 26;
-
-            ctx.save();
-            ctx.translate(cx, cy);
-
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.bezierCurveTo(-s * 0.85, -s * 0.55, -s * 0.75, -s * 1.5, 0, -s * 1.85);
-            ctx.bezierCurveTo(s * 0.75, -s * 1.5, s * 0.85, -s * 0.55, 0, 0);
-
-            const grad = ctx.createRadialGradient(0, -s * 0.4, 0, 0, -s * 0.95, s * 1.25);
-            grad.addColorStop(0, shade.c1);
-            grad.addColorStop(0.65, shade.c2);
-            grad.addColorStop(1, shade.c3);
-            ctx.fillStyle = grad;
-            ctx.fill();
-
-            // 中心立体脉纹
-            ctx.beginPath();
-            ctx.moveTo(0, -s * 0.1);
-            ctx.quadraticCurveTo(s * 0.06, -s * 0.8, 0, -s * 1.45);
-            ctx.strokeStyle = shade.vein;
-            ctx.lineWidth = 0.8;
-            ctx.stroke();
-
-            // 在线金色微光
-            if (appearance.bothOnline && palette.goldAccent) {
-                ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)';
-                ctx.lineWidth = 0.9;
-                ctx.stroke();
-            }
-
-            ctx.restore();
-            petalTextures.petals.push(canvas);
-        }
-
-        // 2. 预烘焙 3 种双瓣并蒂落花 (Twin Petals)
-        for (let i = 0; i < palette.shades.length; i++) {
-            const shade = palette.shades[i];
-            const canvas = document.createElement('canvas');
-            canvas.width = texDim;
-            canvas.height = texDim;
-            const ctx = canvas.getContext('2d');
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-            const cx = 32;
-            const cy = 36;
-            const s = 18;
-
-            ctx.save();
-            ctx.translate(cx, cy);
-
-            // 第一片花瓣 (偏左)
-            ctx.save();
-            ctx.rotate(-0.35);
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.bezierCurveTo(-s * 0.8, -s * 0.6, -s * 0.7, -s * 1.5, 0, -s * 1.8);
-            ctx.bezierCurveTo(s * 0.7, -s * 1.5, s * 0.8, -s * 0.6, 0, 0);
-            const grad1 = ctx.createRadialGradient(0, -s * 0.4, 0, 0, -s * 0.9, s * 1.2);
-            grad1.addColorStop(0, shade.c1);
-            grad1.addColorStop(0.7, shade.c2);
-            grad1.addColorStop(1, shade.c3);
-            ctx.fillStyle = grad1;
-            ctx.fill();
-            ctx.restore();
-
-            // 第二片花瓣 (偏右叠合)
-            ctx.save();
-            ctx.rotate(0.32);
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.bezierCurveTo(-s * 0.8, -s * 0.6, -s * 0.7, -s * 1.5, 0, -s * 1.8);
-            ctx.bezierCurveTo(s * 0.7, -s * 1.5, s * 0.8, -s * 0.6, 0, 0);
-            const grad2 = ctx.createRadialGradient(0, -s * 0.4, 0, 0, -s * 0.9, s * 1.2);
-            grad2.addColorStop(0, shade.c1);
-            grad2.addColorStop(0.7, shade.c2);
-            grad2.addColorStop(1, shade.c3);
-            ctx.fillStyle = grad2;
-            ctx.fill();
-            ctx.restore();
-
-            ctx.restore();
-            petalTextures.twinPetals.push(canvas);
-        }
-
-        // 3. 预烘焙 3 种盛开五瓣小桃花 (Blossom)
-        for (let i = 0; i < palette.shades.length; i++) {
-            const shade = palette.shades[i];
-            const canvas = document.createElement('canvas');
-            canvas.width = texDim;
-            canvas.height = texDim;
-            const ctx = canvas.getContext('2d');
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-            const cx = 32;
-            const cy = 32;
-            const bs = 16;
-
-            ctx.save();
-            ctx.translate(cx, cy);
-
-            for (let b = 0; b < 5; b++) {
-                ctx.save();
-                ctx.rotate(b * Math.PI * 2 / 5);
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.bezierCurveTo(-bs * 0.5, -bs * 0.4, -bs * 0.45, -bs * 0.95, 0, -bs * 1.2);
-                ctx.bezierCurveTo(bs * 0.45, -bs * 0.95, bs * 0.5, -bs * 0.4, 0, 0);
-                const bgrad = ctx.createRadialGradient(0, -bs * 0.2, 0, 0, -bs * 0.6, bs * 0.95);
-                bgrad.addColorStop(0, shade.c1);
-                bgrad.addColorStop(0.7, shade.c2);
-                bgrad.addColorStop(1, shade.c3);
-                ctx.fillStyle = bgrad;
-                ctx.fill();
-                ctx.restore();
-            }
-
-            // 花蕊核心
-            ctx.beginPath();
-            ctx.arc(0, 0, bs * 0.24, 0, Math.PI * 2);
-            ctx.fillStyle = appearance.bothOnline ? '#ffd166' : (appearance.theme === 'dark' ? '#ffccd5' : '#ff3366');
-            ctx.fill();
-
-            // 花蕊微点
-            for (let d = 0; d < 5; d++) {
-                const angle = d * Math.PI * 2 / 5;
-                const r = bs * 0.38;
-                ctx.beginPath();
-                ctx.arc(Math.cos(angle) * r, Math.sin(angle) * r, 0.9, 0, Math.PI * 2);
-                ctx.fillStyle = appearance.bothOnline ? '#fff0a0' : '#ffffff';
-                ctx.fill();
-            }
-
-            ctx.restore();
-            petalTextures.blossoms.push(canvas);
-        }
-
-        // 4. 预烘焙 3 种浪漫爱心小花瓣 (Heart Petal)
-        for (let i = 0; i < palette.shades.length; i++) {
-            const shade = palette.shades[i];
-            const canvas = document.createElement('canvas');
-            canvas.width = texDim;
-            canvas.height = texDim;
-            const ctx = canvas.getContext('2d');
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-            const cx = 32;
-            const cy = 32;
-            const hs = 14;
-
-            ctx.save();
-            ctx.translate(cx, cy);
-
-            ctx.beginPath();
-            ctx.moveTo(0, hs * 0.7);
-            ctx.bezierCurveTo(-hs * 1.3, -hs * 0.3, -hs * 0.8, -hs * 1.2, 0, -hs * 0.5);
-            ctx.bezierCurveTo(hs * 0.8, -hs * 1.2, hs * 1.3, -hs * 0.3, 0, hs * 0.7);
-
-            const hgrad = ctx.createRadialGradient(0, 0, 0, 0, 0, hs * 1.2);
-            hgrad.addColorStop(0, shade.c1);
-            hgrad.addColorStop(0.6, shade.c2);
-            hgrad.addColorStop(1, shade.c3);
-            ctx.fillStyle = hgrad;
-            ctx.fill();
-
-            ctx.restore();
-            petalTextures.heartPetals.push(canvas);
-        }
-
-        // 5. 预烘焙 3 种柔光星尘/梦幻光斑 (Stardust)
-        for (let i = 0; i < 3; i++) {
-            const canvas = document.createElement('canvas');
-            canvas.width = texDim;
-            canvas.height = texDim;
-            const ctx = canvas.getContext('2d');
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-            const cx = 32;
-            const cy = 32;
-            const rad = 14 + i * 4;
-
-            ctx.save();
-            ctx.translate(cx, cy);
-
-            const sgrad = ctx.createRadialGradient(0, 0, 0, 0, 0, rad);
-            sgrad.addColorStop(0, '#ffffff');
-            sgrad.addColorStop(0.3, palette.stardust);
-            sgrad.addColorStop(0.75, palette.shades[i % palette.shades.length].aura);
-            sgrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            ctx.fillStyle = sgrad;
-            ctx.beginPath();
-            ctx.arc(0, 0, rad, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.restore();
-            petalTextures.stardust.push(canvas);
+        if (goldRim) {
+            c.strokeStyle = goldRim;
+            c.lineWidth = 1.1;
+            c.stroke();
+        } else if (shade.rim) {
+            c.strokeStyle = shade.rim;
+            c.lineWidth = 1.0;
+            c.stroke();
         }
     }
 
-    bakeTextures();
+    // ── 单张离屏 Texture Atlas 预烘焙（4×3 共 12 种电影景深水彩材质） ──
+    const atlasCache = new Map();
 
-    // ── 桃花与落花粒子核心物理类 ──
-    class PeachPetal {
-        constructor(layer = 'background', isBurst = false, bx = 0, by = 0, initSpawn = false) {
-            this.layer = layer;
-            this.reset(isBurst, bx, by, initSpawn);
+    function getSharedAtlas(theme, bothOnline) {
+        const key = `${theme === 'dark' ? 'dark' : 'light'}_${bothOnline ? '1' : '0'}`;
+        if (atlasCache.has(key)) return atlasCache.get(key);
+
+        const palette = buildPalette(theme, bothOnline);
+        const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(ATLAS_CELL * ATLAS_COLS * dpr);
+        canvas.height = Math.round(ATLAS_CELL * ATLAS_ROWS * dpr);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return { canvas, palette, dpr, cellPx: Math.round(ATLAS_CELL * dpr) };
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const drawSlot = (col, row, fn) => {
+            ctx.save();
+            ctx.translate(col * ATLAS_CELL + ATLAS_CELL * 0.5, row * ATLAS_CELL + ATLAS_CELL * 0.5);
+            fn(ctx);
+            ctx.restore();
+        };
+
+        // Row 0, Col 0..2：3 种水彩半透明单瓣桃花
+        for (let i = 0; i < 3; i++) {
+            const shade = palette.petals[i];
+            drawSlot(i, 0, (c) => {
+                c.translate(0, 30);
+                drawWatercolorPetalShape(c, 36, shade, palette.goldRim);
+            });
         }
 
-        reset(isBurst = false, bx = 0, by = 0, initSpawn = false) {
-            const isFg = this.layer === 'foreground';
-            this.isBurst = isBurst;
+        // Row 0, Col 3：盛开五瓣小桃花
+        drawSlot(3, 0, (c) => {
+            const shade = palette.petals[0];
+            const bs = 27;
+            for (let b = 0; b < 5; b++) {
+                c.save();
+                c.rotate((b * Math.PI * 2) / 5);
+                c.beginPath();
+                c.moveTo(0, 0);
+                c.bezierCurveTo(-bs * 0.54, -bs * 0.36, -bs * 0.48, -bs * 1.00, -bs * 0.08, -bs * 1.18);
+                c.quadraticCurveTo(0, -bs * 1.04, bs * 0.08, -bs * 1.18);
+                c.bezierCurveTo(bs * 0.48, -bs * 1.00, bs * 0.54, -bs * 0.36, 0, 0);
+                const g = c.createRadialGradient(0, -bs * 0.2, 1, 0, -bs * 0.68, bs * 1.05);
+                g.addColorStop(0, shade.c1);
+                g.addColorStop(0.58, shade.c2);
+                g.addColorStop(1, shade.c3);
+                c.fillStyle = g;
+                c.fill();
+                c.restore();
+            }
+            // 花蕊核心与花粉点
+            c.beginPath();
+            c.arc(0, 0, 5.2, 0, Math.PI * 2);
+            c.fillStyle = palette.blossomCore;
+            c.fill();
+            for (let d = 0; d < 5; d++) {
+                const a = (d * Math.PI * 2) / 5 + 0.3;
+                c.beginPath();
+                c.arc(Math.cos(a) * 9.6, Math.sin(a) * 9.6, 1.5, 0, Math.PI * 2);
+                c.fillStyle = palette.blossomPollen;
+                c.fill();
+            }
+        });
 
-            if (isBurst) {
-                this.x = bx;
-                this.y = by;
-                const angle = Math.random() * Math.PI * 2;
-                const speed = 2.5 + Math.random() * 7.5;
-                this.vx = Math.cos(angle) * speed;
-                this.vy = Math.sin(angle) * speed - 1.5;
-                this.life = 1.0;
-                this.decay = 0.012 + Math.random() * 0.018;
-            } else {
-                this.vx = (Math.random() - 0.5) * 0.7;
-                this.vy = isFg ? (1.3 + Math.random() * 2.1) : (0.85 + Math.random() * 1.6);
-                this.life = 1.0;
-                this.decay = 0;
+        // Row 1, Col 0..1：2 种双瓣并蒂落花
+        for (let i = 0; i < 2; i++) {
+            const s1 = palette.petals[i];
+            const s2 = palette.petals[(i + 1) % 3];
+            drawSlot(i, 1, (c) => {
+                c.translate(0, 22);
+                c.save();
+                c.rotate(-0.38);
+                drawWatercolorPetalShape(c, 27, s1, palette.goldRim);
+                c.restore();
+                c.save();
+                c.rotate(0.32);
+                c.translate(2, 2);
+                drawWatercolorPetalShape(c, 24, s2, palette.goldRim);
+                c.restore();
+            });
+        }
 
-                if (initSpawn) {
-                    this.x = Math.random() * canvasWidth;
-                    this.y = Math.random() * canvasHeight;
+        // Row 1, Col 2：精致水彩爱心桃花瓣
+        drawSlot(2, 1, (c) => {
+            const shade = palette.petals[0];
+            const hs = 28;
+            c.beginPath();
+            c.moveTo(0, hs * 0.78);
+            c.bezierCurveTo(-hs * 1.28, -hs * 0.22, -hs * 0.84, -hs * 1.18, 0, -hs * 0.44);
+            c.bezierCurveTo(hs * 0.84, -hs * 1.18, hs * 1.28, -hs * 0.22, 0, hs * 0.78);
+            c.closePath();
+
+            const hg = c.createRadialGradient(-hs * 0.2, -hs * 0.25, 2, 0, 0, hs * 1.22);
+            hg.addColorStop(0, shade.c1);
+            hg.addColorStop(0.55, shade.c2);
+            hg.addColorStop(1, shade.c3);
+            c.fillStyle = hg;
+            c.fill();
+
+            // 柔润高光点
+            c.fillStyle = 'rgba(255, 255, 255, 0.35)';
+            c.beginPath();
+            c.ellipse(-hs * 0.36, -hs * 0.30, hs * 0.18, hs * 0.10, -0.5, 0, Math.PI * 2);
+            c.fill();
+        });
+
+        // Row 1, Col 3：柔光星尘 (1)
+        const drawDustSlot = (col, row, ds) => {
+            drawSlot(col, row, (c) => {
+                const rad = 40;
+                const grad = c.createRadialGradient(0, 0, 0, 0, 0, rad);
+                grad.addColorStop(0, ds.core);
+                grad.addColorStop(0.18, ds.mid);
+                grad.addColorStop(0.50, ds.outer);
+                grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                c.fillStyle = grad;
+                c.beginPath();
+                c.arc(0, 0, rad, 0, Math.PI * 2);
+                c.fill();
+
+                c.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+                c.lineWidth = 1.2;
+                c.beginPath();
+                c.moveTo(-11, 0);
+                c.lineTo(11, 0);
+                c.moveTo(0, -11);
+                c.lineTo(0, 11);
+                c.stroke();
+            });
+        };
+        drawDustSlot(3, 1, palette.dust[0]);
+
+        // Row 2, Col 0..1：2 种镜头近景柔焦虚化大花瓣 (Bokeh Petal，多层羽化轮廓，零实时滤镜)
+        for (let i = 0; i < 2; i++) {
+            const bk = palette.bokeh[i];
+            drawSlot(i, 2, (c) => {
+                // 通过 4 层渐扩半透明花瓣轮廓叠加出自然摄影失焦感
+                const layers = [
+                    { scale: 1.18, alpha: 0.24 },
+                    { scale: 1.04, alpha: 0.36 },
+                    { scale: 0.90, alpha: 0.52 },
+                    { scale: 0.74, alpha: 0.65 }
+                ];
+                c.translate(0, 26);
+                for (let l = 0; l < layers.length; l++) {
+                    const sc = layers[l].scale;
+                    const s = 34 * sc;
+                    c.save();
+                    c.globalAlpha = layers[l].alpha;
+                    c.beginPath();
+                    c.moveTo(0, 0);
+                    c.bezierCurveTo(-s * 0.92, -s * 0.48, -s * 0.80, -s * 1.44, 0, -s * 1.66);
+                    c.bezierCurveTo(s * 0.80, -s * 1.44, s * 0.92, -s * 0.48, 0, 0);
+                    c.closePath();
+
+                    const bg = c.createRadialGradient(0, -s * 0.75, 2, 0, -s * 0.75, s * 1.15);
+                    bg.addColorStop(0, bk.inner);
+                    bg.addColorStop(0.55, bk.mid);
+                    bg.addColorStop(1, bk.outer);
+                    c.fillStyle = bg;
+                    c.fill();
+                    c.restore();
+                }
+            });
+        }
+
+        // Row 2, Col 2..3：微光星尘 (2, 3)
+        drawDustSlot(2, 2, palette.dust[1]);
+        drawDustSlot(3, 2, palette.dust[2]);
+
+        const entry = {
+            canvas,
+            palette,
+            dpr,
+            cellPx: Math.round(ATLAS_CELL * dpr)
+        };
+        atlasCache.set(key, entry);
+        return entry;
+    }
+
+    // ── 通用电影景深浮屏桃花雨控制器工厂（首页 / 登录页 / 个人主页统一复用） ──
+    function createAtmosphericCanvasController(canvas, options = {}) {
+        const ctx = canvas?.getContext('2d', { alpha: true });
+        if (!canvas || !ctx) return null;
+
+        const config = {
+            desktopCount: options.desktopCount || 32,
+            mobileCount: options.mobileCount || 18,
+            lightDesktopCount: options.lightDesktopCount || 10,
+            lightMobileCount: options.lightMobileCount || 7,
+            enablePointerWind: options.enablePointerWind !== false,
+            scrollThrottle: options.scrollThrottle !== false,
+            initialRouteActive: Boolean(options.initialRouteActive),
+            alwaysDarkTone: Boolean(options.alwaysDarkTone),
+            baseWind: typeof options.baseWind === 'number' ? options.baseWind : 0.92
+        };
+
+        let width = Math.max(window.innerWidth, 1);
+        let height = Math.max(window.innerHeight, 1);
+        let isMobile = width < MOBILE_BREAKPOINT;
+        let dpr = getCanvasDpr(isMobile);
+
+        let routeActive = config.initialRouteActive;
+        const suspendReasons = new Set();
+        let ambientMode = getAmbientMode();
+        let qualityScale = isLowPowerDevice() ? 0.68 : 1.0;
+
+        let appearance = {
+            theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
+            bothOnline: false
+        };
+        let atlasEntry = getSharedAtlas(
+            config.alwaysDarkTone ? 'dark' : appearance.theme,
+            appearance.bothOnline
+        );
+
+        let rafId = null;
+        let lastTimestamp = 0;
+        let simTime = 0;
+        let resizeTimer = null;
+        let isUserScrolling = false;
+        let scrollDebounceTimer = null;
+
+        // 帧耗时滑动监控（自动掉帧保护）
+        let slowFrameSum = 0;
+        let slowFrameCount = 0;
+        let degradeStrikes = 0;
+        let autoDegradedOff = false;
+
+        // 鼠标拂风交互（节流 ~38Hz）
+        const pointer = {
+            x: -2000,
+            y: -2000,
+            vx: 0,
+            vy: 0,
+            lastX: 0,
+            lastY: 0,
+            lastTime: 0,
+            active: false
+        };
+
+        // 常驻桃花雨粒子池 + 一键想你临时加速花雨粒子
+        const particles = [];
+        const gustPetals = [];
+        const MAX_GUST_PETALS = 26;
+
+        // 光学微涟漪对象池
+        const MAX_RIPPLES = 8;
+        const ripples = Array.from({ length: MAX_RIPPLES }, () => ({
+            active: false,
+            x: 0,
+            y: 0,
+            age: 0,
+            duration: 0.72,
+            maxRadius: 54
+        }));
+
+        // 点击散开水彩桃花瓣与微光星屑对象池
+        const MAX_SPARKS = 64;
+        const sparks = Array.from({ length: MAX_SPARKS }, () => ({
+            active: false,
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            size: 0.16,
+            angle: 0,
+            angleSpeed: 0,
+            flip: 0,
+            flipSpeed: 0,
+            life: 0,
+            decay: 0.015,
+            slotCol: 0,
+            slotRow: 0,
+            isAdditive: false
+        }));
+
+        // 按斜风投影权重均匀注入屏幕顶部与迎风左侧
+        function placeWindwardSpawn(p, vy, initSpawn) {
+            if (initSpawn) {
+                p.x = Math.random() * width;
+                p.y = Math.random() * height;
+                return;
+            }
+            const wind = config.baseWind;
+            const drift = Math.abs(wind) * (height / Math.max(0.7, vy));
+            if (wind >= 0.15) {
+                const leftWeight = height;
+                const topWeight = width + drift;
+                if (Math.random() * (leftWeight + topWeight) < leftWeight) {
+                    p.x = -24 - Math.random() * 55;
+                    p.y = Math.random() * (height + 40) - 20;
                 } else {
-                    // 全屏迎风立体循环注入
-                    const wind = baseWind;
-                    const avgVy = Math.max(0.6, this.vy);
-                    const horizontalDrift = Math.abs(wind) * (canvasHeight / avgVy);
+                    p.x = Math.random() * (width + drift) - drift * 0.65;
+                    p.y = -24 - Math.random() * 60;
+                }
+            } else {
+                p.x = Math.random() * (width + 100) - 50;
+                p.y = -24 - Math.random() * 60;
+            }
+        }
 
-                    if (wind >= 0.2) {
-                        const leftWeight = canvasHeight;
-                        const topWeight = canvasWidth + horizontalDrift;
-                        const totalWeight = leftWeight + topWeight;
+        function assignPetalVisual(p, forceKind = null) {
+            const darkTone = appearance.theme === 'dark' || config.alwaysDarkTone;
+            const roll = Math.random();
+            let kind = forceKind;
+            if (!kind) {
+                if (roll < 0.52) kind = 'petal';
+                else if (roll < 0.66) kind = 'twin';
+                else if (roll < 0.76) kind = 'blossom';
+                else if (roll < 0.81) kind = 'heart';
+                else if (roll < 0.90) kind = 'bokeh';
+                else kind = 'dust';
+            }
+            p.kind = kind;
 
-                        if (Math.random() * totalWeight < leftWeight) {
-                            this.x = -Math.random() * 90 - 20;
-                            this.y = Math.random() * (canvasHeight + 40) - 20;
-                        } else {
-                            this.x = Math.random() * (canvasWidth + horizontalDrift) - horizontalDrift;
-                            this.y = -Math.random() * 70 - 20;
-                        }
-                    } else if (wind <= -0.2) {
-                        const rightWeight = canvasHeight;
-                        const topWeight = canvasWidth + horizontalDrift;
-                        const totalWeight = rightWeight + topWeight;
+            if (kind === 'petal') {
+                p.slotCol = Math.floor(Math.random() * 3);
+                p.slotRow = 0;
+                p.isAdditive = false;
+                p.size = isMobile ? (0.20 + Math.random() * 0.11) : (0.23 + Math.random() * 0.14);
+                p.vy = 0.85 + Math.random() * 1.15;
+                p.vx = (Math.random() - 0.5) * 0.45;
+                p.opacity = darkTone ? (0.54 + Math.random() * 0.28) : (0.64 + Math.random() * 0.24);
+            } else if (kind === 'twin') {
+                p.slotCol = Math.random() < 0.5 ? 0 : 1;
+                p.slotRow = 1;
+                p.isAdditive = false;
+                p.size = isMobile ? (0.23 + Math.random() * 0.10) : (0.26 + Math.random() * 0.13);
+                p.vy = 0.80 + Math.random() * 1.02;
+                p.vx = (Math.random() - 0.5) * 0.42;
+                p.opacity = darkTone ? (0.52 + Math.random() * 0.26) : (0.62 + Math.random() * 0.22);
+            } else if (kind === 'blossom') {
+                p.slotCol = 3;
+                p.slotRow = 0;
+                p.isAdditive = false;
+                p.size = isMobile ? (0.20 + Math.random() * 0.10) : (0.24 + Math.random() * 0.12);
+                p.vy = 0.74 + Math.random() * 0.94;
+                p.vx = (Math.random() - 0.5) * 0.38;
+                p.opacity = darkTone ? (0.54 + Math.random() * 0.26) : (0.62 + Math.random() * 0.24);
+            } else if (kind === 'heart') {
+                p.slotCol = 2;
+                p.slotRow = 1;
+                p.isAdditive = false;
+                p.size = isMobile ? (0.18 + Math.random() * 0.08) : (0.21 + Math.random() * 0.10);
+                p.vy = 0.78 + Math.random() * 0.96;
+                p.vx = (Math.random() - 0.5) * 0.4;
+                p.opacity = darkTone ? (0.52 + Math.random() * 0.24) : (0.60 + Math.random() * 0.22);
+            } else if (kind === 'bokeh') {
+                // 近景镜头柔焦虚化大花瓣（薄纱低透明度，飘过卡片前方拉出电影景深）
+                p.slotCol = Math.random() < 0.62 ? 0 : 1;
+                p.slotRow = 2;
+                p.isAdditive = false;
+                p.size = isMobile ? (0.42 + Math.random() * 0.22) : (0.54 + Math.random() * 0.30);
+                p.vy = 1.18 + Math.random() * 1.25;
+                p.vx = (Math.random() - 0.5) * 0.55;
+                p.opacity = darkTone ? (0.30 + Math.random() * 0.16) : (0.36 + Math.random() * 0.18);
+            } else {
+                // 细腻微光星尘
+                const dPick = Math.random();
+                if (dPick < 0.34) { p.slotCol = 3; p.slotRow = 1; }
+                else if (dPick < 0.68) { p.slotCol = 2; p.slotRow = 2; }
+                else { p.slotCol = 3; p.slotRow = 2; }
+                p.isAdditive = true;
+                p.size = isMobile ? (0.15 + Math.random() * 0.10) : (0.18 + Math.random() * 0.12);
+                p.vy = -(0.16 + Math.random() * 0.28);
+                p.vx = (Math.random() - 0.5) * 0.26;
+                p.opacity = darkTone ? (0.46 + Math.random() * 0.38) : (0.42 + Math.random() * 0.32);
+            }
 
-                        if (Math.random() * totalWeight < rightWeight) {
-                            this.x = canvasWidth + Math.random() * 90 + 20;
-                            this.y = Math.random() * (canvasHeight + 40) - 20;
-                        } else {
-                            this.x = Math.random() * (canvasWidth + horizontalDrift);
-                            this.y = -Math.random() * 70 - 20;
-                        }
+            p.angle = Math.random() * Math.PI * 2;
+            p.angleSpeed = (Math.random() - 0.5) * (kind === 'bokeh' ? 0.015 : 0.028);
+            p.flip = Math.random() * Math.PI * 2;
+            p.flipSpeed = 0.018 + Math.random() * 0.032;
+            p.sway = Math.random() * Math.PI * 2;
+            p.swaySpeed = 0.016 + Math.random() * 0.024;
+            p.swayAmp = kind === 'dust' ? (0.24 + Math.random() * 0.26) : (0.55 + Math.random() * 0.78);
+        }
+
+        function resetParticle(p, initSpawn) {
+            assignPetalVisual(p);
+            if (p.kind === 'dust') {
+                p.x = Math.random() * width;
+                p.y = initSpawn ? Math.random() * height : height + 24 + Math.random() * 40;
+            } else {
+                placeWindwardSpawn(p, p.vy, initSpawn);
+            }
+        }
+
+        function getTargetCount() {
+            const isLight = ambientMode === 'light';
+            const base = isLight
+                ? (isMobile ? config.lightMobileCount : config.lightDesktopCount)
+                : (isMobile ? config.mobileCount : config.desktopCount);
+            return Math.max(4, Math.round(base * qualityScale));
+        }
+
+        function syncPopulation(forceRebuild = false) {
+            const target = getTargetCount();
+            if (forceRebuild) particles.length = 0;
+            while (particles.length < target) {
+                const p = {};
+                resetParticle(p, true);
+                particles.push(p);
+            }
+            if (particles.length > target) {
+                particles.length = target;
+            }
+        }
+
+        function sizeCanvas() {
+            const prevW = width;
+            const prevH = height;
+            const prevMobile = isMobile;
+            width = Math.max(window.innerWidth, 1);
+            height = Math.max(window.innerHeight, 1);
+            isMobile = width < MOBILE_BREAKPOINT;
+            dpr = getCanvasDpr(isMobile);
+
+            canvas.style.width = `${width}px`;
+            canvas.style.height = `${height}px`;
+            canvas.width = Math.round(width * dpr);
+            canvas.height = Math.round(height * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.imageSmoothingEnabled = true;
+            if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'low';
+
+            if (prevMobile !== isMobile) {
+                syncPopulation(true);
+            } else if (prevW > 0 && prevH > 0) {
+                const rx = width / prevW;
+                const ry = height / prevH;
+                for (let i = 0; i < particles.length; i++) {
+                    particles[i].x *= rx;
+                    particles[i].y *= ry;
+                }
+            }
+            syncPopulation();
+        }
+
+        function clearCanvas() {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function shouldRun() {
+            return routeActive
+                && suspendReasons.size === 0
+                && !document.hidden
+                && !autoDegradedOff
+                && ambientMode !== 'calm'
+                && reducedMotionQuery?.matches !== true;
+        }
+
+        function stop() {
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+            lastTimestamp = 0;
+            if (scrollDebounceTimer) {
+                clearTimeout(scrollDebounceTimer);
+                scrollDebounceTimer = null;
+            }
+            isUserScrolling = false;
+            clearCanvas();
+        }
+
+        function start() {
+            if (rafId !== null || !shouldRun()) return;
+            lastTimestamp = 0;
+            slowFrameSum = 0;
+            slowFrameCount = 0;
+            rafId = requestAnimationFrame(loop);
+        }
+
+        function reconcile() {
+            if (shouldRun()) start();
+            else stop();
+        }
+
+        // 点击空白处：光学微涟漪 + 8~12 片轻盈散开的水彩桃花瓣与微光星屑
+        function spawnRippleAndPetals(x, y, burstCount = 10, optionsOverride = {}) {
+            if (!shouldRun()) return;
+
+            if (!optionsOverride.skipRipple) {
+                const slot = ripples.find(r => !r.active) || ripples[0];
+                slot.active = true;
+                slot.x = x;
+                slot.y = y;
+                slot.age = 0;
+                slot.duration = optionsOverride.rippleDuration || 0.72;
+                slot.maxRadius = optionsOverride.rippleRadius || (isMobile ? 46 : 58);
+            }
+
+            const count = Math.min(burstCount, isMobile ? 10 : 14);
+            const petalRatio = typeof optionsOverride.petalRatio === 'number' ? optionsOverride.petalRatio : 0.70;
+            let spawned = 0;
+
+            for (let i = 0; i < MAX_SPARKS && spawned < count; i++) {
+                const sp = sparks[i];
+                if (sp.active) continue;
+
+                const angle = (Math.PI * 2 * spawned) / count + (Math.random() - 0.5) * 0.55;
+                const speed = (optionsOverride.speedMin || 1.8) + Math.random() * (optionsOverride.speedSpan || 3.8);
+                sp.active = true;
+                sp.x = x;
+                sp.y = y;
+                sp.vx = Math.cos(angle) * speed;
+                sp.vy = Math.sin(angle) * speed - (optionsOverride.lift || 1.25);
+                sp.life = 1.0;
+                sp.decay = 0.012 + Math.random() * 0.011;
+                sp.angle = Math.random() * Math.PI * 2;
+                sp.angleSpeed = (Math.random() - 0.5) * 0.08;
+                sp.flip = Math.random() * Math.PI * 2;
+                sp.flipSpeed = 0.05 + Math.random() * 0.04;
+
+                if (Math.random() < petalRatio) {
+                    const pType = Math.random();
+                    if (pType < 0.65) {
+                        sp.slotCol = Math.floor(Math.random() * 3);
+                        sp.slotRow = 0;
+                    } else if (pType < 0.85) {
+                        sp.slotCol = 3;
+                        sp.slotRow = 0;
                     } else {
-                        this.x = Math.random() * (canvasWidth + 140) - 70;
-                        this.y = -Math.random() * 70 - 20;
+                        sp.slotCol = 2;
+                        sp.slotRow = 1;
+                    }
+                    sp.size = isMobile ? (0.18 + Math.random() * 0.09) : (0.21 + Math.random() * 0.10);
+                    sp.isAdditive = false;
+                } else {
+                    sp.slotCol = Math.random() < 0.5 ? 2 : 3;
+                    sp.slotRow = 2;
+                    sp.size = 0.14 + Math.random() * 0.10;
+                    sp.isAdditive = true;
+                }
+                spawned++;
+            }
+        }
+
+        // 一键想你呼应：3 处轻柔花瓣涟漪绽放 + 一波自然迎风加速花雨（飘出屏幕自动回收）
+        function triggerFlutter() {
+            if (!shouldRun()) return;
+            const cx = width * 0.5;
+            const cy = height * 0.42;
+
+            spawnRippleAndPetals(cx, cy, isMobile ? 8 : 12, {
+                rippleRadius: isMobile ? 76 : 108,
+                rippleDuration: 1.0,
+                speedMin: 2.2,
+                speedSpan: 4.4,
+                lift: 1.6,
+                petalRatio: 0.72
+            });
+            spawnRippleAndPetals(width * 0.25, height * 0.52, isMobile ? 6 : 9, {
+                skipRipple: true,
+                speedMin: 2.0,
+                speedSpan: 3.6,
+                lift: 1.5,
+                petalRatio: 0.75
+            });
+            spawnRippleAndPetals(width * 0.75, height * 0.52, isMobile ? 6 : 9, {
+                skipRipple: true,
+                speedMin: 2.0,
+                speedSpan: 3.6,
+                lift: 1.5,
+                petalRatio: 0.75
+            });
+
+            // 注入一波浪漫迎风加速水彩桃花瓣（随自然飞出屏幕自动回收，零生硬消失）
+            const extraCount = ambientMode === 'light'
+                ? (isMobile ? 6 : 10)
+                : (isMobile ? 11 : 18);
+
+            for (let i = 0; i < extraCount && gustPetals.length < MAX_GUST_PETALS; i++) {
+                const gp = {};
+                const r = Math.random();
+                const kind = r < 0.60 ? 'petal' : (r < 0.78 ? 'twin' : (r < 0.90 ? 'blossom' : 'heart'));
+                assignPetalVisual(gp, kind);
+                gp.vy *= 1.48;
+                gp.vx += 0.45 + Math.random() * 0.55;
+                gp.opacity = Math.min(0.88, gp.opacity + 0.10);
+                gp.x = Math.random() * (width + 180) - 120;
+                gp.y = -24 - Math.random() * (height * 0.42);
+                gustPetals.push(gp);
+            }
+        }
+
+        function updateSinglePetal(p, step, globalWind, isGust) {
+            p.sway += p.swaySpeed * step;
+            p.flip += p.flipSpeed * step;
+            p.angle += p.angleSpeed * step;
+
+            const osc = Math.sin(p.sway) * p.swayAmp;
+            let vx = p.vx + (p.kind === 'dust' ? osc * 0.75 : globalWind + osc);
+            let vy = p.vy;
+
+            // 桌面端鼠标轻拂微风
+            if (config.enablePointerWind && pointer.active && p.kind !== 'bokeh') {
+                const dx = p.x - pointer.x;
+                const dy = p.y - pointer.y;
+                const distSq = dx * dx + dy * dy;
+                const maxR = 175;
+                if (distSq < maxR * maxR && distSq > 4) {
+                    const dist = Math.sqrt(distSq);
+                    const f = (maxR - dist) / maxR;
+                    vx += (dx / dist) * f * 3.4 + pointer.vx * 0.16;
+                    vy += (dy / dist) * f * 3.4 + pointer.vy * 0.16;
+                }
+            }
+
+            p.x += vx * step;
+            p.y += vy * step;
+
+            if (p.kind === 'dust') {
+                return p.y < -36 || p.x < -70 || p.x > width + 70;
+            }
+            const outY = p.y > height + 72;
+            const outX = p.x > width + 110 || p.x < -220;
+            if (outY || outX) {
+                if (!isGust) resetParticle(p, false);
+                return true;
+            }
+            return false;
+        }
+
+        function update(dtSec) {
+            simTime += dtSec;
+            const step = dtSec * 60;
+            const globalWind = config.baseWind + Math.sin(simTime * 0.65) * 0.30 + Math.cos(simTime * 0.28) * 0.18;
+
+            for (let i = 0; i < particles.length; i++) {
+                const out = updateSinglePetal(particles[i], step, globalWind, false);
+                if (out && particles[i].kind === 'dust') {
+                    resetParticle(particles[i], false);
+                }
+            }
+
+            for (let i = gustPetals.length - 1; i >= 0; i--) {
+                if (updateSinglePetal(gustPetals[i], step, globalWind * 1.15, true)) {
+                    gustPetals.splice(i, 1);
+                }
+            }
+
+            for (let i = 0; i < MAX_RIPPLES; i++) {
+                const r = ripples[i];
+                if (!r.active) continue;
+                r.age += dtSec;
+                if (r.age >= r.duration) r.active = false;
+            }
+
+            const drag = Math.pow(0.955, step);
+            for (let i = 0; i < MAX_SPARKS; i++) {
+                const sp = sparks[i];
+                if (!sp.active) continue;
+                sp.x += sp.vx * step;
+                sp.y += sp.vy * step;
+                sp.vx *= drag;
+                sp.vy *= drag;
+                sp.vy += 0.055 * step; // 轻盈重力沉降
+                sp.angle += sp.angleSpeed * step;
+                sp.flip += sp.flipSpeed * step;
+                sp.life -= sp.decay * step;
+                if (sp.life <= 0) sp.active = false;
+            }
+
+            if (pointer.active) {
+                pointer.vx *= 0.91;
+                pointer.vy *= 0.91;
+                if (performance.now() - pointer.lastTime > 520) {
+                    pointer.active = false;
+                }
+            }
+        }
+
+        function drawParticleSprite(p, atlasImg, cellPx, halfCell) {
+            const cos = Math.cos(p.angle);
+            const sin = Math.sin(p.angle);
+            let sx = p.size;
+            let sy = p.size;
+            let alpha = p.opacity;
+
+            if (p.kind === 'petal' || p.kind === 'twin' || p.kind === 'heart') {
+                const f = Math.sin(p.flip);
+                sx *= (f >= 0 ? Math.max(0.24, f) : Math.min(-0.24, f));
+            } else if (p.kind === 'blossom') {
+                const f = 0.62 + Math.abs(Math.sin(p.flip * 0.8)) * 0.38;
+                sx *= f;
+            } else if (p.kind === 'dust') {
+                const breath = 0.70 + Math.sin(p.sway * 1.8) * 0.30;
+                sx *= breath;
+                sy *= breath;
+                alpha *= (0.62 + 0.38 * breath);
+            }
+
+            ctx.globalAlpha = alpha;
+            ctx.setTransform(
+                cos * sx * dpr,
+                sin * sx * dpr,
+                -sin * sy * dpr,
+                cos * sy * dpr,
+                p.x * dpr,
+                p.y * dpr
+            );
+            ctx.drawImage(
+                atlasImg,
+                p.slotCol * cellPx,
+                p.slotRow * cellPx,
+                cellPx,
+                cellPx,
+                -halfCell,
+                -halfCell,
+                ATLAS_CELL,
+                ATLAS_CELL
+            );
+        }
+
+        function draw() {
+            clearCanvas();
+
+            const atlasImg = atlasEntry.canvas;
+            const cellPx = atlasEntry.cellPx;
+            const halfCell = ATLAS_CELL * 0.5;
+            const useAdditive = atlasEntry.palette.isDark;
+
+            // Pass 1：主水彩半透明桃花雨（普通混合，清晰通透不糊字）
+            ctx.globalCompositeOperation = 'source-over';
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                if (useAdditive && p.isAdditive) continue;
+                drawParticleSprite(p, atlasImg, cellPx, halfCell);
+            }
+            for (let i = 0; i < gustPetals.length; i++) {
+                drawParticleSprite(gustPetals[i], atlasImg, cellPx, halfCell);
+            }
+
+            // 点击散开的半透明水彩桃花瓣
+            for (let i = 0; i < MAX_SPARKS; i++) {
+                const sp = sparks[i];
+                if (!sp.active || (useAdditive && sp.isAdditive)) continue;
+                const cos = Math.cos(sp.angle);
+                const sin = Math.sin(sp.angle);
+                const f = Math.sin(sp.flip);
+                const flipScale = f >= 0 ? Math.max(0.28, f) : Math.min(-0.28, f);
+                const baseScale = sp.size * (0.48 + 0.52 * sp.life);
+                const sx = sp.isAdditive ? baseScale : baseScale * flipScale;
+                const sy = baseScale;
+                ctx.globalAlpha = Math.max(0, Math.min(0.92, sp.life));
+                ctx.setTransform(
+                    cos * sx * dpr,
+                    sin * sx * dpr,
+                    -sin * sy * dpr,
+                    cos * sy * dpr,
+                    sp.x * dpr,
+                    sp.y * dpr
+                );
+                ctx.drawImage(
+                    atlasImg,
+                    sp.slotCol * cellPx,
+                    sp.slotRow * cellPx,
+                    cellPx,
+                    cellPx,
+                    -halfCell,
+                    -halfCell,
+                    ATLAS_CELL,
+                    ATLAS_CELL
+                );
+            }
+
+            // Pass 2：深色模式光学叠加微光星尘（lighter 真实星光感）
+            if (useAdditive) {
+                ctx.globalCompositeOperation = 'lighter';
+                for (let i = 0; i < particles.length; i++) {
+                    const p = particles[i];
+                    if (!p.isAdditive) continue;
+                    drawParticleSprite(p, atlasImg, cellPx, halfCell);
+                }
+                for (let i = 0; i < MAX_SPARKS; i++) {
+                    const sp = sparks[i];
+                    if (!sp.active || !sp.isAdditive) continue;
+                    const s = sp.size * (0.5 + 0.5 * sp.life);
+                    ctx.globalAlpha = Math.max(0, Math.min(1, sp.life));
+                    ctx.setTransform(s * dpr, 0, 0, s * dpr, sp.x * dpr, sp.y * dpr);
+                    ctx.drawImage(
+                        atlasImg,
+                        sp.slotCol * cellPx,
+                        sp.slotRow * cellPx,
+                        cellPx,
+                        cellPx,
+                        -halfCell,
+                        -halfCell,
+                        ATLAS_CELL,
+                        ATLAS_CELL
+                    );
+                }
+            }
+
+            // Pass 3：点击光学微涟漪环
+            let hasRipples = false;
+            for (let i = 0; i < MAX_RIPPLES; i++) {
+                if (ripples[i].active) { hasRipples = true; break; }
+            }
+            if (hasRipples) {
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                ctx.globalCompositeOperation = useAdditive ? 'lighter' : 'source-over';
+                for (let i = 0; i < MAX_RIPPLES; i++) {
+                    const r = ripples[i];
+                    if (!r.active) continue;
+                    const progress = Math.min(1, r.age / r.duration);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    const radius = 6 + eased * r.maxRadius;
+                    const alpha = (1 - progress) * (1 - progress);
+
+                    ctx.globalAlpha = alpha;
+                    ctx.beginPath();
+                    ctx.arc(r.x, r.y, radius, 0, Math.PI * 2);
+                    ctx.strokeStyle = atlasEntry.palette.rippleStroke;
+                    ctx.lineWidth = Math.max(0.6, 1.8 * (1 - progress));
+                    ctx.stroke();
+
+                    if (progress < 0.55) {
+                        ctx.globalAlpha = alpha * 0.6;
+                        ctx.beginPath();
+                        ctx.arc(r.x, r.y, radius * 0.52, 0, Math.PI * 2);
+                        ctx.fillStyle = atlasEntry.palette.rippleFill;
+                        ctx.fill();
                     }
                 }
             }
 
-            // 尺寸与层级景深
-            this.baseSize = isFg ? (7.0 + Math.random() * 5.5) : (4.0 + Math.random() * 4.2);
-            this.angle = Math.random() * Math.PI * 2;
-            this.angleSpeed = (Math.random() - 0.5) * 0.032;
-            this.flip = Math.random() * Math.PI * 2;
-            this.flipSpeed = 0.02 + Math.random() * 0.038;
-            this.sway = Math.random() * Math.PI * 2;
-            this.swaySpeed = 0.02 + Math.random() * 0.032;
-            this.swayAmp = 0.8 + Math.random() * 1.1;
-            this.opacity = isFg ? (0.78 + Math.random() * 0.22) : (0.38 + Math.random() * 0.35);
-            this.shadeIndex = Math.floor(Math.random() * 3);
-
-            // 多样化浪漫粒子分布：
-            // 72% 经典单瓣, 10% 优雅双瓣, 7% 盛开五瓣, 6% 梦幻星尘光斑, 3% 爱心花瓣, 2% 灵动微蝶
-            const roll = Math.random();
-            if (roll < 0.72) this.type = 'petal';
-            else if (roll < 0.82) this.type = 'twin_petal';
-            else if (roll < 0.89) this.type = 'blossom';
-            else if (roll < 0.95) this.type = 'stardust';
-            else if (roll < 0.98) this.type = 'heart_petal';
-            else this.type = 'butterfly';
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'source-over';
         }
 
-        update(dtSec = 0.016, globalWind = 1.15) {
-            const step = dtSec * 60; // 归一化到 60fps 步长
+        function loop(timestamp) {
+            rafId = null;
+            if (!shouldRun()) {
+                stop();
+                return;
+            }
 
-            this.sway += this.swaySpeed * step;
-            this.flip += this.flipSpeed * step;
-            this.angle += this.angleSpeed * step;
+            // 滑动时让位至 ~30fps，平时平稳锁定 <= 60fps
+            const minFrameMs = (config.scrollThrottle && isUserScrolling) ? 32 : 14;
+            if (lastTimestamp > 0 && timestamp - lastTimestamp < minFrameMs) {
+                rafId = requestAnimationFrame(loop);
+                return;
+            }
 
-            const windOscillation = Math.sin(this.sway) * this.swayAmp;
-            let currentVx = this.vx + globalWind + windOscillation;
-            let currentVy = this.vy;
+            const rawDt = lastTimestamp > 0 ? (timestamp - lastTimestamp) / 1000 : 0.016;
+            const dtSec = Math.min(rawDt, MAX_DELTA_SEC);
+            lastTimestamp = timestamp;
 
-            // 鼠标微风交互排斥力
-            if (mouse.active) {
-                const dx = this.x - mouse.x;
-                const dy = this.y - mouse.y;
-                const distSq = dx * dx + dy * dy;
-                const maxDist = 180;
-                if (distSq < maxDist * maxDist && distSq > 4) {
-                    const dist = Math.sqrt(distSq);
-                    const force = (maxDist - dist) / maxDist;
-                    currentVx += (dx / dist) * force * 4.8 + mouse.vx * 0.2;
-                    currentVy += (dy / dist) * force * 4.8 + mouse.vy * 0.2;
+            // 运行时自适应掉帧保护
+            if (!isUserScrolling && rawDt > 0.005 && rawDt < 0.2) {
+                slowFrameSum += rawDt;
+                slowFrameCount += 1;
+                if (slowFrameCount >= 28) {
+                    const avgDt = slowFrameSum / slowFrameCount;
+                    slowFrameSum = 0;
+                    slowFrameCount = 0;
+                    if (avgDt > 0.032) {
+                        degradeStrikes += 1;
+                        if (degradeStrikes === 1 && qualityScale > 0.55) {
+                            qualityScale = 0.52;
+                            syncPopulation();
+                        } else if (degradeStrikes >= 3) {
+                            autoDegradedOff = true;
+                            stop();
+                            return;
+                        }
+                    } else if (degradeStrikes > 0) {
+                        degradeStrikes = 0;
+                    }
                 }
             }
 
-            if (this.isBurst) {
-                this.x += this.vx * step;
-                this.y += this.vy * step;
-                this.vx *= Math.pow(0.95, step);
-                this.vy *= Math.pow(0.95, step);
-                this.vy += 0.07 * step; // 重力沉降
-                this.life -= this.decay * step;
-            } else {
-                this.x += currentVx * step;
-                this.y += currentVy * step;
+            update(dtSec);
+            draw();
 
-                if (this.type === 'butterfly') {
-                    this.y -= Math.sin(this.flip * 2.2) * 1.8 * step;
-                } else if (this.type === 'stardust') {
-                    // 星尘微光悬浮漂游
-                    this.y -= 0.25 * step;
-                }
-
-                // 边界循环回收
-                const wind = baseWind;
-                const horizontalDrift = Math.abs(wind) * (canvasHeight / Math.max(0.6, this.vy));
-                let out = false;
-
-                if (this.y > canvasHeight + 70) {
-                    out = true;
-                } else if (wind >= 0 && this.x > canvasWidth + 120) {
-                    out = true;
-                } else if (wind < 0 && this.x < -120) {
-                    out = true;
-                } else if (wind >= 0 && this.x < -horizontalDrift - 300) {
-                    out = true;
-                } else if (wind < 0 && this.x > canvasWidth + horizontalDrift + 300) {
-                    out = true;
-                }
-
-                if (out) this.reset();
+            if (shouldRun()) {
+                rafId = requestAnimationFrame(loop);
             }
         }
 
-        draw(ctx) {
-            if (this.isBurst && this.life <= 0) return;
-
-            const s = this.baseSize;
-            ctx.save();
-            ctx.translate(this.x, this.y);
-            ctx.rotate(this.angle);
-
-            // 3D 翻转缩放 (星尘不翻转，呈呼吸光斑)
-            if (this.type !== 'stardust') {
-                ctx.scale(Math.sin(this.flip), 1);
-            }
-
-            const alpha = (this.isBurst ? this.life : 1) * this.opacity;
-            ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-
-            if (this.type === 'petal') {
-                const tex = petalTextures.petals[this.shadeIndex];
-                if (tex) {
-                    const scale = s / 26;
-                    ctx.drawImage(tex, -32 * scale, -56 * scale, 64 * scale, 64 * scale);
-                }
-            } else if (this.type === 'twin_petal') {
-                const tex = petalTextures.twinPetals[this.shadeIndex];
-                if (tex) {
-                    const scale = (s * 0.95) / 18;
-                    ctx.drawImage(tex, -32 * scale, -36 * scale, 64 * scale, 64 * scale);
-                }
-            } else if (this.type === 'blossom') {
-                const tex = petalTextures.blossoms[this.shadeIndex];
-                if (tex) {
-                    const scale = (s * 0.92) / 16;
-                    ctx.drawImage(tex, -32 * scale, -32 * scale, 64 * scale, 64 * scale);
-                }
-            } else if (this.type === 'heart_petal') {
-                const tex = petalTextures.heartPetals[this.shadeIndex];
-                if (tex) {
-                    const scale = (s * 0.85) / 14;
-                    ctx.drawImage(tex, -32 * scale, -32 * scale, 64 * scale, 64 * scale);
-                }
-            } else if (this.type === 'stardust') {
-                const tex = petalTextures.stardust[this.shadeIndex];
-                if (tex) {
-                    const breath = 0.75 + Math.sin(this.sway * 2) * 0.25;
-                    const scale = (s * breath) / 16;
-                    ctx.drawImage(tex, -32 * scale, -32 * scale, 64 * scale, 64 * scale);
-                }
-            } else if (this.type === 'butterfly') {
-                // 灵动微蝶动画
-                const flap = 0.3 + Math.abs(Math.cos(this.flip * 2.4)) * 0.7;
-                const b = currentPalette.butterfly;
-                ctx.scale(flap, 1);
-                ctx.fillStyle = b.wing;
-                ctx.beginPath();
-                ctx.moveTo(-1, -1);
-                ctx.bezierCurveTo(-s * 0.8, -s * 1.2, -s * 1.4, -s * 0.4, -1, 1);
-                ctx.moveTo(1, -1);
-                ctx.bezierCurveTo(s * 0.8, -s * 1.2, s * 1.4, -s * 0.4, 1, 1);
-                ctx.fill();
-                ctx.fillStyle = b.cream;
-                ctx.beginPath();
-                ctx.moveTo(-1, 1);
-                ctx.bezierCurveTo(-s * 0.7, s * 0.4, -s * 0.9, s * 0.9, -1, 2);
-                ctx.moveTo(1, 1);
-                ctx.bezierCurveTo(s * 0.7, s * 0.4, s * 0.9, s * 0.9, 1, 2);
-                ctx.fill();
-            }
-
-            ctx.restore();
-        }
-    }
-
-    const MAX_BURST_PETALS = 60;
-    function createPetalBurst(x, y, count = 16) {
-        const availableSlots = Math.max(0, MAX_BURST_PETALS - burstPetals.length);
-        const spawnCount = Math.min(count, availableSlots > 0 ? availableSlots : count);
-        if (burstPetals.length + spawnCount > MAX_BURST_PETALS) {
-            burstPetals.splice(0, Math.min(count, 20));
-        }
-        for (let i = 0; i < spawnCount; i++) {
-            burstPetals.push(new PeachPetal('foreground', true, x, y));
-        }
-    }
-
-    // ── 粒子目标数量配置（高性能丝滑平衡） ──
-    function getTargetCounts() {
-        if (isMobile) {
-            return {
-                bg: 14,
-                fg: 6
-            };
-        }
-        return {
-            bg: 24,
-            fg: 10
+        let lastMoveMs = 0;
+        const onMouseMove = (e) => {
+            if (!config.enablePointerWind || !shouldRun() || isMobile) return;
+            const now = performance.now();
+            if (now - lastMoveMs < 26) return;
+            lastMoveMs = now;
+            const dt = Math.max(1, now - (pointer.lastTime || now - 16));
+            pointer.vx = Math.max(-14, Math.min(14, ((e.clientX - pointer.lastX) / dt) * 9));
+            pointer.vy = Math.max(-14, Math.min(14, ((e.clientY - pointer.lastY) / dt) * 9));
+            pointer.x = e.clientX;
+            pointer.y = e.clientY;
+            pointer.lastX = e.clientX;
+            pointer.lastY = e.clientY;
+            pointer.lastTime = now;
+            pointer.active = true;
         };
-    }
 
-    function syncPetalsPopulation(forceRebuild = false) {
-        const counts = getTargetCounts();
-        if (forceRebuild) {
-            bgPetals = [];
-            fgPetals = [];
-        }
-        while (bgPetals.length < counts.bg) {
-            bgPetals.push(new PeachPetal('background', false, 0, 0, true));
-        }
-        while (bgPetals.length > counts.bg) {
-            bgPetals.pop();
-        }
-        while (fgPetals.length < counts.fg) {
-            fgPetals.push(new PeachPetal('foreground', false, 0, 0, true));
-        }
-        while (fgPetals.length > counts.fg) {
-            fgPetals.pop();
-        }
-    }
-
-    function sizeHomeCanvas(canvas, context, width, height, maxDpr) {
-        const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), maxDpr);
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
-        canvas.width = Math.round(width * dpr);
-        canvas.height = Math.round(height * dpr);
-        context.setTransform(dpr, 0, 0, dpr, 0, 0);
-        context.imageSmoothingEnabled = true;
-        if ('imageSmoothingQuality' in context) context.imageSmoothingQuality = 'high';
-    }
-
-    function resizeHomeCanvases() {
-        const previousWidth = canvasWidth;
-        const previousHeight = canvasHeight;
-        const previousMobile = isMobile;
-        canvasWidth = Math.max(window.innerWidth, 1);
-        canvasHeight = Math.max(window.innerHeight, 1);
-        isMobile = canvasWidth < MOBILE_BREAKPOINT;
-
-        if (previousMobile !== isMobile) {
-            syncPetalsPopulation(true);
-        } else if (previousWidth > 0 && previousHeight > 0) {
-            [...bgPetals, ...fgPetals].forEach(p => {
-                p.x = p.x * canvasWidth / previousWidth;
-                p.y = p.y * canvasHeight / previousHeight;
-            });
-        }
-
-        const maxDpr = isMobile ? 1.0 : 1.25;
-        sizeHomeCanvas(canvasBg, ctxBg, canvasWidth, canvasHeight, isMobile ? 1.0 : 1.15);
-        if (isMobile) {
-            canvasFg.style.display = 'none';
-        } else {
-            canvasFg.style.display = '';
-            sizeHomeCanvas(canvasFg, ctxFg, canvasWidth, canvasHeight, maxDpr);
-        }
-        syncPetalsPopulation();
-    }
-
-    function clearAnimationCanvases() {
-        ctxBg.clearRect(0, 0, canvasWidth, canvasHeight);
-        if (!isMobile) {
-            ctxFg.clearRect(0, 0, canvasWidth, canvasHeight);
-        }
-    }
-
-    function shouldRunAnimation() {
-        return routeActive
-            && !isSuspended
-            && !document.hidden
-            && animationsReducedMotionQuery?.matches !== true;
-    }
-
-    function stopAnimation() {
-        if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-        lastRafTimestamp = 0;
-        if (scrollDebounceTimer) {
+        const onScroll = () => {
+            if (!config.scrollThrottle || !shouldRun()) return;
+            isUserScrolling = true;
             clearTimeout(scrollDebounceTimer);
-            scrollDebounceTimer = null;
-        }
-        isUserScrolling = false;
-        clearAnimationCanvases();
-    }
+            scrollDebounceTimer = setTimeout(() => {
+                isUserScrolling = false;
+            }, 140);
+        };
 
-    function updateParticles(dtSec) {
-        simTime += dtSec;
-        const globalWind = baseWind + Math.sin(simTime * 0.7) * 0.35 + Math.cos(simTime * 0.3) * 0.2;
+        const onResize = () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                sizeCanvas();
+                if (shouldRun()) draw();
+            }, 160);
+        };
 
-        for (let i = 0; i < bgPetals.length; i++) {
-            bgPetals[i].update(dtSec, globalWind);
+        const onVisibilityChange = () => reconcile();
+        const onReducedMotionChange = () => reconcile();
+
+        if (config.enablePointerWind) {
+            window.addEventListener('mousemove', onMouseMove, { passive: true });
         }
-        for (let i = 0; i < fgPetals.length; i++) {
-            fgPetals[i].update(dtSec, globalWind);
+        if (config.scrollThrottle) {
+            window.addEventListener('scroll', onScroll, { passive: true });
         }
-        for (let i = burstPetals.length - 1; i >= 0; i--) {
-            burstPetals[i].update(dtSec, globalWind);
-            if (burstPetals[i].life <= 0) {
-                burstPetals.splice(i, 1);
+        window.addEventListener('resize', onResize, { passive: true });
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        if (typeof reducedMotionQuery?.addEventListener === 'function') {
+            reducedMotionQuery.addEventListener('change', onReducedMotionChange);
+        } else if (typeof reducedMotionQuery?.addListener === 'function') {
+            reducedMotionQuery.addListener(onReducedMotionChange);
+        }
+
+        sizeCanvas();
+        reconcile();
+
+        return Object.freeze({
+            setRouteActive(active) {
+                const next = Boolean(active);
+                if (routeActive === next) return;
+                routeActive = next;
+                reconcile();
+            },
+            setSuspended(suspended, reason = 'default') {
+                const key = String(reason || 'default');
+                if (suspended) {
+                    suspendReasons.add(key);
+                } else {
+                    suspendReasons.delete(key);
+                }
+                reconcile();
+            },
+            setAppearance(next = {}) {
+                const nextTheme = next.theme === 'dark' ? 'dark' : 'light';
+                const nextOnline = Boolean(next.bothOnline);
+                if (appearance.theme === nextTheme && appearance.bothOnline === nextOnline) return;
+                appearance = { theme: nextTheme, bothOnline: nextOnline };
+                atlasEntry = getSharedAtlas(
+                    config.alwaysDarkTone ? 'dark' : appearance.theme,
+                    appearance.bothOnline
+                );
+                if (options.syncResonanceAttr) {
+                    if (nextOnline) {
+                        document.documentElement.setAttribute('data-resonance', 'online');
+                    } else {
+                        document.documentElement.removeAttribute('data-resonance');
+                    }
+                }
+                if (shouldRun()) draw();
+            },
+            setAmbientMode(mode) {
+                const normalized = (mode === 'dream' || mode === 'light' || mode === 'calm') ? mode : 'dream';
+                ambientMode = normalized;
+                if (normalized !== 'calm') {
+                    autoDegradedOff = false;
+                    degradeStrikes = 0;
+                    qualityScale = isLowPowerDevice() ? 0.68 : 1.0;
+                    syncPopulation();
+                } else {
+                    gustPetals.length = 0;
+                }
+                reconcile();
+            },
+            createBurst(x, y, count = 10) {
+                spawnRippleAndPetals(x, y, count);
+            },
+            triggerMissYouFlutter() {
+                triggerFlutter();
+            },
+            getMetrics() {
+                return {
+                    running: rafId !== null,
+                    ambientMode,
+                    particleCount: particles.length,
+                    gustCount: gustPetals.length,
+                    qualityScale,
+                    autoDegradedOff,
+                    suspendReasons: Array.from(suspendReasons)
+                };
+            },
+            destroy() {
+                stop();
+                if (config.enablePointerWind) window.removeEventListener('mousemove', onMouseMove);
+                if (config.scrollThrottle) window.removeEventListener('scroll', onScroll);
+                window.removeEventListener('resize', onResize);
+                document.removeEventListener('visibilitychange', onVisibilityChange);
+                if (typeof reducedMotionQuery?.removeEventListener === 'function') {
+                    reducedMotionQuery.removeEventListener('change', onReducedMotionChange);
+                } else if (typeof reducedMotionQuery?.removeListener === 'function') {
+                    reducedMotionQuery.removeListener(onReducedMotionChange);
+                }
             }
-        }
-
-        // 鼠标速度衰减与休眠
-        if (mouse.active) {
-            mouse.vx *= 0.92;
-            mouse.vy *= 0.92;
-            if (performance.now() - mouse.lastTime > 600) {
-                mouse.active = false;
-            }
-        }
-    }
-
-    function drawFrame() {
-        clearAnimationCanvases();
-        for (let i = 0; i < bgPetals.length; i++) {
-            bgPetals[i].draw(ctxBg);
-        }
-        const targetFgCtx = isMobile ? ctxBg : ctxFg;
-        for (let i = 0; i < fgPetals.length; i++) {
-            fgPetals[i].draw(targetFgCtx);
-        }
-        for (let i = 0; i < burstPetals.length; i++) {
-            burstPetals[i].draw(targetFgCtx);
-        }
-    }
-
-    // ── 滚动时 GPU 节能与帧率预算自适应控制 ──
-    let isUserScrolling = false;
-    let scrollDebounceTimer = null;
-    window.addEventListener('scroll', () => {
-        if (!routeActive || isSuspended || document.hidden) return;
-        isUserScrolling = true;
-        clearTimeout(scrollDebounceTimer);
-        scrollDebounceTimer = setTimeout(() => {
-            isUserScrolling = false;
-        }, 140);
-    }, { passive: true });
-
-    // ── 原生帧率动画主循环 (智能帧率预算控制，平衡画质与能效) ──
-    function animate(timestamp) {
-        animationFrameId = null;
-        if (!shouldRunAnimation()) {
-            stopAnimation();
-            return;
-        }
-
-        // 滑动节能节流：页面处于快速滚动时主动退避(~30 FPS)，将 100% 渲染算力让位给列表滑动
-        const frameThresholdMs = isUserScrolling ? 32 : 14;
-        if (lastRafTimestamp > 0 && timestamp - lastRafTimestamp < frameThresholdMs) {
-            animationFrameId = requestAnimationFrame(animate);
-            return;
-        }
-
-        const dtSec = lastRafTimestamp > 0
-            ? Math.min((timestamp - lastRafTimestamp) / 1000, MAX_DELTA_SEC)
-            : 0.016;
-        lastRafTimestamp = timestamp;
-
-        updateParticles(dtSec);
-        drawFrame();
-
-        if (shouldRunAnimation()) {
-            animationFrameId = requestAnimationFrame(animate);
-        }
-    }
-
-    function startAnimation() {
-        if (animationFrameId !== null || !shouldRunAnimation()) return;
-        lastRafTimestamp = 0;
-        animationFrameId = requestAnimationFrame(animate);
-    }
-
-    function reconcileAnimationState() {
-        if (shouldRunAnimation()) startAnimation();
-        else stopAnimation();
-    }
-
-    document.addEventListener('visibilitychange', reconcileAnimationState);
-    const handleReducedMotionChange = () => reconcileAnimationState();
-    if (typeof animationsReducedMotionQuery?.addEventListener === 'function') {
-        animationsReducedMotionQuery.addEventListener('change', handleReducedMotionChange);
-    } else if (typeof animationsReducedMotionQuery?.addListener === 'function') {
-        animationsReducedMotionQuery.addListener(handleReducedMotionChange);
-    }
-
-    window.addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-            resizeHomeCanvases();
-            if (shouldRunAnimation()) drawFrame();
-        }, 150);
-    });
-
-    resizeHomeCanvases();
-
-    window.homeSakuraEffect = Object.freeze({
-        setRouteActive(isHome) {
-            const nextActive = Boolean(isHome);
-            if (routeActive === nextActive) return;
-            routeActive = nextActive;
-            reconcileAnimationState();
-        },
-        setSuspended(suspended) {
-            const nextSuspended = Boolean(suspended);
-            if (isSuspended === nextSuspended) return;
-            isSuspended = nextSuspended;
-            reconcileAnimationState();
-        },
-        setAppearance(nextAppearance = {}) {
-            const nextTheme = nextAppearance.theme === 'dark' ? 'dark' : 'light';
-            const nextOnline = Boolean(nextAppearance.bothOnline);
-            if (appearance.theme === nextTheme && appearance.bothOnline === nextOnline) return;
-            appearance = { theme: nextTheme, bothOnline: nextOnline };
-            currentPalette = getPalette(appearance.theme, appearance.bothOnline);
-            bakeTextures();
-        },
-        createBurst(x, y, count = 16) {
-            if (!shouldRunAnimation()) return;
-            createPetalBurst(x, y, count);
-        },
-        triggerMissYouFlutter() {
-            if (animationsReducedMotionQuery?.matches === true) return;
-            const cx = canvasWidth / 2;
-            const cy = canvasHeight * 0.38;
-            burstPetals.length = 0;
-            createPetalBurst(cx, cy, 24);
-            createPetalBurst(cx - canvasWidth * 0.25, cy + 30, 16);
-            createPetalBurst(cx + canvasWidth * 0.25, cy + 30, 16);
-
-            // 注入一波加速飞落的浪漫花瓣
-            const extraCount = isMobile ? 12 : 24;
-            for (let i = 0; i < extraCount; i++) {
-                const p = new PeachPetal('foreground', false, 0, 0, false);
-                p.vy *= 1.45;
-                p.y = -Math.random() * 90 - 20;
-                p.x = Math.random() * canvasWidth;
-                fgPetals.push(p);
-            }
-            setTimeout(() => {
-                syncPetalsPopulation();
-            }, 5500);
-        }
-    });
-
-    reconcileAnimationState();
-})();
-
-// ==========================================
-// 个人主页专属：漫天飘落爱心和樱花粒子特效 (预渲染雪碧图 + 丝滑高刷)
-// ==========================================
-let profileParticlesReq = null;
-let profileParticles = [];
-let profileParticlesRequested = false;
-let profileLastRafTimestamp = 0;
-const profileEmojis = ['🌸', '💮', '💖', '✨', '💕', '🎀', '🌷', '💗'];
-const profileEmojiSpriteMap = {};
-
-function getEmojiSprite(emoji, size = 32) {
-    const key = `${emoji}_${size}`;
-    if (profileEmojiSpriteMap[key]) return profileEmojiSpriteMap[key];
-    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
-    const canvas = document.createElement('canvas');
-    const dim = Math.round((size + 8) * dpr);
-    canvas.width = dim;
-    canvas.height = dim;
-    const ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.font = `${size}px "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(emoji, (size + 8) / 2, (size + 8) / 2);
-    profileEmojiSpriteMap[key] = { canvas, size: size + 8 };
-    return profileEmojiSpriteMap[key];
-}
-
-window.getEmojiSprite = getEmojiSprite;
-
-// 空闲时预热主页 Emoji 雪碧图，避免阻塞首屏与脚本评估主线程
-const scheduleEmojiPrewarm = window.requestIdleCallback || ((cb) => setTimeout(cb, 1200));
-scheduleEmojiPrewarm(() => {
-    profileEmojis.forEach(e => {
-        getEmojiSprite(e, 24);
-        getEmojiSprite(e, 32);
-    });
-});
-
-function pauseProfileParticles(clearCanvas = false) {
-    if (profileParticlesReq !== null) cancelAnimationFrame(profileParticlesReq);
-    profileParticlesReq = null;
-    profileLastRafTimestamp = 0;
-    if (clearCanvas) {
-        const canvas = document.getElementById('profile-particles-canvas');
-        const ctx = canvas?.getContext('2d');
-        if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-}
-
-function startProfileParticles() {
-    const canvas = document.getElementById('profile-particles-canvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d', { alpha: true });
-    if (!ctx) return;
-    profileParticlesRequested = true;
-    pauseProfileParticles();
-    const canvasWidth = Math.max(window.innerWidth, 1);
-    const canvasHeight = Math.max(window.innerHeight, 1);
-    sizeAnimationCanvas(canvas, ctx, canvasWidth, canvasHeight);
-
-    if (animationsReducedMotionQuery?.matches === true || document.hidden) {
-        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-        return;
-    }
-
-    const isMobile = window.innerWidth < 768;
-    const particleCount = isMobile ? 12 : 20;
-    profileParticles = [];
-
-    for (let i = 0; i < particleCount; i++) {
-        const emoji = profileEmojis[Math.floor(Math.random() * profileEmojis.length)];
-        const size = Math.floor(Math.random() * 10 + 16);
-        profileParticles.push({
-            x: Math.random() * canvasWidth,
-            y: Math.random() * (canvasHeight + 100) - 50,
-            size,
-            speedY: Math.random() * 1.6 + 0.9,
-            speedX: (Math.random() - 0.5) * 0.8,
-            sway: Math.random() * Math.PI * 2,
-            swaySpeed: 0.02 + Math.random() * 0.03,
-            emoji,
-            rotation: Math.random() * 360,
-            rotationSpeed: (Math.random() - 0.5) * 1.5,
-            alpha: 0.65 + Math.random() * 0.3
         });
     }
 
-    function render(timestamp) {
-        profileParticlesReq = null;
-        if (!profileParticlesRequested || animationsReducedMotionQuery?.matches === true || document.hidden) {
-            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-            return;
-        }
+    window.createAtmosphericCanvasController = createAtmosphericCanvasController;
 
-        // 帧率节流：限频至约 60 FPS
-        if (profileLastRafTimestamp > 0 && timestamp - profileLastRafTimestamp < 14) {
-            profileParticlesReq = requestAnimationFrame(render);
-            return;
-        }
+    // ── 1. 首页电影景深浮屏桃花雨 (#sakura-canvas) ──
+    function isInitialHomeLocation() {
+        const hash = window.location.hash;
+        return !hash || hash === '#' || !hash.startsWith('#/') || hash === '#/' || hash.startsWith('#/?');
+    }
 
-        const dtSec = profileLastRafTimestamp > 0
-            ? Math.min((timestamp - profileLastRafTimestamp) / 1000, 0.05)
-            : 0.016;
-        profileLastRafTimestamp = timestamp;
-        const step = dtSec * 60;
+    const homeCanvas = document.getElementById('sakura-canvas');
+    const homeController = createAtmosphericCanvasController(homeCanvas, {
+        desktopCount: 32,
+        mobileCount: 18,
+        lightDesktopCount: 10,
+        lightMobileCount: 7,
+        enablePointerWind: true,
+        scrollThrottle: true,
+        initialRouteActive: isInitialHomeLocation(),
+        syncResonanceAttr: true,
+        baseWind: 0.92
+    });
 
-        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    if (homeController) {
+        window.homeSakuraEffect = homeController;
+    }
 
-        for (let i = 0; i < profileParticles.length; i++) {
-            const p = profileParticles[i];
-            p.sway += p.swaySpeed * step;
-            p.y += p.speedY * step;
-            p.x += (p.speedX + Math.sin(p.sway) * 0.65) * step;
-            p.rotation += p.rotationSpeed * step;
+    // ── 2. 个人主页浮屏景深桃花雨 (#profile-particles-canvas) ──
+    let profileController = null;
 
-            if (p.y > canvasHeight + 40) {
-                p.y = -40;
-                p.x = Math.random() * canvasWidth;
+    function ensureProfileController() {
+        if (profileController) return profileController;
+        const canvas = document.getElementById('profile-particles-canvas');
+        if (!canvas) return null;
+        profileController = createAtmosphericCanvasController(canvas, {
+            desktopCount: 22,
+            mobileCount: 13,
+            lightDesktopCount: 8,
+            lightMobileCount: 6,
+            enablePointerWind: false,
+            scrollThrottle: false,
+            initialRouteActive: false,
+            baseWind: 0.72
+        });
+        return profileController;
+    }
+
+    window.startProfileParticles = function startProfileParticles() {
+        const ctrl = ensureProfileController();
+        if (!ctrl) return;
+        ctrl.setAmbientMode(getAmbientMode());
+        ctrl.setAppearance({
+            theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
+            bothOnline: typeof bothOnline !== 'undefined' && Boolean(bothOnline)
+        });
+        ctrl.setRouteActive(true);
+    };
+
+    window.stopProfileParticles = function stopProfileParticles() {
+        if (!profileController) return;
+        profileController.setRouteActive(false);
+    };
+
+    // ── 3. 全站氛围档位与主题广播同步接口 ──
+    const extraControllers = new Set();
+    window.registerAmbientController = function registerAmbientController(ctrl) {
+        if (ctrl) extraControllers.add(ctrl);
+        return () => extraControllers.delete(ctrl);
+    };
+
+    window.syncAllAmbientEffects = function syncAllAmbientEffects({ mode, theme, bothOnline: online } = {}) {
+        const targets = [homeController, profileController, ...extraControllers].filter(Boolean);
+        targets.forEach(ctrl => {
+            if (mode !== undefined) ctrl.setAmbientMode(mode);
+            if (theme !== undefined || online !== undefined) {
+                ctrl.setAppearance({
+                    theme: theme !== undefined
+                        ? theme
+                        : (document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'),
+                    bothOnline: online !== undefined
+                        ? Boolean(online)
+                        : (typeof bothOnline !== 'undefined' && Boolean(bothOnline))
+                });
             }
+        });
+    };
 
-            const spriteObj = getEmojiSprite(p.emoji, 28);
-            if (spriteObj) {
-                ctx.save();
-                ctx.translate(p.x, p.y);
-                ctx.rotate(p.rotation * Math.PI / 180);
-                ctx.globalAlpha = p.alpha;
-                const drawScale = p.size / spriteObj.size;
-                const half = spriteObj.size / 2;
-                ctx.drawImage(
-                    spriteObj.canvas,
-                    -half * drawScale,
-                    -half * drawScale,
-                    spriteObj.size * drawScale,
-                    spriteObj.size * drawScale
-                );
-                ctx.restore();
-            }
+    // 向后兼容：保留按需懒加载版 getEmojiSprite（零首屏预热开销）
+    const lazyEmojiSpriteMap = {};
+    window.getEmojiSprite = function getEmojiSprite(emoji, size = 28) {
+        const key = `${emoji}_${size}`;
+        if (lazyEmojiSpriteMap[key]) return lazyEmojiSpriteMap[key];
+        const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+        const canvas = document.createElement('canvas');
+        const dim = Math.round((size + 8) * dpr);
+        canvas.width = dim;
+        canvas.height = dim;
+        const c = canvas.getContext('2d');
+        if (c) {
+            c.setTransform(dpr, 0, 0, dpr, 0, 0);
+            c.font = `${size}px "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif`;
+            c.textAlign = 'center';
+            c.textBaseline = 'middle';
+            c.fillText(emoji, (size + 8) / 2, (size + 8) / 2);
         }
-
-        profileParticlesReq = requestAnimationFrame(render);
-    }
-
-    profileLastRafTimestamp = 0;
-    profileParticlesReq = requestAnimationFrame(render);
-}
-
-function stopProfileParticles() {
-    profileParticlesRequested = false;
-    pauseProfileParticles(true);
-}
-
-const handleProfileMotionPreference = () => {
-    if (animationsReducedMotionQuery?.matches) {
-        pauseProfileParticles(true);
-    } else if (profileParticlesRequested && !document.hidden) {
-        startProfileParticles();
-    }
-};
-
-if (typeof animationsReducedMotionQuery?.addEventListener === 'function') {
-    animationsReducedMotionQuery.addEventListener('change', handleProfileMotionPreference);
-} else if (typeof animationsReducedMotionQuery?.addListener === 'function') {
-    animationsReducedMotionQuery.addListener(handleProfileMotionPreference);
-}
-
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-        pauseProfileParticles();
-    } else if (profileParticlesRequested && animationsReducedMotionQuery?.matches !== true) {
-        startProfileParticles();
-    }
-});
-
-let profileResizeTimer;
-window.addEventListener('resize', () => {
-    if (!profileParticlesRequested) return;
-    clearTimeout(profileResizeTimer);
-    profileResizeTimer = setTimeout(() => startProfileParticles(), 150);
-});
+        lazyEmojiSpriteMap[key] = { canvas, size: size + 8 };
+        return lazyEmojiSpriteMap[key];
+    };
+})();

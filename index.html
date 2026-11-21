@@ -51,27 +51,32 @@
             } else {
                 document.documentElement.removeAttribute('data-cursor');
             }
+            var savedAmbient = localStorage.getItem('ambient_preference');
+            var ambient = (savedAmbient === 'dream' || savedAmbient === 'light' || savedAmbient === 'calm')
+                ? savedAmbient
+                : (navigator.connection && navigator.connection.saveData ? 'light' : 'dream');
+            document.documentElement.setAttribute('data-ambient', ambient);
         })();
     </script>
-    <link rel="stylesheet" href="css/variables.css?v=4.4.7">
-    <link rel="stylesheet" href="css/refresh.css?v=4.4.7">
-    <link rel="stylesheet" href="css/base.css?v=4.4.7">
-    <link rel="stylesheet" href="css/header.css?v=4.4.7">
-    <link rel="stylesheet" href="css/timer.css?v=4.4.7">
-    <link rel="stylesheet" href="css/timeline.css?v=4.4.7">
-    <link rel="stylesheet" href="css/dialogs.css?v=4.4.7">
-    <link rel="stylesheet" href="css/comments.css?v=4.4.7">
-    <link rel="stylesheet" href="css/ai-panel.css?v=4.4.7">
-    <link rel="stylesheet" href="css/fab.css?v=4.4.7">
-    <link rel="stylesheet" href="css/auth.css?v=4.4.7">
-    <link rel="stylesheet" href="css/profile.css?v=4.4.7">
-    <link rel="stylesheet" href="css/notifications.css?v=4.4.7">
-    <link rel="stylesheet" href="css/mood.css?v=4.4.7">
-    <link rel="stylesheet" href="css/anniversary.css?v=4.4.7">
-    <link rel="stylesheet" href="css/effects.css?v=4.4.7">
-    <link rel="stylesheet" href="css/responsive.css?v=4.4.7">
-    <link rel="stylesheet" href="css/pages.css?v=4.4.7">
-    <link rel="stylesheet" href="css/topics.css?v=4.4.7">
+    <link rel="stylesheet" href="css/variables.css?v=4.5.0">
+    <link rel="stylesheet" href="css/refresh.css?v=4.5.0">
+    <link rel="stylesheet" href="css/base.css?v=4.5.0">
+    <link rel="stylesheet" href="css/header.css?v=4.5.0">
+    <link rel="stylesheet" href="css/timer.css?v=4.5.0">
+    <link rel="stylesheet" href="css/timeline.css?v=4.5.0">
+    <link rel="stylesheet" href="css/dialogs.css?v=4.5.0">
+    <link rel="stylesheet" href="css/comments.css?v=4.5.0">
+    <link rel="stylesheet" href="css/ai-panel.css?v=4.5.0">
+    <link rel="stylesheet" href="css/fab.css?v=4.5.0">
+    <link rel="stylesheet" href="css/auth.css?v=4.5.0">
+    <link rel="stylesheet" href="css/profile.css?v=4.5.0">
+    <link rel="stylesheet" href="css/notifications.css?v=4.5.0">
+    <link rel="stylesheet" href="css/mood.css?v=4.5.0">
+    <link rel="stylesheet" href="css/anniversary.css?v=4.5.0">
+    <link rel="stylesheet" href="css/effects.css?v=4.5.0">
+    <link rel="stylesheet" href="css/responsive.css?v=4.5.0">
+    <link rel="stylesheet" href="css/pages.css?v=4.5.0">
+    <link rel="stylesheet" href="css/topics.css?v=4.5.0">
 </head>
 <body class="auth-pending">
 <!-- 内联矢量微光 SVG 图标库 -->
@@ -127,7 +132,12 @@
 </svg>
 <div class="status-bar-shield" id="status-bar-shield" aria-hidden="true"></div>
 <a class="skip-link" id="skip-link" href="#main-content">跳到主要内容</a>
-<div id="bg-layer" aria-hidden="true"></div>
+<div id="bg-layer" aria-hidden="true">
+    <span class="aurora-orb aurora-orb-1"></span>
+    <span class="aurora-orb aurora-orb-2"></span>
+    <span class="aurora-orb aurora-orb-3"></span>
+    <div class="ambient-grain"></div>
+</div>
 
 <!-- 同频共振 UI -->
 <div class="resonance-ui" id="resonance-ui" role="status" aria-live="polite" aria-atomic="true">
@@ -176,10 +186,7 @@
     </ul>
 </aside>
 
-<div id="star-field" aria-hidden="true"></div>
-
 <canvas id="sakura-canvas" aria-hidden="true"></canvas>
-<canvas id="sakura-canvas-foreground" aria-hidden="true"></canvas>
 
 <main class="container" id="main-content">
     <header class="site-header">
@@ -908,6 +915,15 @@
                 <button class="theme-opt-btn" id="theme-btn-light" type="button" onclick="setThemeDirect('light')" aria-pressed="true">☀️ 浅色</button>
                 <button class="theme-opt-btn" id="theme-btn-dark" type="button" onclick="setThemeDirect('dark')" aria-pressed="false">🌙 深色</button>
             </div>
+            <div class="settings-subgroup ambient-settings-subgroup">
+                <div class="settings-sublabel">✨ 浮屏氛围动效</div>
+                <div class="theme-options ambient-options" role="group" aria-label="浮屏氛围动效档位">
+                    <button class="theme-opt-btn active" id="ambient-btn-dream" type="button" onclick="setAmbientDirect('dream')" aria-pressed="true">🌸 梦幻流光</button>
+                    <button class="theme-opt-btn" id="ambient-btn-light" type="button" onclick="setAmbientDirect('light')" aria-pressed="false">🌬️ 轻盈呼吸</button>
+                    <button class="theme-opt-btn" id="ambient-btn-calm" type="button" onclick="setAmbientDirect('calm')" aria-pressed="false">🍃 静谧省电</button>
+                </div>
+                <div class="settings-tip" id="ambient-mode-tip">梦幻流光呈现饱满景深桃花雨与呼吸极光；轻盈模式保留极光与稀疏微风落花；静谧模式纯静态最省电。</div>
+            </div>
             <div class="settings-subgroup cursor-settings-subgroup">
                 <div class="settings-sublabel">✨ 专属鼠标样式</div>
                 <div class="theme-options cursor-options">
@@ -1198,29 +1214,29 @@
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"
         integrity="sha384-nWa0WrJ8Dl90YqhjSU0vNB8IxSO54t6AmEmV83LMTb/Img+Af2MfK7XJE54mwpSR"
         crossorigin="anonymous"></script>
-<script defer src="js/config.js?v=4.4.7"></script>
-<script defer src="js/animations.js?v=4.4.7"></script>
-<script defer src="js/timer.js?v=4.4.7"></script>
-<script defer src="js/auth.js?v=4.4.7"></script>
-<script defer src="js/profile.js?v=4.4.7"></script>
-<script defer src="js/drop-zone.js?v=4.4.7"></script>
-<script defer src="js/moments.js?v=4.4.7"></script>
-<script defer src="js/milestones.js?v=4.4.7"></script>
-<script defer src="js/likes.js?v=4.4.7"></script>
-<script defer src="js/comments.js?v=4.4.7"></script>
-<script defer src="js/mood.js?v=4.4.7"></script>
-<script defer src="js/anniversary.js?v=4.4.7"></script>
-<script defer src="js/lightbox.js?v=4.4.7"></script>
-<script defer src="js/ai.js?v=4.4.7"></script>
-<script defer src="js/blindbox.js?v=4.4.7"></script>
-<script defer src="js/presence.js?v=4.4.7"></script>
-<script defer src="js/theme.js?v=4.4.7"></script>
-<script defer src="js/notifications.js?v=4.4.7"></script>
-<script defer src="js/topics.js?v=4.4.7"></script>
-<script defer src="js/effects.js?v=4.4.7"></script>
-<script defer src="js/settings.js?v=4.4.7"></script>
-<script defer src="js/router.js?v=4.4.7"></script>
-<script defer src="js/app.js?v=4.4.7"></script>
+<script defer src="js/config.js?v=4.5.0"></script>
+<script defer src="js/animations.js?v=4.5.0"></script>
+<script defer src="js/timer.js?v=4.5.0"></script>
+<script defer src="js/auth.js?v=4.5.0"></script>
+<script defer src="js/profile.js?v=4.5.0"></script>
+<script defer src="js/drop-zone.js?v=4.5.0"></script>
+<script defer src="js/moments.js?v=4.5.0"></script>
+<script defer src="js/milestones.js?v=4.5.0"></script>
+<script defer src="js/likes.js?v=4.5.0"></script>
+<script defer src="js/comments.js?v=4.5.0"></script>
+<script defer src="js/mood.js?v=4.5.0"></script>
+<script defer src="js/anniversary.js?v=4.5.0"></script>
+<script defer src="js/lightbox.js?v=4.5.0"></script>
+<script defer src="js/ai.js?v=4.5.0"></script>
+<script defer src="js/blindbox.js?v=4.5.0"></script>
+<script defer src="js/presence.js?v=4.5.0"></script>
+<script defer src="js/theme.js?v=4.5.0"></script>
+<script defer src="js/notifications.js?v=4.5.0"></script>
+<script defer src="js/topics.js?v=4.5.0"></script>
+<script defer src="js/effects.js?v=4.5.0"></script>
+<script defer src="js/settings.js?v=4.5.0"></script>
+<script defer src="js/router.js?v=4.5.0"></script>
+<script defer src="js/app.js?v=4.5.0"></script>
 
 </body>
 </html>

@@ -621,142 +621,44 @@ function hideUserDropdown() {
     // 保留向后兼容空实现
 }
 
-// ── 登录弹窗粒子 (预渲染雪碧图 + 丝滑高刷) ──
-let loginCanvasAnim = null;
-const loginEmojis = ['💖', '💗', '💕', '✨', '🌸', '💝', '🌹', '🎀'];
-const loginEmojiSpriteMap = {};
+// ── 登录页景深氛围画布（统一复用现代景深粒子引擎，告别 Emoji 下雨并自动适配缩放与后台挂起） ──
+let loginAmbientController = null;
 
-function getLoginEmojiSprite(emoji, size = 32) {
-    if (typeof getEmojiSprite === 'function') {
-        return getEmojiSprite(emoji, size);
+function ensureLoginAmbientController() {
+    if (loginAmbientController) return loginAmbientController;
+    const canvas = document.getElementById('login-canvas');
+    if (!canvas || typeof window.createAtmosphericCanvasController !== 'function') return null;
+
+    loginAmbientController = window.createAtmosphericCanvasController(canvas, {
+        desktopCount: 24,
+        mobileCount: 14,
+        lightDesktopCount: 9,
+        lightMobileCount: 6,
+        enablePointerWind: false,
+        scrollThrottle: false,
+        initialRouteActive: false,
+        alwaysDarkTone: false,
+        baseWind: 0.78
+    });
+
+    if (loginAmbientController && typeof window.registerAmbientController === 'function') {
+        window.registerAmbientController(loginAmbientController);
     }
-    const key = `${emoji}_${size}`;
-    if (loginEmojiSpriteMap[key]) return loginEmojiSpriteMap[key];
-    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
-    const canvas = document.createElement('canvas');
-    const dim = Math.round((size + 8) * dpr);
-    canvas.width = dim;
-    canvas.height = dim;
-    const ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.font = `${size}px "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(emoji, (size + 8) / 2, (size + 8) / 2);
-    loginEmojiSpriteMap[key] = { canvas, size: size + 8 };
-    return loginEmojiSpriteMap[key];
+    return loginAmbientController;
 }
 
 function startLoginCanvas() {
-    stopLoginCanvas();
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-
-    const canvas = document.getElementById('login-canvas');
-    const context = canvas?.getContext('2d', { alpha: true });
-    if (!canvas || !context) return;
-
-    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
-    canvas.style.width = `${window.innerWidth}px`;
-    canvas.style.height = `${window.innerHeight}px`;
-    canvas.width = Math.round(window.innerWidth * dpr);
-    canvas.height = Math.round(window.innerHeight * dpr);
-    context.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const petals = [];
-    const count = window.innerWidth < 768 ? 16 : 28;
-    for (let index = 0; index < count; index += 1) {
-        petals.push({
-            x: Math.random() * window.innerWidth,
-            y: Math.random() * (window.innerHeight + 100) - 50,
-            size: 14 + Math.random() * 18,
-            speedY: 0.8 + Math.random() * 1.5,
-            speedX: (Math.random() - 0.5) * 0.8,
-            rot: Math.random() * Math.PI * 2,
-            rotSpeed: (Math.random() - 0.5) * 0.035,
-            sway: Math.random() * Math.PI * 2,
-            swaySpeed: 0.015 + Math.random() * 0.025,
-            alpha: 0.55 + Math.random() * 0.4,
-            emoji: loginEmojis[Math.floor(Math.random() * loginEmojis.length)]
-        });
-    }
-
-    loginCanvasAnim = { running: true, requestId: null, lastTime: 0, animate: null };
-    const animate = (timestamp) => {
-        if (!loginCanvasAnim?.running) return;
-        if (document.hidden || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-            loginCanvasAnim.requestId = null;
-            loginCanvasAnim.lastTime = 0;
-            return;
-        }
-        const dtSec = loginCanvasAnim.lastTime > 0
-            ? Math.min((timestamp - loginCanvasAnim.lastTime) / 1000, 0.05)
-            : 0.016;
-        loginCanvasAnim.lastTime = timestamp;
-        const step = dtSec * 60;
-
-        context.clearRect(0, 0, window.innerWidth, window.innerHeight);
-        petals.forEach(petal => {
-            petal.sway += petal.swaySpeed * step;
-            petal.x += (petal.speedX + Math.sin(petal.sway) * 0.7) * step;
-            petal.y += petal.speedY * step;
-            petal.rot += petal.rotSpeed * step;
-            if (petal.y > window.innerHeight + 35) {
-                petal.y = -35;
-                petal.x = Math.random() * window.innerWidth;
-            }
-            const spriteObj = getLoginEmojiSprite(petal.emoji, 28);
-            if (spriteObj) {
-                context.save();
-                context.translate(petal.x, petal.y);
-                context.rotate(petal.rot);
-                context.globalAlpha = petal.alpha;
-                const drawScale = petal.size / spriteObj.size;
-                const half = spriteObj.size / 2;
-                context.drawImage(
-                    spriteObj.canvas,
-                    -half * drawScale,
-                    -half * drawScale,
-                    spriteObj.size * drawScale,
-                    spriteObj.size * drawScale
-                );
-                context.restore();
-            }
-        });
-        if (loginCanvasAnim) loginCanvasAnim.requestId = requestAnimationFrame(animate);
-    };
-    loginCanvasAnim.animate = animate;
-    if (!document.hidden) {
-        loginCanvasAnim.requestId = requestAnimationFrame(animate);
-    }
+    const ctrl = ensureLoginAmbientController();
+    if (!ctrl) return;
+    const ambient = document.documentElement.getAttribute('data-ambient') || 'dream';
+    ctrl.setAmbientMode(ambient);
+    ctrl.setRouteActive(true);
 }
 
 function stopLoginCanvas() {
-    if (!loginCanvasAnim) return;
-    loginCanvasAnim.running = false;
-    if (loginCanvasAnim.requestId) cancelAnimationFrame(loginCanvasAnim.requestId);
-    loginCanvasAnim = null;
+    if (!loginAmbientController) return;
+    loginAmbientController.setRouteActive(false);
 }
-
-document.addEventListener('visibilitychange', () => {
-    if (!loginCanvasAnim?.running) return;
-    if (document.hidden) {
-        if (loginCanvasAnim.requestId) {
-            cancelAnimationFrame(loginCanvasAnim.requestId);
-            loginCanvasAnim.requestId = null;
-        }
-        loginCanvasAnim.lastTime = 0;
-    } else if (!loginCanvasAnim.requestId && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        const loginModal = document.getElementById('login-modal');
-        const isActive = (typeof isAppRouteActive === 'function' && isAppRouteActive('login'))
-            || loginModal?.classList.contains('is-active')
-            || loginModal?.classList.contains('active')
-            || loginModal?.open;
-        if (isActive && typeof loginCanvasAnim.animate === 'function') {
-            loginCanvasAnim.lastTime = 0;
-            loginCanvasAnim.requestId = requestAnimationFrame(loginCanvasAnim.animate);
-        }
-    }
-});
 
 // ── 受保护动作 ──
 function checkPassword(actionType) {

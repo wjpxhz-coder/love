@@ -7,8 +7,10 @@
     position: fixed;
     inset: 0;
     z-index: 1500;
-    background: linear-gradient(145deg, #ffd3dd 0%, #ffc2ce 25%, #ffb1c3 60%, #ffa5bc 100%);
-    background-attachment: fixed;
+    background:
+        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.35) 0%, transparent 45%),
+        radial-gradient(circle at 85% 80%, rgba(235, 210, 255, 0.38) 0%, transparent 48%),
+        linear-gradient(145deg var(--in-oklab), #ffe0e8 0%, #ffc9d8 38%, #ffbdd1 75%, #f7c5e6 100%);
     display: none;
     flex-direction: column;
     overflow-y: auto;
@@ -20,16 +22,21 @@
     display: flex;
 }
 
-/* 漂浮樱花与粒子画布 (置于最顶层，覆盖在所有卡片之上，不阻挡点击交互) */
+/* 个人主页浮屏景深桃花雨画布 (轻盈浮于内容卡片之上，严格低于顶部导航栏，不阻挡点击) */
 .profile-particles-canvas {
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100%;
     height: 100%;
     pointer-events: none;
-    z-index: 50;
-    will-change: transform;
+    z-index: 5;
+    contain: strict;
+    transition: opacity 0.4s ease;
+}
+
+:root[data-ambient='calm'] .profile-particles-canvas {
+    opacity: 0;
+    visibility: hidden;
 }
 
 /* 顶部导航栏 */
@@ -171,13 +178,11 @@
 
 .profile-content-card {
     background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
     border-radius: 28px;
     padding: 26px 20px 22px;
     width: 100%;
-    box-shadow: 0 14px 40px rgba(230, 95, 125, 0.18), 0 2px 10px rgba(0, 0, 0, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 14px 40px rgba(230, 95, 125, 0.18), 0 2px 10px rgba(0, 0, 0, 0.03), inset 0 1.5px 1px rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.92);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -569,8 +574,7 @@
     position: fixed;
     inset: 0;
     z-index: 1600;
-    background: linear-gradient(145deg, #ffd3dd 0%, #ffc2ce 25%, #ffb1c3 60%, #ffa5bc 100%);
-    background-attachment: fixed;
+    background: linear-gradient(145deg var(--in-oklab), #ffe0e8 0%, #ffc9d8 38%, #ffbdd1 75%, #f7c5e6 100%);
     display: none;
     flex-direction: column;
     overflow-y: auto;
@@ -671,13 +675,11 @@
 
 .edit-profile-content-card {
     background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
     border-radius: 28px;
     padding: 26px 20px 22px;
     width: 100%;
-    box-shadow: 0 14px 40px rgba(230, 95, 125, 0.18);
-    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 14px 40px rgba(230, 95, 125, 0.18), inset 0 1.5px 1px rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.92);
     box-sizing: border-box;
 }
 
