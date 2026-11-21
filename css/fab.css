@@ -16,13 +16,22 @@
     margin-bottom: 16px;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(20px);
-    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform-origin: bottom center;
+    transform: translate3d(0, 14px, 0) scale(0.94);
+    transition:
+        transform 260ms var(--ios-ease-nav),
+        opacity 200ms var(--ios-ease-decel),
+        visibility 0s linear 260ms;
+    will-change: transform, opacity;
 }
 .fab-menu.show {
     opacity: 1;
     visibility: visible;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0) scale(1);
+    transition:
+        transform 280ms var(--ios-ease-nav),
+        opacity 180ms var(--ios-ease-decel),
+        visibility 0s linear 0s;
 }
 .fab-item-wrapper {
     position: relative;
@@ -32,19 +41,22 @@
     align-items: center;
     justify-content: center;
     opacity: 0;
-    transform: translateX(15px);
-    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: translate3d(0, 12px, 0) scale(0.88);
+    transition:
+        transform 280ms var(--ios-ease-nav),
+        opacity 200ms ease;
 }
 .fab-menu.show .fab-item-wrapper {
     opacity: 1;
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0) scale(1);
 }
-.fab-item-wrapper:nth-child(6) { transition-delay: 0.02s; }
-.fab-item-wrapper:nth-child(5) { transition-delay: 0.05s; }
-.fab-item-wrapper:nth-child(4) { transition-delay: 0.08s; }
-.fab-item-wrapper:nth-child(3) { transition-delay: 0.11s; }
-.fab-item-wrapper:nth-child(2) { transition-delay: 0.14s; }
-.fab-item-wrapper:nth-child(1) { transition-delay: 0.17s; }
+.fab-item-wrapper:nth-child(6) { transition-delay: 15ms; }
+.fab-item-wrapper:nth-child(5) { transition-delay: 35ms; }
+.fab-item-wrapper:nth-child(4) { transition-delay: 55ms; }
+.fab-item-wrapper:nth-child(3) { transition-delay: 75ms; }
+.fab-item-wrapper:nth-child(2) { transition-delay: 95ms; }
+.fab-item-wrapper:nth-child(1) { transition-delay: 115ms; }
+.fab-menu:not(.show) .fab-item-wrapper { transition-delay: 0ms; }
 
 .fab-label {
     position: absolute;
@@ -163,6 +175,13 @@
     100% {
         opacity: 0;
         transform: translate3d(calc(var(--start-x, 50vw) + var(--sway-x, 40px)), 105vh, 0) rotate(var(--rot-end, 360deg));
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .fab-menu,
+    .fab-item-wrapper {
+        transition: none !important;
+        transform: none !important;
     }
 }
 

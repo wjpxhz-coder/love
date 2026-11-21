@@ -443,7 +443,7 @@ function enterAIPage() {
     bindAIChatModalLifecycle();
     ensureAIChatWelcome();
     renderPendingChatAttachments();
-    switchAITab('chat');
+    switchAITab('chat', false, { silent: true, fromEnter: true });
 }
 
 function leaveAIPage() {
@@ -573,12 +573,28 @@ async function cacheAIContent(tabName, content) {
     if (error) console.error('缓存 Agnes 2.0 内容失败:', error);
 }
 
-async function switchAITab(tabName, forceRefresh = false) {
+const AI_TAB_ORDER = ['chat', 'topic', 'anniversary', 'summary'];
+
+function animateAIPanelSwitch(panelEl, direction) {
+    if (!panelEl) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+    panelEl.classList.remove('ai-panel-slide-left', 'ai-panel-slide-right');
+    void panelEl.offsetWidth;
+    panelEl.classList.add(direction >= 0 ? 'ai-panel-slide-left' : 'ai-panel-slide-right');
+}
+
+async function switchAITab(tabName, forceRefresh = false, options = {}) {
     if (!AI_TABS.has(tabName)) return;
     if (!isAuthenticated()) {
         openLoginModal();
         return;
     }
+
+    const prevTab = currentAITab;
+    const prevIdx = AI_TAB_ORDER.indexOf(prevTab);
+    const nextIdx = AI_TAB_ORDER.indexOf(tabName);
+    const direction = prevIdx === -1 || nextIdx === -1 ? 1 : (nextIdx >= prevIdx ? 1 : -1);
+    const shouldAnimate = !options.silent && prevTab !== tabName;
 
     currentAITab = tabName;
     updateAITabState(tabName);
@@ -596,7 +612,31 @@ async function switchAITab(tabName, forceRefresh = false) {
         if (refreshButton) refreshButton.hidden = true;
         if (spacer) spacer.hidden = false;
 
-        document.getElementById('aiChatInput')?.focus();
+        if (shouldAnimate) {
+            animateAIPanelSwitch(chatMessages, direction);
+        }
+
+        const focusChatInput = () => {
+            if (currentAITab !== 'chat') return;
+            if (
+                typeof isAppRouteActive === 'function'
+                && !isAppRouteActive('ai')
+                && !isAppRouteActive('ai-chat')
+            ) {
+                return;
+            }
+            const isMobile = typeof isTouchMobileViewport === 'function'
+                ? isTouchMobileViewport()
+                : window.matchMedia?.('(pointer: coarse)')?.matches;
+            if (!isMobile) {
+                document.getElementById('aiChatInput')?.focus({ preventScroll: true });
+            }
+        };
+        if (options.fromEnter && typeof onAppRouteTransitionIdle === 'function') {
+            onAppRouteTransitionIdle(focusChatInput);
+        } else {
+            focusChatInput();
+        }
         return;
     }
 
@@ -608,6 +648,10 @@ async function switchAITab(tabName, forceRefresh = false) {
         refreshButton.setAttribute('title', '重新生成');
     }
     if (spacer) spacer.hidden = true;
+
+    if (shouldAnimate) {
+        animateAIPanelSwitch(featurePanel, direction);
+    }
 
     setAIContent('思考中，请稍候... ✨', 'loading');
 
@@ -722,7 +766,7 @@ function closeAIChatModal() {
 }
 
 function leaveAIChatPage() {
-    closeAIDiaryPicker();
+    closeAIDiaryPicker(true);
     resetAIDiaryPicker();
     clearPendingChatAttachments();
 }
@@ -1436,6 +1480,9 @@ async function loadAIDiaryImages(reset = false) {
     }
 }
 
+let aiDiaryPickerCloseTimer = null;
+let aiDiaryPickerAnimGen = 0;
+
 function openAIDiaryPicker() {
     if (isChatSending) return;
     if (!isAuthenticated()) {
@@ -1448,15 +1495,51 @@ function openAIDiaryPicker() {
     }
     const picker = document.getElementById('aiDiaryPicker');
     if (!picker) return;
+    if (aiDiaryPickerCloseTimer) {
+        clearTimeout(aiDiaryPickerCloseTimer);
+        aiDiaryPickerCloseTimer = null;
+    }
+    const gen = ++aiDiaryPickerAnimGen;
     picker.hidden = false;
+    picker.classList.remove('is-closing');
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+        picker.classList.add('is-open');
+    } else {
+        picker.classList.remove('is-open');
+        void picker.offsetWidth;
+        requestAnimationFrame(() => {
+            if (gen === aiDiaryPickerAnimGen && !picker.hidden && !picker.classList.contains('is-closing')) {
+                picker.classList.add('is-open');
+            }
+        });
+    }
     loadAIDiaryImages(true);
 }
 
-function closeAIDiaryPicker() {
+function closeAIDiaryPicker(immediate = false) {
     const picker = document.getElementById('aiDiaryPicker');
-    if (picker) picker.hidden = true;
     aiDiaryPickerRequestId += 1;
     isAIDiaryPickerLoading = false;
+    if (!picker) return;
+    if (aiDiaryPickerCloseTimer) {
+        clearTimeout(aiDiaryPickerCloseTimer);
+        aiDiaryPickerCloseTimer = null;
+    }
+    const gen = ++aiDiaryPickerAnimGen;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    if (immediate || reduced || picker.hidden) {
+        picker.classList.remove('is-open', 'is-closing');
+        picker.hidden = true;
+        return;
+    }
+    picker.classList.remove('is-open');
+    picker.classList.add('is-closing');
+    aiDiaryPickerCloseTimer = setTimeout(() => {
+        aiDiaryPickerCloseTimer = null;
+        if (gen !== aiDiaryPickerAnimGen) return;
+        picker.classList.remove('is-open', 'is-closing');
+        picker.hidden = true;
+    }, 300);
 }
 
 function loadMoreAIDiaryImages() {

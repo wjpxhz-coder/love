@@ -969,7 +969,20 @@ function renderMoodCalendar(monthKey, entriesByDate) {
         fragment.appendChild(createMoodCalendarCell(dateKey, day, entriesByDate[dateKey] || []));
     }
     heatmap.replaceChildren(fragment);
+    triggerMoodCalendarSlide(heatmap);
     updateMoodCheckinPrompt();
+}
+
+let pendingMoodCalendarSlideDir = '';
+
+function triggerMoodCalendarSlide(heatmap) {
+    const dir = pendingMoodCalendarSlideDir;
+    pendingMoodCalendarSlideDir = '';
+    if (!heatmap || !dir) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+    heatmap.classList.remove('is-slide-next', 'is-slide-prev');
+    void heatmap.offsetWidth;
+    heatmap.classList.add(dir === 'prev' ? 'is-slide-prev' : 'is-slide-next');
 }
 
 function updateMoodCheckinPrompt() {
@@ -1057,18 +1070,27 @@ async function loadMoods(monthKey = currentMoodMonthKey || getCurrentMoodMonthKe
 }
 
 function changeMoodMonth(offset) {
-    const nextMonth = shiftMoodMonth(currentMoodMonthKey || getCurrentMoodMonthKey(), Number(offset) || 0);
+    const numOffset = Number(offset) || 0;
+    const prevMonth = currentMoodMonthKey || getCurrentMoodMonthKey();
+    const nextMonth = shiftMoodMonth(prevMonth, numOffset);
     if (nextMonth > MAX_MOOD_MONTH_KEY || nextMonth < MIN_MOOD_MONTH_KEY) return;
+    if (nextMonth !== prevMonth) {
+        pendingMoodCalendarSlideDir = numOffset < 0 ? 'prev' : 'next';
+    }
     loadMoods(nextMonth);
 }
 
 function selectMoodMonth(monthKey) {
+    const prevMonth = currentMoodMonthKey || getCurrentMoodMonthKey();
     let selectedMonth = normalizeMoodMonthKey(monthKey);
     if (selectedMonth > MAX_MOOD_MONTH_KEY) {
         selectedMonth = MAX_MOOD_MONTH_KEY;
     }
     if (selectedMonth < MIN_MOOD_MONTH_KEY) {
         selectedMonth = MIN_MOOD_MONTH_KEY;
+    }
+    if (selectedMonth !== prevMonth) {
+        pendingMoodCalendarSlideDir = selectedMonth < prevMonth ? 'prev' : 'next';
     }
     loadMoods(selectedMonth);
 }
@@ -1080,7 +1102,12 @@ function selectMoodMonthFromPicker() {
 }
 
 function goToCurrentMoodMonth() {
-    loadMoods(getCurrentMoodMonthKey());
+    const prevMonth = currentMoodMonthKey || getCurrentMoodMonthKey();
+    const targetMonth = getCurrentMoodMonthKey();
+    if (targetMonth !== prevMonth) {
+        pendingMoodCalendarSlideDir = targetMonth < prevMonth ? 'prev' : 'next';
+    }
+    loadMoods(targetMonth);
 }
 
 function formatMoodEntryTime(entry) {

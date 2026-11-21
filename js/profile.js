@@ -344,12 +344,9 @@ function updateAvatarButton() {
 }
 
 function withViewTransition(action) {
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (document.startViewTransition && !reduceMotion) {
-        document.startViewTransition(action);
-    } else {
-        action();
-    }
+    // 页面级切屏已统一由 router.js 的 iOS 双层合成引擎接管，
+    // 避免在此调用 document.startViewTransition 冻结全屏导致动画撕裂和闪烁。
+    if (typeof action === 'function') action();
 }
 
 function openProfilePage(targetAuthor = currentAuthor) {
@@ -374,11 +371,18 @@ function enterProfilePage(route) {
 
     currentViewingProfileAuthor = targetAuthor;
 
-    withViewTransition(() => {
-        renderProfilePage(targetAuthor);
-        loadProfileStats(targetAuthor);
-    });
-    if (typeof startProfileParticles === 'function') startProfileParticles();
+    renderProfilePage(targetAuthor);
+    loadProfileStats(targetAuthor);
+
+    const startParticlesWhenIdle = () => {
+        if (typeof isAppRouteActive === 'function' && !isAppRouteActive('profile')) return;
+        if (typeof startProfileParticles === 'function') startProfileParticles();
+    };
+    if (typeof onAppRouteTransitionIdle === 'function') {
+        onAppRouteTransitionIdle(startParticlesWhenIdle);
+    } else {
+        startParticlesWhenIdle();
+    }
 }
 
 function closeProfilePage() {

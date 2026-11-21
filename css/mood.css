@@ -252,6 +252,43 @@
 
 .mood-calendar-grid { min-height: 218px; }
 
+@keyframes moodMonthSlideNext {
+    from {
+        opacity: 0;
+        transform: translate3d(18px, 0, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes moodMonthSlidePrev {
+    from {
+        opacity: 0;
+        transform: translate3d(-18px, 0, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+.mood-calendar-grid.is-slide-next {
+    animation: moodMonthSlideNext 240ms var(--ios-ease-nav) both;
+}
+
+.mood-calendar-grid.is-slide-prev {
+    animation: moodMonthSlidePrev 240ms var(--ios-ease-nav) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mood-calendar-grid.is-slide-next,
+    .mood-calendar-grid.is-slide-prev {
+        animation: none !important;
+    }
+}
+
 .mood-calendar-day,
 .mood-calendar-spacer {
     min-width: 0;

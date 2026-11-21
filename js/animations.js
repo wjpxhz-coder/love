@@ -1244,6 +1244,16 @@
         });
     };
 
+    // 切屏过渡期间统一冻结全站 Canvas 动画，避免与 GPU 合成争抢 60/120fps 帧预算
+    window.suspendAllAmbientEffects = function suspendAllAmbientEffects(suspended, reason = 'route-transition') {
+        const targets = [homeController, profileController, ...extraControllers].filter(Boolean);
+        targets.forEach(ctrl => {
+            if (typeof ctrl.setSuspended === 'function') {
+                ctrl.setSuspended(Boolean(suspended), reason);
+            }
+        });
+    };
+
     // 向后兼容：保留按需懒加载版 getEmojiSprite（零首屏预热开销）
     const lazyEmojiSpriteMap = {};
     window.getEmojiSprite = function getEmojiSprite(emoji, size = 28) {

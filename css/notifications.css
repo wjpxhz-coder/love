@@ -75,15 +75,24 @@
     flex-direction: column;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-12px) scale(0.96);
-    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform-origin: top right;
+    transform: translate3d(0, -10px, 0) scale(0.95);
+    transition:
+        transform var(--ios-dur-popover, 240ms) var(--ios-ease-popover),
+        opacity 200ms var(--ios-ease-decel),
+        visibility 0s linear 240ms;
+    will-change: transform, opacity;
     overflow: hidden;
     text-align: left;
 }
 .notification-panel.show {
     opacity: 1;
     visibility: visible;
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
+    transition:
+        transform var(--ios-dur-popover, 240ms) var(--ios-ease-popover),
+        opacity 180ms var(--ios-ease-decel),
+        visibility 0s linear 0s;
 }
 
         .notification-header {
@@ -175,4 +184,10 @@
             text-align: center;
             color: var(--text-muted);
             font-size: 0.9em;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .notification-panel {
+                transition: none !important;
+                transform: none !important;
+            }
         }
