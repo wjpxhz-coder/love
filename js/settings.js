@@ -22,6 +22,13 @@ function enterSettingsPage() {
     if (typeof updateSettingsThemeButtons === 'function') {
         updateSettingsThemeButtons(currentTheme);
     }
+    if (typeof updateSettingsAmbientButtons === 'function') {
+        const rawAmbient = document.documentElement.getAttribute('data-ambient');
+        const currentAmbient = typeof normalizeAmbientMode === 'function'
+            ? normalizeAmbientMode(rawAmbient)
+            : (rawAmbient === 'light' || rawAmbient === 'calm' ? rawAmbient : 'dream');
+        updateSettingsAmbientButtons(currentAmbient);
+    }
     if (typeof updateSettingsCursorButtons === 'function') {
         const rawCursor = document.documentElement.getAttribute('data-cursor');
         const currentCursor = typeof normalizeCursorStyle === 'function'

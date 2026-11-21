@@ -140,6 +140,7 @@ function showTopicModal(modal) {
         modal.setAttribute('open', '');
     }
     modal.classList.add('is-open');
+    window.homeSakuraEffect?.setSuspended?.(true, `topic-modal:${modal.id || 'dialog'}`);
 }
 
 /**
@@ -159,6 +160,7 @@ function hideTopicModal(modal) {
         modal.removeAttribute('open');
     }
     modal.classList.remove('is-open');
+    window.homeSakuraEffect?.setSuspended?.(false, `topic-modal:${modal.id || 'dialog'}`);
 }
 
 /**
@@ -168,6 +170,9 @@ function initTopicModalBackdropHandlers() {
     document.querySelectorAll('dialog.topic-modal-dialog').forEach(modal => {
         if (modal.dataset.backdropBound) return;
         modal.dataset.backdropBound = 'true';
+        modal.addEventListener('close', () => {
+            window.homeSakuraEffect?.setSuspended?.(false, `topic-modal:${modal.id || 'dialog'}`);
+        });
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 hideTopicModal(modal);

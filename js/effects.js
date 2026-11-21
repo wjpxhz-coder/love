@@ -1,10 +1,24 @@
-// ==========================================
-// 一键想你与现代 Toast 提示
-// ==========================================
+// ==========================================================================
+// 现代高光仪式特效、Toast 与微交互引擎 (js/effects.js)
+// - 按需挂载的纯 Canvas 琉璃流光蝴蝶仪式层（演完自动销毁，平时 0 常驻开销）
+// - 零内联冗余样式的现代 Toast 提示
+// - 纯 CSS 变量事件委托版卡片漫反射聚光 (Border Spotlight)
+// - 点击空白处统一走 Canvas 光学微涟漪，彻底告别 DOM Emoji 粒子
+// ==========================================================================
+
 function prefersReducedMotion() {
     return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 }
 
+function getCurrentAmbientMode() {
+    const attr = document.documentElement.getAttribute('data-ambient');
+    if (attr === 'dream' || attr === 'light' || attr === 'calm') return attr;
+    return 'dream';
+}
+
+// ==========================================
+// 1. 现代 Toast 提示（样式完全交由 css/effects.css 统一维护）
+// ==========================================
 function showToast(message, duration = 3000) {
     let container = document.getElementById('toast-container');
     if (!container) {
@@ -13,348 +27,556 @@ function showToast(message, duration = 3000) {
         container.setAttribute('role', 'status');
         container.setAttribute('aria-live', 'polite');
         container.setAttribute('aria-atomic', 'false');
-        container.style.cssText = `
-            position: fixed;
-            top: calc(max(24px, env(safe-area-inset-top, 0px)) + 28px);
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 99999;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-            pointer-events: none;
-            width: max-content;
-            max-width: calc(100vw - 32px);
-            box-sizing: border-box;
-            transition: top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-        `;
         document.body.appendChild(container);
     }
-    
+
     const toast = document.createElement('div');
     toast.className = 'toast-item';
-
-    const theme = document.documentElement.getAttribute('data-theme');
-    const isDark = theme === 'dark';
-
-    toast.style.cssText = `
-        background: ${isDark ? 'rgba(38, 22, 54, 0.88)' : 'rgba(255, 255, 255, 0.88)'};
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        color: ${isDark ? '#ff8fab' : 'var(--primary)'};
-        padding: 11px 22px;
-        border-radius: 24px;
-        box-shadow: 0 8px 30px var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
-        font-weight: 600;
-        font-size: 0.92em;
-        letter-spacing: 0.5px;
-        opacity: 0;
-        transform: translateY(-12px) scale(0.92);
-        transition: opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-        border: 1.5px solid ${isDark ? 'rgba(255, 143, 171, 0.3)' : 'var(--border)'};
-        max-width: min(90vw, 420px);
-        text-align: center;
-        line-height: 1.45;
-        word-break: break-word;
-        box-sizing: border-box;
-        pointer-events: auto;
-    `;
-
-    toast.innerText = message;
+    toast.textContent = String(message ?? '');
     container.appendChild(toast);
-    
+
     requestAnimationFrame(() => {
         toast.classList.add('show');
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateY(0) scale(1)';
     });
-    
+
     setTimeout(() => {
         toast.classList.remove('show');
         toast.classList.add('hide');
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-16px) scale(0.92)';
         setTimeout(() => {
             toast.remove();
-        }, 350);
+            if (container.childElementCount === 0) {
+                container.remove();
+            }
+        }, 280);
     }, duration);
 }
 
 // ==========================================
-// 🦋 一键想你专属：五彩流光发光蝴蝶从底部飞入动效 (GPU 极致加速与零回流优化)
+// 2. 🦋 现代高光仪式层：纯 Canvas 琉璃流光蝴蝶群
+//    - 法式香槟玫瑰 / 暮光星紫 / 晨曦珠光 / 暖金流霞 四套轻奢羽翼
+//    - 离屏预烘焙单翼纹理（零实时 drop-shadow、零 DOM 合成层爆炸）
+//    - 切线朝向跟随 + 透视振翅 + 光学鳞粉星尘拖尾
+//    - 演出完毕自动注销 rAF 并移除 Canvas，回归 0 内存/0 GPU 占用
 // ==========================================
-const BUTTERFLY_THEMES = [
+const CEREMONY_BUTTERFLY_PALETTES = [
     {
-        name: 'aurora',
-        glow: '#38bdf8',
-        accent: '#818cf8',
-        wingGrad1: ['#00f2fe', '#4facfe', '#6a11cb'],
-        wingGrad2: ['#38ef7d', '#11998e', '#0575e6'],
-        particleColor: '#67e8f9'
+        name: 'rose-champagne',
+        glow: 'rgba(244, 114, 182, 0.55)',
+        upper: ['#fff5f7', '#fda4af', '#f43f5e'],
+        lower: ['#ffe4e6', '#fb7185', '#e11d48'],
+        vein: 'rgba(255, 255, 255, 0.72)',
+        spark: '#fecdd3'
     },
     {
-        name: 'dream-pink',
-        glow: '#f472b6',
-        accent: '#c084fc',
-        wingGrad1: ['#ff758c', '#ff7eb3', '#7928ca'],
-        wingGrad2: ['#ff9a9e', '#fecfef', '#f43f5e'],
-        particleColor: '#fbcfe8'
+        name: 'moonlight-violet',
+        glow: 'rgba(192, 132, 252, 0.55)',
+        upper: ['#faf5ff', '#d8b4fe', '#a855f7'],
+        lower: ['#f3e8ff', '#c084fc', '#9333ea'],
+        vein: 'rgba(255, 255, 255, 0.72)',
+        spark: '#e9d5ff'
     },
     {
-        name: 'sunset-amber',
-        glow: '#fb923c',
-        accent: '#f43f5e',
-        wingGrad1: ['#ff4e50', '#f9d423', '#f857a6'],
-        wingGrad2: ['#ff8008', '#ffc837', '#e11d48'],
-        particleColor: '#fef08a'
+        name: 'dawn-sakura',
+        glow: 'rgba(251, 146, 178, 0.55)',
+        upper: ['#ffffff', '#fbcfe8', '#ec4899'],
+        lower: ['#fdf2f8', '#f9a8d4', '#db2777'],
+        vein: 'rgba(255, 255, 255, 0.78)',
+        spark: '#fce7f3'
     },
     {
-        name: 'mystic-violet',
-        glow: '#c084fc',
-        accent: '#38bdf8',
-        wingGrad1: ['#b224ef', '#7579ff', '#00d2ff'],
-        wingGrad2: ['#e0c3fc', '#8ec5fc', '#9333ea'],
-        particleColor: '#e9d5ff'
-    },
-    {
-        name: 'emerald-fairy',
-        glow: '#34d399',
-        accent: '#6ee7b7',
-        wingGrad1: ['#0ba360', '#3cba92', '#30dd8a'],
-        wingGrad2: ['#43e97b', '#38f9d7', '#10b981'],
-        particleColor: '#a7f3d0'
-    },
-    {
-        name: 'golden-glamour',
-        glow: '#facc15',
-        accent: '#fb923c',
-        wingGrad1: ['#ffe259', '#ffa751', '#ff5858'],
-        wingGrad2: ['#f6d365', '#fda085', '#d97706'],
-        particleColor: '#fef9c3'
+        name: 'golden-sunset',
+        glow: 'rgba(251, 191, 36, 0.55)',
+        upper: ['#fffbeb', '#fde68a', '#f59e0b'],
+        lower: ['#fef3c7', '#fbbf24', '#f43f5e'],
+        vein: 'rgba(255, 255, 255, 0.75)',
+        spark: '#fef08a'
     }
 ];
 
-function ensureButterflyDefs(container) {
-    if (container.querySelector('#butterfly-global-defs')) return;
-    const svgDefs = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svgDefs.id = 'butterfly-global-defs';
-    svgDefs.setAttribute('aria-hidden', 'true');
-    svgDefs.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;';
-    
-    let gradsHtml = '<defs>';
-    BUTTERFLY_THEMES.forEach(theme => {
-        gradsHtml += `
-            <linearGradient id="bf-grad-${theme.name}-1" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="${theme.wingGrad1[0]}" stop-opacity="0.95" />
-                <stop offset="50%" stop-color="${theme.wingGrad1[1]}" stop-opacity="0.88" />
-                <stop offset="100%" stop-color="${theme.wingGrad1[2]}" stop-opacity="0.8" />
-            </linearGradient>
-            <linearGradient id="bf-grad-${theme.name}-2" x1="100%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="${theme.wingGrad2[0]}" stop-opacity="0.9" />
-                <stop offset="50%" stop-color="${theme.wingGrad2[1]}" stop-opacity="0.75" />
-                <stop offset="100%" stop-color="${theme.wingGrad2[2]}" stop-opacity="0.85" />
-            </linearGradient>
-        `;
-    });
-    gradsHtml += '</defs>';
-    svgDefs.innerHTML = gradsHtml;
-    container.appendChild(svgDefs);
+const ceremonyWingCache = new Map();
+
+function getCeremonyWingSprite(palette) {
+    if (ceremonyWingCache.has(palette.name)) {
+        return ceremonyWingCache.get(palette.name);
+    }
+
+    // 预烘焙单侧左翼（右翼绘制时通过 scaleX(-1) 镜像复用），含柔和外光晕
+    const W = 96;
+    const H = 128;
+    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return { canvas, width: W, height: H };
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // 预烘焙柔光底晕（完全取代昂贵的实时 filter: drop-shadow）
+    const aura = ctx.createRadialGradient(W * 0.56, H * 0.48, 4, W * 0.56, H * 0.48, 52);
+    aura.addColorStop(0, palette.glow);
+    aura.addColorStop(0.55, palette.glow.replace('0.55', '0.16'));
+    aura.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(W * 0.56, H * 0.48, 52, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 坐标映射：翅根贴近画布右侧中线 (x = W - 6, y = H * 0.5)
+    ctx.save();
+    ctx.translate(W - 6, H * 0.5);
+
+    // 上主翼（琉璃感渐变）
+    ctx.beginPath();
+    ctx.moveTo(0, -2);
+    ctx.bezierCurveTo(-4, -22, -26, -50, -56, -56);
+    ctx.bezierCurveTo(-78, -60, -86, -44, -80, -26);
+    ctx.bezierCurveTo(-72, -6, -42, 4, 0, 2);
+    ctx.closePath();
+
+    const g1 = ctx.createLinearGradient(-78, -54, 0, 4);
+    g1.addColorStop(0, palette.upper[0]);
+    g1.addColorStop(0.45, palette.upper[1]);
+    g1.addColorStop(1, palette.upper[2]);
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = g1;
+    ctx.fill();
+
+    // 上翼内部通透丝绸高光层
+    ctx.beginPath();
+    ctx.moveTo(-6, -4);
+    ctx.bezierCurveTo(-18, -22, -38, -40, -58, -42);
+    ctx.bezierCurveTo(-68, -43, -70, -32, -60, -20);
+    ctx.bezierCurveTo(-46, -6, -24, -2, -6, -4);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.34)';
+    ctx.fill();
+
+    // 下尾翼（轻柔拖摆）
+    ctx.beginPath();
+    ctx.moveTo(0, 2);
+    ctx.bezierCurveTo(-14, 14, -36, 36, -54, 48);
+    ctx.bezierCurveTo(-66, 56, -74, 50, -70, 38);
+    ctx.bezierCurveTo(-66, 28, -58, 22, -62, 16);
+    ctx.bezierCurveTo(-64, 10, -44, 2, 0, 2);
+    ctx.closePath();
+
+    const g2 = ctx.createLinearGradient(-68, 46, 0, 2);
+    g2.addColorStop(0, palette.lower[0]);
+    g2.addColorStop(0.5, palette.lower[1]);
+    g2.addColorStop(1, palette.lower[2]);
+    ctx.globalAlpha = 0.86;
+    ctx.fillStyle = g2;
+    ctx.fill();
+
+    // 精致珠光翅脉
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = palette.vein;
+    ctx.lineWidth = 1.15;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-2, -2);
+    ctx.quadraticCurveTo(-34, -28, -68, -36);
+    ctx.moveTo(-2, 0);
+    ctx.quadraticCurveTo(-32, -10, -64, -14);
+    ctx.moveTo(-2, 3);
+    ctx.quadraticCurveTo(-28, 22, -56, 36);
+    ctx.stroke();
+
+    // 翅尖微光珠点
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.beginPath();
+    ctx.arc(-66, -37, 2.1, 0, Math.PI * 2);
+    ctx.arc(-57, 36, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    const sprite = { canvas, width: W, height: H };
+    ceremonyWingCache.set(palette.name, sprite);
+    return sprite;
 }
 
-const BUTTERFLY_WING_TEMPLATE = `
-    <svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M 98,62 C 95,45 80,18 52,6 C 26,-5 2,2 0,16 C -2,28 12,48 40,58 C 65,66 90,65 98,62 Z" fill="__GRAD_1__" />
-        <path d="M 92,60 C 82,46 68,24 48,14 C 30,5 12,12 10,22 C 8,32 20,48 44,55 C 64,61 84,62 92,60 Z" fill="rgba(255, 255, 255, 0.32)" />
-        <path d="M 78,55 C 65,40 50,22 34,18 C 22,15 16,22 18,28 C 20,34 32,44 48,49 C 62,53 72,54 78,55 Z" fill="rgba(255, 255, 255, 0.45)" />
-        <path d="M 95,65 C 85,75 68,96 46,112 C 34,121 20,128 14,124 C 8,120 10,110 18,98 C 24,90 22,86 16,84 C 10,82 12,74 24,70 C 45,63 78,63 95,65 Z" fill="__GRAD_2__" />
-        <path d="M 88,68 C 76,78 58,96 42,106 C 30,114 22,116 20,112 C 18,106 24,96 30,88 C 45,72 70,67 88,68 Z" fill="rgba(255, 255, 255, 0.35)" />
-    </svg>
-`;
+const ceremonyState = {
+    canvas: null,
+    ctx: null,
+    width: 0,
+    height: 0,
+    dpr: 1,
+    rafId: null,
+    lastTimestamp: 0,
+    butterflies: [],
+    sparks: [],
+    resizeHandler: null,
+    visibilityHandler: null,
+    lastTriggerTime: 0
+};
 
-function createButterflyWingMarkup(theme) {
-    return BUTTERFLY_WING_TEMPLATE
-        .replace('__GRAD_1__', `url(#bf-grad-${theme.name}-1)`)
-        .replace('__GRAD_2__', `url(#bf-grad-${theme.name}-2)`);
-}
+function mountCeremonyCanvas() {
+    if (ceremonyState.canvas && ceremonyState.ctx) return true;
 
-function spawnSingleButterfly(container, options = {}) {
-    ensureButterflyDefs(container);
-    const theme = BUTTERFLY_THEMES[Math.floor(Math.random() * BUTTERFLY_THEMES.length)];
-    const isSpecial = options.isSpecial || false;
+    const canvas = document.createElement('canvas');
+    canvas.id = 'ceremony-canvas';
+    canvas.setAttribute('aria-hidden', 'true');
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return false;
 
-    const size = isSpecial 
-        ? (48 + Math.random() * 18) 
-        : (34 + Math.random() * 20);
-    
-    const startX = options.startX !== undefined 
-        ? options.startX 
-        : (window.innerWidth * (0.06 + Math.random() * 0.88));
-    
-    const duration = 4.2 + Math.random() * 1.8;
-    const delay = options.delay !== undefined ? options.delay : 0;
-    const flapSpeed = 0.16 + Math.random() * 0.08;
-    const swayDur = 1.4 + Math.random() * 0.8;
+    const resize = () => {
+        const w = Math.max(window.innerWidth, 1);
+        const h = Math.max(window.innerHeight, 1);
+        const isMobile = w < 768;
+        const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), isMobile ? 1.25 : 1.5);
+        ceremonyState.width = w;
+        ceremonyState.height = h;
+        ceremonyState.dpr = dpr;
+        canvas.style.width = `${w}px`;
+        canvas.style.height = `${h}px`;
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+        ctx.imageSmoothingEnabled = true;
+        if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'low';
+    };
 
-    const d1 = (Math.random() - 0.5) * 110;
-    const d2 = (Math.random() - 0.5) * 160;
-    const d3 = (Math.random() - 0.5) * 200;
-    const d4 = (Math.random() - 0.5) * 240;
-    const baseAngle = (Math.random() - 0.5) * 18;
-
-    const flightEl = document.createElement('div');
-    flightEl.className = 'butterfly-flight';
-    flightEl.style.setProperty('--start-x', `${startX}px`);
-    flightEl.style.setProperty('--size', `${size}px`);
-    flightEl.style.setProperty('--fly-duration', `${duration}s`);
-    flightEl.style.setProperty('--fly-delay', `${delay}s`);
-    flightEl.style.setProperty('--drift-x1', `${d1}px`);
-    flightEl.style.setProperty('--drift-x2', `${d2}px`);
-    flightEl.style.setProperty('--drift-x3', `${d3}px`);
-    flightEl.style.setProperty('--drift-x4', `${d4}px`);
-
-    const tiltEl = document.createElement('div');
-    tiltEl.className = 'butterfly-body-tilt';
-    tiltEl.style.setProperty('--sway-duration', `${swayDur}s`);
-    tiltEl.style.setProperty('--base-angle', `${baseAngle}deg`);
-
-    const modelEl = document.createElement('div');
-    modelEl.className = 'butterfly-model';
-    modelEl.style.setProperty('--glow-color', theme.glow);
-    modelEl.style.setProperty('--sparkle-color', theme.particleColor);
-
-    const antennaeEl = document.createElement('div');
-    antennaeEl.className = 'butterfly-antennae';
-    antennaeEl.innerHTML = `
-        <svg viewBox="0 0 24 16" width="100%" height="100%" aria-hidden="true">
-            <path d="M 12,14 Q 8,4 3,2 M 12,14 Q 16,4 21,2" stroke="#ffffff" stroke-width="1.2" fill="none" stroke-linecap="round"/>
-            <circle cx="3" cy="2" r="1.5" fill="${theme.particleColor}"/>
-            <circle cx="21" cy="2" r="1.5" fill="${theme.particleColor}"/>
-        </svg>
-    `;
-
-    const thoraxEl = document.createElement('div');
-    thoraxEl.className = 'butterfly-thorax';
-
-    const wingSvgMarkup = createButterflyWingMarkup(theme);
-
-    const wingLeft = document.createElement('div');
-    wingLeft.className = 'butterfly-wing left';
-    wingLeft.style.setProperty('--flap-speed', `${flapSpeed}s`);
-    wingLeft.innerHTML = wingSvgMarkup;
-
-    const wingRight = document.createElement('div');
-    wingRight.className = 'butterfly-wing right';
-    wingRight.style.setProperty('--flap-speed', `${flapSpeed}s`);
-    wingRight.innerHTML = wingSvgMarkup;
-
-    // 纯 GPU 驱动的流光鳞粉洒落尾迹，零 JS 回流与零垃圾回收开销
-    const trailEl = document.createElement('div');
-    trailEl.className = 'butterfly-sparkle-trail';
-    trailEl.innerHTML = `
-        <span class="bf-sparkle sp1"></span>
-        <span class="bf-sparkle sp2"></span>
-        <span class="bf-sparkle sp3"></span>
-        <span class="bf-sparkle sp4"></span>
-    `;
-
-    modelEl.appendChild(trailEl);
-    modelEl.appendChild(antennaeEl);
-    modelEl.appendChild(thoraxEl);
-    modelEl.appendChild(wingLeft);
-    modelEl.appendChild(wingRight);
-    tiltEl.appendChild(modelEl);
-    flightEl.appendChild(tiltEl);
-    container.appendChild(flightEl);
-
-    // 自动清理：动画结束后立即从 DOM 移除
-    const totalLifetime = (delay + duration + 0.3) * 1000;
-    let isRemoved = false;
-    const cleanup = () => {
-        if (isRemoved) return;
-        isRemoved = true;
-        if (flightEl.parentNode) {
-            flightEl.remove();
-        }
-        if (container && container.querySelectorAll('.butterfly-flight').length === 0) {
-            container.remove();
+    const onVisibility = () => {
+        if (document.hidden) {
+            ceremonyState.lastTimestamp = 0;
         }
     };
 
-    flightEl.addEventListener('animationend', (e) => {
-        if (e.animationName === 'butterflyFly') {
-            cleanup();
-        }
-    }, { once: true });
-    setTimeout(cleanup, totalLifetime);
+    document.body.appendChild(canvas);
+    ceremonyState.canvas = canvas;
+    ceremonyState.ctx = ctx;
+    ceremonyState.resizeHandler = resize;
+    ceremonyState.visibilityHandler = onVisibility;
+    resize();
+
+    window.addEventListener('resize', resize, { passive: true });
+    document.addEventListener('visibilitychange', onVisibility);
+    return true;
 }
 
-let lastButterflyMissTime = 0;
+function unmountCeremonyCanvas() {
+    if (ceremonyState.rafId !== null) {
+        cancelAnimationFrame(ceremonyState.rafId);
+        ceremonyState.rafId = null;
+    }
+    ceremonyState.lastTimestamp = 0;
+    ceremonyState.butterflies.length = 0;
+    ceremonyState.sparks.length = 0;
+
+    if (ceremonyState.resizeHandler) {
+        window.removeEventListener('resize', ceremonyState.resizeHandler);
+        ceremonyState.resizeHandler = null;
+    }
+    if (ceremonyState.visibilityHandler) {
+        document.removeEventListener('visibilitychange', ceremonyState.visibilityHandler);
+        ceremonyState.visibilityHandler = null;
+    }
+    if (ceremonyState.canvas) {
+        ceremonyState.canvas.remove();
+        ceremonyState.canvas = null;
+        ceremonyState.ctx = null;
+    }
+}
+
+function triggerHorizonGlow() {
+    const existing = document.querySelector('.ceremony-horizon-glow');
+    if (existing) existing.remove();
+    const glow = document.createElement('div');
+    glow.className = 'ceremony-horizon-glow';
+    glow.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(glow);
+    glow.addEventListener('animationend', () => glow.remove(), { once: true });
+    setTimeout(() => glow.remove(), 3000);
+}
+
+function spawnCeremonyButterfly(options = {}) {
+    const w = ceremonyState.width || window.innerWidth;
+    const h = ceremonyState.height || window.innerHeight;
+    const isMobile = w < 768;
+    const palette = CEREMONY_BUTTERFLY_PALETTES[
+        Math.floor(Math.random() * CEREMONY_BUTTERFLY_PALETTES.length)
+    ];
+    const wingSprite = getCeremonyWingSprite(palette);
+    const isHero = Boolean(options.isHero);
+
+    const startX = options.startX !== undefined
+        ? options.startX
+        : w * (0.10 + Math.random() * 0.80);
+    const duration = (isMobile ? 3.8 : 4.4) + Math.random() * 1.4;
+    const size = isHero
+        ? (isMobile ? 42 : 52) + Math.random() * 12
+        : (isMobile ? 28 : 34) + Math.random() * 16;
+
+    ceremonyState.butterflies.push({
+        palette,
+        wingSprite,
+        x: startX,
+        y: h + 48 + Math.random() * 32,
+        prevX: startX,
+        prevY: h + 64,
+        baseX: startX,
+        age: -(options.delay || 0),
+        duration,
+        size,
+        heading: 0,
+        waveFreq1: 1.4 + Math.random() * 1.1,
+        waveFreq2: 2.8 + Math.random() * 1.5,
+        waveAmp1: (isMobile ? 42 : 76) + Math.random() * (isMobile ? 38 : 72),
+        waveAmp2: (isMobile ? 16 : 28) + Math.random() * 22,
+        phase1: Math.random() * Math.PI * 2,
+        phase2: Math.random() * Math.PI * 2,
+        driftX: (Math.random() - 0.5) * (isMobile ? 90 : 180),
+        flapPhase: Math.random() * Math.PI * 2,
+        flapSpeed: 14 + Math.random() * 6,
+        sparkAccum: 0
+    });
+}
+
+function stepAndRenderCeremony(timestamp) {
+    ceremonyState.rafId = null;
+    if (!ceremonyState.canvas || !ceremonyState.ctx) return;
+    if (prefersReducedMotion()) {
+        unmountCeremonyCanvas();
+        return;
+    }
+
+    if (document.hidden) {
+        ceremonyState.lastTimestamp = 0;
+        ceremonyState.rafId = requestAnimationFrame(stepAndRenderCeremony);
+        return;
+    }
+
+    const dtSec = ceremonyState.lastTimestamp > 0
+        ? Math.min((timestamp - ceremonyState.lastTimestamp) / 1000, 0.05)
+        : 0.016;
+    ceremonyState.lastTimestamp = timestamp;
+    const step = dtSec * 60;
+
+    const { ctx, width, height, dpr, butterflies, sparks } = ceremonyState;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, ceremonyState.canvas.width, ceremonyState.canvas.height);
+
+    // 1. 更新并绘制流光鳞粉星尘
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalCompositeOperation = isDark ? 'lighter' : 'source-over';
+
+    for (let i = sparks.length - 1; i >= 0; i--) {
+        const sp = sparks[i];
+        sp.x += sp.vx * step;
+        sp.y += sp.vy * step;
+        sp.vx *= Math.pow(0.96, step);
+        sp.vy = sp.vy * Math.pow(0.97, step) + 0.025 * step;
+        sp.life -= sp.decay * step;
+        if (sp.life <= 0) {
+            sparks.splice(i, 1);
+            continue;
+        }
+
+        const alpha = sp.life * sp.life;
+        const r = sp.radius * (0.45 + 0.55 * sp.life);
+
+        // 外柔光晕
+        ctx.globalAlpha = alpha * (isDark ? 0.55 : 0.42);
+        ctx.fillStyle = sp.color;
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, r * 2.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 中心珠光亮点
+        ctx.globalAlpha = alpha * 0.95;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // 2. 更新并绘制琉璃流光蝴蝶
+    ctx.globalCompositeOperation = 'source-over';
+    const maxSparks = width < 768 ? 90 : 160;
+
+    for (let i = butterflies.length - 1; i >= 0; i--) {
+        const bf = butterflies[i];
+        bf.age += dtSec;
+        if (bf.age < 0) continue;
+
+        const progress = bf.age / bf.duration;
+        if (progress >= 1) {
+            butterflies.splice(i, 1);
+            continue;
+        }
+
+        // 平滑加速入场 + 优雅舒缓升空
+        const easedY = 1 - Math.pow(1 - progress, 1.55);
+        const targetY = (height + 54) - easedY * (height + 165);
+        const sway1 = Math.sin(bf.age * bf.waveFreq1 + bf.phase1) * bf.waveAmp1;
+        const sway2 = Math.sin(bf.age * bf.waveFreq2 + bf.phase2) * bf.waveAmp2;
+        const targetX = bf.baseX + bf.driftX * progress + sway1 + sway2;
+
+        bf.prevX = bf.x;
+        bf.prevY = bf.y;
+        bf.x = targetX;
+        bf.y = targetY;
+
+        // 切线方向平滑跟随（让蝴蝶机身自然转向飞行方向）
+        const dx = bf.x - bf.prevX;
+        const dy = bf.y - bf.prevY;
+        if (dx * dx + dy * dy > 0.04) {
+            const desiredHeading = Math.atan2(dy, dx) + Math.PI / 2;
+            const clampedHeading = Math.max(-0.68, Math.min(0.68, desiredHeading));
+            bf.heading += (clampedHeading - bf.heading) * Math.min(1, dtSec * 8);
+        }
+
+        bf.flapPhase += bf.flapSpeed * dtSec;
+        const flapCos = Math.cos(bf.flapPhase);
+        const wingScaleX = 0.22 + Math.abs(flapCos) * 0.78;
+        // 振翅时轻微上下浮力呼吸
+        const flapLift = flapCos * 2.2;
+
+        // 入场/离场平滑透明度与比例
+        let alpha = 1;
+        let scalePop = 1;
+        if (progress < 0.1) {
+            alpha = progress / 0.1;
+            scalePop = 0.55 + 0.45 * (progress / 0.1);
+        } else if (progress > 0.84) {
+            alpha = Math.max(0, (1 - progress) / 0.16);
+            scalePop = 0.88 + 0.12 * alpha;
+        }
+
+        // 沿飞行轨迹按节拍洒下流光星尘
+        bf.sparkAccum += dtSec;
+        if (bf.sparkAccum >= 0.065 && sparks.length < maxSparks && progress > 0.04 && progress < 0.90) {
+            bf.sparkAccum = 0;
+            sparks.push({
+                x: bf.x + (Math.random() - 0.5) * bf.size * 0.45,
+                y: bf.y + bf.size * 0.18 + (Math.random() - 0.5) * 8,
+                vx: (Math.random() - 0.5) * 0.65 - dx * 0.08,
+                vy: 0.45 + Math.random() * 0.85,
+                radius: 1.3 + Math.random() * 1.8,
+                color: bf.palette.spark,
+                life: 1.0,
+                decay: 0.018 + Math.random() * 0.014
+            });
+        }
+
+        // 绘制双翼（矩阵复用离屏单翼贴图，零实时阴影重算）
+        const drawScale = (bf.size * scalePop) / 96;
+        const sprite = bf.wingSprite;
+        const anchorX = sprite.width - 6;
+        const anchorY = sprite.height * 0.5;
+
+        ctx.save();
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.translate(bf.x, bf.y + flapLift);
+        ctx.rotate(bf.heading);
+        ctx.globalAlpha = alpha;
+
+        // 左翼
+        ctx.save();
+        ctx.scale(wingScaleX * drawScale, drawScale);
+        ctx.drawImage(sprite.canvas, -anchorX, -anchorY, sprite.width, sprite.height);
+        ctx.restore();
+
+        // 右翼（水平镜像）
+        ctx.save();
+        ctx.scale(-wingScaleX * drawScale, drawScale);
+        ctx.drawImage(sprite.canvas, -anchorX, -anchorY, sprite.width, sprite.height);
+        ctx.restore();
+
+        // 精致珠光蝶身与触须
+        ctx.fillStyle = '#ffffff';
+        ctx.globalAlpha = alpha * 0.95;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, Math.max(1.3, bf.size * 0.032), bf.size * 0.22, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.88)';
+        ctx.lineWidth = Math.max(0.9, bf.size * 0.02);
+        ctx.lineCap = 'round';
+        const antY = -bf.size * 0.2;
+        ctx.beginPath();
+        ctx.moveTo(0, antY);
+        ctx.quadraticCurveTo(-bf.size * 0.08, antY - bf.size * 0.14, -bf.size * 0.15, antY - bf.size * 0.16);
+        ctx.moveTo(0, antY);
+        ctx.quadraticCurveTo(bf.size * 0.08, antY - bf.size * 0.14, bf.size * 0.15, antY - bf.size * 0.16);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+
+    // 全部蝴蝶与尾迹星尘演完后立刻彻底销毁画布，回到 0 占用
+    if (butterflies.length === 0 && sparks.length === 0) {
+        unmountCeremonyCanvas();
+        return;
+    }
+
+    ceremonyState.rafId = requestAnimationFrame(stepAndRenderCeremony);
+}
 
 function createButterflyMissEffect(count) {
     if (prefersReducedMotion()) return;
 
-    // 防连击与过载保护：1.2 秒内防暴击堆叠
     const now = performance.now();
     const isMobile = window.innerWidth < 768;
-    const maxActive = isMobile ? 8 : 14;
+    const isCalm = getCurrentAmbientMode() === 'calm';
+    const maxActive = isCalm ? 4 : (isMobile ? 8 : 12);
 
-    let container = document.getElementById('butterfly-miss-container');
-    const currentActive = container ? container.querySelectorAll('.butterfly-flight').length : 0;
-    if (currentActive >= maxActive) {
+    if (ceremonyState.butterflies.length >= maxActive) {
         return;
     }
 
-    if (now - lastButterflyMissTime < 1200 && currentActive > 0) {
-        // 短期连击降级为轻盈追加 2 只伴飞蝴蝶
-        for (let i = 0; i < 2; i++) {
-            spawnSingleButterfly(container, {
-                delay: i * 0.15,
-                isSpecial: false
+    if (!mountCeremonyCanvas()) return;
+
+    // 短期防连击过载：1.2 秒内追加 2 只轻盈伴飞蝴蝶
+    if (now - ceremonyState.lastTriggerTime < 1200 && ceremonyState.butterflies.length > 0) {
+        const extra = Math.min(2, maxActive - ceremonyState.butterflies.length);
+        for (let i = 0; i < extra; i++) {
+            spawnCeremonyButterfly({ delay: i * 0.16, isHero: false });
+        }
+    } else {
+        ceremonyState.lastTriggerTime = now;
+
+        if (!isCalm) {
+            triggerHorizonGlow();
+        }
+        // 呼应首页背景景深画布轻柔绽放
+        if (typeof window.homeSakuraEffect?.triggerMissYouFlutter === 'function') {
+            window.homeSakuraEffect.triggerMissYouFlutter();
+        }
+
+        const defaultCount = isCalm ? 4 : (isMobile ? 6 : 9);
+        const actualCount = Math.min(count || defaultCount, maxActive - ceremonyState.butterflies.length);
+
+        for (let i = 0; i < actualCount; i++) {
+            spawnCeremonyButterfly({
+                delay: i * 0.15 + Math.random() * 0.16,
+                isHero: i === 0 || i === Math.floor(actualCount / 2)
             });
         }
-        return;
-    }
-    lastButterflyMissTime = now;
-
-    // 呼应背景樱花浪漫绽放
-    if (typeof window.homeSakuraEffect?.triggerMissYouFlutter === 'function') {
-        window.homeSakuraEffect.triggerMissYouFlutter();
     }
 
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'butterfly-miss-container';
-        document.body.appendChild(container);
+    if (ceremonyState.rafId === null) {
+        ceremonyState.lastTimestamp = 0;
+        ceremonyState.rafId = requestAnimationFrame(stepAndRenderCeremony);
     }
-
-    const defaultCount = isMobile ? 6 : 9;
-    const actualCount = count || defaultCount;
-
-    for (let i = 0; i < actualCount; i++) {
-        const delay = i * 0.16 + Math.random() * 0.2;
-        spawnSingleButterfly(container, {
-            delay: delay,
-            isSpecial: i === 0 || i === Math.floor(actualCount / 2)
-        });
-    }
-
-    // 容器空兜底清理
-    setTimeout(() => {
-        if (container && container.querySelectorAll('.butterfly-flight').length === 0) {
-            container.remove();
-        }
-    }, (actualCount * 0.2 + 7) * 1000);
 }
 
-// 保持对原有调用接口的全面无缝兼容
+// 保持对全站原有调用接口（presence.js / mood.js / app.js / notifications.js）完全兼容
 function createHeartRain() {
     createButterflyMissEffect();
 }
 
 window.createButterflyMissEffect = createButterflyMissEffect;
 
-
+// ==========================================
+// 3. 一键想你实时发送逻辑（完整保留）
+// ==========================================
 let isSendingMissYou = false;
 let missYouRequestGeneration = 0;
 
@@ -377,7 +599,6 @@ async function sendMissYou() {
         && isCurrentAuthSnapshot(epoch, userId);
 
     try {
-        // Play local animation immediately
         createHeartRain();
 
         const partner = currentAuthor === '小蛇' ? '小奚' : '小蛇';
@@ -402,7 +623,6 @@ async function sendMissYou() {
 
         if (!stillCurrent()) return;
         try {
-            // The database derives sender, recipient, and space from auth.uid().
             const { error } = await supabaseClient.rpc('send_miss_you');
             if (!stillCurrent()) return;
             if (error) throw error;
@@ -417,128 +637,123 @@ async function sendMissYou() {
     }
 }
 
-// --- 星光粒子 ---
+// ==========================================
+// 4. 兼容性占位 & 统一光学交互反馈
+// ==========================================
 function createStarField() {
+    // 远景星尘已统一整合至现代单层景深 Canvas 引擎，不再创建 14 个独立 DOM 合成层
     const field = document.getElementById('star-field');
-    if (!field) return;
-    field.replaceChildren();
-    if (prefersReducedMotion()) return;
-    const count = window.innerWidth < 768 ? 8 : 14;
-    for (let i = 0; i < count; i++) {
-        const star = document.createElement('div');
-        star.className = 'star';
-        star.style.left = Math.random() * 100 + '%';
-        star.style.top = Math.random() * 100 + '%';
-        star.style.setProperty('--duration', (2.5 + Math.random() * 3.5) + 's');
-        star.style.animationDelay = Math.random() * 3 + 's';
-        const size = (1 + Math.random() * 1.8) + 'px';
-        star.style.width = size;
-        star.style.height = size;
-        field.appendChild(star);
-    }
+    if (field) field.replaceChildren();
 }
 
-// --- 滚动入场快速就绪 ---
 function initScrollReveal() {
     document.querySelectorAll('.moment-card:not(.visible)').forEach(card => {
         card.classList.add('visible');
     });
 }
 
-// --- 爱心与甜美粒子 ---
-let lastSpawnHeartTime = 0;
-const MAX_ACTIVE_LOVE_PARTICLES = 6;
+let lastSpawnRippleTime = 0;
 
 function spawnHearts(x, y) {
     if (prefersReducedMotion()) return;
-    const now = Date.now();
-    if (now - lastSpawnHeartTime < 120) return;
-    lastSpawnHeartTime = now;
+    const mode = getCurrentAmbientMode();
+    if (mode === 'calm') return;
+    const now = performance.now();
+    if (now - lastSpawnRippleTime < 180) return;
+    lastSpawnRippleTime = now;
 
-    const currentParticles = document.querySelectorAll('.love-particle');
-    if (currentParticles.length >= MAX_ACTIVE_LOVE_PARTICLES) return;
-
-    const hearts = ['💖', '🌸', '✨', '🎀', '🍬', '🍓', '💕', '🧁', '💗', '⭐', '❀'];
-    const count = Math.min(2, MAX_ACTIVE_LOVE_PARTICLES - currentParticles.length);
-    for (let i = 0; i < count; i++) {
-        const particle = document.createElement('div');
-        particle.className = 'love-particle';
-        particle.textContent = hearts[Math.floor(Math.random() * hearts.length)];
-        const tx = (Math.random() - 0.5) * 110;
-        const ty = -(40 + Math.random() * 70);
-        const rot = (Math.random() - 0.5) * 80;
-        particle.style.left = x + 'px';
-        particle.style.top = y + 'px';
-        particle.style.setProperty('--tx', tx + 'px');
-        particle.style.setProperty('--ty', ty + 'px');
-        particle.style.setProperty('--rot', rot + 'deg');
-        particle.style.fontSize = (15 + Math.random() * 8) + 'px';
-        document.body.appendChild(particle);
-        setTimeout(() => particle.remove(), 1100);
+    if (typeof window.homeSakuraEffect?.createBurst === 'function') {
+        const isMobile = isMobileClient();
+        const count = mode === 'light'
+            ? (isMobile ? 5 : 6)
+            : (isMobile ? 8 : 11);
+        window.homeSakuraEffect.createBurst(x, y, count);
     }
 }
-// --- 卡片跟随光晕 (仅电脑端生效，移动端跳过，RAF 节流 + GPU 合成层 translate3d) ---
+
+// ==========================================
+// 5. 现代卡片漫反射聚光（事件委托 + CSS 变量，零额外 .glow DOM）
+// ==========================================
 function isMobileClient() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent)
         || (window.innerWidth <= 768 && ('ontouchstart' in window || navigator.maxTouchPoints > 0));
 }
 
-function initCardGlow() {
-    // 手机端直接跳过，零开销
-    if (isMobileClient()) return;
+let spotlightInitialized = false;
 
-    document.querySelectorAll('.anniv-card, .timer-card').forEach(card => {
-        if (card.querySelector('.glow')) return;
-        const glow = document.createElement('div');
-        glow.className = 'glow';
-        card.appendChild(glow);
-        let rect = null;
-        let rafId = null;
-        card.addEventListener('mouseenter', () => {
-            rect = card.getBoundingClientRect();
-        }, { passive: true });
-        card.addEventListener('mousemove', (e) => {
-            if (rafId) return;
-            rafId = requestAnimationFrame(() => {
-                rafId = null;
-                if (!rect) rect = card.getBoundingClientRect();
-                glow.style.transform = `translate3d(${e.clientX - rect.left}px, ${e.clientY - rect.top}px, 0) translate(-50%, -50%)`;
-            });
-        }, { passive: true });
-        card.addEventListener('mouseleave', () => {
-            rect = null;
-            if (rafId) {
-                cancelAnimationFrame(rafId);
-                rafId = null;
-            }
-        }, { passive: true });
-    });
+function initCardGlow() {
+    if (spotlightInitialized || isMobileClient()) return;
+    if (window.matchMedia && !window.matchMedia('(any-hover: hover) and (any-pointer: fine)').matches) {
+        return;
+    }
+    spotlightInitialized = true;
+
+    const SPOTLIGHT_SELECTOR = '.timer-card, .anniv-card, .home-topic-card';
+    let activeCard = null;
+    let activeRect = null;
+    let pendingX = 0;
+    let pendingY = 0;
+    let rafId = null;
+
+    document.addEventListener('pointermove', (e) => {
+        if (e.pointerType && e.pointerType !== 'mouse') return;
+        if (getCurrentAmbientMode() === 'calm' || prefersReducedMotion()) return;
+
+        const card = e.target?.closest?.(SPOTLIGHT_SELECTOR);
+        if (!card) {
+            activeCard = null;
+            activeRect = null;
+            return;
+        }
+        if (card !== activeCard) {
+            activeCard = card;
+            activeRect = card.getBoundingClientRect();
+        }
+        pendingX = e.clientX;
+        pendingY = e.clientY;
+        if (rafId !== null) return;
+
+        rafId = requestAnimationFrame(() => {
+            rafId = null;
+            if (!activeCard || !activeRect) return;
+            activeCard.style.setProperty('--spot-x', `${Math.round(pendingX - activeRect.left)}px`);
+            activeCard.style.setProperty('--spot-y', `${Math.round(pendingY - activeRect.top)}px`);
+        });
+    }, { passive: true });
+
+    window.addEventListener('scroll', () => {
+        activeRect = null;
+    }, { passive: true });
+
+    window.addEventListener('resize', () => {
+        activeRect = null;
+    }, { passive: true });
 }
 
-// 自动尝试初始化一次已有卡片（如 timer-card）
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCardGlow, { once: true });
 } else {
     initCardGlow();
 }
+
+// ==========================================
+// 6. 全局点击监听（关闭通知面板 + 空白处克制光学微涟漪）
+// ==========================================
 let lastGlobalClickParticleTime = 0;
+
 document.addEventListener('click', (e) => {
     const panel = document.getElementById('notification-panel');
     const bell = document.getElementById('notification-bell');
-    if (panel && panel.classList.contains('show') && !panel.contains(e.target) && !bell.contains(e.target)) {
+    if (panel && panel.classList.contains('show') && !panel.contains(e.target) && !bell?.contains(e.target)) {
         panel.classList.remove('show');
     }
-    
-    if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, .fab-container, .notification-panel, [role="button"]')) return;
-    
+
+    if (document.body.classList.contains('app-page-active')) return;
+    if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, video, .fab-container, .notification-panel, .moment-card, [role="button"]')) return;
+
     const now = performance.now();
-    if (now - lastGlobalClickParticleTime < 180) return;
+    if (now - lastGlobalClickParticleTime < 200) return;
     lastGlobalClickParticleTime = now;
 
     spawnHearts(e.clientX, e.clientY);
-    if (typeof window.homeSakuraEffect?.createBurst === 'function') {
-        const count = typeof isMobileClient === 'function' && isMobileClient() ? 6 : 10;
-        window.homeSakuraEffect.createBurst(e.clientX, e.clientY, count);
-    }
 });
-

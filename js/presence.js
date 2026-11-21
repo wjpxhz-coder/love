@@ -65,10 +65,12 @@ function getPartnerProfile() {
 }
 
 function syncHomeSakuraAppearance() {
-    window.homeSakuraEffect?.setAppearance({
-        theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
-        bothOnline
-    });
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    if (typeof window.syncAllAmbientEffects === 'function') {
+        window.syncAllAmbientEffects({ theme, bothOnline });
+    } else {
+        window.homeSakuraEffect?.setAppearance({ theme, bothOnline });
+    }
 }
 
 function updateResonanceBannerText(partnerName = 'TA', partnerActivity = PRESENCE_DEFAULT_ACTIVITY, isAway = false) {

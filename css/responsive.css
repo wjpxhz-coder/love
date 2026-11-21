@@ -149,16 +149,14 @@
         @media (prefers-reduced-motion: reduce) {
             html { scroll-behavior: auto !important; }
 
-            *, *::before, *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                scroll-behavior: auto !important;
-                transition-duration: 0.01ms !important;
+            #bg-layer .aurora-orb {
+                animation: none !important;
             }
 
             #sakura-canvas,
             #sakura-canvas-foreground,
             #star-field,
+            #ceremony-canvas,
             .login-canvas,
             .profile-particles-canvas {
                 display: none !important;

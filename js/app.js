@@ -131,6 +131,9 @@ function initAccessibleUiState() {
         event.preventDefault();
         closeVersionModal();
     });
+    versionModal?.addEventListener('close', () => {
+        window.homeSakuraEffect?.setSuspended?.(false, 'version-modal');
+    });
 }
 
 function onAppRouteEnter(route) {
@@ -254,8 +257,9 @@ function showVersionModal(versionName, useConfigLog = true) {
     }
 
     modal.showModal();
+    window.homeSakuraEffect?.setSuspended?.(true, 'version-modal');
 
-    // 播放心形雨特效，增添浪漫感
+    // 播放仪式感琉璃蝴蝶特效，增添浪漫感
     if (typeof createHeartRain === 'function') {
         setTimeout(createHeartRain, 300);
     }
@@ -266,6 +270,7 @@ function closeVersionModal() {
     if (modal) {
         modal.close();
     }
+    window.homeSakuraEffect?.setSuspended?.(false, 'version-modal');
     // 保存已查看的版本号 (保存 SW 缓存名称作为唯一标识)
     if (tempTargetVersionToSave) {
         localStorage.setItem('last_seen_version', tempTargetVersionToSave);

@@ -8,6 +8,7 @@ function initTheme() {
     const saved = localStorage.getItem('theme_preference');
     const theme = saved === 'dark' ? 'dark' : 'light';
     applyTheme(theme);
+    initAmbientMode();
     initCursorStyle();
 }
 
@@ -16,10 +17,12 @@ function applyTheme(theme) {
     updateThemeIcon(theme);
     const themeMeta = document.querySelector('meta[name="theme-color"]');
     if (themeMeta) themeMeta.content = theme === 'dark' ? '#150d1e' : '#fff7f9';
-    window.homeSakuraEffect?.setAppearance({
-        theme,
-        bothOnline: typeof bothOnline !== 'undefined' && bothOnline
-    });
+    const isBothOnline = typeof bothOnline !== 'undefined' && Boolean(bothOnline);
+    if (typeof window.syncAllAmbientEffects === 'function') {
+        window.syncAllAmbientEffects({ theme, bothOnline: isBothOnline });
+    } else {
+        window.homeSakuraEffect?.setAppearance({ theme, bothOnline: isBothOnline });
+    }
 }
 
 function toggleTheme() {
@@ -107,4 +110,67 @@ function setCursorDirect(mode) {
     if (!CURSOR_STYLE_MODES.includes(mode)) return;
     localStorage.setItem('cursor_preference', mode);
     applyCursorStyle(mode);
+}
+
+// --- 浮屏氛围动效档位（梦幻流光 dream / 轻盈呼吸 light / 静谧省电 calm） ---
+const AMBIENT_MODES = ['dream', 'light', 'calm'];
+const AMBIENT_MODE_LABELS = {
+    dream: '🌸 梦幻流光',
+    light: '🌬️ 轻盈呼吸',
+    calm: '🍃 静谧省电'
+};
+
+function normalizeAmbientMode(raw) {
+    if (raw === 'dream' || raw === 'light' || raw === 'calm') return raw;
+    return navigator.connection?.saveData ? 'light' : 'dream';
+}
+
+function getStoredAmbientMode() {
+    try {
+        return normalizeAmbientMode(localStorage.getItem('ambient_preference'));
+    } catch (_e) {
+        return 'dream';
+    }
+}
+
+function initAmbientMode() {
+    applyAmbientMode(getStoredAmbientMode());
+}
+
+function applyAmbientMode(mode) {
+    const normalized = normalizeAmbientMode(mode);
+    document.documentElement.setAttribute('data-ambient', normalized);
+    if (typeof window.syncAllAmbientEffects === 'function') {
+        window.syncAllAmbientEffects({ mode: normalized });
+    } else {
+        window.homeSakuraEffect?.setAmbientMode?.(normalized);
+    }
+    updateSettingsAmbientButtons(normalized);
+}
+
+function updateSettingsAmbientButtons(mode) {
+    const normalized = normalizeAmbientMode(mode);
+    const buttonMap = {
+        dream: document.getElementById('ambient-btn-dream'),
+        light: document.getElementById('ambient-btn-light'),
+        calm: document.getElementById('ambient-btn-calm')
+    };
+
+    Object.entries(buttonMap).forEach(([key, btn]) => {
+        if (!btn) return;
+        const isActive = key === normalized;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', String(isActive));
+    });
+}
+
+function setAmbientDirect(mode) {
+    if (!AMBIENT_MODES.includes(mode)) return;
+    try {
+        localStorage.setItem('ambient_preference', mode);
+    } catch (_e) {}
+    applyAmbientMode(mode);
+    if (typeof showToast === 'function') {
+        showToast(`氛围动效已切换为：${AMBIENT_MODE_LABELS[mode] || mode}`);
+    }
 }
