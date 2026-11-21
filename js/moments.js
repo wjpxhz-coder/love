@@ -2749,23 +2749,22 @@ function createMomentCardElement(item, options = {}) {
     }
     authorInfo.appendChild(avatarWrap);
 
-    // 右侧：上下两行排版 (姓名徽章 / 生活化相对时间)
+    // 右侧：上下两行排版 (专属身份胶囊 / 生活化相对时间)
     const authorTextCol = createMomentNode('div', 'card-author-text');
 
-    // 上行：昵称 + 专属身份小标 + 大事记徽标
+    // 上行：专属身份胶囊 + 大事记徽标
     const authorTopRow = createMomentNode('div', 'card-author-top-row');
-    const nameEl = createMomentNode('span', 'card-author-name', displayName);
-    nameEl.dataset.momentAction = 'open-profile';
-    nameEl.dataset.author = author;
-    nameEl.tabIndex = 0;
-    nameEl.setAttribute('role', 'button');
-    nameEl.title = '点击查看主页';
-    authorTopRow.appendChild(nameEl);
-
+    const authorTag = createMomentNode('span', `card-author-tag${authorThemeClass ? ` ${authorThemeClass}` : ''}`, displayName);
     if (author) {
-        const authorTag = createMomentNode('span', `card-author-tag${authorThemeClass ? ` ${authorThemeClass}` : ''}`, author);
-        authorTopRow.appendChild(authorTag);
+        authorTag.dataset.momentAction = 'open-profile';
+        authorTag.dataset.author = author;
+        authorTag.tabIndex = 0;
+        authorTag.setAttribute('role', 'button');
+        authorTag.setAttribute('aria-label', `查看 ${displayName} 的主页`);
+        authorTag.title = '点击查看主页';
     }
+    authorTopRow.appendChild(authorTag);
+
     if (isMilestone) {
         authorTopRow.appendChild(createMomentNode('span', 'milestone-badge-timeline', '🏆 大事记'));
     } else if (options?.showMilestoneDays) {
@@ -3309,38 +3308,11 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
         ...Array.from(document.querySelectorAll(`[id="card-${momentId}"]`))
     ])).filter(Boolean);
 
-    const badgeTextNodes = [];
     const thinkingLabelNodes = [];
-    const createdBadges = [];
     const createdThinkingEls = [];
 
     matchingCards.forEach(card => {
         card.classList.add('is-ai-analyzing');
-
-        let badge = card.querySelector('.moment-ai-analyzing-badge');
-        if (!badge) {
-            badge = document.createElement('div');
-            badge.className = 'moment-ai-analyzing-badge';
-            const spinSpan = document.createElement('span');
-            spinSpan.className = 'ai-spin';
-            spinSpan.textContent = '🌸';
-            const textSpan = document.createElement('span');
-            textSpan.className = 'moment-ai-analyzing-text';
-            textSpan.textContent = ' 感情小助手正在品读分析动态… ✨';
-            badge.append(spinSpan, textSpan);
-            const cardHeader = card.querySelector('.card-header');
-            if (cardHeader && cardHeader.nextSibling) {
-                card.insertBefore(badge, cardHeader.nextSibling);
-            } else {
-                card.prepend(badge);
-            }
-            createdBadges.push(badge);
-            badgeTextNodes.push(textSpan);
-        } else {
-            badge.style.display = 'flex';
-            const existingText = badge.querySelector('.moment-ai-analyzing-text');
-            if (existingText) badgeTextNodes.push(existingText);
-        }
 
         const section = card.querySelector('.comment-section');
         if (section) {
@@ -3377,15 +3349,15 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
                 }
                 createdThinkingEls.push(thinkingEl);
                 thinkingLabelNodes.push(label);
+            } else {
+                const existingLabel = thinkingEl.querySelector('.comment-ai-thinking-label');
+                if (existingLabel) thinkingLabelNodes.push(existingLabel);
             }
         }
     });
 
     const updateProgressText = text => {
         if (!text) return;
-        badgeTextNodes.forEach(node => {
-            node.textContent = ` ${text}`;
-        });
         thinkingLabelNodes.forEach(node => {
             node.textContent = text;
         });
@@ -3418,7 +3390,6 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
         }
     } finally {
         matchingCards.forEach(card => card.classList.remove('is-ai-analyzing'));
-        createdBadges.forEach(el => el.remove());
         createdThinkingEls.forEach(el => el.remove());
     }
 }

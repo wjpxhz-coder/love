@@ -750,22 +750,6 @@
             color: #fce4ec;
         }
 
-        .ai-comment-tag {
-            display: inline-block;
-            font-size: 0.74em;
-            color: #d81b60;
-            background: rgba(255, 228, 235, 0.8);
-            border-radius: 6px;
-            padding: 1px 6px;
-            margin-bottom: 6px;
-            font-weight: 500;
-        }
-
-        [data-theme='dark'] .ai-comment-tag {
-            color: #ff80ab;
-            background: rgba(255, 64, 129, 0.15);
-        }
-
         /* ── 评论回复引用气泡 ── */
         .comment-reply-quote {
             background: rgba(0, 0, 0, 0.035);

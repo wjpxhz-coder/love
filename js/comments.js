@@ -99,8 +99,9 @@ async function resolveCommentContent(rawContent) {
         text = String(rawContent || '');
     }
 
-    if (!isAI && text.startsWith('🤖【感情小助手】')) {
+    if (/^\s*🤖【感情小助手】/.test(text)) {
         isAI = true;
+        text = text.replace(/^\s*🤖【感情小助手】[\s:：]*/, '');
     }
 
     const images = (await Promise.all(imageValues.map(async value => {
@@ -528,12 +529,6 @@ async function loadComments(momentId, targetCard = null) {
             const bubble = document.createElement('div');
             bubble.className = `comment-bubble${isAIComment ? ' comment-bubble--ai' : ''}`;
             const commentResolved = resolvedContents[commentIndex] || {};
-            if (isAIComment) {
-                const aiHeader = document.createElement('div');
-                aiHeader.className = 'ai-comment-tag';
-                aiHeader.textContent = commentResolved.replyTo ? '✨ 感情小助手互动回复' : '✨ 动态智能分析点评';
-                bubble.appendChild(aiHeader);
-            }
 
             const replyTo = commentResolved.replyTo;
             if (replyTo && replyTo.author) {
