@@ -123,11 +123,19 @@ async function ensureTopicAuthReady(maxWaitMs = 4000) {
 }
 
 /**
- * 跨浏览器/移动端统一手账弹窗显示
+ * 跨浏览器/移动端统一手账弹窗显示（iOS 级双向平滑过渡）
  */
+const topicModalCloseTimers = new WeakMap();
+
 function showTopicModal(modal) {
     if (!modal) return;
     initTopicModalBackdropHandlers();
+    const pendingTimer = topicModalCloseTimers.get(modal);
+    if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        topicModalCloseTimers.delete(modal);
+    }
+    modal.classList.remove('is-closing');
     try {
         if (typeof modal.showModal === 'function') {
             if (!modal.open) {
@@ -139,38 +147,73 @@ function showTopicModal(modal) {
     } catch (_e) {
         modal.setAttribute('open', '');
     }
-    modal.classList.add('is-open');
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+        modal.classList.add('is-open');
+    } else {
+        modal.classList.remove('is-open');
+        void modal.offsetWidth;
+        requestAnimationFrame(() => {
+            if ((modal.open || modal.hasAttribute('open')) && !modal.classList.contains('is-closing')) {
+                modal.classList.add('is-open');
+            }
+        });
+    }
     window.homeSakuraEffect?.setSuspended?.(true, `topic-modal:${modal.id || 'dialog'}`);
 }
 
 /**
- * 跨浏览器/移动端统一手账弹窗隐藏
+ * 跨浏览器/移动端统一手账弹窗隐藏（平滑退场后再关闭 top-layer）
  */
 function hideTopicModal(modal) {
     if (!modal) return;
-    try {
-        if (typeof modal.close === 'function') {
-            if (modal.open) {
-                modal.close();
+    const pendingTimer = topicModalCloseTimers.get(modal);
+    if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        topicModalCloseTimers.delete(modal);
+    }
+
+    const finishClose = () => {
+        topicModalCloseTimers.delete(modal);
+        modal.classList.remove('is-open', 'is-closing');
+        try {
+            if (typeof modal.close === 'function') {
+                if (modal.open) {
+                    modal.close();
+                }
+            } else {
+                modal.removeAttribute('open');
             }
-        } else {
+        } catch (_e) {
             modal.removeAttribute('open');
         }
-    } catch (_e) {
-        modal.removeAttribute('open');
+        window.homeSakuraEffect?.setSuspended?.(false, `topic-modal:${modal.id || 'dialog'}`);
+    };
+
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    if (reduced || (!modal.open && !modal.hasAttribute('open'))) {
+        finishClose();
+        return;
     }
+
     modal.classList.remove('is-open');
-    window.homeSakuraEffect?.setSuspended?.(false, `topic-modal:${modal.id || 'dialog'}`);
+    modal.classList.add('is-closing');
+    const timer = setTimeout(finishClose, 225);
+    topicModalCloseTimers.set(modal, timer);
 }
 
 /**
- * 为手账弹窗绑定点击背景遮罩自动关闭事件
+ * 为手账弹窗绑定点击背景遮罩与 Esc 平滑关闭事件
  */
 function initTopicModalBackdropHandlers() {
     document.querySelectorAll('dialog.topic-modal-dialog').forEach(modal => {
         if (modal.dataset.backdropBound) return;
         modal.dataset.backdropBound = 'true';
+        modal.addEventListener('cancel', (e) => {
+            e.preventDefault();
+            hideTopicModal(modal);
+        });
         modal.addEventListener('close', () => {
+            modal.classList.remove('is-open', 'is-closing');
             window.homeSakuraEffect?.setSuspended?.(false, `topic-modal:${modal.id || 'dialog'}`);
         });
         modal.addEventListener('click', (e) => {

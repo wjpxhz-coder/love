@@ -9,13 +9,23 @@
     z-index: 2000;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.25s ease, visibility 0.25s ease;
+    transition: opacity 260ms var(--ios-ease-nav), visibility 0s linear 260ms;
     cursor: var(--cursor-zoom-out);
     touch-action: none;
     overscroll-behavior: contain;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 
-#lightbox.show { opacity: 1; visibility: visible; }
+#lightbox.show {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 260ms var(--ios-ease-nav), visibility 0s linear 0s;
+}
+
+#lightbox.is-closing {
+    pointer-events: none;
+}
 
 #lightbox img {
     max-width: 92vw;
@@ -30,13 +40,13 @@
     -webkit-user-select: none;
     -webkit-touch-callout: none;
     transform-origin: center center;
-    will-change: transform;
+    will-change: transform, opacity;
     cursor: var(--cursor-zoom-in);
 }
 
 /* ── 弹窗 ── */
 
-/* ── 弹窗 (Native Dialog) ── */
+/* ── 弹窗 (Native Dialog — iOS 级双向离散过渡，现代 Baseline allow-discrete + @starting-style) ── */
 dialog.native-dialog {
     margin: auto;
     border: none;
@@ -47,36 +57,72 @@ dialog.native-dialog {
     max-height: 100vh;
     max-height: 100dvh;
     overscroll-behavior: contain;
-    /* Animation setup */
-    transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-    transform: scale(1);
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.93);
+    transition:
+        opacity 220ms var(--ios-ease-nav),
+        transform 280ms var(--ios-ease-nav),
+        display 280ms,
+        overlay 280ms;
+    transition-behavior: allow-discrete;
+}
+
+dialog.native-dialog[open] {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
 }
 
 dialog.native-dialog::backdrop {
-    background: rgba(255, 230, 240, 0.45);
+    background: rgba(255, 230, 240, 0);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
+    opacity: 0;
+    transition:
+        opacity 240ms var(--ios-ease-nav),
+        background-color 240ms var(--ios-ease-nav),
+        display 280ms,
+        overlay 280ms;
+    transition-behavior: allow-discrete;
 }
 
-[data-theme='dark'] dialog.native-dialog::backdrop {
+dialog.native-dialog[open]::backdrop {
+    background: rgba(255, 230, 240, 0.45);
+    opacity: 1;
+}
+
+[data-theme='dark'] dialog.native-dialog[open]::backdrop {
     background: rgba(20, 10, 28, 0.65);
     backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
 }
 
 @media (max-width: 768px) {
     dialog.native-dialog::backdrop {
         backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+    }
+    dialog.native-dialog[open]::backdrop {
         background: rgba(255, 225, 235, 0.55);
     }
 }
 
 @starting-style {
     dialog.native-dialog[open] {
-        transform: scale(0.92);
+        opacity: 0;
+        transform: translate3d(0, 16px, 0) scale(0.92);
     }
     dialog.native-dialog[open]::backdrop {
+        opacity: 0;
         background: rgba(255, 230, 240, 0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #lightbox,
+    dialog.native-dialog,
+    dialog.native-dialog::backdrop {
+        transition: none !important;
+        transform: none !important;
     }
 }
 

@@ -230,8 +230,22 @@ function enterLoginPage() {
     if (emailInput) emailInput.value = '';
     if (passwordInput) passwordInput.value = '';
     if (errorElement) errorElement.textContent = '';
-    startLoginCanvas();
-    setTimeout(() => emailInput?.focus(), 100);
+
+    const activateAfterTransition = () => {
+        if (typeof isAppRouteActive === 'function' && !isAppRouteActive('login')) return;
+        startLoginCanvas();
+        const isMobile = typeof isTouchMobileViewport === 'function'
+            ? isTouchMobileViewport()
+            : window.matchMedia?.('(pointer: coarse)')?.matches;
+        if (!isMobile) {
+            emailInput?.focus({ preventScroll: true });
+        }
+    };
+    if (typeof onAppRouteTransitionIdle === 'function') {
+        onAppRouteTransitionIdle(activateAfterTransition);
+    } else {
+        activateAfterTransition();
+    }
 }
 
 function leaveLoginPage() {

@@ -29,13 +29,46 @@
     border-radius: 20px;
     white-space: nowrap;
     font-weight: 500;
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.22s var(--ios-ease-nav), background-color 0.22s ease, color 0.22s ease;
+}
+.ai-tab:active {
+    transform: scale(0.95);
 }
 .ai-tab.active {
     color: var(--primary);
     font-weight: 700;
     background: rgba(255, 101, 132, 0.12);
     border-bottom: none;
+}
+
+@keyframes aiPanelSlideLeft {
+    from {
+        opacity: 0;
+        transform: translate3d(18px, 0, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes aiPanelSlideRight {
+    from {
+        opacity: 0;
+        transform: translate3d(-18px, 0, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+.ai-panel-slide-left {
+    animation: aiPanelSlideLeft var(--ios-dur-tab, 260ms) var(--ios-ease-nav) both;
+}
+
+.ai-panel-slide-right {
+    animation: aiPanelSlideRight var(--ios-dur-tab, 260ms) var(--ios-ease-nav) both;
 }
 .ai-content-area {
     background: var(--surface-subtle);
@@ -400,9 +433,32 @@
             flex-direction: column;
             padding: 16px;
             background: var(--surface-elevated);
+            transform: translate3d(0, 100%, 0);
+            opacity: 0;
+            transition: transform 320ms var(--ios-ease-sheet), opacity 220ms ease;
+            will-change: transform, opacity;
+        }
+        .ai-diary-picker.is-open {
+            transform: translate3d(0, 0, 0);
+            opacity: 1;
+        }
+        .ai-diary-picker.is-closing {
+            transform: translate3d(0, 100%, 0);
+            opacity: 0;
+            pointer-events: none;
         }
         .ai-diary-picker[hidden] {
             display: none;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .ai-diary-picker,
+            .ai-panel-slide-left,
+            .ai-panel-slide-right {
+                animation: none !important;
+                transition: none !important;
+                transform: none !important;
+                opacity: 1 !important;
+            }
         }
         .ai-diary-picker-header {
             display: flex;

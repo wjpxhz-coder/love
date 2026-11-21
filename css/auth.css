@@ -98,14 +98,23 @@
             min-width: 120px;
             opacity: 0;
             visibility: hidden;
-            transform: translateY(-8px) scale(0.95);
-            transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+            transform-origin: top right;
+            transform: translate3d(0, -8px, 0) scale(0.94);
+            transition:
+                transform var(--ios-dur-popover, 240ms) var(--ios-ease-popover),
+                opacity 180ms var(--ios-ease-decel),
+                visibility 0s linear 240ms;
+            will-change: transform, opacity;
             text-align: left;
         }
         .user-dropdown.show {
             opacity: 1;
             visibility: visible;
-            transform: translateY(0) scale(1);
+            transform: translate3d(0, 0, 0) scale(1);
+            transition:
+                transform var(--ios-dur-popover, 240ms) var(--ios-ease-popover),
+                opacity 160ms var(--ios-ease-decel),
+                visibility 0s linear 0s;
         }
         .user-dropdown-item {
             display: flex;
@@ -380,3 +389,9 @@
         }
         .login-close-btn:hover { background: rgba(255,255,255,0.25); color: #fff; transform: rotate(90deg); }
         .login-close-btn::after { display: none; }
+        @media (prefers-reduced-motion: reduce) {
+            .user-dropdown {
+                transition: none !important;
+                transform: none !important;
+            }
+        }

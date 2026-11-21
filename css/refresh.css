@@ -252,7 +252,12 @@ body.auth-pending #notification-bell {
     display: none !important;
 }
 
-body.app-page-active :is(.app-utility-bar, .resonance-ui) {
+body.app-page-active .resonance-ui {
+    display: none !important;
+}
+
+/* 顶栏快捷栏在切屏过渡期间参与淡入淡出平移，过渡稳定停留在子页后再彻底隐藏 */
+body.app-page-settled .app-utility-bar {
     display: none !important;
 }
 
@@ -792,10 +797,6 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
     background:
         radial-gradient(circle at 10% 0, rgba(181, 82, 107, 0.08), transparent 28rem),
         var(--bg);
-}
-
-.app-page.is-active {
-    animation: app-page-enter 0.16s ease-out both;
 }
 
 .app-page-topbar {
@@ -1622,12 +1623,14 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
 #lightbox {
     background: rgba(14, 10, 13, 0.95);
     transition:
-        opacity 0.22s ease,
-        visibility 0s linear 0.22s;
+        opacity 260ms var(--ios-ease-nav),
+        visibility 0s linear 260ms;
 }
 
 #lightbox.show {
-    transition-delay: 0s;
+    transition:
+        opacity 260ms var(--ios-ease-nav),
+        visibility 0s linear 0s;
 }
 
 #lightbox:not(.show) {
@@ -1979,7 +1982,7 @@ body.app-page-active :is(.app-utility-bar, .resonance-ui) {
 
     .profile-page.app-page .profile-topbar {
         display: grid;
-        grid-template-columns: minmax(42px, 1fr) auto minmax(42px, 1fr);
+        grid-template-columns: minmax(42px, 1fr) minmax(0, auto) minmax(42px, 1fr);
         gap: 8px;
         padding-right: max(12px, env(safe-area-inset-right));
         padding-left: max(12px, env(safe-area-inset-left));
