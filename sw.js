@@ -1,10 +1,17 @@
 const CACHE_PREFIX = 'love-diary-';
-const APP_SHELL_VERSION = '4.4.6';
+const APP_SHELL_VERSION = '4.4.7';
 const CACHE_NAME = `love-diary-v${APP_SHELL_VERSION}`;
 const MEDIA_CACHE_NAME = 'love-diary-media-v1';
 const MAX_MEDIA_CACHE_ENTRIES = 160;
 const R2_MEDIA_HOST = 'media.xiaoxi666.kdns.fr';
 const LEGACY_SUPABASE_HOST = 'tveiegolbotlqpjpwpes.supabase.co';
+const MIN_VALID_POSTER_BYTES = 2048;
+const REPAIRED_POSTER_FILENAMES = [
+    'poster_1794654194567_0_tbxzist.webp',
+    'poster_1794654195114_2_95tyitn.webp',
+    'poster_1794654193821_3_sd0p2sz.webp',
+    'poster_1794654194515_5_986nwew.webp'
+];
 
 // Only application-shell files are cached in CACHE_NAME.
 const PRECACHE_ASSETS = [
@@ -49,12 +56,61 @@ self.addEventListener('install', event => {
     })());
 });
 
+function isPosterStoragePath(pathname) {
+    return typeof pathname === 'string' && pathname.includes('/poster_');
+}
+
+function isRepairedPosterPath(pathname) {
+    if (typeof pathname !== 'string') return false;
+    return REPAIRED_POSTER_FILENAMES.some(name => pathname.endsWith(`/${name}`));
+}
+
+function isSuspiciousCorruptPosterResponse(url, response) {
+    if (!url || !response || !isPosterStoragePath(url.pathname)) return false;
+    const rawLen = response.headers && response.headers.get('content-length');
+    if (rawLen === null || rawLen === '') return false;
+    const len = Number(rawLen);
+    return Number.isFinite(len) && len > 0 && len < MIN_VALID_POSTER_BYTES;
+}
+
+async function isCachedPosterCorrupt(url, response) {
+    if (!url || !response || !isPosterStoragePath(url.pathname)) return false;
+    if (isSuspiciousCorruptPosterResponse(url, response)) return true;
+    try {
+        const blob = await response.clone().blob();
+        return blob.size > 0 && blob.size < MIN_VALID_POSTER_BYTES;
+    } catch (_err) {
+        return false;
+    }
+}
+
+async function cleanupCorruptPosterCache() {
+    try {
+        const cache = await caches.open(MEDIA_CACHE_NAME);
+        const keys = await cache.keys();
+        await Promise.all(keys.map(async (req) => {
+            try {
+                const keyUrl = new URL(req.url);
+                if (!isPosterStoragePath(keyUrl.pathname) && !isRepairedPosterPath(keyUrl.pathname)) return;
+                const cached = await cache.match(req);
+                if (!cached) return;
+                if (await isCachedPosterCorrupt(keyUrl, cached)) {
+                    await cache.delete(req);
+                }
+            } catch (_err) {}
+        }));
+    } catch (err) {
+        console.warn('Cleanup corrupt poster cache error:', err);
+    }
+}
+
 self.addEventListener('activate', event => {
     event.waitUntil((async () => {
         const keys = await caches.keys();
         const previousAppCaches = keys
             .filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME && key !== MEDIA_CACHE_NAME);
         await Promise.all(previousAppCaches.map(key => caches.delete(key)));
+        await cleanupCorruptPosterCache();
         await self.clients.claim();
     })());
 });
@@ -168,19 +224,34 @@ async function cacheFirstStorageMedia(request) {
     const canonicalKey = getCanonicalMediaKey(url);
     const cache = await caches.open(MEDIA_CACHE_NAME);
 
-    const cached = await cache.match(canonicalKey);
+    let cached = await cache.match(canonicalKey);
+    let evictedCorruptPoster = false;
+    if (cached && isPosterStoragePath(url.pathname)) {
+        if (await isCachedPosterCorrupt(url, cached)) {
+            await cache.delete(canonicalKey);
+            cached = undefined;
+            evictedCorruptPoster = true;
+        }
+    }
     if (cached) return cached;
+
+    const bypassHttpCache = evictedCorruptPoster || isRepairedPosterPath(url.pathname);
+    const corsFetchOptions = bypassHttpCache
+        ? { mode: 'cors', credentials: 'omit', cache: 'reload' }
+        : { mode: 'cors', credentials: 'omit' };
 
     try {
         let response;
         try {
-            response = await fetch(request.url, { mode: 'cors', credentials: 'omit' });
+            response = await fetch(request.url, corsFetchOptions);
         } catch (_corsErr) {
-            response = await fetch(request);
+            response = bypassHttpCache
+                ? await fetch(request.url, { cache: 'reload' })
+                : await fetch(request);
         }
 
-        // 仅在完整成功 (HTTP 200) 时写入缓存，杜绝 206 Partial Content 等非完整响应
-        if (response && response.status === 200) {
+        // 仅在完整成功 (HTTP 200) 且非可疑损坏封面时写入缓存，杜绝 206 Partial Content 或坏图污染缓存
+        if (response && response.status === 200 && !isSuspiciousCorruptPosterResponse(url, response)) {
             // 在 return response 之前同步克隆副本，避免异步回调中对已消费的原始响应调用 clone() 报错
             const responseToCache = response.clone();
             cache.put(canonicalKey, responseToCache.clone()).then(() => {
