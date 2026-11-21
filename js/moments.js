@@ -1397,13 +1397,68 @@ async function compressVideoFile(file, onProgress) {
     }
 }
 
+function isVideoCanvasFrameValid(ctx, width, height) {
+    if (!ctx || width <= 0 || height <= 0) {
+        return { hasPixels: false, isDarkBlank: true };
+    }
+    try {
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+        const gridSteps = 16;
+        const totalSamples = gridSteps * gridSteps;
+        let opaqueCount = 0;
+        let minR = 255;
+        let maxR = 0;
+        let minG = 255;
+        let maxG = 0;
+        let minB = 255;
+        let maxB = 0;
+        let lumaSum = 0;
+
+        for (let gy = 0; gy < gridSteps; gy++) {
+            const y = Math.min(height - 1, Math.floor(((gy + 0.5) * height) / gridSteps));
+            for (let gx = 0; gx < gridSteps; gx++) {
+                const x = Math.min(width - 1, Math.floor(((gx + 0.5) * width) / gridSteps));
+                const idx = (y * width + x) * 4;
+                const alpha = data[idx + 3];
+                if (alpha <= 16) continue;
+
+                const r = data[idx];
+                const g = data[idx + 1];
+                const b = data[idx + 2];
+                opaqueCount++;
+                if (r < minR) minR = r;
+                if (r > maxR) maxR = r;
+                if (g < minG) minG = g;
+                if (g > maxG) maxG = g;
+                if (b < minB) minB = b;
+                if (b > maxB) maxB = b;
+                lumaSum += 0.299 * r + 0.587 * g + 0.114 * b;
+            }
+        }
+
+        const hasPixels = opaqueCount >= totalSamples * 0.5;
+        if (opaqueCount === 0) {
+            return { hasPixels: false, isDarkBlank: true };
+        }
+        const maxChannelRange = Math.max(maxR - minR, maxG - minG, maxB - minB);
+        const avgLuma = lumaSum / opaqueCount;
+        const isDarkBlank = maxChannelRange < 8 && avgLuma < 12;
+        return { hasPixels, isDarkBlank };
+    } catch (_err) {
+        return { hasPixels: false, isDarkBlank: false };
+    }
+}
+
 async function captureVideoFrame(videoFile, seekTime = 0.2) {
     if (!videoFile || !isMomentVideoFile(videoFile)) return null;
     return new Promise((resolve) => {
         const video = document.createElement('video');
-        video.preload = 'metadata';
+        video.preload = 'auto';
         video.muted = true;
         video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
 
         let objectUrl = '';
         try {
@@ -1411,13 +1466,25 @@ async function captureVideoFrame(videoFile, seekTime = 0.2) {
         } catch (_err) {
             return resolve(null);
         }
-        video.src = objectUrl;
 
         let resolved = false;
+        let seekInitiated = false;
+        let hasRetriedDarkFrame = false;
+        let timer = null;
+
         const cleanup = () => {
             if (resolved) return;
             resolved = true;
+            if (timer) {
+                clearTimeout(timer);
+                timer = null;
+            }
             try {
+                video.removeEventListener('loadedmetadata', onReadyForSeek);
+                video.removeEventListener('loadeddata', onReadyForSeek);
+                video.removeEventListener('canplay', onCanPlayFallback);
+                video.removeEventListener('seeked', onSeeked);
+                video.removeEventListener('error', onError);
                 video.pause();
                 video.removeAttribute('src');
                 video.load();
@@ -1425,75 +1492,175 @@ async function captureVideoFrame(videoFile, seekTime = 0.2) {
             } catch (_) {}
         };
 
-        const timer = setTimeout(() => {
+        const finish = (result) => {
+            if (resolved) return;
             cleanup();
-            resolve(null);
-        }, 8000);
+            resolve(result);
+        };
 
-        video.addEventListener('loadedmetadata', () => {
-            const targetTime = Math.min(
-                Math.max(0.1, seekTime),
-                Math.max(0.1, (video.duration || 1) * 0.15)
-            );
-            try {
-                video.currentTime = targetTime;
-            } catch (_) {
-                cleanup();
-                resolve(null);
-            }
-        }, { once: true });
-
-        video.addEventListener('seeked', () => {
-            clearTimeout(timer);
-            try {
-                const canvas = document.createElement('canvas');
-                const maxDim = 1280;
-                let width = video.videoWidth || 640;
-                let height = video.videoHeight || 360;
-
-                if (width > maxDim || height > maxDim) {
-                    if (width > height) {
-                        height = Math.round((height * maxDim) / width);
-                        width = maxDim;
-                    } else {
-                        width = Math.round((width * maxDim) / height);
-                        height = maxDim;
+        const waitForFramePaint = (callback) => {
+            if (typeof video.requestVideoFrameCallback === 'function') {
+                let done = false;
+                const guard = setTimeout(() => {
+                    if (!done) {
+                        done = true;
+                        callback();
                     }
+                }, 250);
+                video.requestVideoFrameCallback(() => {
+                    if (!done) {
+                        done = true;
+                        clearTimeout(guard);
+                        callback();
+                    }
+                });
+                return;
+            }
+            requestAnimationFrame(() => requestAnimationFrame(callback));
+        };
+
+        const triggerSeek = (targetSec) => {
+            const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
+            const safeMax = Math.max(0.05, duration - 0.05);
+            const clampedTime = Math.min(Math.max(0.05, targetSec), safeMax);
+            seekInitiated = true;
+            try {
+                video.currentTime = clampedTime;
+            } catch (_) {
+                finish(null);
+            }
+        };
+
+        const onReadyForSeek = () => {
+            if (resolved || seekInitiated) return;
+            if (video.videoWidth > 0 && video.videoHeight > 0 && video.readyState >= 2) {
+                const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
+                const targetTime = Math.min(
+                    Math.max(0.1, seekTime),
+                    Math.max(0.1, duration * 0.15)
+                );
+                triggerSeek(targetTime);
+            }
+        };
+
+        const onCanPlayFallback = () => {
+            if (resolved || seekInitiated) return;
+            if (video.videoWidth > 0 && video.videoHeight > 0 && video.readyState >= 2) {
+                onReadyForSeek();
+            } else {
+                finish(null);
+            }
+        };
+
+        const onSeeked = () => {
+            if (resolved) return;
+            if (video.videoWidth <= 0 || video.videoHeight <= 0 || video.readyState < 2) {
+                finish(null);
+                return;
+            }
+
+            waitForFramePaint(() => {
+                if (resolved) return;
+                if (video.videoWidth <= 0 || video.videoHeight <= 0 || video.readyState < 2) {
+                    finish(null);
+                    return;
                 }
 
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, width, height);
+                try {
+                    const maxDim = 1280;
+                    let width = video.videoWidth;
+                    let height = video.videoHeight;
 
-                const exportBlob = (type, quality, fallbackType) => {
-                    canvas.toBlob((blob) => {
-                        cleanup();
-                        if (blob) {
-                            const ext = type.includes('webp') ? 'webp' : 'jpg';
-                            const posterFile = new File([blob], `poster_${Date.now()}.${ext}`, { type: blob.type || type });
-                            resolve(posterFile);
-                        } else if (fallbackType) {
-                            exportBlob(fallbackType, 0.82, null);
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
                         } else {
-                            resolve(null);
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
                         }
-                    }, type, quality);
-                };
+                    }
 
-                // 优先生成 WebP，不支持时自动降级到 JPEG
-                exportBlob('image/webp', 0.82, 'image/jpeg');
-            } catch (err) {
-                cleanup();
-                resolve(null);
-            }
-        }, { once: true });
+                    const probeCanvas = document.createElement('canvas');
+                    probeCanvas.width = width;
+                    probeCanvas.height = height;
+                    const probeCtx = probeCanvas.getContext('2d');
+                    if (!probeCtx) {
+                        finish(null);
+                        return;
+                    }
+                    probeCtx.drawImage(video, 0, 0, width, height);
 
-        video.addEventListener('error', () => {
-            clearTimeout(timer);
-            cleanup();
-            resolve(null);
-        }, { once: true });
+                    const frameCheck = isVideoCanvasFrameValid(probeCtx, width, height);
+                    if (!frameCheck.hasPixels) {
+                        if (!hasRetriedDarkFrame && Number.isFinite(video.duration) && video.duration > 0.8) {
+                            hasRetriedDarkFrame = true;
+                            triggerSeek(Math.min(1.0, video.duration * 0.25));
+                            return;
+                        }
+                        finish(null);
+                        return;
+                    }
+
+                    if (frameCheck.isDarkBlank) {
+                        if (!hasRetriedDarkFrame && Number.isFinite(video.duration) && video.duration > 0.8) {
+                            hasRetriedDarkFrame = true;
+                            triggerSeek(Math.min(1.0, video.duration * 0.25));
+                            return;
+                        }
+                        finish(null);
+                        return;
+                    }
+
+                    const exportCanvas = document.createElement('canvas');
+                    exportCanvas.width = width;
+                    exportCanvas.height = height;
+                    const exportCtx = exportCanvas.getContext('2d');
+                    if (!exportCtx) {
+                        finish(null);
+                        return;
+                    }
+                    exportCtx.fillStyle = '#000000';
+                    exportCtx.fillRect(0, 0, width, height);
+                    exportCtx.drawImage(probeCanvas, 0, 0, width, height);
+
+                    const exportBlob = (type, quality, fallbackType) => {
+                        exportCanvas.toBlob((blob) => {
+                            if (resolved) return;
+                            if (blob && blob.size >= 1500) {
+                                const ext = type.includes('webp') ? 'webp' : 'jpg';
+                                const posterFile = new File([blob], `poster_${Date.now()}.${ext}`, { type: blob.type || type });
+                                finish(posterFile);
+                            } else if (fallbackType) {
+                                exportBlob(fallbackType, 0.82, null);
+                            } else {
+                                finish(null);
+                            }
+                        }, type, quality);
+                    };
+
+                    // 优先生成 WebP，不支持或体积异常时自动降级到 JPEG
+                    exportBlob('image/webp', 0.82, 'image/jpeg');
+                } catch (_err) {
+                    finish(null);
+                }
+            });
+        };
+
+        const onError = () => {
+            finish(null);
+        };
+
+        timer = setTimeout(() => {
+            finish(null);
+        }, 10000);
+
+        video.addEventListener('loadedmetadata', onReadyForSeek);
+        video.addEventListener('loadeddata', onReadyForSeek);
+        video.addEventListener('canplay', onCanPlayFallback);
+        video.addEventListener('seeked', onSeeked);
+        video.addEventListener('error', onError);
+        video.src = objectUrl;
     });
 }
 
@@ -1565,22 +1732,26 @@ async function submitMomentPost() {
             for (let i = 0; i < totalFiles; i++) {
                 let file = momentSelectedFiles[i];
                 if (isMomentVideoFile(file)) {
-                    // 1. 优先提取高清首帧海报（利用当前设备原生硬解能力，确保即使转码耗时或弱网降级，九宫格也 100% 具备海报封面）
-                    btn.textContent = `⏳ 提取视频海报 (${i + 1}/${totalFiles})...`;
-                    let posterFile = null;
-                    try {
-                        posterFile = await captureVideoFrame(file);
-                    } catch (frameErr) {
-                        console.warn('提取视频海报失败，降级为无封面:', frameErr);
-                    }
-
-                    // 2. 检查并执行客户端全平台兼容性转码
+                    const originalFile = file;
+                    // 1. 先检查并执行客户端全平台兼容性转码（如苹果 HEVC/MOV 转为标准 H.264 MP4），保证后续抽帧能被浏览器原生硬解
                     const needCompress = await isMomentVideoNeedsTranscode(file);
                     if (needCompress) {
                         btn.textContent = `⏳ 准备优化视频 (${i + 1}/${totalFiles})...`;
                         file = await compressVideoFile(file, (progress) => {
                             btn.textContent = `⏳ 视频兼容性转码 ${progress}% (${i + 1}/${totalFiles})...`;
                         });
+                    }
+
+                    // 2. 在标准视频上提取高清首帧海报；若失败且经过了转码，再回退尝试原文件抽帧
+                    btn.textContent = `⏳ 提取视频海报 (${i + 1}/${totalFiles})...`;
+                    let posterFile = null;
+                    try {
+                        posterFile = await captureVideoFrame(file);
+                        if (!posterFile && file !== originalFile) {
+                            posterFile = await captureVideoFrame(originalFile);
+                        }
+                    } catch (frameErr) {
+                        console.warn('提取视频海报失败，降级为无封面:', frameErr);
                     }
                     processedItems.push({ file, isVideo: true, posterFile });
                 } else if (file.type.startsWith('image/')) {
@@ -2475,6 +2646,14 @@ function createMomentSingleVideoCard(videoUrl, posterUrl) {
     card.setAttribute('aria-label', '播放视频');
     card.title = '点击全屏播放视频';
 
+    const createSinglePlaceholder = () => {
+        const placeholder = createMomentNode('div', 'moment-single-video-placeholder');
+        const iconSpan = createMomentNode('span', 'moment-single-video-placeholder-icon', '🎬');
+        const textSpan = createMomentNode('span', 'moment-single-video-placeholder-text', '甜蜜回忆视频');
+        placeholder.append(iconSpan, textSpan);
+        return placeholder;
+    };
+
     if (safePosterUrl) {
         const img = document.createElement('img');
         img.className = 'moment-single-video-poster';
@@ -2482,14 +2661,13 @@ function createMomentSingleVideoCard(videoUrl, posterUrl) {
         img.crossOrigin = 'anonymous';
         img.loading = 'lazy';
         img.decoding = 'async';
+        img.addEventListener('error', () => {
+            img.replaceWith(createSinglePlaceholder());
+        }, { once: true });
         img.src = safePosterUrl;
         card.appendChild(img);
     } else {
-        const placeholder = createMomentNode('div', 'moment-single-video-placeholder');
-        const iconSpan = createMomentNode('span', 'moment-single-video-placeholder-icon', '🎬');
-        const textSpan = createMomentNode('span', 'moment-single-video-placeholder-text', '甜蜜回忆视频');
-        placeholder.append(iconSpan, textSpan);
-        card.appendChild(placeholder);
+        card.appendChild(createSinglePlaceholder());
     }
 
     const overlay = createMomentNode('div', 'moment-single-video-overlay');
@@ -2556,15 +2734,18 @@ function createMomentCardElement(item, options = {}) {
     avatarWrap.setAttribute('aria-label', `查看 ${displayName} 的主页`);
     avatarWrap.title = '点击查看主页';
 
+    const createAvatarEmoji = () => createMomentNode('span', 'card-author-avatar-emoji', defaultEmoji);
     if (avatarUrl) {
         const avatarImg = document.createElement('img');
-        avatarImg.src = avatarUrl;
         avatarImg.alt = displayName;
         avatarImg.className = 'card-author-avatar-img';
+        avatarImg.addEventListener('error', () => {
+            avatarImg.replaceWith(createAvatarEmoji());
+        }, { once: true });
+        avatarImg.src = avatarUrl;
         avatarWrap.appendChild(avatarImg);
     } else {
-        const avatarEmoji = createMomentNode('span', 'card-author-avatar-emoji', defaultEmoji);
-        avatarWrap.appendChild(avatarEmoji);
+        avatarWrap.appendChild(createAvatarEmoji());
     }
     authorInfo.appendChild(avatarWrap);
 
@@ -2734,6 +2915,7 @@ function createMomentCardElement(item, options = {}) {
                     wrap.setAttribute('aria-label', '打开视频预览');
                     if (isHidden) wrap.style.display = 'none';
 
+                    const createGridVideoPlaceholder = () => createMomentNode('div', 'moment-grid-video-placeholder', '🎬');
                     if (posterUrl) {
                         const img = document.createElement('img');
                         img.className = 'moment-grid-item';
@@ -2741,11 +2923,13 @@ function createMomentCardElement(item, options = {}) {
                         img.crossOrigin = 'anonymous';
                         img.loading = isHidden ? 'lazy' : (index < 4 ? 'eager' : 'lazy');
                         img.decoding = 'async';
+                        img.addEventListener('error', () => {
+                            img.replaceWith(createGridVideoPlaceholder());
+                        }, { once: true });
                         img.src = posterUrl;
                         wrap.appendChild(img);
                     } else {
-                        const placeholder = createMomentNode('div', 'moment-grid-video-placeholder', '🎬');
-                        wrap.appendChild(placeholder);
+                        wrap.appendChild(createGridVideoPlaceholder());
                     }
                     const badge = createMomentNode('span', 'moment-video-badge', '▶');
                     wrap.appendChild(badge);

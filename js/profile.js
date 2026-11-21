@@ -107,22 +107,29 @@ function renderAvatar(container, profile, options = {}) {
         ? sanitizeMediaUrl(previewUrl, { allowBlob: true })
         : getProfileAvatarUrl(profile);
 
+    const createPlaceholder = () => {
+        const placeholder = document.createElement('div');
+        placeholder.className = placeholderClass;
+        placeholder.textContent = profile?.username === '小蛇' ? '🐍' : '🐟';
+        placeholder.setAttribute('aria-hidden', 'true');
+        return placeholder;
+    };
+
     if (safeUrl) {
         const image = document.createElement('img');
-        image.src = safeUrl;
         image.alt = alt;
         image.decoding = 'async';
         image.referrerPolicy = 'no-referrer';
         if (imageClass) image.className = imageClass;
+        image.addEventListener('error', () => {
+            image.replaceWith(createPlaceholder());
+        }, { once: true });
+        image.src = safeUrl;
         container.appendChild(image);
         return;
     }
 
-    const placeholder = document.createElement('div');
-    placeholder.className = placeholderClass;
-    placeholder.textContent = profile?.username === '小蛇' ? '🐍' : '🐟';
-    placeholder.setAttribute('aria-hidden', 'true');
-    container.appendChild(placeholder);
+    container.appendChild(createPlaceholder());
 }
 
 // ── 个人信息扩展解析与序列化 (兼容纯文本 bio 与 JSON 结构) ──
@@ -1196,11 +1203,19 @@ function renderProfilePhotosGrid(photos, container) {
         if (photo.isVideo) {
             if (photo.poster) {
                 const img = document.createElement('img');
-                img.src = photo.poster;
                 img.alt = photo.textSnippet ? photo.textSnippet.slice(0, 30) : '视频封面';
                 img.className = 'profile-photo-img';
                 img.loading = index < 6 ? 'eager' : 'lazy';
                 img.decoding = 'async';
+                img.addEventListener('error', () => {
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'moment-grid-video-placeholder profile-photo-img';
+                    placeholder.textContent = '🎬';
+                    placeholder.style.background = 'linear-gradient(135deg, #2b1f2e 0%, #17111b 100%)';
+                    placeholder.setAttribute('aria-hidden', 'true');
+                    img.replaceWith(placeholder);
+                }, { once: true });
+                img.src = photo.poster;
                 itemEl.appendChild(img);
             } else {
                 const video = document.createElement('video');
