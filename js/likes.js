@@ -60,11 +60,19 @@ function createLikeActorBadgeElement(actor, options = {}) {
     const variant = options.variant === 'moment' ? 'moment' : 'comment';
     const badge = document.createElement('span');
     badge.className = `like-actor-badge like-actor-badge--${variant}${actor.themeClass ? ` ${actor.themeClass}` : ''}`;
+    if (actor.displayName) {
+        badge.title = actor.displayName;
+    }
 
     const createEmojiNode = () => {
         const emojiEl = document.createElement('span');
         emojiEl.className = 'like-actor-emoji';
-        emojiEl.setAttribute('aria-hidden', 'true');
+        if (variant === 'moment' && actor.displayName) {
+            emojiEl.setAttribute('role', 'img');
+            emojiEl.setAttribute('aria-label', actor.displayName);
+        } else {
+            emojiEl.setAttribute('aria-hidden', 'true');
+        }
         emojiEl.textContent = actor.fallbackEmoji;
         return emojiEl;
     };
@@ -73,7 +81,7 @@ function createLikeActorBadgeElement(actor, options = {}) {
         const avatar = document.createElement('img');
         avatar.className = 'like-actor-avatar';
         avatar.src = actor.avatarUrl;
-        avatar.alt = '';
+        avatar.alt = variant === 'moment' ? (actor.displayName || '') : '';
         avatar.decoding = 'async';
         avatar.referrerPolicy = 'no-referrer';
         avatar.addEventListener('error', () => {
@@ -84,10 +92,6 @@ function createLikeActorBadgeElement(actor, options = {}) {
         badge.appendChild(createEmojiNode());
     }
 
-    const nameEl = document.createElement('span');
-    nameEl.className = 'like-actor-name';
-    nameEl.textContent = actor.displayName;
-    badge.appendChild(nameEl);
     return badge;
 }
 
