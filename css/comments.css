@@ -313,60 +313,56 @@
             font-weight: 700;
         }
 
-        /* 双人点赞专属身份标示 */
+        /* 双人点赞专属圆形头像标示 */
         .like-actor-badge {
             display: inline-flex;
             align-items: center;
-            gap: 4px;
-            padding: 1px 7px 1px 4px;
-            border-radius: var(--radius-pill, 9999px);
-            font-size: 0.92em;
-            font-weight: 600;
-            line-height: 1.35;
-            background: rgba(244, 63, 94, 0.1);
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            border-radius: 50%;
+            overflow: hidden;
+            font-size: 0.85em;
+            line-height: 1;
+            background: rgba(244, 63, 94, 0.12);
             color: #be123c;
-            border: 1px solid rgba(244, 63, 94, 0.24);
+            border: 1.5px solid rgba(244, 63, 94, 0.34);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
             flex-shrink: 0;
         }
         .like-actor-badge.author-snake {
-            background: rgba(255, 105, 140, 0.14);
+            background: rgba(255, 105, 140, 0.16);
             color: #be123c;
-            border-color: rgba(244, 63, 94, 0.28);
+            border-color: rgba(244, 63, 94, 0.42);
         }
         .like-actor-badge.author-xi {
-            background: rgba(59, 130, 246, 0.12);
+            background: rgba(59, 130, 246, 0.14);
             color: #1d4ed8;
-            border-color: rgba(59, 130, 246, 0.26);
+            border-color: rgba(59, 130, 246, 0.42);
         }
         .like-actor-badge--comment {
-            padding: 1px 6px 1px 3px;
-            font-size: 0.92em;
+            width: 19px;
+            height: 19px;
+            font-size: 0.82em;
         }
         .like-actor-badge--moment {
-            padding: 2px 9px 2px 5px;
+            width: 24px;
+            height: 24px;
             font-size: 0.96em;
         }
         .like-actor-avatar {
-            width: 15px;
-            height: 15px;
+            width: 100%;
+            height: 100%;
             border-radius: 50%;
             object-fit: cover;
             flex-shrink: 0;
             display: block;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-        }
-        .like-actor-badge--moment .like-actor-avatar {
-            width: 17px;
-            height: 17px;
         }
         .like-actor-emoji {
             font-size: 0.95em;
             line-height: 1;
             flex-shrink: 0;
-        }
-        .like-actor-name {
-            line-height: 1.25;
-            white-space: nowrap;
         }
 
         /* 评论回复 */
@@ -414,19 +410,19 @@
             background: rgba(255, 143, 171, 0.15);
         }
         [data-theme='dark'] .like-actor-badge {
-            background: rgba(255, 143, 171, 0.2);
+            background: rgba(255, 143, 171, 0.22);
             color: #fda4af;
-            border-color: rgba(255, 143, 171, 0.34);
+            border-color: rgba(255, 143, 171, 0.48);
         }
         [data-theme='dark'] .like-actor-badge.author-snake {
-            background: rgba(255, 105, 140, 0.22);
+            background: rgba(255, 105, 140, 0.24);
             color: #fda4af;
-            border-color: rgba(255, 143, 171, 0.36);
+            border-color: rgba(255, 143, 171, 0.54);
         }
         [data-theme='dark'] .like-actor-badge.author-xi {
-            background: rgba(96, 165, 250, 0.22);
+            background: rgba(96, 165, 250, 0.24);
             color: #93c5fd;
-            border-color: rgba(147, 197, 253, 0.36);
+            border-color: rgba(147, 197, 253, 0.54);
         }
         [data-theme='dark'] .comment-reply-btn:hover {
             color: #ff8fab;

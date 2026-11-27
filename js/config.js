@@ -625,12 +625,13 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v4.5.2';
+const APP_VERSION = 'v4.5.3';
 const CONFIG = {
-    version: 'v4.5.2',
-    date: '2026-11-21',
-    title: 'iOS 原生级丝滑切屏动效与跟手手势升级 ✨📱',
+    version: 'v4.5.3',
+    date: '2026-11-27',
+    title: '点赞标示精简为纯头像展示 ✨💖',
     features: [
+        '精简动态与评论区点赞展示：点赞人标示仅保留专属粉/蓝边框圆形头像（悬停可查看昵称），视觉更清爽简洁 💖',
         '全站切屏动画全面重构为 iOS 原生级物理动效体系：区分 Push/Pop 横向视差钻取（附柔和左缘投影与景深暗幕）、Modal Sheet 底部浮层滑升（底层视口居中微缩零漂移）、同级 Tab 左右轻滑切换与跨层柔和淡入，采用临界阻尼曲线与纯 GPU 合成层驱动，彻底根除卡顿与方向错乱 ✨📱',
         '新增移动端 iOS 左边缘跟手右滑返回手势与相册灯箱单指下拉跟手关闭手势：页面、底层视差与暗幕随手指 1:1 实时联动，支持动量速度判定与弹性回弹 👆💫',
         '根治切屏掉帧、闪白与跳屏顽疾：移除与路由打架的全屏 ViewTransition 冻结闪烁、保留底层首页滚动位与动态滚动条补偿实现 0px 抖动、切屏黄金窗口期自动挂起全站粒子画布并抑制实时毛玻璃重算、延后非关键 Canvas 初始化与移动端键盘自动顶起 ⚡🚀',
