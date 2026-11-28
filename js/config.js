@@ -625,12 +625,13 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v4.6.0';
+const APP_VERSION = 'v4.6.1';
 const CONFIG = {
-    version: 'v4.6.0',
+    version: 'v4.6.1',
     date: '2026-11-28',
-    title: '全站动效与微交互丝滑焕新 ✨🦋',
+    title: '评论区丝滑展开与微交互升级 💬✨',
     features: [
+        '评论区展开/收起升级 iOS 物理曲线丝滑高度动画：支持连点无缝打断折返、首次“加载中 → 评论列表”高度接力舒展与前 6 条微错峰浮现，同步为写评论输入区、展开态按钮旋转箭头及通知/AI 点评入口接入丝滑过渡 💬✨',
         '全站动效与手势交互全面焕新：恢复手机与桌面灯箱双击缩放及视频滑动关闭、升级动态与评论零延迟乐观更新及原位平滑折叠撤回、接入昼夜主题 View Transition 丝绒切换 ✨🦋',
         '细节体验与视觉统一打磨：Toast 与庆典琉璃蝴蝶升级为 Top Layer 置顶展示、全站确认弹窗统一为轻奢毛玻璃卡片、手账与 AI 助手支持多行自适应输入与智能贴底滚动 🌸💖',
         '精简动态与评论区点赞展示：点赞人标示仅保留专属粉/蓝边框圆形头像（悬停可查看昵称），视觉更清爽简洁 💖',

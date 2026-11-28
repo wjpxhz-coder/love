@@ -10,6 +10,35 @@
     }
 }
 
+@keyframes commentItemReveal {
+    from {
+        opacity: 0;
+        transform: translateY(9px) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes commentBtnPop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.22) rotate(-8deg); }
+    72% { transform: scale(0.94) rotate(3deg); }
+    100% { transform: scale(1) rotate(0); }
+}
+
+@keyframes commentWriteReveal {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .comment-toggle-btn {
     font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
     background: var(--primary-subtle);
@@ -28,21 +57,71 @@
     gap: 6px;
     border-radius: var(--radius-pill);
     transition:
-        transform 0.22s var(--ease-spring-snappy),
-        background-color 0.2s ease,
-        border-color 0.2s ease,
-        color 0.2s ease;
+        transform 0.25s var(--ease-spring-snappy),
+        background-color 0.22s ease,
+        border-color 0.22s ease,
+        color 0.22s ease,
+        box-shadow 0.22s ease;
     font-weight: 600;
+}
+.comment-toggle-btn:active {
+    transform: scale(0.95) !important;
+}
+.comment-toggle-btn[aria-expanded='true'] {
+    color: var(--twilight);
+    background: rgba(192, 132, 252, 0.14);
+    border-color: rgba(192, 132, 252, 0.34);
+}
+[data-theme='dark'] .comment-toggle-btn {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+[data-theme='dark'] .comment-toggle-btn[aria-expanded='true'] {
+    color: #e9d5ff;
+    background: rgba(192, 132, 252, 0.22);
+    border-color: rgba(216, 180, 254, 0.42);
 }
 @media (hover: hover) and (pointer: fine) {
     .comment-toggle-btn:hover {
         color: var(--twilight);
         background: rgba(192, 132, 252, 0.12);
-        border-color: rgba(192, 132, 252, 0.25);
+        border-color: rgba(192, 132, 252, 0.28);
         transform: translateY(-1px);
+    }
+    [data-theme='dark'] .comment-toggle-btn:hover {
+        color: #e9d5ff;
+        background: rgba(192, 132, 252, 0.18);
+        border-color: rgba(216, 180, 254, 0.36);
     }
 }
 .comment-toggle-btn::after { display: none !important; }
+.comment-toggle-btn:focus-visible {
+    outline: 2px solid var(--focus-ring, var(--primary));
+    outline-offset: 2px;
+}
+.comment-toggle-btn .comment-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.28s var(--ease-spring-snappy);
+}
+.comment-toggle-btn.is-toggling .comment-btn-icon {
+    animation: commentBtnPop 0.38s var(--ease-spring-snappy) both;
+}
+.comment-toggle-btn .comment-btn-chevron {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    opacity: 0.72;
+    margin-left: -1px;
+    transition:
+        transform 0.34s var(--ios-ease-nav, cubic-bezier(0.32, 0.72, 0, 1)),
+        opacity 0.22s ease;
+    transform-origin: center;
+}
+.comment-toggle-btn[aria-expanded='true'] .comment-btn-chevron {
+    transform: rotate(180deg);
+    opacity: 0.96;
+}
 .comment-toggle-btn .svg-icon,
 .moment-like-btn .svg-icon,
 .moment-star-btn .svg-icon {
@@ -56,7 +135,17 @@
     border-top: 1px solid rgba(220, 180, 190, 0.22);
     margin-top: 12px;
     padding-top: 14px;
-    animation: commentSlideIn 0.24s var(--ios-ease-decel) both;
+    box-sizing: border-box;
+    transform-origin: top center;
+}
+.comment-section.is-animating,
+.comments-section.is-animating {
+    overflow: hidden;
+    contain: layout style;
+}
+.comment-section.is-collapsing,
+.comments-section.is-collapsing {
+    pointer-events: none;
 }
 [data-theme='dark'] .comment-section,
 [data-theme='dark'] .comments-section {
@@ -72,7 +161,51 @@
 }
 
 .comment-item.comment-item--enter {
-    animation: commentSlideIn 0.28s var(--ios-ease-decel) both;
+    animation: commentItemReveal 0.34s var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1)) both;
+    animation-delay: var(--comment-enter-delay, 0ms);
+}
+
+.comment-loading-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0.8em;
+    color: var(--text-muted);
+    padding: 10px 0 6px;
+    letter-spacing: 0.4px;
+    animation: commentSlideIn 0.22s var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+.comment-loading-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.comment-loading-dots span {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--primary-light, #fda4af);
+    animation: thinkingDot 1.25s infinite ease-in-out both;
+}
+.comment-loading-dots span:nth-child(1) { animation-delay: -0.28s; }
+.comment-loading-dots span:nth-child(2) { animation-delay: -0.14s; }
+[data-theme='dark'] .comment-loading-dots span {
+    background: #f9a8d4;
+}
+
+.comment-input-area {
+    box-sizing: border-box;
+    transform-origin: top center;
+}
+.comment-input-area.is-animating {
+    overflow: hidden;
+}
+.comment-input-area.is-collapsing {
+    pointer-events: none;
+}
+.comment-write-btn.is-revealing {
+    animation: commentWriteReveal 0.24s var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1)) both;
 }
 
 .comment-header {
@@ -979,6 +1112,10 @@
             .comment-section,
             .comments-section,
             .comment-item.comment-item--enter,
+            .comment-loading-state,
+            .comment-loading-dots span,
+            .comment-write-btn.is-revealing,
+            .comment-toggle-btn.is-toggling .comment-btn-icon,
             .moment-likers-row,
             .comment-reply-banner,
             .comment-ai-thinking,
@@ -995,7 +1132,11 @@
             .moment-star-btn.is-just-starred .star-btn-text {
                 animation: none !important;
             }
-            .comment-ai-thinking-dots span {
+            .comment-toggle-btn .comment-btn-chevron {
+                transition: none !important;
+            }
+            .comment-ai-thinking-dots span,
+            .comment-loading-dots span {
                 transform: none !important;
                 opacity: 0.75 !important;
             }
