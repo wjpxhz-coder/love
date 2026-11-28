@@ -625,12 +625,14 @@ window.getSafeFileExtension = getSafeFileExtension;
 window.removeStorageObjects = removeStorageObjects;
 
 // ── 版本与更新日志 ──
-const APP_VERSION = 'v4.5.3';
+const APP_VERSION = 'v4.6.0';
 const CONFIG = {
-    version: 'v4.5.3',
-    date: '2026-11-27',
-    title: '点赞标示精简为纯头像展示 ✨💖',
+    version: 'v4.6.0',
+    date: '2026-11-28',
+    title: '全站动效与微交互丝滑焕新 ✨🦋',
     features: [
+        '全站动效与手势交互全面焕新：恢复手机与桌面灯箱双击缩放及视频滑动关闭、升级动态与评论零延迟乐观更新及原位平滑折叠撤回、接入昼夜主题 View Transition 丝绒切换 ✨🦋',
+        '细节体验与视觉统一打磨：Toast 与庆典琉璃蝴蝶升级为 Top Layer 置顶展示、全站确认弹窗统一为轻奢毛玻璃卡片、手账与 AI 助手支持多行自适应输入与智能贴底滚动 🌸💖',
         '精简动态与评论区点赞展示：点赞人标示仅保留专属粉/蓝边框圆形头像（悬停可查看昵称），视觉更清爽简洁 💖',
         '全站切屏动画全面重构为 iOS 原生级物理动效体系：区分 Push/Pop 横向视差钻取（附柔和左缘投影与景深暗幕）、Modal Sheet 底部浮层滑升（底层视口居中微缩零漂移）、同级 Tab 左右轻滑切换与跨层柔和淡入，采用临界阻尼曲线与纯 GPU 合成层驱动，彻底根除卡顿与方向错乱 ✨📱',
         '新增移动端 iOS 左边缘跟手右滑返回手势与相册灯箱单指下拉跟手关闭手势：页面、底层视差与暗幕随手指 1:1 实时联动，支持动量速度判定与弹性回弹 👆💫',

@@ -132,6 +132,30 @@
             overlayEl.classList.remove('is-active');
         };
 
+        const resetDragState = () => {
+            if (
+                dragCounter === 0
+                && !overlayEl.classList.contains('is-active')
+                && !targetEl.classList.contains('is-drag-over')
+            ) {
+                return;
+            }
+            dragCounter = 0;
+            hideOverlay();
+        };
+
+        const handleWindowKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                resetDragState();
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                resetDragState();
+            }
+        };
+
         // 拖拽事件监听
         const handleDragEnter = (e) => {
             if (!isEnabled()) return;
@@ -155,10 +179,18 @@
         };
 
         const handleDragLeave = (e) => {
-            if (!isEnabled()) return;
+            if (!isEnabled()) {
+                resetDragState();
+                return;
+            }
             if (!hasDragFiles(e)) return;
 
             e.preventDefault();
+            // 鼠标直接拖出浏览器窗口边界时立即清零，防止子元素嵌套计数失衡
+            if (!e.relatedTarget) {
+                resetDragState();
+                return;
+            }
             dragCounter--;
             if (dragCounter <= 0) {
                 dragCounter = 0;
@@ -224,6 +256,13 @@
             targetEl.addEventListener('paste', handlePaste, false);
         }
 
+        // 异常中断拖拽全局自愈监听（取消拖拽、切窗口、按 Esc、页面切后台、窗口外部松手）
+        window.addEventListener('dragend', resetDragState, false);
+        window.addEventListener('drop', resetDragState, false);
+        window.addEventListener('blur', resetDragState, false);
+        window.addEventListener('keydown', handleWindowKeyDown, false);
+        document.addEventListener('visibilitychange', handleVisibilityChange, false);
+
         const unbind = () => {
             targetEl.removeEventListener('dragenter', handleDragEnter, false);
             targetEl.removeEventListener('dragover', handleDragOver, false);
@@ -232,6 +271,11 @@
             if (enablePaste) {
                 targetEl.removeEventListener('paste', handlePaste, false);
             }
+            window.removeEventListener('dragend', resetDragState, false);
+            window.removeEventListener('drop', resetDragState, false);
+            window.removeEventListener('blur', resetDragState, false);
+            window.removeEventListener('keydown', handleWindowKeyDown, false);
+            document.removeEventListener('visibilitychange', handleVisibilityChange, false);
             hideOverlay();
             if (overlayEl && overlayEl.parentNode === targetEl) {
                 targetEl.removeChild(overlayEl);

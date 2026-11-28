@@ -28,10 +28,45 @@ function getMilestoneTrustedMediaUrl(value) {
     return typeof sanitizeMediaUrl === 'function' ? sanitizeMediaUrl(value) : '';
 }
 
-function setMilestoneStatus(container, text, color = 'var(--text-muted)', padding = '30px') {
+const milestoneStarPopTimers = new WeakMap();
+
+function triggerMilestoneStarPop(button, duration = 520) {
+    if (!button) return;
+    if (typeof window.triggerTransientPopClass === 'function') {
+        window.triggerTransientPopClass(button, 'is-just-starred', duration);
+        return;
+    }
+    const prev = milestoneStarPopTimers.get(button);
+    if (prev) clearTimeout(prev);
+    button.classList.remove('is-just-starred');
+    void button.offsetWidth;
+    button.classList.add('is-just-starred');
+    const timer = setTimeout(() => {
+        button.classList.remove('is-just-starred');
+        milestoneStarPopTimers.delete(button);
+    }, duration);
+    milestoneStarPopTimers.set(button, timer);
+}
+
+function clearMilestoneStarPop(button) {
+    if (!button) return;
+    if (typeof window.clearTransientPopClass === 'function') {
+        window.clearTransientPopClass(button, 'is-just-starred');
+        return;
+    }
+    const prev = milestoneStarPopTimers.get(button);
+    if (prev) {
+        clearTimeout(prev);
+        milestoneStarPopTimers.delete(button);
+    }
+    button.classList.remove('is-just-starred');
+}
+
+function setMilestoneStatus(container, text, options = {}) {
+    if (!container) return;
     const status = document.createElement('div');
+    status.className = options?.isError ? 'empty-state is-error' : 'empty-state';
     status.textContent = text;
-    Object.assign(status.style, { textAlign: 'center', padding, color });
     container.replaceChildren(status);
 }
 
@@ -102,10 +137,18 @@ async function loadMomentStars(options = {}) {
     }
 }
 
+const EMPTY_MILESTONES_TEXT = '🌱 还没有大事记或收藏哦~\n快去发布时勾选“重大事件”，\n或在时间轴里点亮 ⭐ 收藏一些美好回忆吧！';
+
 function setMomentStarButtonState(button, isStarred) {
-    if (button) {
-        button.classList.toggle('starred', isStarred);
-        button.setAttribute('aria-label', isStarred ? '取消收藏' : '收藏此动态');
+    if (!button) return;
+    button.classList.toggle('starred', isStarred);
+    button.setAttribute('aria-pressed', String(isStarred));
+    button.setAttribute('aria-label', isStarred ? '取消收藏' : '收藏此动态');
+    let iconSpan = button.querySelector('.star-btn-icon');
+    let textSpan = button.querySelector('.star-btn-text');
+    if (iconSpan && textSpan) {
+        textSpan.textContent = isStarred ? '已收藏' : '收藏';
+    } else {
         const icon = '<span class="star-btn-icon"><svg class="svg-icon" aria-hidden="true"><use href="#icon-star"/></svg></span>';
         button.innerHTML = `${icon}<span class="star-btn-text">${isStarred ? '已收藏' : '收藏'}</span>`;
     }
@@ -113,7 +156,6 @@ function setMomentStarButtonState(button, isStarred) {
 
 function setMomentStarButtonPending(button, isPending) {
     if (!button) return;
-    button.disabled = isPending;
     if (isPending) {
         button.setAttribute('aria-busy', 'true');
     } else {
@@ -122,11 +164,58 @@ function setMomentStarButtonPending(button, isPending) {
 }
 
 function showMomentStarError() {
-    if (typeof showToast === 'function') {
-        showToast('收藏操作失败，请稍后重试');
-    } else {
-        alert('收藏操作失败，请稍后重试。');
+    if (typeof window.showToast === 'function') {
+        window.showToast('收藏操作失败，请稍后重试 🌸');
     }
+}
+
+function smoothRemoveMilestoneCard(card, container) {
+    if (!card) return;
+    if (typeof releaseMomentVideosWithin === 'function') {
+        releaseMomentVideosWithin(card, true);
+    }
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+    const finalize = () => {
+        card.remove();
+        if (container && !container.querySelector('.moment-card')) {
+            setMilestoneStatus(container, EMPTY_MILESTONES_TEXT);
+        }
+    };
+    if (reduceMotion || card.offsetHeight === 0) {
+        finalize();
+        return;
+    }
+    const startHeight = card.getBoundingClientRect().height;
+    const computed = window.getComputedStyle(card);
+    card.style.contentVisibility = 'visible';
+    card.style.contain = 'none';
+    card.style.overflow = 'hidden';
+    card.style.pointerEvents = 'none';
+    card.style.maxHeight = `${startHeight}px`;
+    card.style.paddingTop = computed.paddingTop;
+    card.style.paddingBottom = computed.paddingBottom;
+    card.style.marginBottom = computed.marginBottom;
+    void card.offsetHeight;
+    card.style.transition = [
+        'opacity 220ms ease',
+        'transform 280ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+        'max-height 280ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+        'margin-bottom 280ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+        'padding-top 280ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+        'padding-bottom 280ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+        'border-width 280ms ease'
+    ].join(', ');
+    requestAnimationFrame(() => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateX(-16px) scale(0.98)';
+        card.style.maxHeight = '0px';
+        card.style.marginBottom = '0px';
+        card.style.paddingTop = '0px';
+        card.style.paddingBottom = '0px';
+        card.style.borderTopWidth = '0px';
+        card.style.borderBottomWidth = '0px';
+    });
+    setTimeout(finalize, 285);
 }
 
 async function toggleMomentStar(momentId, triggerElement = null) {
@@ -143,13 +232,27 @@ async function toggleMomentStar(momentId, triggerElement = null) {
     const pendingOperation = Symbol(`moment-star-${momentId}`);
     pendingMomentStarIds.set(momentId, pendingOperation);
     const hasStarred = starredMomentIds.has(momentId);
-    const allBtns = document.querySelectorAll(`[id="card-${momentId}"] .moment-star-btn, [id="moment-star-btn-${momentId}"]`);
+    const nextStarred = !hasStarred;
+    const allBtns = Array.from(document.querySelectorAll(`[id="card-${momentId}"] .moment-star-btn, [id="moment-star-btn-${momentId}"]`));
     if (hasStarred) starredMomentIds.delete(momentId);
     else starredMomentIds.add(momentId);
     allBtns.forEach(btn => {
-        setMomentStarButtonState(btn, !hasStarred);
+        setMomentStarButtonState(btn, nextStarred);
         setMomentStarButtonPending(btn, true);
+        if (nextStarred) {
+            triggerMilestoneStarPop(btn, 520);
+        } else {
+            clearMilestoneStarPop(btn);
+        }
     });
+
+    // 点击收藏瞬间零延迟绽放粒子
+    const targetBtn = triggerElement?.closest?.('.moment-star-btn') || triggerElement || allBtns[0];
+    if (nextStarred && targetBtn && typeof spawnHearts === 'function') {
+        const rect = targetBtn.getBoundingClientRect();
+        spawnHearts(rect.left + rect.width / 2, rect.top);
+    }
+
     let didChange = false;
 
     try {
@@ -179,18 +282,15 @@ async function toggleMomentStar(momentId, triggerElement = null) {
         if (error) throw error;
 
         didChange = true;
-
-        const targetBtn = triggerElement || allBtns[0];
-        if (!hasStarred && targetBtn && typeof spawnHearts === 'function') {
-            const rect = targetBtn.getBoundingClientRect();
-            spawnHearts(rect.left + rect.width / 2, rect.top);
-        }
     } catch (error) {
         if (!isMilestoneAuthEpochCurrent(requestAuthEpoch)
             || String(currentAuthUser.id || '') !== requestUserId) return;
         if (hasStarred) starredMomentIds.add(momentId);
         else starredMomentIds.delete(momentId);
-        allBtns.forEach(btn => setMomentStarButtonState(btn, hasStarred));
+        allBtns.forEach(btn => {
+            clearMilestoneStarPop(btn);
+            setMomentStarButtonState(btn, hasStarred);
+        });
         console.error('收藏操作失败:', error);
         showMomentStarError();
     } finally {
@@ -199,13 +299,19 @@ async function toggleMomentStar(momentId, triggerElement = null) {
             allBtns.forEach(btn => setMomentStarButtonPending(btn, false));
         }
     }
-    
-    // 如果大事记页面当前打开，刷新大事记展示
+
+    // 如果大事记页面当前打开，原位平滑移除或刷新展示
     const milestonesActive = typeof isAppRouteActive === 'function'
         ? isAppRouteActive('milestones')
         : document.getElementById('milestonesModal')?.classList.contains('is-active');
     if (didChange && milestonesActive) {
-        renderMilestonesContent();
+        const milestonesContainer = document.getElementById('milestonesContent');
+        const milestoneCard = milestonesContainer?.querySelector(`[id="card-${momentId}"]`);
+        if (!nextStarred && milestoneCard && !milestoneCard.classList.contains('milestone')) {
+            smoothRemoveMilestoneCard(milestoneCard, milestonesContainer);
+        } else if (nextStarred && !milestoneCard) {
+            renderMilestonesContent();
+        }
     }
 }
 
@@ -277,14 +383,7 @@ async function renderMilestonesContent() {
         if (requestId !== milestoneRenderRequestId || !isMilestoneAuthEpochCurrent(requestAuthEpoch)) return;
 
         if (items.length === 0) {
-            setMilestoneStatus(
-                contentContainer,
-                '🌱 还没有大事记或收藏哦~\n快去发布时勾选“重大事件”，\n或在时间轴里点亮 ⭐ 收藏一些美好回忆吧！',
-                'var(--text-muted)',
-                '50px 20px'
-            );
-            const empty = contentContainer.firstElementChild;
-            if (empty) Object.assign(empty.style, { fontSize: '0.92em', lineHeight: '1.6', whiteSpace: 'pre-line' });
+            setMilestoneStatus(contentContainer, EMPTY_MILESTONES_TEXT);
             return;
         }
 
@@ -292,10 +391,13 @@ async function renderMilestonesContent() {
     } catch (e) {
         console.error('加载大事记失败:', e);
         if (requestId === milestoneRenderRequestId && isMilestoneAuthEpochCurrent(requestAuthEpoch)) {
-            setMilestoneStatus(contentContainer, '加载大事记失败，请重试 😢', 'var(--primary)');
+            setMilestoneStatus(contentContainer, '加载大事记失败，请重试 😢', { isError: true });
         }
     }
 }
+
+window.EMPTY_MILESTONES_TEXT = EMPTY_MILESTONES_TEXT;
+window.setMilestoneStatus = setMilestoneStatus;
 
 function renderMilestonesTimelineList(items, container) {
     if (typeof releaseMomentVideosWithin === 'function') {

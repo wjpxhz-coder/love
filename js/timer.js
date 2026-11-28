@@ -1,15 +1,22 @@
 // ==========================================
 // 3. 计时器
 // ==========================================
+const timerReducedMotionQuery = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)')
+    : null;
+
 function flipUpdate(id, newVal) {
     const el = document.getElementById(id);
     if (!el) return;
     if (el.textContent !== newVal) {
         el.textContent = newVal;
+        if (timerReducedMotionQuery?.matches) {
+            el.classList.remove('flip');
+            return;
+        }
         el.classList.remove('flip');
-        requestAnimationFrame(() => {
-            el.classList.add('flip');
-        });
+        void el.offsetWidth;
+        el.classList.add('flip');
     }
 }
 

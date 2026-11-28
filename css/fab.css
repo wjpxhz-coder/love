@@ -73,7 +73,7 @@
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
-    transition: opacity 0.35s ease;
+    transition: opacity 0.2s ease;
     border: 1.5px solid var(--border);
 }
 
@@ -107,9 +107,11 @@
     animation: pulseHW 2.2s ease-out infinite;
     pointer-events: none;
 }
-.fab-main:hover {
-    transform: translateY(-3px) scale(1.08);
-    box-shadow: 0 12px 34px var(--primary-glow);
+@media (hover: hover) and (pointer: fine) {
+    .fab-main:hover {
+        transform: translateY(-3px) scale(1.08);
+        box-shadow: 0 12px 34px var(--primary-glow);
+    }
 }
 
 .fab-container:has(.fab-menu.show) .fab-main,
@@ -141,9 +143,11 @@
     padding: 0;
     color: #fff;
 }
-.fab-item:hover {
-    transform: scale(1.15) rotate(6deg);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+@media (hover: hover) and (pointer: fine) {
+    .fab-item:hover {
+        transform: scale(1.15) rotate(6deg);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+    }
 }
 
 .fab-item:active {
@@ -179,9 +183,18 @@
 }
 @media (prefers-reduced-motion: reduce) {
     .fab-menu,
-    .fab-item-wrapper {
+    .fab-item-wrapper,
+    .fab-main {
         transition: none !important;
         transform: none !important;
+    }
+    .fab-container:has(.fab-menu.show) .fab-main,
+    .fab-main[aria-expanded='true'] {
+        transform: rotate(135deg) !important;
+    }
+    .fab-main::after {
+        animation: none !important;
+        opacity: 0 !important;
     }
 }
 

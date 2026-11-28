@@ -117,7 +117,15 @@ async function updatePhotoCacheSizeDisplay() {
 }
 
 async function clearWebCache() {
-    const confirmed = window.confirm('确定要清除网页缓存并重新加载吗？\n将刷新网站获取最新功能与页面更新，不会删除已缓存的照片，登录状态也会保留。');
+    const confirmed = await window.showConfirmDialog(
+        '将刷新网站获取最新功能与页面更新，不会删除已缓存的照片，登录状态也会保留。',
+        {
+            title: '清除网页缓存 🧹',
+            confirmText: '清除并重载',
+            cancelText: '取消',
+            danger: false
+        }
+    );
     if (!confirmed) return;
 
     if (typeof showToast === 'function') showToast('正在清除网页缓存并重新加载... 🧹');
@@ -151,7 +159,15 @@ async function clearWebCache() {
 }
 
 async function clearPhotoCache() {
-    const confirmed = window.confirm('确定要清理本地照片缓存吗？\n清理后再次查看照片将重新从云端下载。');
+    const confirmed = await window.showConfirmDialog(
+        '清理后再次查看照片将重新从云端下载，云端原图不会丢失。',
+        {
+            title: '清理本地照片缓存 🖼️',
+            confirmText: '确认清理',
+            cancelText: '取消',
+            danger: true
+        }
+    );
     if (!confirmed) return;
 
     if (typeof showToast === 'function') showToast('正在清理本地照片缓存... 🖼️');

@@ -595,7 +595,7 @@
                 && reducedMotionQuery?.matches !== true;
         }
 
-        function stop() {
+        function stop(keepLastFrame = false) {
             if (rafId !== null) {
                 cancelAnimationFrame(rafId);
                 rafId = null;
@@ -606,7 +606,9 @@
                 scrollDebounceTimer = null;
             }
             isUserScrolling = false;
-            clearCanvas();
+            if (!keepLastFrame) {
+                clearCanvas();
+            }
         }
 
         function start() {
@@ -618,8 +620,16 @@
         }
 
         function reconcile() {
-            if (shouldRun()) start();
-            else stop();
+            if (shouldRun()) {
+                start();
+            } else {
+                // 切屏过渡挂起时保留最后一帧画面，由 CSS opacity 柔和淡出，消除第 0ms 花瓣全屏瞬灭闪烁
+                const onlySuspendedWhileActive = routeActive
+                    && ambientMode !== 'calm'
+                    && reducedMotionQuery?.matches !== true
+                    && suspendReasons.size > 0;
+                stop(onlySuspendedWhileActive);
+            }
         }
 
         // 点击空白处：光学微涟漪 + 8~12 片轻盈散开的水彩桃花瓣与微光星屑

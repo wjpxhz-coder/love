@@ -8,14 +8,25 @@ let lastY = 0;
 let lastZ = 0;
 let deviceMotionRegistered = false;
 let blindBoxGeneration = 0;
+let blindBoxDevelopTimer = null;
+
+function clearBlindBoxDevelopTimer() {
+    if (blindBoxDevelopTimer !== null) {
+        clearTimeout(blindBoxDevelopTimer);
+        blindBoxDevelopTimer = null;
+    }
+}
 
 function isBlindBoxSnapshotCurrent(epoch, userId, generation) {
     return generation === blindBoxGeneration && isCurrentAuthSnapshot(epoch, userId);
 }
 
 function setBlindBoxMessage(message) {
+    clearBlindBoxDevelopTimer();
     const content = document.getElementById('blindBoxContent');
     if (!content) return;
+    content.classList.remove('blind-box-card-develop');
+    content.style.opacity = '';
     content.replaceChildren();
     const messageElement = document.createElement('div');
     messageElement.className = 'blind-box-status';
@@ -95,6 +106,12 @@ function closeBlindBox() {
 
 function cleanupBlindBox() {
     blindBoxGeneration += 1;
+    clearBlindBoxDevelopTimer();
+    const content = document.getElementById('blindBoxContent');
+    if (content) {
+        content.classList.remove('blind-box-card-develop');
+        content.style.opacity = '';
+    }
     if (deviceMotionRegistered) {
         window.removeEventListener('devicemotion', handleShake);
         deviceMotionRegistered = false;
@@ -180,9 +197,14 @@ function renderBlindBoxMoment(moment) {
             }
         });
     }
+
+    clearBlindBoxDevelopTimer();
+    const renderGeneration = blindBoxGeneration;
+    const epoch = authEpoch;
+    const userId = currentAuthUser?.id;
+
     content.classList.remove('blind-box-card-develop');
-    void content.offsetWidth;
-    content.classList.add('blind-box-card-develop');
+    content.style.opacity = '';
     content.replaceChildren();
 
     if (moment.type === 'photo') {
@@ -280,6 +302,50 @@ function renderBlindBoxMoment(moment) {
     locateButton.textContent = '📍 定位到原文';
     locateButton.addEventListener('click', locateToMoment);
     content.append(meta, prompt, locateButton);
+
+    const reducedMotion = typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const firstImg = content.querySelector('img');
+    if (firstImg) {
+        firstImg.loading = 'eager';
+    }
+
+    let developed = false;
+    const startPolaroidDevelop = () => {
+        if (developed) return;
+        developed = true;
+        clearBlindBoxDevelopTimer();
+        if (!isBlindBoxSnapshotCurrent(epoch, userId, renderGeneration)) return;
+        content.style.opacity = '';
+        if (!reducedMotion) {
+            content.classList.remove('blind-box-card-develop');
+            void content.offsetWidth;
+            content.classList.add('blind-box-card-develop');
+            if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+                try { navigator.vibrate(18); } catch (_e) {}
+            }
+        }
+    };
+
+    if (firstImg && !reducedMotion) {
+        content.style.opacity = '0';
+        blindBoxDevelopTimer = setTimeout(startPolaroidDevelop, 450);
+        const onReadyToDecode = () => {
+            if (typeof firstImg.decode === 'function') {
+                firstImg.decode().then(startPolaroidDevelop, startPolaroidDevelop);
+            } else {
+                startPolaroidDevelop();
+            }
+        };
+        if (firstImg.complete && firstImg.naturalWidth > 0) {
+            onReadyToDecode();
+        } else {
+            firstImg.addEventListener('load', onReadyToDecode, { once: true });
+            firstImg.addEventListener('error', startPolaroidDevelop, { once: true });
+        }
+    } else {
+        startPolaroidDevelop();
+    }
 }
 
 async function fetchRandomMoment() {

@@ -28,7 +28,7 @@
     padding: 7px 16px;
     border-radius: 20px;
     white-space: nowrap;
-    font-weight: 500;
+    font-weight: 600;
     transition: transform 0.22s var(--ios-ease-nav), background-color 0.22s ease, color 0.22s ease;
 }
 .ai-tab:active {
@@ -36,7 +36,8 @@
 }
 .ai-tab.active {
     color: var(--primary);
-    font-weight: 700;
+    font-weight: 600;
+    text-shadow: 0 0 0.35px currentColor;
     background: rgba(255, 101, 132, 0.12);
     border-bottom: none;
 }
@@ -128,14 +129,23 @@
             align-items: center;
             justify-content: center;
             padding: 0;
-            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+            transition:
+                transform 0.22s var(--ease-spring-snappy),
+                color 0.2s ease,
+                border-color 0.2s ease,
+                background-color 0.2s ease;
         }
-        .ai-refresh-btn:hover {
-            color: var(--primary);
-            border-color: var(--primary-light);
-            background: rgba(212, 160, 168, 0.1);
-            transform: none;
-            box-shadow: none;
+        .ai-refresh-btn:active:not(:disabled) {
+            transform: scale(0.92);
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .ai-refresh-btn:hover:not(:disabled) {
+                color: var(--primary);
+                border-color: var(--primary-light);
+                background: rgba(212, 160, 168, 0.1);
+                transform: none;
+                box-shadow: none;
+            }
         }
         .ai-refresh-btn.spinning {
             animation: spin 0.8s linear infinite;
@@ -176,7 +186,11 @@
             box-shadow: 0 20px 50px rgba(181, 115, 122, 0.22);
             border: 1px solid var(--border);
             transform: translateY(16px) scale(0.97);
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            transition:
+                transform 0.28s var(--ios-ease-nav),
+                opacity 0.22s ease,
+                background-color 0.25s ease,
+                border-color 0.25s ease;
             overflow: hidden;
             position: relative;
         }
@@ -211,13 +225,22 @@
             align-items: center;
             justify-content: center;
             padding: 0;
-            transition: all 0.2s;
+            transition:
+                transform 0.2s var(--ease-spring-snappy),
+                color 0.2s ease,
+                border-color 0.2s ease,
+                background-color 0.2s ease;
         }
-        .ai-chat-close-btn:hover {
-            color: var(--primary);
-            border-color: var(--primary-light);
-            transform: none;
-            box-shadow: none;
+        .ai-chat-close-btn:active {
+            transform: scale(0.92);
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .ai-chat-close-btn:hover {
+                color: var(--primary);
+                border-color: var(--primary-light);
+                transform: none;
+                box-shadow: none;
+            }
         }
         .ai-chat-messages {
             flex: 1;
@@ -236,12 +259,32 @@
             line-height: 1.65;
             word-wrap: break-word;
             white-space: pre-wrap;
-            animation: chatMsgIn 0.3s ease;
+            animation: chatMsgIn 0.26s var(--ios-ease-decel);
             cursor: var(--cursor-text);
         }
         @keyframes chatMsgIn {
-            0% { opacity: 0; transform: translateY(8px); }
-            100% { opacity: 1; transform: translateY(0); }
+            0% { opacity: 0; transform: translate3d(0, 8px, 0); }
+            100% { opacity: 1; transform: translate3d(0, 0, 0); }
+        }
+        @keyframes aiTypingBreath {
+            0%, 100% {
+                opacity: 0.94;
+                transform: translate3d(0, 0, 0);
+            }
+            50% {
+                opacity: 0.52;
+                transform: translate3d(0, -1px, 0);
+            }
+        }
+        @keyframes aiReplyReveal {
+            from {
+                opacity: 0.35;
+                transform: translate3d(0, 4px, 0);
+            }
+            to {
+                opacity: 1;
+                transform: translate3d(0, 0, 0);
+            }
         }
         .chat-msg.user {
             align-self: flex-end;
@@ -264,8 +307,16 @@
         }
         
         .chat-msg.ai.typing {
-            color: var(--text-muted);
-            font-style: italic;
+            color: var(--primary);
+            font-style: normal;
+            font-weight: 500;
+            border-color: rgba(244, 63, 94, 0.28);
+            background: linear-gradient(135deg, var(--surface-subtle), rgba(244, 63, 94, 0.07));
+            animation: aiTypingBreath 1.6s ease-in-out infinite;
+            will-change: opacity, transform;
+        }
+        .chat-msg.ai.is-reply-ready {
+            animation: aiReplyReveal 0.26s var(--ios-ease-decel) both;
         }
         .ai-chat-composer {
             flex: 0 0 auto;
@@ -286,14 +337,16 @@
             border: 1px solid var(--border);
             border-radius: 20px;
             font-size: 0.92em;
+            line-height: 1.45;
             font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
             outline: none;
             color: var(--text);
             background: var(--field-bg);
-            transition: border-color 0.3s, box-shadow 0.3s;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
             resize: none;
-            max-height: 80px;
+            max-height: 136px;
             min-height: 40px;
+            overflow-y: hidden;
         }
         
         .ai-chat-input:focus {
@@ -309,6 +362,18 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            transition:
+                transform 0.2s var(--ease-spring-snappy),
+                opacity 0.2s ease,
+                box-shadow 0.2s ease;
+        }
+        .ai-chat-send-btn:active:not(:disabled) {
+            transform: scale(0.93);
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .ai-chat-send-btn:hover:not(:disabled) {
+                transform: scale(1.05);
+            }
         }
         .ai-chat-send-btn:disabled {
             opacity: 0.5;
@@ -335,14 +400,26 @@
             letter-spacing: 0;
             padding: 5px 12px;
             cursor: var(--cursor-pointer);
+            transition:
+                transform 0.2s var(--ease-spring-snappy),
+                border-color 0.2s ease,
+                color 0.2s ease,
+                background-color 0.2s ease,
+                opacity 0.2s ease;
         }
-        .ai-attachment-btn:hover,
-        .ai-diary-load-more:hover {
-            border-color: var(--primary-light);
-            color: var(--primary);
-            background: rgba(212, 160, 168, 0.1);
-            transform: none;
-            box-shadow: none;
+        .ai-attachment-btn:active:not(:disabled),
+        .ai-diary-load-more:active:not(:disabled) {
+            transform: scale(0.96);
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .ai-attachment-btn:hover:not(:disabled),
+            .ai-diary-load-more:hover:not(:disabled) {
+                border-color: var(--primary-light);
+                color: var(--primary);
+                background: rgba(212, 160, 168, 0.1);
+                transform: none;
+                box-shadow: none;
+            }
         }
         .ai-attachment-btn:disabled,
         .ai-diary-load-more:disabled {
@@ -354,6 +431,13 @@
             color: var(--text-muted);
             font-size: 0.78em;
             white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+            transition: color 0.2s ease;
+        }
+        .ai-attachment-count.is-preparing {
+            color: var(--primary);
+            font-weight: 600;
+            animation: pulse 1.4s ease-in-out infinite;
         }
         .ai-attachment-tip {
             color: var(--text-muted);
@@ -419,11 +503,17 @@
             font: 700 13px/1 system-ui, sans-serif;
             letter-spacing: 0;
             cursor: var(--cursor-pointer);
+            transition: transform 0.18s var(--ease-spring-snappy), background-color 0.18s ease;
         }
-        .ai-attachment-remove:hover {
-            background: rgba(181, 89, 103, 0.92);
-            transform: none;
-            box-shadow: none;
+        .ai-attachment-remove:active:not(:disabled) {
+            transform: scale(0.9);
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .ai-attachment-remove:hover:not(:disabled) {
+                background: rgba(181, 89, 103, 0.92);
+                transform: none;
+                box-shadow: none;
+            }
         }
         .ai-diary-picker {
             position: absolute;
@@ -451,13 +541,30 @@
             display: none;
         }
         @media (prefers-reduced-motion: reduce) {
-            .ai-diary-picker,
+            .ai-diary-picker {
+                transition: none !important;
+            }
+            .ai-diary-picker:not([hidden]):not(.is-closing) {
+                transform: none !important;
+                opacity: 1 !important;
+            }
+            .ai-diary-picker.is-closing {
+                opacity: 0 !important;
+            }
             .ai-panel-slide-left,
             .ai-panel-slide-right {
                 animation: none !important;
                 transition: none !important;
                 transform: none !important;
                 opacity: 1 !important;
+            }
+            .ai-loading,
+            .ai-refresh-btn.spinning,
+            .chat-msg,
+            .chat-msg.ai.typing,
+            .chat-msg.ai.is-reply-ready,
+            .ai-attachment-count.is-preparing {
+                animation: none !important;
             }
         }
         .ai-diary-picker-header {
@@ -502,12 +609,19 @@
             background: var(--surface-subtle);
             box-shadow: none;
             cursor: var(--cursor-pointer);
+            transition: border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
         }
-        .ai-diary-image-option:hover,
         .ai-diary-image-option.selected {
             border-color: var(--primary);
             transform: none;
             box-shadow: 0 0 0 2px rgba(212, 160, 168, 0.16);
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .ai-diary-image-option:hover:not(:disabled) {
+                border-color: var(--primary);
+                transform: none;
+                box-shadow: 0 0 0 2px rgba(212, 160, 168, 0.16);
+            }
         }
         .ai-diary-image-option:disabled {
             cursor: var(--cursor-not-allowed);
@@ -621,19 +735,29 @@
     padding: 6px 14px;
     border-radius: 20px;
     white-space: nowrap;
-    font-weight: 500;
+    font-weight: 600;
     cursor: var(--cursor-pointer);
-    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition:
+        transform 0.2s var(--ios-ease-nav),
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease;
 }
-.ai-tabs-bar .ai-tab:hover {
-    color: var(--primary);
-    background: rgba(255, 101, 132, 0.08);
-    transform: none;
-    box-shadow: none;
+.ai-tabs-bar .ai-tab:active {
+    transform: scale(0.95);
+}
+@media (hover: hover) and (pointer: fine) {
+    .ai-tabs-bar .ai-tab:hover {
+        color: var(--primary);
+        background: rgba(255, 101, 132, 0.08);
+        transform: none;
+        box-shadow: none;
+    }
 }
 .ai-tabs-bar .ai-tab.active {
     color: var(--primary);
-    font-weight: 700;
+    font-weight: 600;
+    text-shadow: 0 0 0.35px currentColor;
     background: rgba(255, 101, 132, 0.14);
     border-color: rgba(255, 101, 132, 0.22);
 }
@@ -683,11 +807,16 @@
     font-weight: 600;
     cursor: var(--cursor-pointer);
     box-shadow: 0 4px 14px rgba(219, 39, 119, 0.25);
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition:
+        transform 0.25s var(--ease-spring-snappy),
+        box-shadow 0.25s ease,
+        opacity 0.2s ease;
 }
-.ai-discuss-btn:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 6px 18px rgba(219, 39, 119, 0.35);
+@media (hover: hover) and (pointer: fine) {
+    .ai-discuss-btn:hover {
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 0 6px 18px rgba(219, 39, 119, 0.35);
+    }
 }
 .ai-discuss-btn:active {
     transform: translateY(1px) scale(0.98);

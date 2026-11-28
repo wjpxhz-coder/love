@@ -1,9 +1,18 @@
-/* ── 全局 Toast 提示容器与弹窗 ── */
+/* ── 全局 Toast 提示容器与弹窗（支持 Top Layer popover="manual"，浮于所有模态弹窗之上） ── */
 #toast-container {
     position: fixed;
+    inset: auto;
     top: calc(max(20px, env(safe-area-inset-top, 0px)) + 16px);
+    right: auto;
+    bottom: auto;
     left: 50%;
     transform: translateX(-50%);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    overflow: visible;
     z-index: 99999;
     display: flex;
     flex-direction: column;
@@ -11,9 +20,9 @@
     gap: 10px;
     pointer-events: none;
     width: max-content;
+    height: auto;
     max-width: calc(100vw - 32px);
     box-sizing: border-box;
-    transition: top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 @media (max-width: 768px) {
@@ -92,6 +101,19 @@
     opacity: 1;
     visibility: visible;
     transform: translateX(-50%) translateY(0);
+}
+
+/* 窄桌面视口下避让右侧快捷胶囊栏，防止水平重叠碰撞 */
+@media (min-width: 681px) and (max-width: 820px) {
+    .resonance-ui {
+        max-width: calc(100vw - 360px);
+    }
+    .resonance-ui .resonance-text-full {
+        display: none;
+    }
+    .resonance-ui .resonance-text-short {
+        display: inline;
+    }
 }
 .resonance-hearts {
     font-size: 1.35em;
@@ -281,11 +303,13 @@
     border-radius: 20px;
     font-size: 0.9em;
     font-weight: 600;
-    transition: all 0.25s ease;
+    transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s var(--ease-spring-snappy);
 }
-.blind-box-back button:hover {
-    background: rgba(255, 101, 132, 0.16);
-    transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+    .blind-box-back button:hover {
+        background: rgba(255, 101, 132, 0.16);
+        transform: translateY(-2px);
+    }
 }
 .blind-box-target {
     box-shadow: 0 0 24px var(--primary-glow) !important;
@@ -310,15 +334,21 @@
     100% { background-position: 200% center; }
 }
 
-/* ── 按钮光扫效果与Q弹反馈 ── */
+/* ── 按钮光扫效果与Q弹反馈（移除破坏性 !important，不创建额外堆叠上下文，豁免定位/旋转按钮） ── */
 button {
     position: relative;
     overflow: hidden;
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+    transition:
+        transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+        box-shadow 0.25s ease,
+        background-color 0.25s ease,
+        border-color 0.25s ease,
+        color 0.25s ease,
+        opacity 0.25s ease;
 }
 
-button:active {
-    transform: scale(0.95) !important;
+:where(button):not(:disabled, .lightbox-nav-btn, .login-pw-eye, .moment-menu-trigger):active {
+    transform: scale(0.96);
 }
 
 button::after {
@@ -331,16 +361,29 @@ button::after {
     transition: transform 0.65s ease;
     pointer-events: none;
 }
-button:hover::after {
-    transform: rotate(25deg) translateX(100%);
+@media (hover: hover) and (pointer: fine) {
+    button:hover::after {
+        transform: rotate(25deg) translateX(100%);
+    }
 }
-/* 禁用一些小按钮的光扫 */
+/* 禁用小图标按钮、网格项与自带光环按钮的全局斜向白光扫过 */
+.fab-main::after {
+    top: auto;
+    left: auto;
+    width: auto;
+    height: auto;
+}
 .delete-btn::after, .comment-toggle-btn::after, .comment-write-btn::after,
 .comment-cancel-btn::after, .btn-cancel::after, .mood-emoji-btn::after,
-.ai-tab::after, .theme-toggle::after, .ai-refresh-btn::after,
-.ai-chat-close-btn::after, .ai-chat-send-btn::after,
+.mood-calendar-day::after, .mood-month-nav::after, .mood-today-btn::after,
+.ai-tab::after, .theme-toggle::after, .notification-bell::after,
+.user-avatar-btn::after, .login-trigger-btn::after, .ai-refresh-btn::after,
+.ai-chat-close-btn::after, .ai-chat-send-btn::after, .ai-diary-image-option::after,
 .moment-like-btn::after, .moment-star-btn::after, .comment-img-upload-btn::after,
-.comment-reply-btn::after, .comment-recall-btn::after,
+.comment-reply-btn::after, .comment-recall-btn::after, .moment-menu-trigger::after,
+.moment-menu-item::after, .topics-filter-pill::after, .profile-subpage-tab::after,
+.app-page-back::after, .app-page-action-btn::after, .profile-back-btn::after,
+.profile-settings-btn::after, .lightbox-close::after, .lightbox-nav-btn::after,
 .notification-read-all::after, .user-dropdown-item::after,
 .moment-image-add-btn::after, .edit-avatar-circle::after { display: none; }
 
@@ -403,13 +446,15 @@ button:hover::after {
     z-index: 2;
 }
 
-/* ── 现代原生 CSS 滚动驱动入场（零 JS 滚动监听，渐进增强） ── */
+/* ── 现代原生 CSS 滚动驱动入场（零 JS 滚动监听，渐进增强）
+   采用 backwards 填充：入场完成后立即释放动画级联锁以恢复桌面端 :hover 上浮，
+   并收紧 entry 区间避免视口底部卡片停驻在半透明发虚状态 ── */
 @media (prefers-reduced-motion: no-preference) {
     @supports ((animation-timeline: view()) and (animation-range: entry)) {
         @keyframes cardScrollReveal {
             from {
-                opacity: 0.72;
-                transform: translate3d(0, 18px, 0) scale(0.985);
+                opacity: 0.88;
+                transform: translate3d(0, 14px, 0) scale(0.99);
             }
             to {
                 opacity: 1;
@@ -418,9 +463,9 @@ button:hover::after {
         }
 
         :root:not([data-ambient='calm']) .moment-card {
-            animation: cardScrollReveal linear both;
+            animation: cardScrollReveal linear backwards;
             animation-timeline: view(block);
-            animation-range: entry 0% entry 24%;
+            animation-range: entry 0% entry 14%;
         }
     }
 }
@@ -430,10 +475,10 @@ button:hover::after {
     display: none;
 }
 
-/* ── 标题入场动画 ── */
+/* ── 标题入场动画（不在 100% 驻留 filter: blur(0)，保留 h1 原生 drop-shadow 柔光） ── */
 @keyframes titleAppear {
-    0% { opacity: 0; transform: scale(0.85) translateY(20px); filter: blur(8px); }
-    100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+    0% { opacity: 0; transform: scale(0.9) translateY(16px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 @keyframes taglineAppear {
     0% { opacity: 0; transform: translateY(12px); }
@@ -489,15 +534,31 @@ button:hover::after {
 }
 
 /* ========================================================
-   🦋 仪式感爆发画布层（按需挂载，演完即销毁，平时 0 开销）
+   🦋 仪式感爆发画布层（Top Layer Popover 置顶，按需挂载，演完即销毁）
    ======================================================== */
+#ceremony-layer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 99998;
+}
+
 #ceremony-canvas {
     position: fixed;
     inset: 0;
     width: 100vw;
+    height: 100vh;
     height: 100dvh;
     pointer-events: none;
-    z-index: 99998;
+    z-index: 2;
     contain: strict;
 }
 
@@ -508,7 +569,7 @@ button:hover::after {
     bottom: 0;
     height: 36vh;
     pointer-events: none;
-    z-index: 99997;
+    z-index: 1;
     background: radial-gradient(
         ellipse 80% 100% at 50% 100%,
         rgba(244, 114, 182, 0.24) 0%,
@@ -545,9 +606,17 @@ button:hover::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    #ceremony-layer,
     #ceremony-canvas,
-    .ceremony-horizon-glow {
+    .ceremony-horizon-glow,
+    button::after {
         display: none !important;
+    }
+
+    .timer-card .num.flip,
+    .blind-box-card-develop,
+    .notification-badge.show {
+        animation: none !important;
     }
 }
 
@@ -735,6 +804,7 @@ button:hover::after {
     .anniv-card.today,
     .locked-icon,
     .recording-active,
+    .blind-box-card-develop,
     .moment-card {
         animation: none !important;
     }
@@ -747,5 +817,9 @@ button:hover::after {
         transition-property: color, background-color, border-color, opacity !important;
         transition-duration: 0.16s !important;
         transition-timing-function: ease !important;
+    }
+
+    :where(button):not(:disabled, .lightbox-nav-btn, .login-pw-eye, .moment-menu-trigger):active {
+        transform: none;
     }
 }

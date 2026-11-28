@@ -2027,7 +2027,9 @@ async function executeMomentRecording() {
             
             const btn = document.getElementById('btn-moment-audio');
             if (duration < 1000) {
-                alert('录音时间太短啦，至少要1秒哦！');
+                if (typeof window.showToast === 'function') {
+                    window.showToast('录音时间太短啦，至少要 1 秒哦 🎙️');
+                }
                 momentAudioChunks = [];
                 resetMomentAudioBtn();
                 return;
@@ -2069,7 +2071,9 @@ async function executeMomentRecording() {
         }
     } catch (err) {
         if (sessionId !== momentRecordingSessionId) return;
-        alert('无法访问麦克风，请检查设备权限设置！\n' + err.message);
+        if (typeof window.showToast === 'function') {
+            window.showToast('无法访问麦克风，请检查设备权限设置 🎙️');
+        }
         isMomentRecording = false;
         stopMomentMediaStream();
         resetMomentAudioBtn();
@@ -2126,10 +2130,21 @@ function isDefaultFilter() {
         && !currentFilters.keyword;
 }
 
+function isHomeTimelineRouteActive() {
+    if (typeof getCurrentAppRoute === 'function') {
+        return getCurrentAppRoute()?.id === 'home';
+    }
+    return !document.body.classList.contains('app-page-active');
+}
+
 function saveTimelineSnapshot() {
     if (!isDefaultFilter() || !hasMomentAuthContext() || !currentRenderedMomentsList.length) return;
     try {
-        const scrollY = Math.max(0, window.scrollY || window.pageYOffset || 0);
+        const isHomeRoute = isHomeTimelineRouteActive();
+        const prevSavedY = Number(sessionStorage.getItem(MOMENTS_SCROLL_KEY));
+        const scrollY = isHomeRoute
+            ? Math.max(0, window.scrollY || window.pageYOffset || 0)
+            : (Number.isFinite(prevSavedY) && prevSavedY >= 0 ? prevSavedY : 0);
         const snapshot = {
             userId: currentAuthUser?.id,
             author: currentAuthor,
@@ -2141,8 +2156,10 @@ function saveTimelineSnapshot() {
             moments: currentRenderedMomentsList.slice(0, MAX_SNAPSHOT_MOMENTS)
         };
         sessionStorage.setItem(MOMENTS_SNAPSHOT_KEY, JSON.stringify(snapshot));
-        sessionStorage.setItem(MOMENTS_SCROLL_KEY, String(scrollY));
-        if (typeof setRouterHomeScroll === 'function') setRouterHomeScroll(scrollY);
+        if (isHomeRoute) {
+            sessionStorage.setItem(MOMENTS_SCROLL_KEY, String(scrollY));
+            if (typeof setRouterHomeScroll === 'function') setRouterHomeScroll(scrollY);
+        }
     } catch (e) {
         console.warn('保存时光轴本地快照失败:', e);
     }
@@ -2404,8 +2421,11 @@ document.addEventListener('visibilitychange', () => {
         }
         saveTimelineSnapshot();
     } else {
-        // 切回应用时，若在主页且处于下滚位置但被浏览器置0，立即补偿恢复
-        if (isDefaultFilter() && hasMomentAuthContext()) {
+        // 切回应用时，仅在处于主页路由且处于下滚位置被浏览器置0时，立即补偿恢复
+        const isHomeRoute = typeof getCurrentAppRoute === 'function'
+            ? getCurrentAppRoute()?.id === 'home'
+            : !document.body.classList.contains('app-page-active');
+        if (isHomeRoute && isDefaultFilter() && hasMomentAuthContext()) {
             const savedY = Number(sessionStorage.getItem(MOMENTS_SCROLL_KEY));
             const currentY = window.scrollY || window.pageYOffset || 0;
             if (Number.isFinite(savedY) && savedY > 100 && currentY < 50) {
@@ -2471,6 +2491,7 @@ function createCardTextElement(text, momentId) {
     expanded.style.display = 'none';
     const toggle = createMomentNode('button', 'toggle-text-btn', '展开');
     toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', 'false');
     toggle.dataset.momentAction = 'toggle-text';
     toggle.dataset.momentId = String(momentId);
     container.append(collapsed, expanded, toggle);
@@ -2873,7 +2894,8 @@ function createMomentCardElement(item, options = {}) {
         const images = Array.isArray(parsedMoment.images)
             ? parsedMoment.images.map(url => sanitizeMediaUrl(url)).filter(Boolean)
             : [];
-        if (images.length === 1) {
+        const renderMediaCount = images.length;
+        if (renderMediaCount === 1) {
             const isVid = isVideoMediaUrl(images[0]);
             const posterUrl = isVid ? getPosterForVideo(images[0], parsedMoment?.video_posters) : '';
             if (isVid) {
@@ -2881,18 +2903,17 @@ function createMomentCardElement(item, options = {}) {
                 const videoCard = createMomentSingleVideoCard(images[0], posterUrl);
                 if (videoCard) card.appendChild(videoCard);
             } else {
-                // 单图：如果有缩略图则列表展示缩略图，点开灯箱查看 1920px 高清原图
-                const thumbUrl = getThumbnailForImage(images[0], parsedMoment?.image_thumbnails);
-                const displaySrc = thumbUrl || images[0];
-                const single = createMomentMedia(displaySrc, 'moment-single-image', {
+                // 单图模式：直接使用高清源展示，避免 360px 缩略图放大模糊，且点开灯箱秒开命中缓存
+                const hdSingleSrc = images[0];
+                const single = createMomentMedia(hdSingleSrc, 'moment-single-image', {
                     controls: false,
                     lightbox: true,
-                    originalSrc: images[0],
+                    originalSrc: hdSingleSrc,
                     priority: isPriorityCard
                 });
                 if (single) card.appendChild(single);
             }
-        } else if (images.length > 1) {
+        } else if (renderMediaCount > 1) {
             const grid = createMomentNode('div', 'moment-grid');
             grid.id = `moment-grid-${momentId}`;
             try {
@@ -2956,6 +2977,7 @@ function createMomentCardElement(item, options = {}) {
                 const showAll = createMomentNode('button', 'show-all-images-btn', `展开剩余 ${remainingCount} 张照片 ↓`);
                 showAll.type = 'button';
                 showAll.id = `show-images-btn-${momentId}`;
+                showAll.setAttribute('aria-expanded', 'false');
                 showAll.dataset.momentAction = 'show-images';
                 showAll.dataset.momentId = String(momentId);
                 showAll.dataset.remaining = String(remainingCount);
@@ -3005,13 +3027,13 @@ function createMomentCardElement(item, options = {}) {
     starButton.id = `moment-star-btn-${momentId}`;
     starButton.dataset.momentAction = 'toggle-star';
     starButton.dataset.momentId = String(momentId);
+    starButton.setAttribute('aria-pressed', String(hasStarred));
     starButton.setAttribute('aria-label', hasStarred ? '取消收藏' : '收藏此动态');
     const starIcon = createMomentNode('span', 'star-btn-icon');
     starIcon.innerHTML = '<svg class="svg-icon" aria-hidden="true"><use href="#icon-star"/></svg>';
     const starText = createMomentNode('span', 'star-btn-text', hasStarred ? '已收藏' : '收藏');
     starButton.append(starIcon, starText);
     const starPending = typeof pendingMomentStarIds !== 'undefined' && pendingMomentStarIds.has(momentId);
-    starButton.disabled = starPending;
     if (starPending) starButton.setAttribute('aria-busy', 'true');
 
     buttonsGroup.append(likeButton, commentToggle, starButton);
@@ -3258,6 +3280,8 @@ async function locateMomentById(momentId, options = {}) {
     }
 }
 
+const momentMenuClosingTimers = new WeakMap();
+
 function toggleMomentActionMenu(momentId, triggerElement = null) {
     const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
     const menu = card ? card.querySelector('.moment-actions-menu') : document.getElementById(`moment-menu-${momentId}`);
@@ -3267,6 +3291,14 @@ function toggleMomentActionMenu(momentId, triggerElement = null) {
     const isOpen = dropdown.classList.contains('is-open');
     closeAllMomentActionMenus();
     if (!isOpen) {
+        if (card) {
+            const pendingTimer = momentMenuClosingTimers.get(card);
+            if (pendingTimer) {
+                clearTimeout(pendingTimer);
+                momentMenuClosingTimers.delete(card);
+            }
+            card.classList.remove('is-menu-closing');
+        }
         dropdown.classList.add('is-open');
         if (trigger) trigger.setAttribute('aria-expanded', 'true');
     }
@@ -3274,7 +3306,18 @@ function toggleMomentActionMenu(momentId, triggerElement = null) {
 
 function closeAllMomentActionMenus() {
     document.querySelectorAll('.moment-menu-dropdown.is-open').forEach(menu => {
+        const card = menu.closest('.moment-card');
         menu.classList.remove('is-open');
+        if (card) {
+            const prevTimer = momentMenuClosingTimers.get(card);
+            if (prevTimer) clearTimeout(prevTimer);
+            card.classList.add('is-menu-closing');
+            const timerId = setTimeout(() => {
+                card.classList.remove('is-menu-closing');
+                momentMenuClosingTimers.delete(card);
+            }, 200);
+            momentMenuClosingTimers.set(card, timerId);
+        }
     });
     document.querySelectorAll('.moment-menu-trigger[aria-expanded="true"]').forEach(btn => {
         btn.setAttribute('aria-expanded', 'false');
@@ -3287,10 +3330,8 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
         return;
     }
     if (typeof hasAIServiceConsent === 'function' && !hasAIServiceConsent()) {
-        if (typeof showToast === 'function') {
-            showToast('请先在“设置 → 感情小助手”中开启服务 ✨');
-        } else {
-            alert('请先在系统设置中开启感情小助手 AI 服务');
+        if (typeof window.showToast === 'function') {
+            window.showToast('请先在“设置 → 感情小助手”中开启服务 ✨');
         }
         return;
     }
@@ -3383,10 +3424,8 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
         if (typeof getFriendlyAIError === 'function') {
             errorMsg = getFriendlyAIError(error);
         }
-        if (typeof showToast === 'function') {
-            showToast(errorMsg, 4500);
-        } else {
-            alert(errorMsg);
+        if (typeof window.showToast === 'function') {
+            window.showToast(errorMsg, 4500);
         }
     } finally {
         matchingCards.forEach(card => card.classList.remove('is-ai-analyzing'));
@@ -3497,6 +3536,50 @@ document.addEventListener('change', event => {
     if (momentId) handleCommentImgSelect(event, momentId);
 });
 
+const momentRevealTimers = new WeakMap();
+
+function triggerMomentSoftReveal(element, delayMs = 0) {
+    if (!element) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const prev = momentRevealTimers.get(element);
+    if (prev) clearTimeout(prev);
+    element.classList.remove('moment-soft-reveal');
+    if (delayMs > 0) {
+        element.style.setProperty('--reveal-delay', `${delayMs}ms`);
+    } else {
+        element.style.removeProperty('--reveal-delay');
+    }
+    void element.offsetWidth;
+    element.classList.add('moment-soft-reveal');
+    const timer = setTimeout(() => {
+        element.classList.remove('moment-soft-reveal');
+        element.style.removeProperty('--reveal-delay');
+        momentRevealTimers.delete(element);
+    }, 320 + delayMs);
+    momentRevealTimers.set(element, timer);
+}
+
+function correctCardScrollAfterCollapse(card, rectBefore) {
+    if (!card || !rectBefore) return;
+    const topThreshold = 76;
+    if (rectBefore.top >= topThreshold) return;
+    const rectAfter = card.getBoundingClientRect();
+    if (rectAfter.top >= topThreshold) return;
+
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+    const behavior = reduceMotion ? 'auto' : 'smooth';
+    const scrollParent = card.closest('.app-page-scroll, .modal-body-scroll');
+    if (scrollParent && scrollParent.scrollHeight > scrollParent.clientHeight) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        const targetTop = scrollParent.scrollTop + (rectAfter.top - parentRect.top) - 16;
+        scrollParent.scrollTo({ top: Math.max(0, targetTop), behavior });
+    } else {
+        const currentY = window.scrollY || window.pageYOffset || 0;
+        const targetY = currentY + rectAfter.top - topThreshold;
+        window.scrollTo({ top: Math.max(0, targetY), behavior });
+    }
+}
+
 window.showAllImages = function(id, triggerElement = null) {
     const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${id}`);
     const grid = card ? card.querySelector('.moment-grid') : document.getElementById(`moment-grid-${id}`);
@@ -3505,7 +3588,7 @@ window.showAllImages = function(id, triggerElement = null) {
     const hiddenImgs = grid.querySelectorAll('.hidden-image');
     const isExpanded = btn && btn.dataset.expanded === 'true';
     if (!isExpanded) {
-        hiddenImgs.forEach(item => {
+        hiddenImgs.forEach((item, index) => {
             const media = (item instanceof HTMLImageElement || item instanceof HTMLVideoElement)
                 ? item
                 : item.querySelector('img, video');
@@ -3514,22 +3597,29 @@ window.showAllImages = function(id, triggerElement = null) {
                 delete media.dataset.deferredSrc;
             }
             item.style.display = 'block';
+            triggerMomentSoftReveal(item, Math.min(index * 28, 168));
             if (item instanceof HTMLVideoElement) refreshMomentVideoPlayback(item);
         });
         if (btn) {
             btn.dataset.expanded = 'true';
+            btn.setAttribute('aria-expanded', 'true');
             btn.textContent = '收起照片 ↑';
         }
     } else {
+        const rectBefore = card ? card.getBoundingClientRect() : null;
         hiddenImgs.forEach(img => {
+            img.classList.remove('moment-soft-reveal');
+            img.style.removeProperty('--reveal-delay');
             img.style.display = 'none';
             if (img instanceof HTMLVideoElement) releaseMomentVideo(img, false);
         });
         if (btn) {
             btn.dataset.expanded = 'false';
+            btn.setAttribute('aria-expanded', 'false');
             const remaining = btn.dataset.remaining || '';
             btn.textContent = remaining ? `展开剩余 ${remaining} 张照片 ↓` : '展开照片 ↓';
         }
+        correctCardScrollAfterCollapse(card, rectBefore);
     }
 };
 
@@ -3540,15 +3630,23 @@ window.toggleTextCollapse = function(id, triggerElement = null) {
     const expandedEl = container.querySelector('.text-expanded');
     const btn = container.querySelector('.toggle-text-btn');
     if (!collapsedEl || !expandedEl || !btn) return;
+    const card = container.closest('.moment-card');
     
     if (collapsedEl.style.display !== 'none') {
         collapsedEl.style.display = 'none';
         expandedEl.style.display = 'block';
+        triggerMomentSoftReveal(expandedEl);
         btn.innerText = '收起';
+        btn.setAttribute('aria-expanded', 'true');
     } else {
+        const rectBefore = card ? card.getBoundingClientRect() : null;
+        expandedEl.classList.remove('moment-soft-reveal');
         collapsedEl.style.display = 'block';
         expandedEl.style.display = 'none';
+        triggerMomentSoftReveal(collapsedEl);
         btn.innerText = '展开';
+        btn.setAttribute('aria-expanded', 'false');
+        correctCardScrollAfterCollapse(card, rectBefore);
     }
 };
 
@@ -3824,9 +3922,7 @@ async function fetchMoments(append = false, options = {}) {
     if (error) {
         if (!append) {
             console.error('读取动态失败:', error);
-            const errorText = createMomentNode('p', '', '读取数据失败，请稍后重试。');
-            Object.assign(errorText.style, { color: 'var(--primary)', textAlign: 'center' });
-            contentDiv.replaceChildren(errorText);
+            contentDiv.replaceChildren(createMomentNode('div', 'empty-state is-error', '读取数据失败，请稍后重试。'));
         }
         finishRequest();
         return;
@@ -3898,10 +3994,13 @@ async function fetchMoments(append = false, options = {}) {
                 try {
                     const parsed = JSON.parse(item.content);
                     if (Array.isArray(parsed.images)) {
+                        const isSingleMedia = parsed.images.length === 1;
                         parsed.images.slice(0, 4).forEach(u => {
                             if (isVideoMediaUrl(u)) {
                                 const poster = getPosterForVideo(u, parsed.video_posters);
                                 if (poster) topUrls.push(poster);
+                            } else if (isSingleMedia) {
+                                topUrls.push(u);
                             } else {
                                 const thumb = getThumbnailForImage(u, parsed.image_thumbnails);
                                 topUrls.push(thumb || u);
@@ -4233,18 +4332,26 @@ function confirmDelete(id) {
         if (typeof openLoginModal === 'function') openLoginModal();
         return;
     }
-    const momentId = normalizeMomentId(id);
-    if (!momentId || deletingMomentIds.has(momentId)) return;
-    if (!confirm('确定要撤回这条回忆吗？此操作不可逆哦 💖')) {
-        return;
-    }
-    deleteMoment(momentId);
+    return deleteMoment(id);
 }
 
-async function deleteMoment(id) {
-    if (!hasMomentAuthContext()) return;
+async function deleteMoment(id, options = {}) {
+    if (!hasMomentAuthContext()) {
+        if (typeof openLoginModal === 'function') openLoginModal();
+        return;
+    }
     const momentId = normalizeMomentId(id);
     if (!momentId || deletingMomentIds.has(momentId)) return;
+
+    if (options?.skipConfirm !== true) {
+        const ok = await window.showConfirmDialog(
+            '确定要撤回这条甜蜜回忆吗？撤回后无法恢复哦 🌸',
+            { title: '撤回回忆确认', confirmText: '确认撤回', danger: true }
+        );
+        if (!ok) return;
+        if (!hasMomentAuthContext() || deletingMomentIds.has(momentId)) return;
+    }
+
     deletingMomentIds.add(momentId);
 
     try {
@@ -4309,7 +4416,9 @@ async function deleteMoment(id) {
         if (!isMomentAuthEpochCurrent(requestAuthEpoch)) return;
         if (error || deleted !== true) {
             console.error('撤回动态失败:', error);
-            alert('撤回失败。仅支持撤回 24 小时内由当前账号发布的动态。');
+            if (typeof window.showToast === 'function') {
+                window.showToast('撤回失败：仅支持撤回 24 小时内由自己发布的动态 🌸');
+            }
         } else {
             // 撤回成功后，物理清理所有关联的媒体文件
             if (mediaToDelete.length > 0) {
@@ -4319,34 +4428,129 @@ async function deleteMoment(id) {
                 invalidateProfileMomentsCache();
             }
             onThisDayMemoryCache.cacheKey = '';
-
-            const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
-            if (cards.length > 0) {
-                cards.forEach(card => {
-                    releaseMomentVideosWithin(card, true);
-                    card.style.transition = 'opacity 0.3s, transform 0.3s';
-                    card.style.opacity = '0';
-                    card.style.transform = 'translateX(-16px)';
-                });
-                clearTimelineSnapshot();
-                setTimeout(() => {
-                    fetchMoments(false, { forceRefresh: true });
-                    const milestonesActive = typeof isAppRouteActive === 'function'
-                        ? isAppRouteActive('milestones')
-                        : document.getElementById('milestonesModal')?.classList.contains('is-active');
-                    if (milestonesActive && typeof renderMilestonesContent === 'function') {
-                        renderMilestonesContent();
-                    }
-                }, 300);
+            renderedMomentIds.delete(momentId);
+            currentRenderedMomentsList = currentRenderedMomentsList.filter(
+                item => normalizeMomentId(item?.id) !== momentId
+            );
+            if (typeof starredMomentIds !== 'undefined' && starredMomentIds instanceof Set) {
+                starredMomentIds.delete(momentId);
+            }
+            if (typeof clearCommentImageSelection === 'function') {
+                clearCommentImageSelection(momentId);
+            }
+            if (currentRenderedMomentsList.length > 0 && isDefaultFilter()) {
+                saveTimelineSnapshot();
             } else {
                 clearTimelineSnapshot();
-                fetchMoments(false, { forceRefresh: true });
+            }
+
+            const cards = Array.from(document.querySelectorAll(`[id="card-${momentId}"]`));
+            const affectedParents = new Set();
+            cards.forEach(card => {
+                releaseMomentVideosWithin(card, true);
+                if (card.parentElement) affectedParents.add(card.parentElement);
+            });
+
+            const finalizeRemoval = () => {
+                cards.forEach(card => card.remove());
+
+                const timelineEl = document.getElementById('timeline-content');
+                if (timelineEl && !timelineEl.querySelector('.moment-card')) {
+                    const locateBack = timelineEl.querySelector('.moment-locate-back');
+                    if (locateBack) {
+                        timelineEl.replaceChildren(
+                            locateBack,
+                            createMomentNode('div', 'empty-state', '这条甜蜜回忆已撤回 🌸')
+                        );
+                    } else if (hasMore && !isLoading) {
+                        fetchMoments(true);
+                    } else {
+                        const emptyText = isDefaultFilter()
+                            ? '还没有记录哦，快去添加第一条回忆吧！'
+                            : '当前筛选条件下暂无更多回忆 🌸';
+                        timelineEl.replaceChildren(createMomentNode('div', 'empty-state', emptyText));
+                    }
+                }
+
                 const milestonesActive = typeof isAppRouteActive === 'function'
                     ? isAppRouteActive('milestones')
                     : document.getElementById('milestonesModal')?.classList.contains('is-active');
-                if (milestonesActive && typeof renderMilestonesContent === 'function') {
-                    renderMilestonesContent();
+                const milestonesContainer = document.getElementById('milestonesContent');
+                if (milestonesContainer && (milestonesActive || affectedParents.has(milestonesContainer))) {
+                    if (!milestonesContainer.querySelector('.moment-card')) {
+                        const fallbackEmptyText = window.EMPTY_MILESTONES_TEXT
+                            || '🌱 还没有大事记或收藏哦~\n快去发布时勾选“重大事件”，\n或在时间轴里点亮 ⭐ 收藏一些美好回忆吧！';
+                        if (typeof window.setMilestoneStatus === 'function') {
+                            window.setMilestoneStatus(milestonesContainer, fallbackEmptyText);
+                        } else {
+                            milestonesContainer.replaceChildren(createMomentNode('div', 'empty-state', fallbackEmptyText));
+                        }
+                    }
                 }
+
+                const profileMomentsContainer = document.getElementById('profile-moments-content');
+                if (profileMomentsContainer && affectedParents.has(profileMomentsContainer)) {
+                    const remainingProfileCards = profileMomentsContainer.querySelectorAll('.moment-card').length;
+                    document.querySelectorAll('.profile-subpage-moments-count').forEach(el => {
+                        el.textContent = String(remainingProfileCards);
+                    });
+                    const statPostsEl = document.getElementById('stat-posts');
+                    if (statPostsEl) statPostsEl.textContent = String(remainingProfileCards);
+                    if (remainingProfileCards === 0) {
+                        profileMomentsContainer.replaceChildren(
+                            createMomentNode('div', 'empty-state', '你还没有发布过动态哦~\n在主页发布动态，记录属于你们的专属甜蜜吧 💕')
+                        );
+                    }
+                }
+
+                if (currentRenderedMomentsList.length > 0 && isDefaultFilter()) {
+                    saveTimelineSnapshot();
+                } else {
+                    clearTimelineSnapshot();
+                }
+            };
+
+            const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+            if (!cards.length || reduceMotion) {
+                finalizeRemoval();
+            } else {
+                cards.forEach(card => {
+                    const startHeight = card.getBoundingClientRect().height;
+                    const computed = window.getComputedStyle(card);
+                    card.style.contentVisibility = 'visible';
+                    card.style.contain = 'none';
+                    card.style.overflow = 'hidden';
+                    card.style.pointerEvents = 'none';
+                    card.style.maxHeight = `${startHeight}px`;
+                    card.style.paddingTop = computed.paddingTop;
+                    card.style.paddingBottom = computed.paddingBottom;
+                    card.style.marginBottom = computed.marginBottom;
+                    void card.offsetHeight;
+                    card.style.transition = [
+                        'opacity 220ms ease',
+                        'transform 280ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+                        'max-height 280ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+                        'margin-bottom 280ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+                        'padding-top 280ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+                        'padding-bottom 280ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+                        'border-width 280ms ease'
+                    ].join(', ');
+                    requestAnimationFrame(() => {
+                        card.style.opacity = '0';
+                        card.style.transform = 'translateX(-16px) scale(0.98)';
+                        card.style.maxHeight = '0px';
+                        card.style.marginBottom = '0px';
+                        card.style.paddingTop = '0px';
+                        card.style.paddingBottom = '0px';
+                        card.style.borderTopWidth = '0px';
+                        card.style.borderBottomWidth = '0px';
+                    });
+                });
+                setTimeout(finalizeRemoval, 285);
+            }
+
+            if (typeof window.showToast === 'function') {
+                window.showToast('甜蜜回忆已撤回 🌸');
             }
         }
     } finally {

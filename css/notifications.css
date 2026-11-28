@@ -16,14 +16,16 @@
     justify-content: center;
     font-size: 1.25em;
     box-shadow: 0 4px 16px var(--shadow);
-    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s;
+    transition: transform 0.35s var(--ease-spring-snappy), box-shadow 0.3s ease, border-color 0.25s ease;
     padding: 0;
     color: var(--text);
 }
-.notification-bell:hover {
-    transform: scale(1.12);
-    box-shadow: var(--shadow-hover);
-    border-color: var(--primary-light);
+@media (hover: hover) and (pointer: fine) {
+    .notification-bell:hover {
+        transform: scale(1.12);
+        box-shadow: var(--shadow-hover);
+        border-color: var(--primary-light);
+    }
 }
 .notification-badge {
     position: absolute;
@@ -52,7 +54,7 @@
     position: fixed;
     top: calc(68px + env(safe-area-inset-top, 0px));
     right: 16px;
-    z-index: 600;
+    z-index: 1350;
     width: 320px;
     max-width: calc(100vw - 32px);
     max-height: 60vh;
@@ -121,8 +123,10 @@
             font-family: inherit;
             letter-spacing: normal;
         }
-        .notification-read-all:hover {
-            color: var(--primary);
+        @media (hover: hover) and (pointer: fine) {
+            .notification-read-all:hover {
+                color: var(--primary);
+            }
         }
         .notification-list {
             flex: 1;
@@ -136,13 +140,15 @@
             border-bottom: 1px solid var(--border);
             font-size: 0.9em;
             color: var(--text);
-            transition: background 0.2s;
+            transition: background-color 0.2s ease;
         }
         .notification-item:last-child {
             border-bottom: none;
         }
-        .notification-item:hover {
-            background: var(--glass-highlight);
+        @media (hover: hover) and (pointer: fine) {
+            .notification-item:hover {
+                background: var(--glass-highlight);
+            }
         }
         .notification-item.unread {
             background: rgba(212, 160, 168, 0.1);
@@ -189,5 +195,9 @@
             .notification-panel {
                 transition: none !important;
                 transform: none !important;
+            }
+            .notification-badge.show,
+            .notification-bell:has(.notification-badge.show) {
+                animation: none !important;
             }
         }

@@ -127,11 +127,18 @@ function initAccessibleUiState() {
     }
 
     const versionModal = document.getElementById('versionModal');
+    versionModal?.addEventListener('click', event => {
+        if (event.target === versionModal) {
+            closeVersionModal();
+        }
+    });
     versionModal?.addEventListener('cancel', event => {
         event.preventDefault();
         closeVersionModal();
     });
     versionModal?.addEventListener('close', () => {
+        window.unlockBodyScroll?.('version-modal');
+        window.suspendAllAmbientEffects?.(false, 'version-modal');
         window.homeSakuraEffect?.setSuspended?.(false, 'version-modal');
     });
 }
@@ -166,6 +173,19 @@ function onAppRouteEnter(route) {
 
 function onAppRouteLeave(route) {
     if (!route) return;
+    // 离开首页进入子页面时自动收起已展开的通知面板与 FAB 悬浮菜单
+    if (route.id === 'home') {
+        const notifPanel = document.getElementById('notification-panel');
+        const notifBell = document.getElementById('notification-bell');
+        if (notifPanel && notifPanel.classList.contains('show')) {
+            notifPanel.classList.remove('show');
+            notifPanel.setAttribute('aria-hidden', 'true');
+            notifBell?.setAttribute('aria-expanded', 'false');
+        }
+        if (typeof window.closeFabMenu === 'function') {
+            window.closeFabMenu(true);
+        }
+    }
     // Restore the current route's inert snapshot before the router applies the
     // next route, otherwise a lightbox opened during history navigation can
     // overwrite the new page's interaction state.
@@ -256,21 +276,24 @@ function showVersionModal(versionName, useConfigLog = true) {
         });
     }
 
+    window.lockBodyScroll?.('version-modal');
     modal.showModal();
-    window.homeSakuraEffect?.setSuspended?.(true, 'version-modal');
+    window.promoteToastLayer?.();
+    window.suspendAllAmbientEffects?.(true, 'version-modal');
 
-    // 播放仪式感琉璃蝴蝶特效，增添浪漫感
+    // 播放仪式感琉璃蝴蝶特效（已升级为 Top Layer Popover，晶莹浮于弹窗前方）
     if (typeof createHeartRain === 'function') {
-        setTimeout(createHeartRain, 300);
+        setTimeout(createHeartRain, 280);
     }
 }
 
 function closeVersionModal() {
     const modal = document.getElementById('versionModal');
-    if (modal) {
+    if (modal && modal.open) {
         modal.close();
     }
-    window.homeSakuraEffect?.setSuspended?.(false, 'version-modal');
+    window.unlockBodyScroll?.('version-modal');
+    window.suspendAllAmbientEffects?.(false, 'version-modal');
     // 保存已查看的版本号 (保存 SW 缓存名称作为唯一标识)
     if (tempTargetVersionToSave) {
         localStorage.setItem('last_seen_version', tempTargetVersionToSave);
@@ -278,4 +301,5 @@ function closeVersionModal() {
         localStorage.setItem('last_seen_version', APP_VERSION);
     }
 }
+window.closeVersionModal = closeVersionModal;
 

@@ -17,24 +17,71 @@ function getCurrentAmbientMode() {
 }
 
 // ==========================================
-// 1. 现代 Toast 提示（样式完全交由 css/effects.css 统一维护）
+// 0. 全局滚动锁定与滚动条宽度补偿协议（多浮层引用计数，桌面端 0px 横跳）
 // ==========================================
+const activeScrollLocks = new Set();
+
+function lockBodyScroll(reason = 'modal') {
+    const key = String(reason || 'modal');
+    if (activeScrollLocks.size === 0 && !document.body.classList.contains('app-page-active')) {
+        const sbWidth = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+        document.documentElement.style.setProperty('--app-scrollbar-comp', `${sbWidth}px`);
+    }
+    activeScrollLocks.add(key);
+    document.body.classList.add('is-scroll-locked');
+}
+
+function unlockBodyScroll(reason = 'modal') {
+    const key = String(reason || 'modal');
+    activeScrollLocks.delete(key);
+    if (activeScrollLocks.size === 0) {
+        document.body.classList.remove('is-scroll-locked');
+        if (!document.body.classList.contains('app-page-active')) {
+            document.documentElement.style.setProperty('--app-scrollbar-comp', '0px');
+        }
+    }
+}
+
+window.lockBodyScroll = lockBodyScroll;
+window.unlockBodyScroll = unlockBodyScroll;
+
+// ==========================================
+// 1. 现代 Top Layer Toast 提示（支持 popover="manual" 浮于所有 <dialog> 之上）
+// ==========================================
+function promoteToastLayer() {
+    const container = document.getElementById('toast-container');
+    if (!container || typeof container.showPopover !== 'function') return;
+    try {
+        if (container.matches?.(':popover-open')) {
+            container.hidePopover();
+        }
+        container.showPopover();
+    } catch (_e) {}
+}
+window.promoteToastLayer = promoteToastLayer;
+
 function showToast(message, duration = 3000) {
     let container = document.getElementById('toast-container');
     if (!container) {
         container = document.createElement('div');
         container.id = 'toast-container';
+        if ('popover' in HTMLElement.prototype) {
+            container.setAttribute('popover', 'manual');
+        }
         container.setAttribute('role', 'status');
         container.setAttribute('aria-live', 'polite');
         container.setAttribute('aria-atomic', 'false');
         document.body.appendChild(container);
     }
+    promoteToastLayer();
 
     const toast = document.createElement('div');
     toast.className = 'toast-item';
     toast.textContent = String(message ?? '');
     container.appendChild(toast);
 
+    // 强制提交初始帧布局，杜绝首次挂载同帧合并吞动画
+    void toast.offsetWidth;
     requestAnimationFrame(() => {
         toast.classList.add('show');
     });
@@ -45,11 +92,186 @@ function showToast(message, duration = 3000) {
         setTimeout(() => {
             toast.remove();
             if (container.childElementCount === 0) {
+                try {
+                    if (typeof container.hidePopover === 'function' && container.matches?.(':popover-open')) {
+                        container.hidePopover();
+                    }
+                } catch (_e) {}
                 container.remove();
             }
-        }, 280);
+        }, 260);
     }, duration);
 }
+
+// ==========================================
+// 1.5 全局统一轻奢毛玻璃确认弹窗（替代冰冷的原生 window.confirm）
+// ==========================================
+let activeConfirmResolver = null;
+let confirmDialogCloseTimer = null;
+let confirmDialogPendingFinalize = null;
+
+function showConfirmDialog(message, options = {}) {
+    const {
+        title = '温柔确认 ✨',
+        confirmText = '确认',
+        cancelText = '取消',
+        danger = false
+    } = options || {};
+
+    // 若上一个确认框尚未关闭，先立即同步结算为 false
+    if (activeConfirmResolver) {
+        const prev = activeConfirmResolver;
+        activeConfirmResolver = null;
+        prev(false, true);
+    }
+
+    // 若上一轮确认框正处于 220ms 退场动画窗口期，立即取消残留定时器并同步完成底层 close()
+    if (confirmDialogCloseTimer) {
+        clearTimeout(confirmDialogCloseTimer);
+        confirmDialogCloseTimer = null;
+    }
+    if (confirmDialogPendingFinalize) {
+        const finalizePrev = confirmDialogPendingFinalize;
+        confirmDialogPendingFinalize = null;
+        finalizePrev();
+    }
+
+    return new Promise((resolve) => {
+        let dialog = document.getElementById('globalConfirmDialog');
+        if (!dialog) {
+            dialog = document.createElement('dialog');
+            dialog.id = 'globalConfirmDialog';
+            dialog.className = 'native-dialog confirm-modal-dialog';
+            dialog.setAttribute('aria-labelledby', 'globalConfirmTitle');
+            dialog.setAttribute('aria-describedby', 'globalConfirmMessage');
+            dialog.innerHTML = `
+                <div class="modal-box confirm-modal-box">
+                    <h2 class="modal-title confirm-modal-title" id="globalConfirmTitle"></h2>
+                    <div class="confirm-modal-message" id="globalConfirmMessage"></div>
+                    <div class="modal-btns confirm-modal-btns">
+                        <button type="button" class="btn-cancel confirm-btn-cancel" id="globalConfirmCancelBtn"></button>
+                        <button type="button" class="confirm-btn-ok" id="globalConfirmOkBtn"></button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(dialog);
+        }
+
+        const titleEl = dialog.querySelector('#globalConfirmTitle');
+        const msgEl = dialog.querySelector('#globalConfirmMessage');
+        const cancelBtn = dialog.querySelector('#globalConfirmCancelBtn');
+        const okBtn = dialog.querySelector('#globalConfirmOkBtn');
+
+        if (titleEl) titleEl.textContent = title;
+        if (msgEl) msgEl.textContent = String(message ?? '');
+        if (cancelBtn) cancelBtn.textContent = cancelText;
+        if (okBtn) {
+            okBtn.textContent = confirmText;
+            okBtn.classList.toggle('is-danger', Boolean(danger));
+        }
+
+        let settled = false;
+        const previousFocus = document.activeElement;
+
+        const settle = (result, immediate = false) => {
+            if (settled) return;
+            settled = true;
+            if (activeConfirmResolver === settle) {
+                activeConfirmResolver = null;
+            }
+            dialog.removeEventListener('click', onBackdropClick);
+            dialog.removeEventListener('cancel', onCancel);
+            dialog.removeEventListener('close', onNativeClose);
+            okBtn?.removeEventListener('click', onConfirmClick);
+            cancelBtn?.removeEventListener('click', onCancelClick);
+
+            let finalized = false;
+            const finalizeClose = () => {
+                if (finalized) return;
+                finalized = true;
+                if (confirmDialogPendingFinalize === finalizeClose) {
+                    confirmDialogPendingFinalize = null;
+                }
+                dialog.classList.remove('is-open', 'is-closing');
+                try {
+                    if (dialog.open) dialog.close();
+                } catch (_e) {
+                    dialog.removeAttribute('open');
+                }
+                unlockBodyScroll('confirm-dialog');
+                window.suspendAllAmbientEffects?.(false, 'confirm-dialog');
+                if (!immediate && previousFocus && typeof previousFocus.focus === 'function') {
+                    try { previousFocus.focus({ preventScroll: true }); } catch (_err) {}
+                }
+                resolve(Boolean(result));
+            };
+
+            if (immediate || prefersReducedMotion() || !dialog.open) {
+                finalizeClose();
+                return;
+            }
+            dialog.classList.remove('is-open');
+            dialog.classList.add('is-closing');
+            confirmDialogPendingFinalize = finalizeClose;
+            confirmDialogCloseTimer = setTimeout(() => {
+                confirmDialogCloseTimer = null;
+                finalizeClose();
+            }, 220);
+        };
+
+        activeConfirmResolver = settle;
+
+        const onConfirmClick = () => settle(true);
+        const onCancelClick = () => settle(false);
+        const onBackdropClick = (e) => {
+            if (e.target === dialog) settle(false);
+        };
+        const onCancel = (e) => {
+            e.preventDefault();
+            settle(false);
+        };
+        const onNativeClose = () => {
+            settle(false, true);
+        };
+
+        okBtn?.addEventListener('click', onConfirmClick);
+        cancelBtn?.addEventListener('click', onCancelClick);
+        dialog.addEventListener('click', onBackdropClick);
+        dialog.addEventListener('cancel', onCancel);
+        dialog.addEventListener('close', onNativeClose);
+
+        dialog.classList.remove('is-closing');
+        lockBodyScroll('confirm-dialog');
+        window.suspendAllAmbientEffects?.(true, 'confirm-dialog');
+        try {
+            if (!dialog.open && typeof dialog.showModal === 'function') {
+                dialog.showModal();
+            } else {
+                dialog.setAttribute('open', '');
+            }
+        } catch (_e) {
+            dialog.setAttribute('open', '');
+        }
+        promoteToastLayer();
+
+        if (prefersReducedMotion()) {
+            dialog.classList.add('is-open');
+        } else {
+            dialog.classList.remove('is-open');
+            void dialog.offsetWidth;
+            requestAnimationFrame(() => {
+                if (dialog.open && !dialog.classList.contains('is-closing')) {
+                    dialog.classList.add('is-open');
+                }
+            });
+        }
+
+        requestAnimationFrame(() => {
+            (danger ? cancelBtn : okBtn)?.focus?.({ preventScroll: true });
+        });
+    });
+}
+window.showConfirmDialog = showConfirmDialog;
 
 // ==========================================
 // 2. 🦋 现代高光仪式层：纯 Canvas 琉璃流光蝴蝶群
@@ -198,6 +420,7 @@ function getCeremonyWingSprite(palette) {
 }
 
 const ceremonyState = {
+    layer: null,
     canvas: null,
     ctx: null,
     width: 0,
@@ -209,17 +432,38 @@ const ceremonyState = {
     sparks: [],
     resizeHandler: null,
     visibilityHandler: null,
+    glowTimer: null,
     lastTriggerTime: 0
 };
 
 function mountCeremonyCanvas() {
-    if (ceremonyState.canvas && ceremonyState.ctx) return true;
+    if (ceremonyState.canvas && ceremonyState.ctx) {
+        if (ceremonyState.layer && typeof ceremonyState.layer.showPopover === 'function') {
+            try {
+                if (ceremonyState.layer.matches?.(':popover-open')) {
+                    ceremonyState.layer.hidePopover();
+                }
+                ceremonyState.layer.showPopover();
+            } catch (_e) {}
+            promoteToastLayer();
+        }
+        return true;
+    }
+
+    const layer = document.createElement('div');
+    layer.id = 'ceremony-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    if ('popover' in HTMLElement.prototype) {
+        layer.setAttribute('popover', 'manual');
+    }
 
     const canvas = document.createElement('canvas');
     canvas.id = 'ceremony-canvas';
     canvas.setAttribute('aria-hidden', 'true');
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return false;
+
+    layer.appendChild(canvas);
 
     const resize = () => {
         const w = Math.max(window.innerWidth, 1);
@@ -239,11 +483,17 @@ function mountCeremonyCanvas() {
 
     const onVisibility = () => {
         if (document.hidden) {
-            ceremonyState.lastTimestamp = 0;
+            unmountCeremonyCanvas();
         }
     };
 
-    document.body.appendChild(canvas);
+    document.body.appendChild(layer);
+    if (typeof layer.showPopover === 'function') {
+        try { layer.showPopover(); } catch (_e) {}
+        promoteToastLayer();
+    }
+
+    ceremonyState.layer = layer;
     ceremonyState.canvas = canvas;
     ceremonyState.ctx = ctx;
     ceremonyState.resizeHandler = resize;
@@ -260,6 +510,10 @@ function unmountCeremonyCanvas() {
         cancelAnimationFrame(ceremonyState.rafId);
         ceremonyState.rafId = null;
     }
+    if (ceremonyState.glowTimer !== null) {
+        clearTimeout(ceremonyState.glowTimer);
+        ceremonyState.glowTimer = null;
+    }
     ceremonyState.lastTimestamp = 0;
     ceremonyState.butterflies.length = 0;
     ceremonyState.sparks.length = 0;
@@ -272,22 +526,42 @@ function unmountCeremonyCanvas() {
         document.removeEventListener('visibilitychange', ceremonyState.visibilityHandler);
         ceremonyState.visibilityHandler = null;
     }
-    if (ceremonyState.canvas) {
+    if (ceremonyState.layer) {
+        try {
+            if (typeof ceremonyState.layer.hidePopover === 'function' && ceremonyState.layer.matches?.(':popover-open')) {
+                ceremonyState.layer.hidePopover();
+            }
+        } catch (_e) {}
+        ceremonyState.layer.remove();
+        ceremonyState.layer = null;
+    } else if (ceremonyState.canvas) {
         ceremonyState.canvas.remove();
-        ceremonyState.canvas = null;
-        ceremonyState.ctx = null;
     }
+    ceremonyState.canvas = null;
+    ceremonyState.ctx = null;
 }
 
 function triggerHorizonGlow() {
-    const existing = document.querySelector('.ceremony-horizon-glow');
-    if (existing) existing.remove();
-    const glow = document.createElement('div');
-    glow.className = 'ceremony-horizon-glow';
-    glow.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(glow);
-    glow.addEventListener('animationend', () => glow.remove(), { once: true });
-    setTimeout(() => glow.remove(), 3000);
+    const host = ceremonyState.layer || document.body;
+    let glow = host.querySelector('.ceremony-horizon-glow');
+    if (!glow) {
+        glow = document.createElement('div');
+        glow.className = 'ceremony-horizon-glow';
+        glow.setAttribute('aria-hidden', 'true');
+        host.insertBefore(glow, host.firstChild);
+    } else {
+        // 平滑重启动画而不直接拔除 DOM 节点造成黑闪
+        glow.style.animation = 'none';
+        void glow.offsetWidth;
+        glow.style.animation = '';
+    }
+    if (ceremonyState.glowTimer !== null) {
+        clearTimeout(ceremonyState.glowTimer);
+    }
+    ceremonyState.glowTimer = setTimeout(() => {
+        ceremonyState.glowTimer = null;
+        glow?.remove();
+    }, 2800);
 }
 
 function spawnCeremonyButterfly(options = {}) {
@@ -342,8 +616,7 @@ function stepAndRenderCeremony(timestamp) {
     }
 
     if (document.hidden) {
-        ceremonyState.lastTimestamp = 0;
-        ceremonyState.rafId = requestAnimationFrame(stepAndRenderCeremony);
+        unmountCeremonyCanvas();
         return;
     }
 
@@ -737,8 +1010,28 @@ if (document.readyState === 'loading') {
 }
 
 // ==========================================
-// 6. 全局点击监听（关闭通知面板 + 空白处克制光学微涟漪）
+// 6. 全局点击与 Escape 监听（收起通知面板/FAB 菜单 + 空白处克制光学微涟漪）
 // ==========================================
+function closeFabMenu(instant = false) {
+    const menu = document.getElementById('fab-menu');
+    const mainBtn = document.getElementById('fab-main');
+    if (!menu || !menu.classList.contains('show')) return;
+    if (instant) {
+        menu.style.transition = 'none';
+        menu.classList.remove('show');
+        menu.setAttribute('aria-hidden', 'true');
+        if (mainBtn) mainBtn.setAttribute('aria-expanded', 'false');
+        requestAnimationFrame(() => {
+            menu.style.transition = '';
+        });
+        return;
+    }
+    menu.classList.remove('show');
+    menu.setAttribute('aria-hidden', 'true');
+    if (mainBtn) mainBtn.setAttribute('aria-expanded', 'false');
+}
+window.closeFabMenu = closeFabMenu;
+
 let lastGlobalClickParticleTime = 0;
 
 document.addEventListener('click', (e) => {
@@ -746,14 +1039,43 @@ document.addEventListener('click', (e) => {
     const bell = document.getElementById('notification-bell');
     if (panel && panel.classList.contains('show') && !panel.contains(e.target) && !bell?.contains(e.target)) {
         panel.classList.remove('show');
+        panel.setAttribute('aria-hidden', 'true');
+        bell?.setAttribute('aria-expanded', 'false');
     }
 
-    if (document.body.classList.contains('app-page-active')) return;
-    if (e.target.closest('button, a, input, textarea, select, .modal-overlay, audio, video, .fab-container, .notification-panel, .moment-card, [role="button"]')) return;
+    const fabContainer = document.getElementById('fab-container');
+    const fabMenu = document.getElementById('fab-menu');
+    if (fabMenu && fabMenu.classList.contains('show') && !fabContainer?.contains(e.target)) {
+        closeFabMenu(false);
+    }
+
+    if (document.body.classList.contains('app-page-active') || document.body.classList.contains('is-scroll-locked')) return;
+    if (e.target.closest('button, a, input, textarea, select, dialog, .modal-overlay, audio, video, .fab-container, .notification-panel, .moment-card, [role="button"]')) return;
 
     const now = performance.now();
     if (now - lastGlobalClickParticleTime < 200) return;
     lastGlobalClickParticleTime = now;
 
     spawnHearts(e.clientX, e.clientY);
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    const panel = document.getElementById('notification-panel');
+    const bell = document.getElementById('notification-bell');
+    if (panel && panel.classList.contains('show')) {
+        e.preventDefault();
+        panel.classList.remove('show');
+        panel.setAttribute('aria-hidden', 'true');
+        bell?.setAttribute('aria-expanded', 'false');
+        bell?.focus?.({ preventScroll: true });
+        return;
+    }
+    const fabMenu = document.getElementById('fab-menu');
+    const fabMain = document.getElementById('fab-main');
+    if (fabMenu && fabMenu.classList.contains('show')) {
+        e.preventDefault();
+        closeFabMenu(false);
+        fabMain?.focus?.({ preventScroll: true });
+    }
 });

@@ -51,15 +51,6 @@
         opacity 0.3s ease;
 }
 
-.anniv-card:hover {
-    transform: translateY(-4px) translateZ(0);
-    box-shadow: var(--shadow-hover);
-    border-color: rgba(253, 164, 175, 0.6);
-}
-.anniv-card:active {
-    transform: scale(0.98) translateZ(0);
-}
-
 /* 今天是纪念日时的暖金特别光晕 */
 .anniv-card.today {
     border-color: rgba(245, 158, 11, 0.4);
@@ -85,16 +76,7 @@
     border-radius: 50%;
     background: var(--primary-subtle);
     box-shadow: 0 3px 10px rgba(244, 63, 94, 0.12);
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.anniv-card:hover .anniv-icon {
-    transform: scale(1.18) rotate(-10deg) translateZ(0);
-    box-shadow: 0 4px 14px var(--primary-glow);
-}
-.anniv-card:hover .anniv-days {
-    transform: scale(1.06);
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.3s var(--ease-spring-snappy), box-shadow 0.3s ease;
 }
 
 .anniv-card .anniv-name {
@@ -109,9 +91,29 @@
     font-family: 'Nunito', sans-serif;
     font-size: 1.65rem;
     font-weight: 800;
+    font-variant-numeric: tabular-nums;
     color: var(--primary);
     line-height: 1.1;
     filter: drop-shadow(0 2px 4px var(--primary-glow));
+    transition: transform 0.3s var(--ease-spring-snappy);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .anniv-card:hover {
+        transform: translateY(-4px) translateZ(0);
+        box-shadow: var(--shadow-hover);
+        border-color: rgba(253, 164, 175, 0.6);
+    }
+    .anniv-card:hover .anniv-icon {
+        transform: scale(1.18) rotate(-10deg) translateZ(0);
+        box-shadow: 0 4px 14px var(--primary-glow);
+    }
+    .anniv-card:hover .anniv-days {
+        transform: scale(1.06);
+    }
+    .anniv-card:active {
+        transform: scale(0.98) translateZ(0);
+    }
 }
 
 .anniv-card.today .anniv-days {

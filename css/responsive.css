@@ -39,11 +39,11 @@
             padding-left: max(16px, env(safe-area-inset-left, 0px));
         }
 
-        .notification-panel { right: max(16px, env(safe-area-inset-right, 0px)); }
-        .user-dropdown { right: max(76px, calc(16px + env(safe-area-inset-right, 0px))); }
+        .notification-panel { right: calc(max(16px, env(safe-area-inset-right, 0px)) + var(--app-scrollbar-comp, 0px)); }
+        .user-dropdown { right: calc(max(76px, calc(16px + env(safe-area-inset-right, 0px))) + var(--app-scrollbar-comp, 0px)); }
         .fab-container {
-            right: calc(20px + env(safe-area-inset-right));
-            bottom: calc(30px + env(safe-area-inset-bottom));
+            right: calc(20px + env(safe-area-inset-right, 0px) + var(--app-scrollbar-comp, 0px));
+            bottom: calc(30px + env(safe-area-inset-bottom, 0px));
         }
 
         /* ── 保持经典单竖列排布（全平台居中自适应） ── */
@@ -109,7 +109,7 @@
             outline-offset: 3px;
         }
 
-        [data-theme='dark'] dialog.native-dialog::backdrop {
+        [data-theme='dark'] dialog.native-dialog[open]::backdrop {
             background: rgba(8, 5, 15, 0.7);
         }
 
@@ -194,7 +194,7 @@
             .notification-panel,
             .user-dropdown {
                 top: calc(54px + env(safe-area-inset-top, 0px));
-                right: max(12px, env(safe-area-inset-right, 0px));
+                right: calc(max(12px, env(safe-area-inset-right, 0px)) + var(--app-scrollbar-comp, 0px));
             }
         }
 
@@ -207,6 +207,11 @@
             .moment-card,
             .toast-item,
             .app-page-card,
+            .app-page-topbar,
+            .profile-topbar,
+            .edit-topbar,
+            .topic-composer-bar,
+            .site-header .tagline,
             .notification-panel,
             .resonance-ui,
             .bottom-nav,
@@ -222,6 +227,13 @@
             .topic-message-bubble {
                 -webkit-backdrop-filter: none !important;
                 backdrop-filter: none !important;
+            }
+
+            .app-page-topbar,
+            .profile-topbar,
+            .edit-topbar,
+            .topic-composer-bar {
+                background: var(--surface-elevated) !important;
             }
 
             .moment-card {

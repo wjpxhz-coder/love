@@ -23,7 +23,13 @@ let zoomIsDragging = false;
 let zoomLastTapTime = 0;
 let zoomLastTapPos = { x: 0, y: 0 };
 let zoomSingleTapTimeout = null;
+let justHandledDoubleTap = false;
+let hadMultiTouchInGesture = false;
+let zoomMouseMoved = false;
+let suppressNextLightboxClick = false;
 let zoomHandlersAttached = false;
+let videoGestureHandlersAttached = false;
+let pendingLightboxSwipeCommit = null;
 
 // 画廊与移动端滑动/下拉关闭手势状态变量
 let lightboxGallery = [];
@@ -147,6 +153,49 @@ function resetDismissVisuals(animate = true) {
     resetLightboxZoom(animate);
 }
 
+function settlePendingLightboxSwipeCommit(executeAction = false) {
+    if (!pendingLightboxSwipeCommit) return;
+    const pending = pendingLightboxSwipeCommit;
+    pendingLightboxSwipeCommit = null;
+    clearTimeout(pending.timerId);
+    if (executeAction && typeof pending.action === 'function') {
+        pending.action();
+    }
+}
+
+function commitLightboxSwipeSwitch(direction, activeEl, currentOffsetX = 0) {
+    settlePendingLightboxSwipeCommit(false);
+    const goSwitch = () => {
+        if (direction === 'next') lightboxNext();
+        else lightboxPrev();
+    };
+    if (!activeEl || lightboxPrefersReducedMotion()) {
+        goSwitch();
+        return;
+    }
+
+    const generation = lightboxRenderGeneration;
+    const exitShift = direction === 'next' ? -96 : 96;
+    const targetX = (Number(currentOffsetX) || 0) + exitShift;
+
+    activeEl.style.transition = 'transform 125ms cubic-bezier(0.22, 1, 0.36, 1), opacity 115ms ease';
+    activeEl.style.transform = `translate3d(${targetX.toFixed(1)}px, 0, 0) scale(0.95)`;
+    activeEl.style.opacity = '0';
+
+    const action = () => {
+        if (generation !== lightboxRenderGeneration) return;
+        const lightbox = document.getElementById('lightbox');
+        if (!lightbox?.classList.contains('show')) return;
+        goSwitch();
+    };
+    const timerId = setTimeout(() => {
+        pendingLightboxSwipeCommit = null;
+        action();
+    }, 125);
+
+    pendingLightboxSwipeCommit = { timerId, action };
+}
+
 function initLightboxZoomHandlers() {
     if (zoomHandlersAttached) return;
     const img = document.getElementById('lightbox-img');
@@ -155,12 +204,17 @@ function initLightboxZoomHandlers() {
 
     // ── 手机端触摸手势（双指捏合缩放、双击放大、单指平移、左右跟手切图、下拉跟手关闭） ──
     img.addEventListener('touchstart', (e) => {
+        if (pendingLightboxSwipeCommit) {
+            settlePendingLightboxSwipeCommit(true);
+        }
         if (zoomSingleTapTimeout) {
             clearTimeout(zoomSingleTapTimeout);
             zoomSingleTapTimeout = null;
         }
 
-        if (e.touches.length === 2) {
+        if (e.touches.length >= 2) {
+            hadMultiTouchInGesture = true;
+            justHandledDoubleTap = false;
             zoomIsPinching = true;
             zoomIsDragging = false;
             isSwipeActive = false;
@@ -193,9 +247,12 @@ function initLightboxZoomHandlers() {
 
             if (timeDiff < 320 && distDiff < 36) {
                 zoomLastTapTime = 0;
+                if (e.cancelable) e.preventDefault();
                 handleDoubleTapZoom(touch.clientX, touch.clientY);
+                justHandledDoubleTap = true;
                 return;
             }
+            justHandledDoubleTap = false;
             zoomLastTapTime = now;
             zoomLastTapPos = { x: touch.clientX, y: touch.clientY };
 
@@ -289,6 +346,15 @@ function initLightboxZoomHandlers() {
                 clampZoomBounds();
                 applyLightboxTransform(true);
             }
+            if (e.touches.length === 0) {
+                hadMultiTouchInGesture = false;
+            }
+            return;
+        }
+        if (hadMultiTouchInGesture) {
+            if (e.touches.length === 0) {
+                hadMultiTouchInGesture = false;
+            }
             return;
         }
         if (zoomIsDragging) {
@@ -322,8 +388,7 @@ function initLightboxZoomHandlers() {
             const farSwipe = Math.abs(dx) > (window.innerWidth || 375) * 0.25;
 
             if (fastSwipe || farSwipe) {
-                if (dx < 0) lightboxNext();
-                else lightboxPrev();
+                commitLightboxSwipeSwitch(dx < 0 ? 'next' : 'prev', img, zoomTranslateX);
                 return;
             }
             zoomTranslateX = 0;
@@ -331,12 +396,21 @@ function initLightboxZoomHandlers() {
             return;
         }
 
+        // 双击第二下抬手：阻止合成 click 且不触发单击关闭定时器
+        if (justHandledDoubleTap) {
+            justHandledDoubleTap = false;
+            if (e.cancelable) e.preventDefault();
+            return;
+        }
+
         // 单指轻击检测：未放大状态下轻击延时确认后关闭灯箱
         if (e.changedTouches.length === 1 && zoomScale <= 1.05) {
             const touch = e.changedTouches[0];
-            const dist = Math.hypot(touch.clientX - zoomLastTapPos.x, touch.clientY - zoomLastTapPos.y);
+            const dist = Math.hypot(touch.clientX - touchStartX, touch.clientY - touchStartY);
             if (dist < 10) {
+                if (e.cancelable) e.preventDefault();
                 zoomSingleTapTimeout = setTimeout(() => {
+                    zoomSingleTapTimeout = null;
                     closeLightbox();
                 }, 260);
             }
@@ -344,6 +418,8 @@ function initLightboxZoomHandlers() {
     });
 
     img.addEventListener('touchcancel', () => {
+        justHandledDoubleTap = false;
+        hadMultiTouchInGesture = false;
         zoomIsPinching = false;
         zoomIsDragging = false;
         isSwipeActive = false;
@@ -373,6 +449,7 @@ function initLightboxZoomHandlers() {
 
     img.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return;
+        zoomMouseMoved = false;
         if (zoomScale > 1.05) {
             zoomIsDragging = true;
             zoomStartX = e.clientX;
@@ -388,6 +465,9 @@ function initLightboxZoomHandlers() {
         if (!zoomIsDragging) return;
         const dx = e.clientX - zoomStartX;
         const dy = e.clientY - zoomStartY;
+        if (Math.hypot(dx, dy) > 4) {
+            zoomMouseMoved = true;
+        }
         zoomTranslateX = zoomLastTranslateX + dx;
         zoomTranslateY = zoomLastTranslateY + dy;
         applyLightboxTransform(false);
@@ -395,15 +475,263 @@ function initLightboxZoomHandlers() {
 
     window.addEventListener('mouseup', () => {
         if (!zoomIsDragging) return;
+        const didMove = zoomMouseMoved;
         zoomIsDragging = false;
+        zoomMouseMoved = false;
+        if (didMove) {
+            suppressNextLightboxClick = true;
+            setTimeout(() => {
+                suppressNextLightboxClick = false;
+            }, 80);
+        }
         clampZoomBounds();
         applyLightboxTransform(true);
     });
 
     img.addEventListener('dblclick', (e) => {
+        e.preventDefault();
         e.stopPropagation();
+        if (zoomSingleTapTimeout) {
+            clearTimeout(zoomSingleTapTimeout);
+            zoomSingleTapTimeout = null;
+        }
         handleDoubleTapZoom(e.clientX, e.clientY);
     });
+}
+
+function isLightboxVideoInFullscreen(video) {
+    return Boolean(
+        document.fullscreenElement
+        || document.webkitFullscreenElement
+        || video?.webkitDisplayingFullscreen
+    );
+}
+
+function initLightboxVideoGestureHandlers() {
+    if (videoGestureHandlersAttached) return;
+    const video = document.getElementById('lightbox-video');
+    const lightbox = document.getElementById('lightbox');
+    if (!video || !lightbox) return;
+    videoGestureHandlersAttached = true;
+
+    let vTracking = false;
+    let vAborted = false;
+    let vStartX = 0;
+    let vStartY = 0;
+    let vStartTime = 0;
+    let vLastY = 0;
+    let vLastTime = 0;
+    let vVelocityY = 0;
+    let vSwipeActive = false;
+    let vDismissActive = false;
+    let vSwipeDx = 0;
+    let vDismissDx = 0;
+    let vDismissDy = 0;
+    let vOriginIsBackdrop = false;
+
+    const getActiveLightboxMedia = () => {
+        const imgEl = document.getElementById('lightbox-img');
+        if (video.style.display !== 'none') return video;
+        if (imgEl && imgEl.style.display !== 'none') return imgEl;
+        return null;
+    };
+
+    const resetVideoGestureVisuals = (animate = true) => {
+        const mediaEl = getActiveLightboxMedia();
+        if (lightbox) {
+            lightbox.style.transition = animate ? `background-color 260ms ${LIGHTBOX_IOS_EASE}, opacity 240ms ease` : '';
+            lightbox.style.backgroundColor = '';
+        }
+        setLightboxChromeOpacity('', animate);
+        if (mediaEl === video) {
+            video.style.transition = animate && !lightboxPrefersReducedMotion()
+                ? `transform 260ms ${LIGHTBOX_IOS_EASE}, opacity 220ms ease`
+                : 'none';
+            video.style.transform = 'translate3d(0, 0, 0) scale(1)';
+            video.style.opacity = '1';
+        } else if (mediaEl) {
+            resetLightboxZoom(animate);
+        }
+    };
+
+    const onGestureStart = (e, isBackdrop) => {
+        if (!lightbox.classList.contains('show') || isLightboxVideoInFullscreen(video)) {
+            vTracking = false;
+            return;
+        }
+        if (isBackdrop && e.target !== lightbox) {
+            return;
+        }
+        if (!isBackdrop && zoomScale > 1.05) {
+            return;
+        }
+        if (pendingLightboxSwipeCommit) {
+            settlePendingLightboxSwipeCommit(true);
+        }
+
+        if (e.touches.length >= 2) {
+            vAborted = true;
+            vTracking = false;
+            suppressNextLightboxClick = true;
+            setTimeout(() => { suppressNextLightboxClick = false; }, 140);
+            return;
+        }
+        if (e.touches.length !== 1) return;
+
+        const touch = e.touches[0];
+        if (!isBackdrop) {
+            // 保护视频底部原生播放控件与进度条拖拽区，绝不抢占 scrubber 操作
+            const rect = video.getBoundingClientRect();
+            const bottomSafeHeight = Math.max(84, rect.height * 0.25);
+            if (rect.height > 0 && (rect.bottom - touch.clientY) <= bottomSafeHeight) {
+                vTracking = false;
+                return;
+            }
+        }
+
+        const now = performance.now();
+        vTracking = true;
+        vAborted = false;
+        vOriginIsBackdrop = isBackdrop;
+        vStartX = touch.clientX;
+        vStartY = touch.clientY;
+        vStartTime = now;
+        vLastY = touch.clientY;
+        vLastTime = now;
+        vVelocityY = 0;
+        vSwipeActive = false;
+        vDismissActive = false;
+        vSwipeDx = 0;
+        vDismissDx = 0;
+        vDismissDy = 0;
+    };
+
+    const onGestureMove = (e) => {
+        if (!vTracking || vAborted || isLightboxVideoInFullscreen(video)) return;
+        if (e.touches.length !== 1) {
+            vAborted = true;
+            vTracking = false;
+            suppressNextLightboxClick = true;
+            setTimeout(() => { suppressNextLightboxClick = false; }, 140);
+            if (vDismissActive || vSwipeActive) {
+                vDismissActive = false;
+                vSwipeActive = false;
+                resetVideoGestureVisuals(true);
+            }
+            return;
+        }
+
+        // 若背景边缘手势期间图片已处于放大态，不接管手势
+        const activeMedia = getActiveLightboxMedia();
+        if (!activeMedia || (activeMedia.id === 'lightbox-img' && zoomScale > 1.05)) {
+            vTracking = false;
+            return;
+        }
+
+        const touch = e.touches[0];
+        const dx = touch.clientX - vStartX;
+        const dy = touch.clientY - vStartY;
+        const now = performance.now();
+        const dt = Math.max(1, now - vLastTime);
+        const vy = (touch.clientY - vLastY) / dt;
+        vVelocityY = vVelocityY * 0.4 + vy * 0.6;
+        vLastY = touch.clientY;
+        vLastTime = now;
+
+        const hasGallery = Array.isArray(lightboxGallery) && lightboxGallery.length > 1;
+
+        if (!vSwipeActive && !vDismissActive) {
+            if (dy > 14 && Math.abs(dy) > Math.abs(dx) * 1.3) {
+                vDismissActive = true;
+            } else if (hasGallery && Math.abs(dx) > 14 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+                vSwipeActive = true;
+            }
+        }
+
+        if (vDismissActive) {
+            if (e.cancelable) e.preventDefault();
+            const clampedDy = Math.max(-40, dy);
+            const progress = Math.min(1, Math.max(0, clampedDy / 280));
+            const dragScale = 1 - progress * 0.24;
+            vDismissDx = dx * 0.35;
+            vDismissDy = clampedDy;
+
+            activeMedia.style.transition = 'none';
+            activeMedia.style.transform = `translate3d(${vDismissDx.toFixed(1)}px, ${vDismissDy.toFixed(1)}px, 0) scale(${dragScale.toFixed(3)})`;
+            lightbox.style.transition = 'none';
+            lightbox.style.backgroundColor = `rgba(14, 10, 13, ${(0.95 * (1 - progress * 0.72)).toFixed(3)})`;
+            setLightboxChromeOpacity(Math.max(0, 1 - progress * 1.8).toFixed(3), false);
+        } else if (vSwipeActive && hasGallery) {
+            if (e.cancelable) e.preventDefault();
+            vSwipeDx = dx * 0.82;
+            const dragProgress = Math.min(1, Math.abs(dx) / (window.innerWidth || 375));
+            activeMedia.style.transition = 'none';
+            activeMedia.style.transform = `translate3d(${vSwipeDx.toFixed(1)}px, 0, 0) scale(${(1 - dragProgress * 0.04).toFixed(3)})`;
+        }
+    };
+
+    const onGestureEnd = (e, cancelled) => {
+        if (!vTracking) return;
+        vTracking = false;
+
+        if (vAborted || cancelled) {
+            if (vDismissActive || vSwipeActive) {
+                vDismissActive = false;
+                vSwipeActive = false;
+                resetVideoGestureVisuals(true);
+            }
+            return;
+        }
+
+        const activeMedia = getActiveLightboxMedia();
+        if (vDismissActive) {
+            vDismissActive = false;
+            if (vOriginIsBackdrop) {
+                suppressNextLightboxClick = true;
+                setTimeout(() => { suppressNextLightboxClick = false; }, 90);
+            }
+            if (vDismissDy > 88 || (vVelocityY > 0.55 && vDismissDy > 30)) {
+                closeLightbox(null, {
+                    fromSwipeDown: true,
+                    dx: vDismissDx,
+                    dy: vDismissDy
+                });
+            } else {
+                resetVideoGestureVisuals(true);
+            }
+            return;
+        }
+
+        if (vSwipeActive && Array.isArray(lightboxGallery) && lightboxGallery.length > 1) {
+            vSwipeActive = false;
+            if (vOriginIsBackdrop) {
+                suppressNextLightboxClick = true;
+                setTimeout(() => { suppressNextLightboxClick = false; }, 90);
+            }
+            const touch = e.changedTouches?.[0];
+            const dx = touch ? touch.clientX - vStartX : vSwipeDx;
+            const dy = touch ? touch.clientY - vStartY : 0;
+            const elapsed = performance.now() - vStartTime;
+            const fastSwipe = Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(dy) * 1.1 && elapsed < 650;
+            const farSwipe = Math.abs(dx) > (window.innerWidth || 375) * 0.25;
+
+            if (fastSwipe || farSwipe) {
+                commitLightboxSwipeSwitch(dx < 0 ? 'next' : 'prev', activeMedia, vSwipeDx);
+            } else {
+                resetVideoGestureVisuals(true);
+            }
+        }
+    };
+
+    video.addEventListener('touchstart', (e) => onGestureStart(e, false), { passive: true });
+    video.addEventListener('touchmove', onGestureMove, { passive: false });
+    video.addEventListener('touchend', (e) => onGestureEnd(e, false), { passive: true });
+    video.addEventListener('touchcancel', (e) => onGestureEnd(e, true), { passive: true });
+
+    lightbox.addEventListener('touchstart', (e) => onGestureStart(e, true), { passive: true });
+    lightbox.addEventListener('touchmove', onGestureMove, { passive: false });
+    lightbox.addEventListener('touchend', (e) => onGestureEnd(e, false), { passive: true });
+    lightbox.addEventListener('touchcancel', (e) => onGestureEnd(e, true), { passive: true });
 }
 
 function setLightboxBackgroundInert(active) {
@@ -520,6 +848,7 @@ function animateLightboxMediaEnter(mediaEl, mode = 'open', generation = lightbox
 }
 
 function showLightboxItem(index, transitionMode = 'open') {
+    settlePendingLightboxSwipeCommit(false);
     if (!Array.isArray(lightboxGallery) || lightboxGallery.length === 0) return;
     if (index < 0 || index >= lightboxGallery.length) return;
 
@@ -728,14 +1057,28 @@ function openLightbox(src, options = {}) {
     }
 
     initLightboxZoomHandlers();
+    initLightboxVideoGestureHandlers();
+    settlePendingLightboxSwipeCommit(false);
+    justHandledDoubleTap = false;
+    hadMultiTouchInGesture = false;
+    zoomMouseMoved = false;
+    suppressNextLightboxClick = false;
     resetLightboxZoom(false);
 
     if (!lightbox.classList.contains('show')) {
         lightboxPreviousFocus = document.activeElement;
-        lightboxPreviousBodyOverflow = document.body.style.overflow;
         setLightboxBackgroundInert(true);
-        document.body.style.overflow = 'hidden';
-        window.homeSakuraEffect?.setSuspended?.(true, 'lightbox');
+        if (typeof window.lockBodyScroll === 'function') {
+            window.lockBodyScroll('lightbox');
+        } else {
+            lightboxPreviousBodyOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+        }
+        if (typeof window.suspendAllAmbientEffects === 'function') {
+            window.suspendAllAmbientEffects(true, 'lightbox');
+        } else {
+            window.homeSakuraEffect?.setSuspended?.(true, 'lightbox');
+        }
     }
     lightbox.inert = false;
 
@@ -748,18 +1091,22 @@ function openLightbox(src, options = {}) {
 }
 
 function closeLightbox(event, closeOptions = {}) {
+    if (event && suppressNextLightboxClick) {
+        suppressNextLightboxClick = false;
+        return;
+    }
     if (event && event.target && (
+        event.target.id === 'lightbox-img' ||
         event.target.id === 'lightbox-video' ||
         event.target.closest('#lightbox-fallback') ||
         event.target.closest('.lightbox-nav-btn') ||
         event.target.closest('.lightbox-counter')
     )) return;
-    if (event?.target?.id === 'lightbox-close') event.stopPropagation();
+    if (event?.target?.closest?.('#lightbox-close')) event.stopPropagation();
 
-    // 放大状态下轻点图片先平滑还原，不直接关闭
-    if (event && event.target && event.target.id === 'lightbox-img' && zoomScale > 1.05) {
-        resetLightboxZoom(true);
-        return;
+    if (zoomSingleTapTimeout) {
+        clearTimeout(zoomSingleTapTimeout);
+        zoomSingleTapTimeout = null;
     }
 
     const lightbox = document.getElementById('lightbox');
@@ -767,6 +1114,7 @@ function closeLightbox(event, closeOptions = {}) {
     const video = document.getElementById('lightbox-video');
     if (!lightbox || !lightbox.classList.contains('show')) return;
 
+    settlePendingLightboxSwipeCommit(false);
     lightboxRenderGeneration += 1;
 
     if (lightboxCloseCleanupTimer) {
@@ -791,9 +1139,17 @@ function closeLightbox(event, closeOptions = {}) {
     lightbox.inert = true;
 
     setLightboxBackgroundInert(false);
-    document.body.style.overflow = lightboxPreviousBodyOverflow;
-    lightboxPreviousBodyOverflow = '';
-    window.homeSakuraEffect?.setSuspended?.(false, 'lightbox');
+    if (typeof window.unlockBodyScroll === 'function') {
+        window.unlockBodyScroll('lightbox');
+    } else {
+        document.body.style.overflow = lightboxPreviousBodyOverflow;
+        lightboxPreviousBodyOverflow = '';
+    }
+    if (typeof window.suspendAllAmbientEffects === 'function') {
+        window.suspendAllAmbientEffects(false, 'lightbox');
+    } else {
+        window.homeSakuraEffect?.setSuspended?.(false, 'lightbox');
+    }
 
     if (lightboxPreviousFocus && typeof lightboxPreviousFocus.focus === 'function') {
         lightboxPreviousFocus.focus({ preventScroll: true });

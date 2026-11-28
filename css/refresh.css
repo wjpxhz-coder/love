@@ -38,13 +38,15 @@ button {
         box-shadow 0.3s ease;
 }
 
-button:hover {
-    transform: translateY(-3px) scale(1.03);
-    box-shadow: var(--shadow-hover);
+@media (hover: hover) and (pointer: fine) {
+    :where(button):not(:disabled, .lightbox-nav-btn, .login-pw-eye, .moment-menu-trigger):hover {
+        transform: translateY(-3px) scale(1.03);
+        box-shadow: var(--shadow-hover);
+    }
 }
 
-button:active {
-    transform: scale(0.96) !important;
+:where(button):not(:disabled, .lightbox-nav-btn, .login-pw-eye, .moment-menu-trigger):active {
+    transform: translateY(0) scale(0.96);
 }
 
 [data-page-focus][tabindex='-1']:focus,
@@ -77,7 +79,7 @@ body.app-page-active .status-bar-shield {
     position: fixed;
     z-index: 1300;
     top: calc(12px + env(safe-area-inset-top, 0px));
-    right: max(16px, env(safe-area-inset-right, 0px));
+    right: calc(max(16px, env(safe-area-inset-right, 0px)) + var(--app-scrollbar-comp, 0px));
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -116,7 +118,7 @@ body.app-page-active .status-bar-shield {
     color: var(--text-muted);
     background: transparent;
     box-shadow: none;
-    transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.28s var(--ease-spring-snappy), background-color 0.22s ease, border-color 0.22s ease, color 0.22s ease, box-shadow 0.22s ease;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -190,17 +192,19 @@ body.app-page-active .status-bar-shield {
     height: 8px;
 }
 
-.app-utility-bar :is(
-    .theme-toggle,
-    .notification-bell,
-    .login-trigger-btn,
-    .user-avatar-btn
-):hover {
-    color: var(--primary);
-    border-color: var(--primary-light);
-    background: var(--surface-subtle);
-    transform: translateY(-1px) scale(1.08);
-    box-shadow: 0 4px 14px var(--shadow);
+@media (hover: hover) and (pointer: fine) {
+    .app-utility-bar :is(
+        .theme-toggle,
+        .notification-bell,
+        .login-trigger-btn,
+        .user-avatar-btn
+    ):hover {
+        color: var(--primary);
+        border-color: var(--primary-light);
+        background: var(--surface-subtle);
+        transform: translateY(-1px) scale(1.08);
+        box-shadow: 0 4px 14px var(--shadow);
+    }
 }
 
 .app-utility-bar :is(
@@ -252,8 +256,9 @@ body.auth-pending #notification-bell {
     display: none !important;
 }
 
-body.app-page-active .resonance-ui {
-    display: none !important;
+body.app-page-settled .resonance-ui {
+    visibility: hidden;
+    pointer-events: none;
 }
 
 /* 顶栏快捷栏在切屏过渡期间参与淡入淡出平移，过渡稳定停留在子页后再彻底隐藏 */
@@ -605,7 +610,7 @@ body.app-page-settled .app-utility-bar {
     color: var(--primary);
     background-color: rgba(255, 255, 255, 0.85);
     border-radius: 16px;
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.24s var(--ease-spring-snappy), background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .mood-month-picker select {
@@ -688,7 +693,7 @@ body.app-page-settled .app-utility-bar {
     color: var(--on-primary);
     font-weight: 700;
     box-shadow: 0 6px 20px var(--primary-glow);
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.28s var(--ease-spring-snappy), box-shadow 0.25s ease, opacity 0.2s ease;
 }
 
 .btn-mood:hover {
@@ -726,7 +731,7 @@ body.app-page-settled .app-utility-bar {
     background: rgba(255, 255, 255, 0.85);
     box-shadow: 0 2px 8px var(--shadow);
     font-weight: 700;
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.25s var(--ease-spring-snappy), background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.22s ease;
 }
 
 .timeline-filter-button:hover {
@@ -953,7 +958,7 @@ body.app-page-settled .app-utility-bar {
     background: rgba(255, 255, 255, 0.9);
     padding: 12px 16px;
     font-size: 0.95rem;
-    transition: all 0.25s ease;
+    transition: border-color 0.22s ease, background-color 0.22s ease, box-shadow 0.22s ease;
 }
 
 #login-overlay.app-page .login-input:focus {
@@ -983,7 +988,7 @@ body.app-page-settled .app-utility-bar {
     font-weight: 700;
     font-size: 1rem;
     padding: 12px 24px;
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.26s var(--ease-spring-snappy), box-shadow 0.24s ease, opacity 0.2s ease;
 }
 
 #login-overlay.app-page .login-btn:hover {
@@ -998,7 +1003,7 @@ body.app-page-settled .app-utility-bar {
     border-radius: 50%;
     color: var(--text);
     background: var(--surface);
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.24s var(--ease-spring-snappy), border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
 }
 
 #login-overlay.app-page .login-close-btn:hover {
@@ -1039,7 +1044,7 @@ body.app-page-settled .app-utility-bar {
     border: 2px dashed var(--primary-light);
     border-radius: 18px;
     background: rgba(255, 240, 246, 0.6);
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.24s var(--ease-spring-snappy), background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .moment-image-add-btn:hover {
@@ -1162,14 +1167,16 @@ body.app-page-settled .app-utility-bar {
     border: 1.5px solid var(--border);
     border-radius: 18px;
     background: var(--surface);
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.24s var(--ease-spring-snappy), background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.mood-emoji-btn:hover {
-    transform: scale(1.18);
-    border-color: var(--primary);
-    background: rgba(255, 230, 240, 0.8);
-    box-shadow: 0 6px 16px var(--shadow);
+@media (hover: hover) and (pointer: fine) {
+    .mood-emoji-btn:hover {
+        transform: scale(1.18);
+        border-color: var(--primary);
+        background: rgba(255, 230, 240, 0.8);
+        box-shadow: 0 6px 16px var(--shadow);
+    }
 }
 
 .mood-emoji-btn.selected {
@@ -1644,7 +1651,7 @@ body.app-page-settled .app-utility-bar {
 
 .lightbox-fallback {
     position: absolute;
-    bottom: 24px;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
     background: rgba(30, 20, 25, 0.88);

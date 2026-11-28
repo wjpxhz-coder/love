@@ -5,12 +5,61 @@ const commentLoadRequests = new Map();
 const commentSubmitRequests = new Set();
 const commentLikeInFlight = new Set();
 const commentDeleteInFlight = new Set();
+const commentLikesActorsCache = new Map(); // commentId -> actor[]
+const commentLikePopTimers = new WeakMap();
 const activeCommentReplies = new Map(); // momentId -> { commentId, author, snippet, isAI }
 const activeAICommentReplies = new Set(); // momentId -> awaiting AI reply
 const MAX_COMMENT_TEXT_LENGTH = 1000;
 const MAX_COMMENT_IMAGE_COUNT = 4;
 const MAX_COMMENT_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_COMMENT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+function triggerCommentLikePop(button, duration = 520) {
+    if (!button) return;
+    if (typeof window.triggerTransientPopClass === 'function') {
+        window.triggerTransientPopClass(button, 'is-just-liked', duration);
+        return;
+    }
+    const prev = commentLikePopTimers.get(button);
+    if (prev) clearTimeout(prev);
+    button.classList.remove('is-just-liked');
+    void button.offsetWidth;
+    button.classList.add('is-just-liked');
+    const timer = setTimeout(() => {
+        button.classList.remove('is-just-liked');
+        commentLikePopTimers.delete(button);
+    }, duration);
+    commentLikePopTimers.set(button, timer);
+}
+
+function clearCommentLikePop(button) {
+    if (!button) return;
+    if (typeof window.clearTransientPopClass === 'function') {
+        window.clearTransientPopClass(button, 'is-just-liked');
+        return;
+    }
+    const prev = commentLikePopTimers.get(button);
+    if (prev) {
+        clearTimeout(prev);
+        commentLikePopTimers.delete(button);
+    }
+    button.classList.remove('is-just-liked');
+}
+
+function syncMomentCommentCountDisplay(momentId, count) {
+    const safeCount = Math.max(0, Number(count) || 0);
+    const text = safeCount > 0 ? `${safeCount} 条评论` : '评论';
+    const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
+    if (cards.length > 0) {
+        cards.forEach(card => {
+            const countEl = card.querySelector('.comment-toggle-btn span:last-child') || card.querySelector(`[id="comment-count-${momentId}"]`);
+            if (countEl) countEl.innerText = text;
+        });
+    } else {
+        const countEls = document.querySelectorAll(`[id="comment-count-${momentId}"]`);
+        countEls.forEach(el => { el.innerText = text; });
+    }
+}
 
 function hasCommentAuthContext() {
     return typeof hasAuthContext === 'function' ? hasAuthContext() : Boolean(currentAuthUser && currentAuthor);
@@ -278,7 +327,16 @@ function showCommentInput(momentId, triggerElement = null, { isReply = false } =
         }
 
         const ta = inputArea.querySelector('.comment-textarea');
-        if (ta) setTimeout(() => ta.focus(), 100);
+        if (ta) {
+            ta.style.borderColor = '';
+            if (!ta.dataset.borderCleanBound) {
+                ta.dataset.borderCleanBound = 'true';
+                ta.addEventListener('input', () => {
+                    if (ta.style.borderColor) ta.style.borderColor = '';
+                });
+            }
+            setTimeout(() => ta.focus(), 100);
+        }
     }
 }
 
@@ -291,7 +349,10 @@ function cancelCommentInput(momentId, triggerElement = null) {
     const writeBtn = card ? card.querySelector('.comment-write-btn') : document.getElementById(`comment-write-btn-${momentId}`);
     const inputArea = card ? card.querySelector('.comment-input-area') : document.getElementById(`comment-input-area-${momentId}`);
     const ta = inputArea ? inputArea.querySelector('.comment-textarea') : document.getElementById(`comment-text-${momentId}`);
-    if (ta) ta.value = '';
+    if (ta) {
+        ta.value = '';
+        ta.style.borderColor = '';
+    }
     clearCommentReplyTarget(momentId, card);
     if (inputArea) inputArea.style.display = 'none';
     if (writeBtn) writeBtn.style.display = 'inline-flex';
@@ -321,7 +382,10 @@ function applyCommentLikeButtonState(button, likeActors, isLiked) {
 
     const heart = button.querySelector('.like-heart');
     if (heart) {
-        heart.textContent = isLiked ? '❤️' : '🤍';
+        const targetEmoji = isLiked ? '❤️' : '🤍';
+        if (heart.textContent !== targetEmoji) {
+            heart.textContent = targetEmoji;
+        }
     }
 
     const contentEl = button.querySelector('.like-count');
@@ -364,14 +428,21 @@ function toggleComments(momentId, triggerElement = null) {
     const isHidden = section.style.display === 'none';
     section.style.display = isHidden ? 'block' : 'none';
     section.setAttribute('aria-hidden', String(!isHidden));
-    
+
     const toggleBtn = card ? card.querySelector('.comment-toggle-btn') : document.getElementById(`comment-toggle-${momentId}`);
     toggleBtn?.setAttribute('aria-expanded', String(isHidden));
-    
-    if (isHidden) loadComments(momentId, card);
+
+    if (isHidden) {
+        section.classList.remove('is-entering');
+        void section.offsetWidth;
+        section.classList.add('is-entering');
+        loadComments(momentId, card);
+    } else {
+        section.classList.remove('is-entering');
+    }
 }
 
-async function loadComments(momentId, targetCard = null) {
+async function loadComments(momentId, targetCard = null, options = {}) {
     if (!hasCommentAuthContext()) return;
     const requestAuthEpoch = getCommentAuthEpoch();
     const requestId = (commentLoadRequests.get(momentId) || 0) + 1;
@@ -391,7 +462,12 @@ async function loadComments(momentId, targetCard = null) {
 
     const listEls = getListElements();
     if (!listEls.length) return;
-    listEls.forEach(listEl => setCommentStatus(listEl, '加载中…'));
+    // 保留已有评论列表避免清空闪烁；仅在列表尚无评论条目时显示加载提示
+    listEls.forEach(listEl => {
+        if (!listEl.querySelector('.comment-item')) {
+            setCommentStatus(listEl, '加载中…');
+        }
+    });
 
     const { data, error } = await supabaseClient.from('comments')
         .select('id, moment_id, user_id, author, content, created_at')
@@ -401,7 +477,11 @@ async function loadComments(momentId, targetCard = null) {
     if (!isCommentAuthEpochCurrent(requestAuthEpoch) || commentLoadRequests.get(momentId) !== requestId) return;
     const currentListEls = getListElements();
     if (error) {
-        currentListEls.forEach(listEl => setCommentStatus(listEl, '加载失败 😢'));
+        currentListEls.forEach(listEl => {
+            if (!listEl.querySelector('.comment-item')) {
+                setCommentStatus(listEl, '加载失败 😢');
+            }
+        });
         return;
     }
 
@@ -453,6 +533,11 @@ async function loadComments(momentId, targetCard = null) {
     if (!isCommentAuthEpochCurrent(requestAuthEpoch) || commentLoadRequests.get(momentId) !== requestId) return;
 
     currentListEls.forEach(listEl => {
+        const prevItemIds = new Set(
+            Array.from(listEl.querySelectorAll('.comment-item')).map(el => el.id).filter(Boolean)
+        );
+        const wasInitiallyEmpty = prevItemIds.size === 0;
+        const activeThinking = listEl.querySelector('.comment-ai-thinking');
         const fragment = document.createDocumentFragment();
         data.forEach((c, commentIndex) => {
             const commentId = Number(c.id);
@@ -472,15 +557,22 @@ async function loadComments(momentId, targetCard = null) {
             
             const likeActors = typeof window.resolveLikeActors === 'function' ? window.resolveLikeActors(likeRowsMap[c.id] || []) : [];
             const isLiked = Boolean(userLikedMap[c.id]);
+            commentLikesActorsCache.set(commentId, likeActors);
 
             const textContent = resolvedContents[commentIndex].text;
             const imageUrls = resolvedContents[commentIndex].images;
 
             const isAIComment = Boolean(resolvedContents[commentIndex].isAI);
+            const domId = `comment-${commentId}`;
+            const shouldAnimateEnter = options?.animateNewCommentId === commentId
+                || (!wasInitiallyEmpty && !prevItemIds.has(domId));
 
             const item = document.createElement('div');
-            item.className = `comment-item${isAIComment ? ' comment-item--ai' : ''}`;
-            item.id = `comment-${commentId}`;
+            item.className = `comment-item${isAIComment ? ' comment-item--ai' : ''}${shouldAnimateEnter ? ' comment-item--enter' : ''}`;
+            item.id = domId;
+            if (shouldAnimateEnter) {
+                setTimeout(() => item.classList.remove('comment-item--enter'), 380);
+            }
             const authorBadge = document.createElement('span');
 
             if (isAIComment) {
@@ -620,7 +712,7 @@ async function loadComments(momentId, targetCard = null) {
             count.id = `like-count-${commentId}`;
             likeButton.append(heart, count);
             applyCommentLikeButtonState(likeButton, likeActors, isLiked);
-            likeButton.addEventListener('click', () => toggleCommentLike(commentId, momentId));
+            likeButton.addEventListener('click', () => toggleCommentLike(commentId, momentId, likeButton));
             actionsWrap.appendChild(likeButton);
 
             const replyButton = document.createElement('button');
@@ -665,9 +757,13 @@ async function loadComments(momentId, targetCard = null) {
             fragment.appendChild(item);
         });
         listEl.replaceChildren(fragment);
+        if (activeThinking && activeAICommentReplies.has(momentId)) {
+            listEl.appendChild(activeThinking);
+        }
     });
 
     if (Array.isArray(data) && data.length > 0) {
+        syncMomentCommentCountDisplay(momentId, data.length);
         const commentIds = data.map(c => c.id);
         if (typeof window.autoMarkCommentsNotificationRead === 'function') {
             window.autoMarkCommentsNotificationRead(momentId, commentIds);
@@ -676,41 +772,71 @@ async function loadComments(momentId, targetCard = null) {
 }
 
 function confirmDeleteComment(commentId, momentId) {
-    if (!confirm('确定要撤回这条评论吗？此操作不可逆哦 💬')) {
+    if (!hasCommentAuthContext()) {
+        if (typeof openLoginModal === 'function') openLoginModal();
         return;
     }
-    if (hasCommentAuthContext()) {
-        deleteComment(commentId, momentId);
-        return;
-    }
-    if (typeof openLoginModal === 'function') openLoginModal();
+    return deleteComment(commentId, momentId);
 }
 
-// --- 评论点赞 ---
-async function toggleCommentLike(commentId, momentId) {
+// --- 评论点赞（零延迟乐观更新 + 失败自动回滚） ---
+async function toggleCommentLike(commentId, momentId, triggerElement = null) {
     if (!hasCommentAuthContext()) {
         if (typeof openLoginModal === 'function') openLoginModal();
         return;
     }
     const lockKey = String(commentId ?? '').trim();
     if (!lockKey || commentLikeInFlight.has(lockKey)) return;
+    if (!currentAuthUser || !currentAuthUser.id) return;
     commentLikeInFlight.add(lockKey);
 
-    const btns = document.querySelectorAll(`[id="like-btn-${commentId}"]`);
+    const normalizedCommentId = Number(commentId);
+    const btns = Array.from(document.querySelectorAll(`[id="like-btn-${commentId}"]`));
     btns.forEach(btn => btn.setAttribute('aria-busy', 'true'));
 
-    try {
-        const requestAuthEpoch = getCommentAuthEpoch();
-        const isLiked = btns.length ? btns[0].classList.contains('liked') : false;
+    const requestAuthEpoch = getCommentAuthEpoch();
+    const userId = currentAuthUser.id;
+    const authorName = typeof currentAuthor === 'string' ? currentAuthor : '';
+    const isLiked = btns.length ? btns[0].classList.contains('liked') : false;
+    const nextLiked = !isLiked;
+    const prevActors = commentLikesActorsCache.get(normalizedCommentId) || [];
 
+    let optimisticActors = prevActors;
+    if (typeof window.buildOptimisticActors === 'function') {
+        optimisticActors = window.buildOptimisticActors(prevActors, userId, authorName, nextLiked);
+    } else if (typeof window.resolveLikeActors === 'function') {
+        const filtered = prevActors.filter(a => a && a.userId !== userId && (!authorName || a.username !== authorName));
+        if (nextLiked) {
+            const selfActors = window.resolveLikeActors([{ user_id: userId, author: authorName }]);
+            optimisticActors = [...filtered, ...selfActors].sort((a, b) => (a.sortOrder ?? 2) - (b.sortOrder ?? 2));
+        } else {
+            optimisticActors = filtered;
+        }
+    }
+
+    if (Number.isSafeInteger(normalizedCommentId)) {
+        commentLikesActorsCache.set(normalizedCommentId, optimisticActors);
+    }
+    btns.forEach(btn => applyCommentLikeButtonState(btn, optimisticActors, nextLiked));
+
+    if (nextLiked) {
+        btns.forEach(btn => triggerCommentLikePop(btn, 520));
+        const targetBtn = triggerElement?.closest?.('.comment-like-btn') || triggerElement || btns[0];
+        if (targetBtn && typeof spawnHearts === 'function') {
+            const rect = targetBtn.getBoundingClientRect();
+            spawnHearts(rect.left + rect.width / 2, rect.top);
+        }
+    } else {
+        btns.forEach(btn => clearCommentLikePop(btn));
+    }
+
+    try {
         let error = null;
         if (isLiked) {
-            // 取消点赞
-            if (!currentAuthUser || !currentAuthUser.id) return;
             const res = await supabaseClient.from('comment_likes')
                 .delete()
                 .eq('comment_id', commentId)
-                .eq('user_id', currentAuthUser.id);
+                .eq('user_id', userId);
             error = res.error;
             if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
             if (!error && currentAuthUser) {
@@ -718,25 +844,34 @@ async function toggleCommentLike(commentId, momentId) {
                     .update({ type: 'recalled', content: '此点赞互动已被对方撤回' })
                     .eq('type', 'like')
                     .eq('related_id', commentId.toString())
-                    .eq('actor_id', currentAuthUser.id);
+                    .eq('actor_id', userId);
                 if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
             }
         } else {
-            // 点赞
             const res = await supabaseClient.from('comment_likes')
                 .insert([{ comment_id: commentId }]);
             error = res.error;
         }
         if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
+        if (error) throw error;
 
-        if (error) {
-            console.error('评论点赞失败:', error);
-            alert('点赞失败，请稍后重试。');
-            return;
-        }
-
-        // 刷新该评论的点赞状态
+        // 静默校准该评论的点赞状态
         await updateSingleLike(commentId);
+    } catch (error) {
+        console.error('评论点赞失败:', error);
+        if (isCommentAuthEpochCurrent(requestAuthEpoch)) {
+            if (Number.isSafeInteger(normalizedCommentId)) {
+                commentLikesActorsCache.set(normalizedCommentId, prevActors);
+            }
+            const currentBtns = document.querySelectorAll(`[id="like-btn-${commentId}"]`);
+            currentBtns.forEach(btn => {
+                clearCommentLikePop(btn);
+                applyCommentLikeButtonState(btn, prevActors, isLiked);
+            });
+            if (typeof window.showToast === 'function') {
+                window.showToast('点赞未成功，请稍后重试 🌸');
+            }
+        }
     } finally {
         commentLikeInFlight.delete(lockKey);
         document.querySelectorAll(`[id="like-btn-${commentId}"]`).forEach(btn => btn.removeAttribute('aria-busy'));
@@ -758,15 +893,35 @@ async function updateSingleLike(commentId) {
     const rows = Array.isArray(data) ? data : [];
     const likeActors = typeof window.resolveLikeActors === 'function' ? window.resolveLikeActors(rows) : [];
     const userLiked = Boolean(currentAuthUser && rows.some(l => l.user_id === currentAuthUser.id));
+    const normalizedId = Number(commentId);
+    if (Number.isSafeInteger(normalizedId)) {
+        commentLikesActorsCache.set(normalizedId, likeActors);
+    }
 
     btns.forEach(btn => applyCommentLikeButtonState(btn, likeActors, userLiked));
 }
 
-async function deleteComment(commentId, momentId) {
-    if (!hasCommentAuthContext()) return;
+async function deleteComment(commentId, momentId, options = {}) {
+    if (!hasCommentAuthContext()) {
+        if (typeof openLoginModal === 'function') openLoginModal();
+        return;
+    }
     const normalizedCommentId = Number(commentId);
     if (!Number.isSafeInteger(normalizedCommentId) || normalizedCommentId <= 0) return;
     if (commentDeleteInFlight.has(normalizedCommentId)) return;
+
+    if (options?.skipConfirm !== true) {
+        const confirmed = typeof window.showConfirmDialog === 'function'
+            ? await window.showConfirmDialog('确定要撤回这条评论吗？', {
+                title: '撤回评论',
+                confirmText: '撤回',
+                danger: true
+            })
+            : false;
+        if (!confirmed) return;
+        if (!hasCommentAuthContext() || commentDeleteInFlight.has(normalizedCommentId)) return;
+    }
+
     commentDeleteInFlight.add(normalizedCommentId);
 
     try {
@@ -798,23 +953,78 @@ async function deleteComment(commentId, momentId) {
         if (!isCommentAuthEpochCurrent(requestAuthEpoch)) return;
         if (error || deleted !== true) {
             console.error('撤回评论失败:', error);
-            alert('撤回失败，请稍后重试。');
+            if (typeof window.showToast === 'function') {
+                window.showToast('撤回评论失败，请稍后重试 🌸');
+            }
         } else {
             // 撤回成功后，物理清理该评论包含的图片
             if (mediaToDelete.length > 0) {
                 removeUploadedCommentObjects(mediaToDelete);
             }
+            commentLikesActorsCache.delete(normalizedCommentId);
+            if (activeCommentReplies.get(momentId)?.commentId === normalizedCommentId) {
+                clearCommentReplyTarget(momentId);
+            }
 
-            const items = document.querySelectorAll(`[id="comment-${normalizedCommentId}"]`);
+            const items = Array.from(document.querySelectorAll(`[id="comment-${normalizedCommentId}"]`));
+            const affectedLists = new Set();
             items.forEach(item => {
-                item.style.transition = 'opacity 0.3s, transform 0.3s';
-                item.style.opacity = '0';
-                item.style.transform = 'translateX(-10px)';
+                const listEl = item.closest('.comment-list');
+                if (listEl) affectedLists.add(listEl);
             });
-            setTimeout(() => {
-                loadComments(momentId);
+
+            const finalizeCommentRemoval = () => {
+                items.forEach(item => item.remove());
+                let remainingInFirstList = null;
+                affectedLists.forEach(listEl => {
+                    const remainingItems = listEl.querySelectorAll('.comment-item').length;
+                    if (remainingInFirstList === null) remainingInFirstList = remainingItems;
+                    if (remainingItems === 0 && !listEl.querySelector('.comment-ai-thinking')) {
+                        setCommentStatus(listEl, '还没有评论，来说点什么吧 ✨');
+                    }
+                });
+                if (remainingInFirstList !== null) {
+                    syncMomentCommentCountDisplay(momentId, remainingInFirstList);
+                }
                 loadCommentCounts([momentId]);
-            }, 300);
+            };
+
+            const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+            if (!items.length || reduceMotion) {
+                finalizeCommentRemoval();
+            } else {
+                items.forEach(item => {
+                    const startHeight = item.getBoundingClientRect().height;
+                    const computed = window.getComputedStyle(item);
+                    item.style.overflow = 'hidden';
+                    item.style.pointerEvents = 'none';
+                    item.style.maxHeight = `${startHeight}px`;
+                    item.style.marginBottom = computed.marginBottom;
+                    item.style.paddingTop = computed.paddingTop;
+                    item.style.paddingBottom = computed.paddingBottom;
+                    void item.offsetHeight;
+                    item.style.transition = [
+                        'opacity 200ms ease',
+                        'transform 260ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+                        'max-height 260ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+                        'margin-bottom 260ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+                        'padding-top 260ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+                        'padding-bottom 260ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))',
+                        'border-width 260ms ease'
+                    ].join(', ');
+                    requestAnimationFrame(() => {
+                        item.style.opacity = '0';
+                        item.style.transform = 'translateX(-12px) scale(0.98)';
+                        item.style.maxHeight = '0px';
+                        item.style.marginBottom = '0px';
+                        item.style.paddingTop = '0px';
+                        item.style.paddingBottom = '0px';
+                        item.style.borderTopWidth = '0px';
+                        item.style.borderBottomWidth = '0px';
+                    });
+                });
+                setTimeout(finalizeCommentRemoval, 270);
+            }
         }
     } finally {
         commentDeleteInFlight.delete(normalizedCommentId);
@@ -838,18 +1048,7 @@ async function loadCommentCounts(momentIds, options = {}) {
     data.forEach(c => { counts[c.moment_id] = (counts[c.moment_id] || 0) + 1; });
 
     momentIds.forEach(id => {
-        const count = counts[id] || 0;
-        const text = count > 0 ? `${count} 条评论` : '评论';
-        const cards = document.querySelectorAll(`[id="card-${id}"]`);
-        if (cards.length > 0) {
-            cards.forEach(card => {
-                const countEl = card.querySelector('.comment-toggle-btn span:last-child') || card.querySelector(`[id="comment-count-${id}"]`);
-                if (countEl) countEl.innerText = text;
-            });
-        } else {
-            const countEls = document.querySelectorAll(`[id="comment-count-${id}"]`);
-            countEls.forEach(el => { el.innerText = text; });
-        }
+        syncMomentCommentCountDisplay(id, counts[id] || 0);
     });
 }
 
@@ -863,23 +1062,35 @@ async function submitComment(momentId, triggerElement = null) {
     const imageEntries = commentImgFiles[momentId] || [];
     
     if (!textVal && imageEntries.length === 0) {
-        if (ta) { ta.style.borderColor = 'var(--primary)'; ta.focus(); }
+        if (typeof window.showToast === 'function') {
+            window.showToast('写点内容或选张照片再发送吧 🌸');
+        }
+        if (ta) {
+            ta.style.borderColor = '';
+            ta.focus();
+        }
         return;
     }
     if (textVal.length > MAX_COMMENT_TEXT_LENGTH) {
-        alert('评论最多 1000 个字符。');
+        if (typeof window.showToast === 'function') {
+            window.showToast('评论最多 1000 个字符哦 ✨');
+        }
         return;
     }
     if (imageEntries.length > MAX_COMMENT_IMAGE_COUNT
         || imageEntries.some(entry => !ALLOWED_COMMENT_IMAGE_TYPES.has(entry.file.type)
             || entry.file.size > MAX_COMMENT_IMAGE_BYTES)) {
-        alert('评论最多 4 张图片；单张不超过 10MB，仅支持 JPG/PNG/WebP/GIF。');
+        if (typeof window.showToast === 'function') {
+            window.showToast('评论最多 4 张图片，单张不超过 10MB（JPG/PNG/WebP/GIF）📸');
+        }
         return;
     }
 
     const storageDirectory = getCommentStorageDirectory();
     if (!storageDirectory || typeof createStorageReference !== 'function') {
-        alert('当前会话缺少空间信息，请重新登录后再试。');
+        if (typeof window.showToast === 'function') {
+            window.showToast('当前会话缺少空间信息，请重新登录后再试 🌸');
+        }
         return;
     }
 
@@ -949,7 +1160,7 @@ async function submitComment(momentId, triggerElement = null) {
         activeCommentReplies.delete(momentId);
         commentSubmitRequests.delete(momentId);
         cancelCommentInput(momentId, triggerElement);
-        await loadComments(momentId);
+        await loadComments(momentId, null, { animateNewCommentId: newCommentId });
         await loadCommentCounts([momentId]);
 
         if (triggerAI) {
@@ -963,7 +1174,9 @@ async function submitComment(momentId, triggerElement = null) {
     } catch(err) {
         if (!databaseCommitted) await removeUploadedCommentObjects(uploadedObjectPaths);
         console.error('评论发送失败:', err);
-        if (isCommentAuthEpochCurrent(requestAuthEpoch)) alert('评论发送失败，请稍后重试。');
+        if (isCommentAuthEpochCurrent(requestAuthEpoch) && typeof window.showToast === 'function') {
+            window.showToast('评论发送失败，请稍后重试 🌸');
+        }
     } finally {
         commentSubmitRequests.delete(momentId);
         if (submitBtn) { submitBtn.textContent = origText; submitBtn.disabled = false; }
@@ -1038,7 +1251,9 @@ window.handleCommentImgFiles = function(files, momentId, card = null) {
         && file.size <= MAX_COMMENT_IMAGE_BYTES);
     const acceptedFiles = validFiles.slice(0, availableSlots);
     if (acceptedFiles.length !== fileList.length) {
-        alert('评论最多 4 张图片；单张不超过 10MB，仅支持 JPG/PNG/WebP/GIF。');
+        if (typeof window.showToast === 'function') {
+            window.showToast('评论最多 4 张图片，单张不超过 10MB（JPG/PNG/WebP/GIF）📸');
+        }
     }
     acceptedFiles.forEach(file => {
         const objUrl = URL.createObjectURL(file);
@@ -1134,16 +1349,17 @@ async function submitAIAnalysisComment(momentId, commentText) {
         }
     }
 
-    await loadComments(momentId);
+    await loadComments(momentId, null, { animateNewCommentId: newCommentId });
     await loadCommentCounts([momentId]);
 
     // 定位并高亮最新生成的 AI 评论，确保用户在长图文卡片中立即感知到结果
-    const targetItem = (newCommentId && document.getElementById(`comment-item-${newCommentId}`))
+    const targetItem = (newCommentId && document.getElementById(`comment-${newCommentId}`))
         || document.querySelector(`[id="card-${momentId}"] .comment-list .comment-item:last-child`);
     if (targetItem) {
-        targetItem.classList.remove('comment-item--highlight');
+        targetItem.classList.remove('comment-item--enter', 'comment-item--highlight');
         void targetItem.offsetWidth;
         targetItem.classList.add('comment-item--highlight');
+        setTimeout(() => targetItem.classList.remove('comment-item--highlight'), 2100);
         if (typeof targetItem.scrollIntoView === 'function') {
             targetItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }

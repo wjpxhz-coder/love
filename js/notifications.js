@@ -386,6 +386,24 @@ function createNotificationItem(notification) {
     return item;
 }
 
+function computeMoodSectionScrollTop() {
+    const moodSection = document.querySelector('.mood-section');
+    if (
+        !moodSection
+        || document.body.classList.contains('app-page-active')
+        || moodSection.getClientRects().length === 0
+    ) {
+        return null;
+    }
+    const rect = moodSection.getBoundingClientRect();
+    const currentScrollY = window.scrollY || window.pageYOffset || 0;
+    const absTop = rect.top + currentScrollY;
+    const viewportH = window.innerHeight || document.documentElement.clientHeight || 800;
+    const centeredTop = absTop - Math.max(72, (viewportH - rect.height) * 0.5);
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - viewportH);
+    return Math.max(0, Math.min(Math.round(centeredTop), maxScroll));
+}
+
 function createMoodReminderItem(reminder) {
     const item = document.createElement('li');
     item.className = `notification-item mood-reminder-notification${reminder.isRead ? '' : ' unread'}`;
@@ -409,15 +427,25 @@ function createMoodReminderItem(reminder) {
     time.textContent = `每日 ${normalizeMoodReminderTime(moodReminderSettings?.reminderTime)} 提醒`;
     item.appendChild(time);
 
-    const activate = async () => {
-        await acknowledgeMoodReminder();
+    const activate = () => {
+        reminder.isRead = true;
+        if (currentMoodReminder) currentMoodReminder.isRead = true;
+        item.classList.remove('unread');
+        updateNotificationBadge();
+
         const panel = document.getElementById('notification-panel');
         panel?.classList.remove('show');
         panel?.setAttribute('aria-hidden', 'true');
         document.getElementById('notification-bell')?.setAttribute('aria-expanded', 'false');
-        document.querySelector('.mood-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        if (typeof openMoodModal === 'function') openMoodModal();
-        loadNotifications();
+
+        const moodTop = computeMoodSectionScrollTop();
+        if (typeof openMoodModal === 'function') {
+            openMoodModal();
+        }
+        if (moodTop !== null) {
+            window.setRouterHomeScroll?.(moodTop);
+        }
+        void acknowledgeMoodReminder();
     };
     item.addEventListener('click', activate);
     item.addEventListener('keydown', event => {
@@ -532,10 +560,8 @@ function toggleNotificationPanel() {
 
 async function markAllNotificationsRead() {
     if (!isAuthenticated()) return;
-    const epoch = authEpoch;
-    const userId = currentAuthUser.id;
 
-    // 乐观立即将前端所有未读通知标记为已读
+    // 乐观立即将前端所有未读通知标记为已读，后台静默同步数据库（不重绘列表防闪烁跳顶）
     currentLoadedNotifications.forEach(n => {
         if (!Array.isArray(n.read_by)) n.read_by = [];
         if (!n.read_by.includes(currentAuthor)) n.read_by.push(currentAuthor);
@@ -553,9 +579,7 @@ async function markAllNotificationsRead() {
     const { error } = notificationResult;
     if (error) {
         console.error('全部标为已读失败:', error);
-        return;
     }
-    if (isCurrentAuthSnapshot(epoch, userId)) loadNotifications();
 }
 
 async function handleNotificationClick(notificationId, type, relatedId) {
@@ -572,46 +596,47 @@ async function handleNotificationClick(notificationId, type, relatedId) {
     if (matched) {
         if (!Array.isArray(matched.read_by)) matched.read_by = [];
         if (!matched.read_by.includes(currentAuthor)) matched.read_by.push(currentAuthor);
-        const itemEl = document.querySelector(`li.notification-item[data-notification-id="${notificationId}"]`);
+        const safeIdSelector = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+            ? CSS.escape(String(notificationId))
+            : String(notificationId);
+        const itemEl = document.querySelector(`li.notification-item[data-notification-id="${safeIdSelector}"]`);
         if (itemEl) itemEl.classList.remove('unread');
         updateNotificationBadge();
     }
 
-    await markSingleNotificationRead(notificationId);
-    if (!isCurrentAuthSnapshot(epoch, userId)) return;
+    // 后台静默更新已读状态，不阻塞界面导航且不重复全量 replaceChildren
+    void markSingleNotificationRead(notificationId);
 
     if (type === 'mood') {
-        if (typeof appReplace === 'function') {
-            appReplace('/', { force: true, focus: false, scroll: false, reason: 'locate-mood' });
-        } else {
-            window.location.hash = '#/';
-        }
         const targetDate = relatedId;
-        const moodSection = document.querySelector('.mood-section');
-        if (moodSection) {
-            moodSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        const moodTop = computeMoodSectionScrollTop();
         if (typeof openMoodDayModal === 'function' && targetDate) {
             openMoodDayModal(targetDate);
+            if (moodTop !== null) {
+                window.setRouterHomeScroll?.(moodTop);
+            }
+        } else {
+            if (typeof appReplace === 'function') {
+                appReplace('/', { force: true, focus: false, scroll: false, reason: 'locate-mood' });
+            } else {
+                window.location.hash = '#/';
+            }
+            if (moodTop !== null) {
+                window.setRouterHomeScroll?.(moodTop);
+                window.scrollTo({ top: moodTop, behavior: 'smooth' });
+            }
         }
-        loadNotifications();
         return;
     }
 
     if (type === 'topic' || type === 'topic_message') {
-        const panel = document.getElementById('notification-panel');
-        panel?.classList.remove('show');
-        panel?.setAttribute('aria-hidden', 'true');
-        document.getElementById('notification-bell')?.setAttribute('aria-expanded', 'false');
         if (relatedId && typeof appNavigate === 'function') {
             appNavigate(`/topics/${relatedId}`);
         }
-        loadNotifications();
         return;
     }
 
     if (type === 'miss' || type === 'recalled' || !relatedId) {
-        loadNotifications();
         return;
     }
 
@@ -691,8 +716,6 @@ async function handleNotificationClick(notificationId, type, relatedId) {
         }
     } catch (error) {
         console.error('定位通知目标失败:', error);
-    } finally {
-        if (isCurrentAuthSnapshot(epoch, userId)) loadNotifications();
     }
 }
 
