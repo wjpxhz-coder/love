@@ -8,6 +8,7 @@
     <meta name="robots" content="noindex, nofollow, noarchive">
     <meta http-equiv="X-Frame-Options" content="DENY">
     <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#fff7f9">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon-192.png">
@@ -45,6 +46,8 @@
             var saved = localStorage.getItem('theme_preference');
             var theme = saved === 'dark' ? 'dark' : 'light';
             document.documentElement.setAttribute('data-theme', theme);
+            var themeMeta = document.querySelector('meta[name="theme-color"]');
+            if (themeMeta) themeMeta.content = theme === 'dark' ? '#150d1e' : '#fff7f9';
             var savedCursor = localStorage.getItem('cursor_preference');
             if (savedCursor === 'paw' || savedCursor === 'wand' || savedCursor === 'system') {
                 document.documentElement.setAttribute('data-cursor', savedCursor);
@@ -58,25 +61,25 @@
             document.documentElement.setAttribute('data-ambient', ambient);
         })();
     </script>
-    <link rel="stylesheet" href="css/variables.css?v=4.5.3">
-    <link rel="stylesheet" href="css/refresh.css?v=4.5.3">
-    <link rel="stylesheet" href="css/base.css?v=4.5.3">
-    <link rel="stylesheet" href="css/header.css?v=4.5.3">
-    <link rel="stylesheet" href="css/timer.css?v=4.5.3">
-    <link rel="stylesheet" href="css/timeline.css?v=4.5.3">
-    <link rel="stylesheet" href="css/dialogs.css?v=4.5.3">
-    <link rel="stylesheet" href="css/comments.css?v=4.5.3">
-    <link rel="stylesheet" href="css/ai-panel.css?v=4.5.3">
-    <link rel="stylesheet" href="css/fab.css?v=4.5.3">
-    <link rel="stylesheet" href="css/auth.css?v=4.5.3">
-    <link rel="stylesheet" href="css/profile.css?v=4.5.3">
-    <link rel="stylesheet" href="css/notifications.css?v=4.5.3">
-    <link rel="stylesheet" href="css/mood.css?v=4.5.3">
-    <link rel="stylesheet" href="css/anniversary.css?v=4.5.3">
-    <link rel="stylesheet" href="css/effects.css?v=4.5.3">
-    <link rel="stylesheet" href="css/responsive.css?v=4.5.3">
-    <link rel="stylesheet" href="css/pages.css?v=4.5.3">
-    <link rel="stylesheet" href="css/topics.css?v=4.5.3">
+    <link rel="stylesheet" href="css/variables.css?v=4.6.0">
+    <link rel="stylesheet" href="css/refresh.css?v=4.6.0">
+    <link rel="stylesheet" href="css/base.css?v=4.6.0">
+    <link rel="stylesheet" href="css/header.css?v=4.6.0">
+    <link rel="stylesheet" href="css/timer.css?v=4.6.0">
+    <link rel="stylesheet" href="css/timeline.css?v=4.6.0">
+    <link rel="stylesheet" href="css/dialogs.css?v=4.6.0">
+    <link rel="stylesheet" href="css/comments.css?v=4.6.0">
+    <link rel="stylesheet" href="css/ai-panel.css?v=4.6.0">
+    <link rel="stylesheet" href="css/fab.css?v=4.6.0">
+    <link rel="stylesheet" href="css/auth.css?v=4.6.0">
+    <link rel="stylesheet" href="css/profile.css?v=4.6.0">
+    <link rel="stylesheet" href="css/notifications.css?v=4.6.0">
+    <link rel="stylesheet" href="css/mood.css?v=4.6.0">
+    <link rel="stylesheet" href="css/anniversary.css?v=4.6.0">
+    <link rel="stylesheet" href="css/effects.css?v=4.6.0">
+    <link rel="stylesheet" href="css/responsive.css?v=4.6.0">
+    <link rel="stylesheet" href="css/pages.css?v=4.6.0">
+    <link rel="stylesheet" href="css/topics.css?v=4.6.0">
 </head>
 <body class="auth-pending">
 <!-- 内联矢量微光 SVG 图标库 -->
@@ -558,23 +561,23 @@
     <div class="fab-menu" id="fab-menu" aria-hidden="true">
         <div class="fab-item-wrapper">
             <span class="fab-label">一键想你</span>
-            <button class="fab-item fab-item-miss" type="button" onclick="sendMissYou(); toggleFabMenu();" aria-label="一键想你">💓</button>
+            <button class="fab-item fab-item-miss" type="button" onclick="closeFabMenu(); sendMissYou();" aria-label="一键想你">💓</button>
         </div>
         <div class="fab-item-wrapper">
             <span class="fab-label">感情小助手</span>
-            <button class="fab-item fab-item-ai" type="button" onclick="openAIModal(); toggleFabMenu();" aria-label="感情小助手">🤖</button>
+            <button class="fab-item fab-item-ai" type="button" onclick="closeFabMenu(true); openAIModal();" aria-label="感情小助手">🤖</button>
         </div>
         <div class="fab-item-wrapper">
             <span class="fab-label">检索回忆</span>
-            <button class="fab-item fab-item-filter" type="button" onclick="openFilterModal(); toggleFabMenu();" aria-label="检索回忆">🔍</button>
+            <button class="fab-item fab-item-filter" type="button" onclick="closeFabMenu(true); openFilterModal();" aria-label="检索回忆">🔍</button>
         </div>
         <div class="fab-item-wrapper">
             <span class="fab-label">恋爱手账</span>
-            <button class="fab-item fab-item-topics" type="button" onclick="openTopicsCatalog(); toggleFabMenu();" aria-label="恋爱手账">📖</button>
+            <button class="fab-item fab-item-topics" type="button" onclick="closeFabMenu(true); openTopicsCatalog();" aria-label="恋爱手账">📖</button>
         </div>
         <div class="fab-item-wrapper">
             <span class="fab-label">大事记</span>
-            <button class="fab-item fab-item-milestones" type="button" onclick="openMilestonesModal(); toggleFabMenu();" aria-label="重大事件">🏆</button>
+            <button class="fab-item fab-item-milestones" type="button" onclick="closeFabMenu(true); openMilestonesModal();" aria-label="重大事件">🏆</button>
         </div>
     </div>
     <button class="fab-main" id="fab-main" type="button" onclick="toggleFabMenu()" aria-label="功能菜单"
@@ -632,7 +635,7 @@
                 <textarea class="ai-chat-input" id="aiChatInput" maxlength="500" placeholder="说点什么，或只选择图片..." rows="1" onkeydown="handleChatKeyDown(event)"></textarea>
                 <button class="ai-chat-send-btn" id="aiChatSendBtn" type="button" onclick="sendChatMessage()" aria-label="发送消息">💌</button>
             </div>
-            <div class="ai-attachment-tip">支持 JPEG、PNG、WebP；最多 9 张，每张不超过 10 MiB，总计不超过 40 MiB，不会压缩。图片不会写入聊天历史。</div>
+            <div class="ai-attachment-tip">支持 JPEG、PNG、WebP；最多 9 张，每张不超过 10 MiB，大图将自动优化传输。图片不会写入聊天历史。</div>
         </div>
         <section class="ai-diary-picker" id="aiDiaryPicker" aria-labelledby="ai-diary-picker-title" hidden>
             <div class="ai-diary-picker-header">
@@ -1125,14 +1128,15 @@
         <div style="font-size:0.86rem; color:var(--text-muted); margin-bottom:12px;">为我们这次交流起一个名字吧，像目录一样整齐记录～</div>
         <input type="text" id="newTopicTitleInput" class="modal-input" placeholder="例如：周末的小矛盾 / 期末备考计划 / 去青岛旅行" maxlength="80">
         
+    <!-- 恋爱手账话题弹窗手势分类项补充键盘可达性 -->
         <div style="font-size:0.88rem; font-weight:700; margin-top:14px; color:var(--text);">🏷️ 选择手账分类</div>
-        <div class="category-radio-group">
-            <div class="category-radio-btn selected" data-category="reconciliation" onclick="selectTopicCategory('reconciliation')">矛盾和解 🌿</div>
-            <div class="category-radio-btn" data-category="study" onclick="selectTopicCategory('study')">学习备考 📚</div>
-            <div class="category-radio-btn" data-category="trip" onclick="selectTopicCategory('trip')">旅行规划 ✈️</div>
-            <div class="category-radio-btn" data-category="promise" onclick="selectTopicCategory('promise')">未来约定 💍</div>
-            <div class="category-radio-btn" data-category="life" onclick="selectTopicCategory('life')">生活琐事 💬</div>
-            <div class="category-radio-btn" data-category="general" onclick="selectTopicCategory('general')">专属话题 ✨</div>
+        <div class="category-radio-group" role="radiogroup" aria-label="选择手账分类">
+            <div class="category-radio-btn selected" role="radio" aria-checked="true" tabindex="0" data-category="reconciliation" onclick="selectTopicCategory('reconciliation')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTopicCategory('reconciliation');}">矛盾和解 🌿</div>
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-category="study" onclick="selectTopicCategory('study')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTopicCategory('study');}">学习备考 📚</div>
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-category="trip" onclick="selectTopicCategory('trip')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTopicCategory('trip');}">旅行规划 ✈️</div>
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-category="promise" onclick="selectTopicCategory('promise')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTopicCategory('promise');}">未来约定 💍</div>
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-category="life" onclick="selectTopicCategory('life')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTopicCategory('life');}">生活琐事 💬</div>
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-category="general" onclick="selectTopicCategory('general')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTopicCategory('general');}">专属话题 ✨</div>
         </div>
 
         <div class="modal-msg" id="newTopicModalMsg" role="status" aria-live="polite"></div>
@@ -1153,19 +1157,19 @@
         <input type="text" id="editTopicTitleInput" class="modal-input" placeholder="输入手账题目" maxlength="80" style="margin-top:0;">
         
         <div style="font-size:0.88rem; font-weight:700; margin-top:14px; margin-bottom:6px; color:var(--text); text-align:left;">🏷️ 手账分类</div>
-        <div class="category-radio-group" id="editCategoryRadioGroup">
-            <div class="category-radio-btn" data-category="reconciliation" onclick="selectEditTopicCategory('reconciliation')">矛盾和解 🌿</div>
-            <div class="category-radio-btn" data-category="study" onclick="selectEditTopicCategory('study')">学习备考 📚</div>
-            <div class="category-radio-btn" data-category="trip" onclick="selectEditTopicCategory('trip')">旅行规划 ✈️</div>
-            <div class="category-radio-btn" data-category="promise" onclick="selectEditTopicCategory('promise')">未来约定 💍</div>
-            <div class="category-radio-btn" data-category="life" onclick="selectEditTopicCategory('life')">生活琐事 💬</div>
-            <div class="category-radio-btn" data-category="general" onclick="selectEditTopicCategory('general')">专属话题 ✨</div>
+        <div class="category-radio-group" id="editCategoryRadioGroup" role="radiogroup" aria-label="编辑手账分类">
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-category="reconciliation" onclick="selectEditTopicCategory('reconciliation')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectEditTopicCategory('reconciliation');}">矛盾和解 🌿</div>
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-category="study" onclick="selectEditTopicCategory('study')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectEditTopicCategory('study');}">学习备考 📚</div>
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-category="trip" onclick="selectEditTopicCategory('trip')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectEditTopicCategory('trip');}">旅行规划 ✈️</div>
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-category="promise" onclick="selectEditTopicCategory('promise')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectEditTopicCategory('promise');}">未来约定 💍</div>
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-category="life" onclick="selectEditTopicCategory('life')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectEditTopicCategory('life');}">生活琐事 💬</div>
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-category="general" onclick="selectEditTopicCategory('general')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectEditTopicCategory('general');}">专属话题 ✨</div>
         </div>
 
         <div style="font-size:0.88rem; font-weight:700; margin-top:14px; margin-bottom:6px; color:var(--text); text-align:left;">📌 交流状态</div>
-        <div class="category-radio-group" id="editStatusRadioGroup">
-            <div class="category-radio-btn" data-status="open" onclick="selectEditTopicStatus('open')">💬 正在交流</div>
-            <div class="category-radio-btn" data-status="resolved" onclick="selectEditTopicStatus('resolved')">✨ 达成共识</div>
+        <div class="category-radio-group" id="editStatusRadioGroup" role="radiogroup" aria-label="交流状态">
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-status="open" onclick="selectEditTopicStatus('open')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectEditTopicStatus('open');}">💬 正在交流</div>
+            <div class="category-radio-btn" role="radio" aria-checked="false" tabindex="0" data-status="resolved" onclick="selectEditTopicStatus('resolved')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectEditTopicStatus('resolved');}">✨ 达成共识</div>
         </div>
 
         <div id="editTopicSummaryField" style="margin-top:12px;" hidden>
@@ -1214,29 +1218,29 @@
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.min.js"
         integrity="sha384-nWa0WrJ8Dl90YqhjSU0vNB8IxSO54t6AmEmV83LMTb/Img+Af2MfK7XJE54mwpSR"
         crossorigin="anonymous"></script>
-<script defer src="js/config.js?v=4.5.3"></script>
-<script defer src="js/animations.js?v=4.5.3"></script>
-<script defer src="js/timer.js?v=4.5.3"></script>
-<script defer src="js/auth.js?v=4.5.3"></script>
-<script defer src="js/profile.js?v=4.5.3"></script>
-<script defer src="js/drop-zone.js?v=4.5.3"></script>
-<script defer src="js/moments.js?v=4.5.3"></script>
-<script defer src="js/milestones.js?v=4.5.3"></script>
-<script defer src="js/likes.js?v=4.5.3"></script>
-<script defer src="js/comments.js?v=4.5.3"></script>
-<script defer src="js/mood.js?v=4.5.3"></script>
-<script defer src="js/anniversary.js?v=4.5.3"></script>
-<script defer src="js/lightbox.js?v=4.5.3"></script>
-<script defer src="js/ai.js?v=4.5.3"></script>
-<script defer src="js/blindbox.js?v=4.5.3"></script>
-<script defer src="js/presence.js?v=4.5.3"></script>
-<script defer src="js/theme.js?v=4.5.3"></script>
-<script defer src="js/notifications.js?v=4.5.3"></script>
-<script defer src="js/topics.js?v=4.5.3"></script>
-<script defer src="js/effects.js?v=4.5.3"></script>
-<script defer src="js/settings.js?v=4.5.3"></script>
-<script defer src="js/router.js?v=4.5.3"></script>
-<script defer src="js/app.js?v=4.5.3"></script>
+<script defer src="js/config.js?v=4.6.0"></script>
+<script defer src="js/animations.js?v=4.6.0"></script>
+<script defer src="js/timer.js?v=4.6.0"></script>
+<script defer src="js/auth.js?v=4.6.0"></script>
+<script defer src="js/profile.js?v=4.6.0"></script>
+<script defer src="js/drop-zone.js?v=4.6.0"></script>
+<script defer src="js/moments.js?v=4.6.0"></script>
+<script defer src="js/milestones.js?v=4.6.0"></script>
+<script defer src="js/likes.js?v=4.6.0"></script>
+<script defer src="js/comments.js?v=4.6.0"></script>
+<script defer src="js/mood.js?v=4.6.0"></script>
+<script defer src="js/anniversary.js?v=4.6.0"></script>
+<script defer src="js/lightbox.js?v=4.6.0"></script>
+<script defer src="js/ai.js?v=4.6.0"></script>
+<script defer src="js/blindbox.js?v=4.6.0"></script>
+<script defer src="js/presence.js?v=4.6.0"></script>
+<script defer src="js/theme.js?v=4.6.0"></script>
+<script defer src="js/notifications.js?v=4.6.0"></script>
+<script defer src="js/topics.js?v=4.6.0"></script>
+<script defer src="js/effects.js?v=4.6.0"></script>
+<script defer src="js/settings.js?v=4.6.0"></script>
+<script defer src="js/router.js?v=4.6.0"></script>
+<script defer src="js/app.js?v=4.6.0"></script>
 
 </body>
 </html>

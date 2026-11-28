@@ -34,13 +34,29 @@ button {
     overflow: hidden;
 }
 
-button:hover {
-    transform: translateY(-4px) scale(1.035);
-    box-shadow: var(--shadow-hover);
+@media (hover: hover) and (pointer: fine) {
+    button:not(:disabled):hover {
+        transform: translateY(-4px) scale(1.035);
+        box-shadow: var(--shadow-hover);
+    }
 }
 
-button:active { transform: scale(0.96); }
-button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-shadow: none; transform: none; }
+:where(button:not(:disabled)):active { transform: translateY(0) scale(0.96); }
+button:disabled {
+    background: #d6c8c8;
+    color: rgba(255, 255, 255, 0.88);
+    cursor: var(--cursor-not-allowed);
+    box-shadow: none;
+    transform: none;
+}
+[data-theme='dark'] button:disabled {
+    background: var(--surface-subtle, rgba(45, 28, 66, 0.82));
+    color: var(--text-muted);
+    border-color: rgba(255, 255, 255, 0.08);
+    opacity: 0.56;
+    box-shadow: none;
+    transform: none;
+}
 
 /* ── 时光轴 ── */
 .timeline-section {
@@ -54,9 +70,11 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
     transition: box-shadow 0.28s ease, border-color 0.28s ease;
 }
 
-.timeline-section:hover {
-    box-shadow: var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
-    border-color: rgba(253, 164, 175, 0.65);
+@media (hover: hover) and (pointer: fine) {
+    .timeline-section:hover {
+        box-shadow: var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
+        border-color: rgba(253, 164, 175, 0.65);
+    }
 }
 
 [data-theme='dark'] .timeline-section {
@@ -101,9 +119,8 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
     outline: none !important;
     opacity: 1;
     transform: none;
-    contain: layout style paint;
     content-visibility: auto;
-    contain-intrinsic-size: auto 240px;
+    contain-intrinsic-size: auto 380px;
     transition:
         transform 0.35s var(--ease-spring-gentle),
         box-shadow 0.28s ease,
@@ -111,6 +128,14 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
         background-color 0.28s ease,
         color 0.28s ease,
         opacity 0.28s ease;
+}
+
+/* 更多菜单展开或收起期间临时解除绘制边界裁切并抬升卡片层级，避免短动态菜单被截断或被相邻卡片遮挡 */
+.moment-card:has(.moment-menu-dropdown.is-open),
+.moment-card.is-menu-closing {
+    content-visibility: visible;
+    contain: none;
+    z-index: 30;
 }
 
 [data-theme='dark'] .moment-card {
@@ -127,10 +152,13 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
     display: none;
 }
 
-.moment-card.visible:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-hover);
-    border-color: rgba(253, 164, 175, 0.6);
+@media (hover: hover) and (pointer: fine) {
+    .moment-card:hover,
+    .moment-card.visible:hover {
+        transform: translateY(-3px) scale(1.006);
+        box-shadow: var(--shadow-hover);
+        border-color: rgba(253, 164, 175, 0.7);
+    }
 }
 
 .card-header {
@@ -160,12 +188,14 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
     background: linear-gradient(135deg, rgba(255, 182, 193, 0.28), rgba(255, 105, 140, 0.16));
     border: 2px solid #ffffff;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+    transition: transform 0.25s var(--ease-spring-snappy), box-shadow 0.25s ease;
     user-select: none;
 }
-.card-author-avatar-wrap:hover {
-    transform: scale(1.08) rotate(3deg);
-    box-shadow: 0 4px 14px rgba(255, 101, 132, 0.22);
+@media (hover: hover) and (pointer: fine) {
+    .card-author-avatar-wrap:hover {
+        transform: scale(1.08) rotate(3deg);
+        box-shadow: 0 4px 14px rgba(255, 101, 132, 0.22);
+    }
 }
 .card-author-avatar-wrap:active {
     transform: scale(0.95);
@@ -219,7 +249,7 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
     color: var(--text);
     border: 1px solid rgba(200, 155, 165, 0.28);
     transition:
-        transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+        transform 0.22s var(--ease-spring-snappy),
         background-color 0.2s ease,
         border-color 0.2s ease,
         box-shadow 0.2s ease;
@@ -227,10 +257,6 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
 .card-author-tag[role="button"] {
     cursor: var(--cursor-pointer);
     user-select: none;
-}
-.card-author-tag[role="button"]:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
 }
 .card-author-tag[role="button"]:active {
     transform: scale(0.96);
@@ -240,20 +266,10 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
     color: #e11d48;
     border-color: rgba(255, 105, 140, 0.28);
 }
-.card-author-tag.author-snake[role="button"]:hover {
-    background: rgba(255, 105, 140, 0.2);
-    border-color: rgba(255, 105, 140, 0.42);
-    box-shadow: 0 3px 10px rgba(255, 105, 140, 0.18);
-}
 .card-author-tag.author-xi {
     background: rgba(96, 165, 250, 0.16);
     color: #2563eb;
     border-color: rgba(96, 165, 250, 0.3);
-}
-.card-author-tag.author-xi[role="button"]:hover {
-    background: rgba(96, 165, 250, 0.24);
-    border-color: rgba(96, 165, 250, 0.45);
-    box-shadow: 0 3px 10px rgba(59, 130, 246, 0.18);
 }
 
 .card-author-sub-row {
@@ -306,20 +322,37 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
     color: #ff8fab;
     border-color: rgba(255, 143, 171, 0.36);
 }
-[data-theme='dark'] .card-author-tag.author-snake[role="button"]:hover {
-    background: rgba(255, 105, 140, 0.32);
-    border-color: rgba(255, 143, 171, 0.5);
-    box-shadow: 0 3px 12px rgba(255, 105, 140, 0.24);
-}
 [data-theme='dark'] .card-author-tag.author-xi {
     background: rgba(147, 197, 253, 0.22);
     color: #93c5fd;
     border-color: rgba(147, 197, 253, 0.36);
 }
-[data-theme='dark'] .card-author-tag.author-xi[role="button"]:hover {
-    background: rgba(147, 197, 253, 0.3);
-    border-color: rgba(147, 197, 253, 0.52);
-    box-shadow: 0 3px 12px rgba(96, 165, 250, 0.24);
+
+@media (hover: hover) and (pointer: fine) {
+    .card-author-tag[role="button"]:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    }
+    .card-author-tag.author-snake[role="button"]:hover {
+        background: rgba(255, 105, 140, 0.2);
+        border-color: rgba(255, 105, 140, 0.42);
+        box-shadow: 0 3px 10px rgba(255, 105, 140, 0.18);
+    }
+    .card-author-tag.author-xi[role="button"]:hover {
+        background: rgba(96, 165, 250, 0.24);
+        border-color: rgba(96, 165, 250, 0.45);
+        box-shadow: 0 3px 10px rgba(59, 130, 246, 0.18);
+    }
+    [data-theme='dark'] .card-author-tag.author-snake[role="button"]:hover {
+        background: rgba(255, 105, 140, 0.32);
+        border-color: rgba(255, 143, 171, 0.5);
+        box-shadow: 0 3px 12px rgba(255, 105, 140, 0.24);
+    }
+    [data-theme='dark'] .card-author-tag.author-xi[role="button"]:hover {
+        background: rgba(147, 197, 253, 0.3);
+        border-color: rgba(147, 197, 253, 0.52);
+        box-shadow: 0 3px 12px rgba(96, 165, 250, 0.24);
+    }
 }
 
 .delete-btn {
@@ -332,17 +365,23 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
     font-size: 0.74em;
     cursor: var(--cursor-pointer);
     box-shadow: none;
-    transition: all 0.2s;
+    transition:
+        transform 0.2s var(--ease-spring-snappy),
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease;
     letter-spacing: 0.5px;
     flex-shrink: 0;
 }
 
-.delete-btn:hover {
-    background: rgba(255, 105, 140, 0.15);
-    color: var(--primary);
-    border-color: var(--primary);
-    transform: none;
-    box-shadow: none;
+@media (hover: hover) and (pointer: fine) {
+    .delete-btn:hover {
+        background: rgba(255, 105, 140, 0.15);
+        color: var(--primary);
+        border-color: var(--primary);
+        transform: none;
+        box-shadow: none;
+    }
 }
 
 
@@ -367,7 +406,7 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             font-weight: 700;
             line-height: 1;
             letter-spacing: 0;
-            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+            transition: transform 0.3s var(--ease-spring-snappy), background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -375,13 +414,22 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             padding: 0;
         }
 
-        .moment-menu-trigger:hover,
         .moment-menu-trigger:focus-visible {
             background: rgba(200, 155, 155, 0.15);
             color: var(--primary);
             border-color: var(--border);
             transform: rotate(90deg) scale(1.08);
             box-shadow: none;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .moment-menu-trigger:hover {
+                background: rgba(200, 155, 155, 0.15);
+                color: var(--primary);
+                border-color: var(--border);
+                transform: rotate(90deg) scale(1.08);
+                box-shadow: none;
+            }
         }
 
         .moment-menu-trigger:active {
@@ -406,14 +454,16 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             gap: 3px;
             opacity: 0;
             visibility: hidden;
+            pointer-events: none;
             transform: scale(0.92) translateY(-6px);
             transform-origin: top right;
-            transition: opacity 0.18s cubic-bezier(0.2, 0.9, 0.3, 1), transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1), visibility 0.18s;
+            transition: opacity 0.18s var(--ios-ease-popover), transform 0.18s var(--ios-ease-popover), visibility 0.18s;
         }
 
         .moment-menu-dropdown.is-open {
             opacity: 1;
             visibility: visible;
+            pointer-events: auto;
             transform: scale(1) translateY(0);
         }
 
@@ -430,12 +480,11 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             color: var(--text);
             cursor: var(--cursor-pointer);
             text-align: left;
-            transition: background 0.15s ease, color 0.15s ease;
+            transition: transform 0.18s var(--ease-spring-gentle), background-color 0.15s ease, color 0.15s ease;
             box-shadow: none;
             font-family: inherit;
         }
 
-        .moment-menu-item:hover,
         .moment-menu-item:focus-visible {
             background: rgba(200, 155, 155, 0.12);
             color: var(--primary);
@@ -447,7 +496,6 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             color: #d64555;
         }
 
-        .moment-menu-item--danger:hover,
         .moment-menu-item--danger:focus-visible {
             background: rgba(214, 69, 85, 0.12);
             color: #bd2d3e;
@@ -458,10 +506,26 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             font-weight: 500;
         }
 
-        .moment-menu-item--ai:hover,
         .moment-menu-item--ai:focus-visible {
             background: rgba(232, 67, 96, 0.12);
             color: #c92a49;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .moment-menu-item:hover {
+                background: rgba(200, 155, 155, 0.12);
+                color: var(--primary);
+                transform: translateX(3px);
+                box-shadow: none;
+            }
+            .moment-menu-item--danger:hover {
+                background: rgba(214, 69, 85, 0.12);
+                color: #bd2d3e;
+            }
+            .moment-menu-item--ai:hover {
+                background: rgba(232, 67, 96, 0.12);
+                color: #c92a49;
+            }
         }
 
         .moment-edited-badge {
@@ -487,10 +551,30 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             cursor: var(--cursor-text);
         }
 
+        /* ── 全文/隐藏照片柔和展开微动效 ── */
+        @keyframes momentSoftReveal {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .moment-soft-reveal {
+            animation: momentSoftReveal 0.24s var(--ios-ease-decel) var(--reveal-delay, 0ms) both;
+        }
+
         /* ── 微光流光骨架屏动效 ── */
         @keyframes mediaShimmer {
             0% { background-position: -200% 0; }
             100% { background-position: 200% 0; }
+        }
+
+        @keyframes singleMediaFadeIn {
+            from { opacity: 0.72; }
+            to { opacity: 1; }
         }
 
         .card-img {
@@ -503,7 +587,7 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             background-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
             background-size: 200% 100%;
             animation: mediaShimmer 1.8s ease-in-out infinite;
-            transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: opacity 0.35s var(--ios-ease-decel);
         }
 
         [data-theme='dark'] .card-img {
@@ -516,7 +600,9 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             animation: none;
         }
 
-        .card-img:hover { opacity: 0.92; }
+        @media (hover: hover) and (pointer: fine) {
+            .card-img:hover { opacity: 0.92; }
+        }
         /* ── 图文动态弹窗及瀑布流样式 ── */
         .moment-image-preview-container {
             display: flex;
@@ -535,14 +621,19 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             align-items: center;
             justify-content: center;
             cursor: var(--cursor-pointer);
-            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+            transition:
+                transform 0.25s var(--ease-spring-snappy),
+                background-color 0.25s ease,
+                border-color 0.25s ease;
             padding: 0;
             box-shadow: none;
             letter-spacing: normal;
         }
-        .moment-image-add-btn:hover {
-            background: rgba(255, 255, 255, 0.9);
-            border-color: var(--primary-light);
+        @media (hover: hover) and (pointer: fine) {
+            .moment-image-add-btn:hover {
+                background: rgba(255, 255, 255, 0.9);
+                border-color: var(--primary-light);
+            }
         }
         .moment-preview-item {
             position: relative;
@@ -576,11 +667,14 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             font-size: 13px;
             cursor: var(--cursor-pointer);
             line-height: 1;
+            transition: transform 0.2s var(--ease-spring-snappy), background-color 0.2s ease;
         }
-        .moment-preview-item .remove-btn:hover {
-            background: rgba(225, 29, 72, 0.9);
-            transform: scale(1.1);
-            box-shadow: none;
+        @media (hover: hover) and (pointer: fine) {
+            .moment-preview-item .remove-btn:hover {
+                background: rgba(225, 29, 72, 0.9);
+                transform: scale(1.1);
+                box-shadow: none;
+            }
         }
         .moment-grid {
             display: grid;
@@ -604,8 +698,10 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             background-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
             background-size: 200% 100%;
             animation: mediaShimmer 1.8s ease-in-out infinite;
-            transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1), transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease;
-            will-change: transform;
+            transition:
+                opacity 0.35s var(--ios-ease-decel),
+                transform 0.28s var(--ease-spring-snappy),
+                box-shadow 0.28s ease;
         }
         [data-theme='dark'] .moment-grid-item {
             background-color: rgba(60, 45, 50, 0.4);
@@ -615,10 +711,12 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             background: none;
             animation: none;
         }
-        .moment-grid-item:hover {
-            transform: scale(1.035) translateZ(0);
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
-            z-index: 2;
+        @media (hover: hover) and (pointer: fine) {
+            .moment-grid-item:hover {
+                transform: scale(1.035) translateZ(0);
+                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+                z-index: 2;
+            }
         }
         .moment-grid-item:active {
             transform: scale(0.97) translateZ(0);
@@ -632,7 +730,7 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             cursor: var(--cursor-pointer);
             box-shadow: 0 2px 6px rgba(0,0,0,0.08);
             background-color: rgba(40, 30, 35, 0.15);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            transition: transform 0.22s var(--ease-spring-snappy), box-shadow 0.2s ease;
         }
         .moment-grid-video-wrap::after {
             content: '';
@@ -644,9 +742,11 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
         [data-theme='dark'] .moment-grid-video-wrap {
             background-color: rgba(20, 15, 18, 0.6);
         }
-        .moment-grid-video-wrap:hover {
-            transform: scale(1.02);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        @media (hover: hover) and (pointer: fine) {
+            .moment-grid-video-wrap:hover {
+                transform: scale(1.02);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
         }
         .moment-grid-video-wrap .moment-grid-item {
             width: 100%;
@@ -676,7 +776,8 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
         }
         .moment-single-image {
             max-width: 100%;
-            min-height: 100px;
+            width: auto;
+            height: auto;
             border-radius: 12px;
             margin-top: 10px;
             cursor: var(--cursor-zoom-in);
@@ -687,11 +788,16 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             background-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
             background-size: 200% 100%;
             animation: mediaShimmer 1.8s ease-in-out infinite;
-            transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1), transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease;
+            transition:
+                opacity 0.32s var(--ios-ease-decel),
+                transform 0.28s var(--ease-spring-snappy),
+                box-shadow 0.28s ease;
         }
-        .moment-single-image:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        @media (hover: hover) and (pointer: fine) {
+            .moment-single-image:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            }
         }
         .moment-single-image:active {
             transform: scale(0.985);
@@ -711,15 +817,16 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
         [data-theme='dark'] video.moment-single-image {
             background-color: #100c0e;
         }
+        /* 温和骨架占位：避免强制 width: 100%; aspect-ratio: 4/3; cover 导致加载完跳回 contain 的高度弹跳 */
         img.moment-single-image:not(.media-loaded) {
+            min-width: min(240px, 100%);
             min-height: 180px;
-            width: 100%;
-            aspect-ratio: 4 / 3;
-            object-fit: cover;
+            opacity: 0.88;
         }
         .moment-single-image.media-loaded {
             background: none;
-            animation: none;
+            animation: singleMediaFadeIn 0.28s var(--ios-ease-decel) both;
+            opacity: 1;
         }
 
         .show-all-images-btn {
@@ -733,24 +840,35 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             margin-top: 10px;
             cursor: var(--cursor-pointer);
             width: 100%;
-            transition: all 0.2s;
+            transition:
+                transform 0.22s var(--ease-spring-snappy),
+                background-color 0.2s ease,
+                border-color 0.2s ease,
+                color 0.2s ease;
             box-shadow: none;
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        .show-all-images-btn:hover {
-            background: rgba(200, 155, 155, 0.2);
-            transform: translateY(-1px);
+        @media (hover: hover) and (pointer: fine) {
+            .show-all-images-btn:hover {
+                background: rgba(200, 155, 155, 0.2);
+                transform: translateY(-1px);
+            }
         }
 
         /* ── 空状态 ── */
         .empty-state {
             text-align: center;
-            padding: 30px 0;
+            padding: 36px 16px;
             color: var(--text-muted);
-            font-size: 0.9em;
-            letter-spacing: 1px;
+            font-size: 0.92em;
+            line-height: 1.7;
+            letter-spacing: 0.8px;
+            white-space: pre-line;
+        }
+        .empty-state.is-error {
+            color: var(--primary);
         }
 
         .load-more-indicator {
@@ -791,14 +909,16 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
         }
 
         /* 大事记标签徽章 */
-        .moment-card.milestone:hover .milestone-badge-timeline {
-            transform: scale(1.05) rotate(2deg);
-        }
-        .moment-card.milestone:hover .milestone-days-badge {
-            transform: scale(1.04);
+        @media (hover: hover) and (pointer: fine) {
+            .moment-card.milestone:hover .milestone-badge-timeline {
+                transform: scale(1.05) rotate(2deg);
+            }
+            .moment-card.milestone:hover .milestone-days-badge {
+                transform: scale(1.04);
+            }
         }
         .milestone-badge-timeline {
-            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: transform 0.25s var(--ease-spring-snappy);
             display: inline-flex;
             align-items: center;
             height: 22px;
@@ -828,6 +948,7 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
 
         /* 已过天数纪念徽章 */
         .milestone-days-badge {
+            transition: transform 0.25s var(--ease-spring-snappy);
             display: inline-flex;
             align-items: center;
             height: 22px;
@@ -871,12 +992,14 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             justify-content: center;
             gap: 6px;
             animation: newMomentsBounce 2.4s infinite ease-in-out;
-            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+            transition: transform 0.25s var(--ease-spring-snappy), box-shadow 0.25s ease;
         }
 
-        .new-moments-pill:hover {
-            transform: translateY(-2px) scale(1.04);
-            box-shadow: 0 8px 24px var(--primary-glow);
+        @media (hover: hover) and (pointer: fine) {
+            .new-moments-pill:hover {
+                transform: translateY(-2px) scale(1.04);
+                box-shadow: 0 8px 24px var(--primary-glow);
+            }
         }
 
         .new-moments-pill:active {
@@ -909,7 +1032,7 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             box-shadow: 0 8px 26px rgba(245, 158, 11, 0.14), inset 0 1.5px 1px rgba(255, 255, 255, 0.9);
             color: var(--text);
             overflow: hidden;
-            transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease;
+            transition: transform 0.28s var(--ease-spring-snappy), box-shadow 0.28s ease;
         }
 
         [data-theme='dark'] .on-this-day-card,
@@ -978,13 +1101,7 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             border: 1px solid rgba(245, 158, 11, 0.22);
             box-shadow: 0 3px 10px rgba(245, 158, 11, 0.08);
             cursor: var(--cursor-pointer);
-            transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .on-this-day-item:hover {
-            transform: translateY(-1px);
-            background: rgba(255, 255, 255, 0.94);
-            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.15);
+            transition: transform 0.22s var(--ease-spring-snappy), background-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         [data-theme='dark'] .on-this-day-item,
@@ -994,9 +1111,16 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
         }
 
-        [data-theme='dark'] .on-this-day-item:hover,
-        [data-theme="dark"] .on-this-day-item:hover {
-            background: rgba(42, 25, 62, 0.85);
+        @media (hover: hover) and (pointer: fine) {
+            .on-this-day-item:hover {
+                transform: translateY(-1px);
+                background: rgba(255, 255, 255, 0.94);
+                box-shadow: 0 6px 16px rgba(245, 158, 11, 0.15);
+            }
+            [data-theme='dark'] .on-this-day-item:hover,
+            [data-theme="dark"] .on-this-day-item:hover {
+                background: rgba(42, 25, 62, 0.85);
+            }
         }
 
         .on-this-day-thumb {
@@ -1056,15 +1180,12 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             box-shadow: 0 6px 18px rgba(244, 63, 94, 0.14), inset 0 1px 1px #ffffff;
             font-weight: 700;
             letter-spacing: 0.5px;
-            transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        .btn-polaroid-share:hover {
-            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
-            color: #ffffff;
-            border-color: transparent;
-            box-shadow: 0 10px 24px var(--primary-glow);
-            transform: translateY(-2px) scale(1.03);
+            transition:
+                transform 0.28s var(--ease-spring-snappy),
+                box-shadow 0.25s ease,
+                border-color 0.25s ease,
+                color 0.25s ease,
+                background-color 0.25s ease;
         }
 
         [data-theme='dark'] .btn-polaroid-share,
@@ -1075,12 +1196,21 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
         }
 
-        [data-theme='dark'] .btn-polaroid-share:hover,
-        [data-theme="dark"] .btn-polaroid-share:hover {
-            background: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
-            color: #ffffff;
-            border-color: transparent;
-            box-shadow: 0 10px 26px rgba(251, 113, 133, 0.38);
+        @media (hover: hover) and (pointer: fine) {
+            .btn-polaroid-share:hover {
+                background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+                color: #ffffff;
+                border-color: transparent;
+                box-shadow: 0 10px 24px var(--primary-glow);
+                transform: translateY(-2px) scale(1.03);
+            }
+            [data-theme='dark'] .btn-polaroid-share:hover,
+            [data-theme="dark"] .btn-polaroid-share:hover {
+                background: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+                color: #ffffff;
+                border-color: transparent;
+                box-shadow: 0 10px 26px rgba(251, 113, 133, 0.38);
+            }
         }
 
 
@@ -1101,11 +1231,13 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.4, 1.2), box-shadow 0.25s ease;
+            transition: transform 0.25s var(--ease-spring-snappy), box-shadow 0.25s ease;
         }
-        .moment-single-video-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+        @media (hover: hover) and (pointer: fine) {
+            .moment-single-video-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+            }
         }
         .moment-single-video-poster {
             width: 100%;
@@ -1154,12 +1286,14 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
             justify-content: center;
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
             color: #d84572;
-            transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease, box-shadow 0.3s ease;
+            transition: transform 0.32s var(--ease-spring-snappy), background-color 0.2s ease, box-shadow 0.3s ease;
         }
-        .moment-single-video-card:hover .moment-single-video-play-btn {
-            transform: scale(1.14) translateZ(0);
-            background: #ffffff;
-            box-shadow: 0 8px 26px rgba(216, 69, 114, 0.45), 0 0 0 6px rgba(255, 255, 255, 0.28);
+        @media (hover: hover) and (pointer: fine) {
+            .moment-single-video-card:hover .moment-single-video-play-btn {
+                transform: scale(1.14) translateZ(0);
+                background: #ffffff;
+                box-shadow: 0 8px 26px rgba(216, 69, 114, 0.45), 0 0 0 6px rgba(255, 255, 255, 0.28);
+            }
         }
         .moment-single-video-card:active .moment-single-video-play-btn {
             transform: scale(0.94) translateZ(0);
@@ -1201,4 +1335,16 @@ button:disabled { background: #d6c8c8; cursor: var(--cursor-not-allowed); box-sh
         [data-theme='dark'] .moment-single-video-play-btn {
             background: rgba(255, 255, 255, 0.88);
             color: #c93b66;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .card-img,
+            .moment-grid-item,
+            .moment-single-image,
+            .moment-single-image.media-loaded,
+            .new-moments-pill,
+            .load-more-spinner,
+            .moment-soft-reveal {
+                animation: none !important;
+            }
         }

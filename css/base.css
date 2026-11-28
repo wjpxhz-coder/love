@@ -3,20 +3,24 @@ html {
     scrollbar-width: thin;
     background-color: var(--bg-1);
     cursor: var(--cursor-default);
+    -webkit-tap-highlight-color: transparent;
 }
 
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, var(--primary-light), var(--primary));
-    border-radius: 10px;
+@supports not (scrollbar-color: auto) {
+    html {
+        scrollbar-width: auto;
+    }
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, var(--primary-light), var(--primary));
+        border-radius: 10px;
+    }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,6 +35,17 @@ body {
     flex-direction: column;
     align-items: center;
     overflow-x: hidden;
+}
+
+body.is-scroll-locked {
+    overflow: hidden;
+    padding-right: calc(max(16px, env(safe-area-inset-right, 0px)) + var(--app-scrollbar-comp, 0px));
+}
+
+@media (max-width: 680px) {
+    body.is-scroll-locked {
+        padding-right: calc(max(12px, env(safe-area-inset-right, 0px)) + var(--app-scrollbar-comp, 0px));
+    }
 }
 
 .visually-hidden {
@@ -259,9 +274,32 @@ body.app-page-active #bg-layer .aurora-orb,
     animation-play-state: paused !important;
 }
 
-/* 昼夜主题平滑过渡 */
+/* 昼夜主题平滑过渡（配合 View Transitions API 实现全屏渐变与卡片 100% 同步溶解） */
 body, #bg-layer {
-    transition: background-color 0.35s ease, color 0.35s ease;
+    transition: background-color 0.28s ease, color 0.28s ease;
+}
+
+html.is-theme-transitioning *,
+html.is-theme-transitioning *::before,
+html.is-theme-transitioning *::after {
+    transition: none !important;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 280ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes themeIconPop {
+    0% { transform: rotate(-38deg) scale(0.72); opacity: 0.4; }
+    100% { transform: rotate(0deg) scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .theme-switch-anim {
+        animation: themeIconPop 0.34s var(--ease-spring-snappy);
+    }
 }
 
 /* ── 统一电影景深浮屏桃花雨 Canvas（半透明薄纱水彩，浮于内容卡片之上、严格低于顶栏与弹窗） ── */
@@ -273,7 +311,13 @@ body, #bg-layer {
     pointer-events: none;
     z-index: 2;
     contain: strict;
-    transition: opacity 0.45s ease;
+    transition: opacity 0.32s ease;
+}
+
+html.is-route-transitioning #sakura-canvas,
+body.app-page-settled #sakura-canvas {
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
 
 :root[data-ambient='calm'] #sakura-canvas {
@@ -314,9 +358,11 @@ body, #bg-layer {
     transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease;
 }
 
-.locked-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
+@media (hover: hover) and (pointer: fine) {
+    .locked-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
+    }
 }
 
 [data-theme='dark'] .locked-card {
@@ -356,13 +402,15 @@ body, #bg-layer {
     justify-content: center;
     cursor: var(--cursor-pointer);
     box-shadow: 0 4px 16px var(--primary-glow);
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.28s var(--ease-spring-snappy), box-shadow 0.25s ease, opacity 0.2s ease;
     outline: none;
 }
 
-.btn-locked-login:hover {
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 8px 24px var(--primary-glow);
+@media (hover: hover) and (pointer: fine) {
+    .btn-locked-login:hover {
+        transform: translateY(-3px) scale(1.05);
+        box-shadow: 0 8px 24px var(--primary-glow);
+    }
 }
 
 .btn-locked-login:active {
@@ -383,6 +431,14 @@ body, #bg-layer {
 
 @keyframes fadeInUp {
     to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fade-in-section {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
 }
 
 /* ── 全站语义交互元素专属光标基线 ── */

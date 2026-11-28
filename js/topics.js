@@ -36,6 +36,7 @@ let topicSelectedPhotos = [];
 let topicPhotoPreviewUrls = new Set();
 let topicPhotoItemSeq = 0;
 let isTopicRecording = false;
+let isTopicRecordingStarting = false;
 let topicMediaRecorder = null;
 let topicAudioChunks = [];
 let topicAudioBlob = null;
@@ -127,15 +128,30 @@ async function ensureTopicAuthReady(maxWaitMs = 4000) {
  */
 const topicModalCloseTimers = new WeakMap();
 
+function getTopicModalLockReason(modal) {
+    return `topic-modal:${modal?.id || 'dialog'}`;
+}
+
+function setTopicModalAmbientSuspended(suspended, reason) {
+    if (typeof window.suspendAllAmbientEffects === 'function') {
+        window.suspendAllAmbientEffects(suspended, reason);
+    } else {
+        window.homeSakuraEffect?.setSuspended?.(suspended, reason);
+    }
+}
+
 function showTopicModal(modal) {
     if (!modal) return;
     initTopicModalBackdropHandlers();
+    const lockReason = getTopicModalLockReason(modal);
     const pendingTimer = topicModalCloseTimers.get(modal);
     if (pendingTimer) {
         clearTimeout(pendingTimer);
         topicModalCloseTimers.delete(modal);
     }
     modal.classList.remove('is-closing');
+    window.lockBodyScroll?.(lockReason);
+    setTopicModalAmbientSuspended(true, lockReason);
     try {
         if (typeof modal.showModal === 'function') {
             if (!modal.open) {
@@ -147,6 +163,7 @@ function showTopicModal(modal) {
     } catch (_e) {
         modal.setAttribute('open', '');
     }
+    window.promoteToastLayer?.();
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
         modal.classList.add('is-open');
     } else {
@@ -158,7 +175,6 @@ function showTopicModal(modal) {
             }
         });
     }
-    window.homeSakuraEffect?.setSuspended?.(true, `topic-modal:${modal.id || 'dialog'}`);
 }
 
 /**
@@ -166,6 +182,7 @@ function showTopicModal(modal) {
  */
 function hideTopicModal(modal) {
     if (!modal) return;
+    const lockReason = getTopicModalLockReason(modal);
     const pendingTimer = topicModalCloseTimers.get(modal);
     if (pendingTimer) {
         clearTimeout(pendingTimer);
@@ -186,7 +203,8 @@ function hideTopicModal(modal) {
         } catch (_e) {
             modal.removeAttribute('open');
         }
-        window.homeSakuraEffect?.setSuspended?.(false, `topic-modal:${modal.id || 'dialog'}`);
+        window.unlockBodyScroll?.(lockReason);
+        setTopicModalAmbientSuspended(false, lockReason);
     };
 
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
@@ -197,7 +215,7 @@ function hideTopicModal(modal) {
 
     modal.classList.remove('is-open');
     modal.classList.add('is-closing');
-    const timer = setTimeout(finishClose, 225);
+    const timer = setTimeout(finishClose, 240);
     topicModalCloseTimers.set(modal, timer);
 }
 
@@ -208,13 +226,15 @@ function initTopicModalBackdropHandlers() {
     document.querySelectorAll('dialog.topic-modal-dialog').forEach(modal => {
         if (modal.dataset.backdropBound) return;
         modal.dataset.backdropBound = 'true';
+        const lockReason = getTopicModalLockReason(modal);
         modal.addEventListener('cancel', (e) => {
             e.preventDefault();
             hideTopicModal(modal);
         });
         modal.addEventListener('close', () => {
             modal.classList.remove('is-open', 'is-closing');
-            window.homeSakuraEffect?.setSuspended?.(false, `topic-modal:${modal.id || 'dialog'}`);
+            window.unlockBodyScroll?.(lockReason);
+            setTopicModalAmbientSuspended(false, lockReason);
         });
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
@@ -223,6 +243,16 @@ function initTopicModalBackdropHandlers() {
         });
     });
 }
+
+function handleTopicCardKeyDown(event, topicId) {
+    if (!event || !topicId) return;
+    if (event.target !== event.currentTarget) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        appNavigate(`/topics/${topicId}`);
+    }
+}
+window.handleTopicCardKeyDown = handleTopicCardKeyDown;
 
 // ==========================================================================
 // 1. 首页板块逻辑
@@ -295,7 +325,7 @@ function renderHomeTopics(topics) {
         const safeId = escapeHtml(String(topic.id));
 
         return `
-            <div class="home-topic-card ${isResolved ? 'is-resolved' : ''}" onclick="appNavigate('/topics/${safeId}')" role="button" tabindex="0">
+            <div class="home-topic-card ${isResolved ? 'is-resolved' : ''}" onclick="appNavigate('/topics/${safeId}')" onkeydown="handleTopicCardKeyDown(event, '${safeId}')" role="button" tabindex="0">
                 <div class="home-topic-card-header">
                     <span class="topic-tag category-${escapeHtml(topic.category)}">${catInfo.label}</span>
                     ${statusHtml}
@@ -345,7 +375,13 @@ async function loadTopicsCatalog(category = activeTopicCategoryFilter) {
     }
 
     const reqEpoch = getTopicCurrentAuthEpoch();
-    listEl.innerHTML = `<div class="empty-state">正在翻开我们的手账目录… 📖</div>`;
+    const hasExistingContent = Boolean(listEl.querySelector('.topic-list-card, .home-topics-empty'));
+    if (hasExistingContent) {
+        listEl.classList.add('is-loading-filter');
+        listEl.setAttribute('aria-busy', 'true');
+    } else {
+        listEl.innerHTML = `<div class="empty-state">正在翻开我们的手账目录… 📖</div>`;
+    }
 
     try {
         let query = supabaseClient
@@ -361,6 +397,9 @@ async function loadTopicsCatalog(category = activeTopicCategoryFilter) {
         const { data, error } = await query;
         if (reqId !== catalogTopicsReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
 
+        listEl.classList.remove('is-loading-filter');
+        listEl.removeAttribute('aria-busy');
+
         if (error) {
             listEl.innerHTML = `<div class="empty-state">加载手账目录失败，请稍后重试</div>`;
             return;
@@ -370,6 +409,8 @@ async function loadTopicsCatalog(category = activeTopicCategoryFilter) {
         renderTopicsCatalog(catalogTopicsList);
     } catch (err) {
         if (reqId !== catalogTopicsReqId || reqEpoch !== getTopicCurrentAuthEpoch()) return;
+        listEl.classList.remove('is-loading-filter');
+        listEl.removeAttribute('aria-busy');
         console.error('加载话题手账目录异常:', err);
         listEl.innerHTML = `<div class="empty-state">加载手账目录异常</div>`;
     }
@@ -404,7 +445,7 @@ function renderTopicsCatalog(topics) {
         const safeId = escapeHtml(String(topic.id));
 
         return `
-            <div class="topic-list-card ${isResolved ? 'is-resolved' : ''}" onclick="appNavigate('/topics/${safeId}')" role="button" tabindex="0">
+            <div class="topic-list-card ${isResolved ? 'is-resolved' : ''}" onclick="appNavigate('/topics/${safeId}')" onkeydown="handleTopicCardKeyDown(event, '${safeId}')" role="button" tabindex="0">
                 <div class="topic-list-card-top">
                     <span class="topic-tag category-${escapeHtml(topic.category)}">${catInfo.label}</span>
                     ${statusHtml}
@@ -454,9 +495,11 @@ function openNewTopicModal() {
     if (msg) msg.textContent = '';
     selectedNewTopicCategory = 'reconciliation';
 
-    // 选中默认分类
-    document.querySelectorAll('.category-radio-btn').forEach(btn => {
-        btn.classList.toggle('selected', btn.dataset.category === selectedNewTopicCategory);
+    // 选中默认分类并同步 aria-checked
+    document.querySelectorAll('#newTopicModal .category-radio-btn').forEach(btn => {
+        const isSelected = btn.dataset.category === selectedNewTopicCategory;
+        btn.classList.toggle('selected', isSelected);
+        btn.setAttribute('aria-checked', String(isSelected));
     });
 
     showTopicModal(modal);
@@ -469,8 +512,10 @@ function closeNewTopicModal() {
 
 function selectTopicCategory(cat) {
     selectedNewTopicCategory = cat;
-    document.querySelectorAll('.category-radio-btn').forEach(btn => {
-        btn.classList.toggle('selected', btn.dataset.category === cat);
+    document.querySelectorAll('#newTopicModal .category-radio-btn').forEach(btn => {
+        const isSelected = btn.dataset.category === cat;
+        btn.classList.toggle('selected', isSelected);
+        btn.setAttribute('aria-checked', String(isSelected));
     });
 }
 
@@ -537,8 +582,31 @@ async function loadTopicDetail(topicId) {
 
     const titleEl = document.getElementById('topic-detail-title');
     const flowEl = document.getElementById('topic-messages-flow');
-    if (titleEl) titleEl.textContent = '手账加载中…';
+
+    // 若内存缓存（首页列表或目录列表）已命中该话题，立即先行回填顶栏标题与分类标签，避免闪出“手账加载中…”
+    const cachedTopic = (homeTopicsList || []).find(t => String(t.id) === String(topicId))
+        || (catalogTopicsList || []).find(t => String(t.id) === String(topicId))
+        || (currentTopicDetail && String(currentTopicDetail.id) === String(topicId) ? currentTopicDetail : null);
+
+    if (cachedTopic) {
+        currentTopicDetail = cachedTopic;
+        window.currentTopicDetail = cachedTopic;
+        renderTopicDetailShell(cachedTopic);
+    } else {
+        if (titleEl) titleEl.textContent = '手账加载中…';
+        const catEl = document.getElementById('topic-detail-category-tag');
+        if (catEl) {
+            catEl.className = 'topic-tag category-general';
+            catEl.textContent = TOPIC_CATEGORIES.general.label;
+        }
+        const summaryBanner = document.getElementById('topic-summary-banner');
+        if (summaryBanner) {
+            summaryBanner.hidden = true;
+            summaryBanner.innerHTML = '';
+        }
+    }
     if (flowEl) flowEl.innerHTML = '<div class="empty-state">正在展开这一页的对话回忆… 🌸</div>';
+    bindTopicFlowScrollAndMediaPinning();
 
     // 确保认证信息就绪
     if (!currentUserProfile?.space_id || !currentAuthUser) {
@@ -601,8 +669,8 @@ async function loadTopicDetail(topicId) {
         // 3. 订阅该话题的 Realtime 动态
         initTopicRealtimeSubscription(topicId);
 
-        // 滚动到底部最新消息
-        scrollTopicToBottom();
+        // 首次进入直接瞬时定位到底部最新消息（告别先看第1条再慢滚的拖沓感）
+        scrollTopicToBottom({ behavior: 'auto', instant: true });
 
         // 自动标为已读
         if (typeof window.autoMarkTopicNotificationRead === 'function') {
@@ -766,6 +834,83 @@ async function renderTopicMessages(messages) {
     flowEl.innerHTML = rowsHtml.join('');
 }
 
+let isTopicPinnedToBottom = true;
+let lastTopicScrollerClientHeight = 0;
+let lastTopicVisualViewportHeight = typeof window !== 'undefined' && window.visualViewport
+    ? window.visualViewport.height
+    : 0;
+let topicViewportPinningBound = false;
+
+function getTopicDetailScroller() {
+    return document.querySelector('#topicDetailModal .app-page-scroll');
+}
+
+function isTopicScrollerNearBottom(scroller = getTopicDetailScroller(), threshold = 140) {
+    if (!scroller) return true;
+    return (scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight) <= threshold;
+}
+
+function bindTopicFlowScrollAndMediaPinning() {
+    const scroller = getTopicDetailScroller();
+    if (scroller && scroller.dataset.scrollPinBound !== 'true') {
+        scroller.dataset.scrollPinBound = 'true';
+        lastTopicScrollerClientHeight = scroller.clientHeight;
+        scroller.addEventListener('scroll', () => {
+            isTopicPinnedToBottom = isTopicScrollerNearBottom(scroller, 140);
+            lastTopicScrollerClientHeight = scroller.clientHeight;
+        }, { passive: true });
+    }
+
+    const flowEl = document.getElementById('topic-messages-flow');
+    if (flowEl && flowEl.dataset.imgLoadPinBound !== 'true') {
+        flowEl.dataset.imgLoadPinBound = 'true';
+        flowEl.addEventListener('load', (event) => {
+            if (event.target?.tagName !== 'IMG') return;
+            const currentScroller = getTopicDetailScroller();
+            if (currentScroller && isTopicPinnedToBottom) {
+                currentScroller.scrollTop = currentScroller.scrollHeight;
+                lastTopicScrollerClientHeight = currentScroller.clientHeight;
+            }
+        }, true);
+    }
+
+    initTopicViewportPinning();
+}
+
+function initTopicViewportPinning() {
+    if (topicViewportPinningBound || typeof window === 'undefined' || !window.visualViewport) return;
+    topicViewportPinningBound = true;
+    lastTopicVisualViewportHeight = window.visualViewport.height;
+    window.visualViewport.addEventListener('resize', () => {
+        const vv = window.visualViewport;
+        if (!vv) return;
+        const prevVvHeight = lastTopicVisualViewportHeight || vv.height;
+        lastTopicVisualViewportHeight = vv.height;
+
+        const page = document.getElementById('topicDetailModal');
+        const scroller = getTopicDetailScroller();
+        if (!page || page.hidden || !page.classList.contains('is-active') || !scroller) {
+            return;
+        }
+
+        const prevClientH = lastTopicScrollerClientHeight || scroller.clientHeight;
+        const wasNearBottom = isTopicPinnedToBottom
+            || (scroller.scrollHeight - scroller.scrollTop - prevClientH) <= 150;
+        lastTopicScrollerClientHeight = scroller.clientHeight;
+
+        if (vv.height < prevVvHeight - 12 && wasNearBottom) {
+            isTopicPinnedToBottom = true;
+            scroller.scrollTop = scroller.scrollHeight;
+            requestAnimationFrame(() => {
+                if (scroller.isConnected) {
+                    scroller.scrollTop = scroller.scrollHeight;
+                    lastTopicScrollerClientHeight = scroller.clientHeight;
+                }
+            });
+        }
+    }, { passive: true });
+}
+
 async function appendSingleTopicMessageToFlow(msg) {
     const flowEl = document.getElementById('topic-messages-flow');
     if (!flowEl || !msg) return;
@@ -784,28 +929,74 @@ async function appendSingleTopicMessageToFlow(msg) {
     if (emptyEl) emptyEl.remove();
 
     flowEl.insertAdjacentHTML('beforeend', rowHtml);
+    const rowEl = flowEl.querySelector(`.topic-message-row[data-msg-id="${CSS.escape(msgIdStr)}"]`);
+    if (rowEl && !window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+        rowEl.classList.add('is-entering');
+        rowEl.addEventListener('animationend', () => {
+            rowEl.classList.remove('is-entering');
+        }, { once: true });
+    }
 }
 
-function removeSingleTopicMessageFromFlow(msgId) {
+async function removeSingleTopicMessageFromFlow(msgId, options = {}) {
     const flowEl = document.getElementById('topic-messages-flow');
     if (!flowEl) return;
 
     const msgIdStr = String(msgId);
     const rowEl = flowEl.querySelector(`.topic-message-row[data-msg-id="${CSS.escape(msgIdStr)}"]`);
-    if (rowEl) rowEl.remove();
+    if (!rowEl) {
+        if (!flowEl.querySelector('.topic-message-row')) {
+            flowEl.innerHTML = getEmptyTopicMessagesHtml();
+        }
+        return;
+    }
+    if (rowEl.classList.contains('is-removing')) return;
 
-    if (!flowEl.querySelector('.topic-message-row')) {
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    if (options.immediate || reduced) {
+        rowEl.remove();
+        if (!flowEl.querySelector('.topic-message-row')) {
+            flowEl.innerHTML = getEmptyTopicMessagesHtml();
+        }
+        return;
+    }
+
+    rowEl.classList.remove('is-entering');
+    rowEl.classList.add('is-removing');
+    await new Promise(resolve => setTimeout(resolve, 220));
+    rowEl.remove();
+    if (flowEl.isConnected && !flowEl.querySelector('.topic-message-row:not(.is-removing)')) {
         flowEl.innerHTML = getEmptyTopicMessagesHtml();
     }
 }
 
-function scrollTopicToBottom() {
-    const scroller = document.querySelector('#topicDetailModal .app-page-scroll');
-    if (scroller) {
-        setTimeout(() => {
-            scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
-        }, 100);
+function scrollTopicToBottom(options = {}) {
+    const scroller = getTopicDetailScroller();
+    if (!scroller) return;
+    isTopicPinnedToBottom = true;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    const instant = options.instant === true || options.behavior === 'auto' || reduced;
+    if (instant) {
+        if (typeof scroller.scrollTo === 'function') {
+            scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'auto' });
+        } else {
+            scroller.scrollTop = scroller.scrollHeight;
+        }
+        lastTopicScrollerClientHeight = scroller.clientHeight;
+        requestAnimationFrame(() => {
+            if (scroller.isConnected && isTopicPinnedToBottom) {
+                scroller.scrollTop = scroller.scrollHeight;
+                lastTopicScrollerClientHeight = scroller.clientHeight;
+            }
+        });
+        return;
     }
+    if (typeof scroller.scrollTo === 'function') {
+        scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+    } else {
+        scroller.scrollTop = scroller.scrollHeight;
+    }
+    lastTopicScrollerClientHeight = scroller.clientHeight;
 }
 
 function openTopicPhotoLightbox(url, gallery = null, initialIndex = 0) {
@@ -859,9 +1050,17 @@ function initTopicRealtimeSubscription(topicId) {
                 // 如果是新消息且列表中尚未包含，增量追加而不重绘历史消息
                 const exists = currentTopicMessages.some(m => String(m.id) === String(payload.new.id));
                 if (!exists) {
+                    const scroller = getTopicDetailScroller();
+                    const wasNearBottom = isTopicScrollerNearBottom(scroller, 140);
+                    const isSelfMsg = payload.new.user_id === currentAuthUser?.id
+                        || payload.new.author === currentUserProfile?.username;
                     currentTopicMessages.push(payload.new);
                     await appendSingleTopicMessageToFlow(payload.new);
-                    scrollTopicToBottom();
+                    if (isSelfMsg || wasNearBottom) {
+                        scrollTopicToBottom({ behavior: 'smooth' });
+                    } else if (typeof window.showToast === 'function') {
+                        window.showToast('收到 TA 的新留言 💌');
+                    }
                 }
                 // 前台正停留在此话题实时聊天，对方发来的新消息通知静默标已读
                 if (typeof window.autoMarkTopicNotificationRead === 'function') {
@@ -961,11 +1160,7 @@ function handleTopicPhotoFiles(files) {
     if (!fileList.length) return;
 
     if (topicSelectedPhotos.length + fileList.length > 9) {
-        if (typeof showToast === 'function') {
-            showToast('最多只能选择 9 张照片哦～ 🌸');
-        } else {
-            alert('最多只能选择 9 张照片哦～');
-        }
+        window.showToast?.('最多只能选择 9 张照片哦～ 🌸');
         return;
     }
 
@@ -973,17 +1168,11 @@ function handleTopicPhotoFiles(files) {
 
     for (const file of fileList) {
         if (!file.type || !file.type.startsWith('image/')) {
-            if (typeof showToast === 'function') {
-                showToast('仅支持选择图片格式的文件哦 🌸');
-            }
+            window.showToast?.('仅支持选择图片格式的文件哦 🌸');
             continue;
         }
         if (file.size > MAX_TOPIC_PHOTO_BYTES) {
-            if (typeof showToast === 'function') {
-                showToast(`图片「${file.name}」超过 20MB 上限，请换一张更小的图片 🌸`);
-            } else {
-                alert(`图片「${file.name}」超过 20MB 上限`);
-            }
+            window.showToast?.(`图片「${file.name}」超过 20MB 上限，请换一张更小的图片 🌸`);
             continue;
         }
 
@@ -1079,12 +1268,31 @@ async function toggleTopicRecording() {
     }
 }
 
+function resolveCurrentActiveTopicId() {
+    return currentTopicDetail?.id
+        || window.currentTopicDetail?.id
+        || (typeof getCurrentAppRoute === 'function' && getCurrentAppRoute()?.id === 'topic-detail'
+            ? getCurrentAppRoute()?.params?.id
+            : null)
+        || null;
+}
+
 async function startTopicRecording() {
+    if (isTopicRecording || isTopicRecordingStarting) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert('当前浏览器环境不支持语音录制');
+        window.showToast?.('当前浏览器环境不支持语音录制 🎙️');
         return;
     }
 
+    const activeTopicBeforePrompt = resolveCurrentActiveTopicId();
+    if (!activeTopicBeforePrompt) {
+        if (typeof showToast === 'function') {
+            showToast('手账正在加载中，请稍候再试 🌸');
+        }
+        return;
+    }
+
+    isTopicRecordingStarting = true;
     try {
         if (topicAudioDurationTimer) {
             clearInterval(topicAudioDurationTimer);
@@ -1095,9 +1303,9 @@ async function startTopicRecording() {
             topicRecordingStream = null;
         }
 
-        const activeTopicBeforePrompt = currentActiveTopicId;
         topicRecordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        if (!currentActiveTopicId || currentActiveTopicId !== activeTopicBeforePrompt) {
+        const activeTopicAfterPrompt = resolveCurrentActiveTopicId();
+        if (!activeTopicAfterPrompt || String(activeTopicAfterPrompt) !== String(activeTopicBeforePrompt)) {
             topicRecordingStream.getTracks().forEach(track => track.stop());
             topicRecordingStream = null;
             return;
@@ -1144,8 +1352,16 @@ async function startTopicRecording() {
             }
         }, 1000);
     } catch (err) {
-        console.error('麦克风录音权限被拒绝或失败:', err);
-        alert('无法获取麦克风权限');
+        console.error('麦克风录音启动失败:', err);
+        const errName = err?.name || '';
+        const msg = (errName === 'NotFoundError' || errName === 'DevicesNotFoundError')
+            ? '未检测到可用的麦克风设备 🎙️'
+            : (errName === 'NotAllowedError' || errName === 'PermissionDeniedError')
+                ? '请在浏览器设置中允许麦克风权限 🎙️'
+                : '无法启动麦克风录音，请稍后重试';
+        window.showToast?.(msg);
+    } finally {
+        isTopicRecordingStarting = false;
     }
 }
 
@@ -1195,12 +1411,45 @@ function deleteTopicAudioPreview() {
     if (previewWrap) previewWrap.hidden = true;
 }
 
+function autoResizeTopicComposerInput(inputEl) {
+    const el = inputEl || document.getElementById('topicComposerTextInput');
+    if (!el) return;
+    if (!el.value) {
+        el.style.height = '';
+        el.style.overflowY = 'hidden';
+        return;
+    }
+    el.style.height = 'auto';
+    const nextHeight = Math.min(el.scrollHeight, 120);
+    el.style.height = `${nextHeight}px`;
+    el.style.overflowY = el.scrollHeight > 120 ? 'auto' : 'hidden';
+}
+
+function resetTopicComposerInputHeight(inputEl) {
+    const el = inputEl || document.getElementById('topicComposerTextInput');
+    if (!el) return;
+    el.style.height = '';
+    el.style.overflowY = 'hidden';
+}
+
+function bindTopicComposerAutoGrow() {
+    const input = document.getElementById('topicComposerTextInput');
+    if (!input || input.dataset.autoGrowBound === 'true') return;
+    input.dataset.autoGrowBound = 'true';
+    input.addEventListener('input', () => {
+        autoResizeTopicComposerInput(input);
+    });
+}
+
 function resetTopicComposer() {
     stopTopicRecording();
     deleteTopicAudioPreview();
 
     const input = document.getElementById('topicComposerTextInput');
-    if (input) input.value = '';
+    if (input) {
+        input.value = '';
+        resetTopicComposerInputHeight(input);
+    }
 
     topicPhotoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
     topicPhotoPreviewUrls.clear();
@@ -1223,6 +1472,11 @@ function resetTopicsStateOnLogout() {
     deletingTopicMsgIds.clear();
     isTopicAIRequesting = false;
     isTopicMessageSending = false;
+    isTopicPinnedToBottom = true;
+
+    document.querySelectorAll('dialog.topic-modal-dialog[open]').forEach(modal => {
+        hideTopicModal(modal);
+    });
 
     cleanupTopicRealtimeSubscription();
     resetTopicComposer();
@@ -1235,7 +1489,11 @@ function resetTopicsStateOnLogout() {
 
     ['home-topics-content', 'topics-catalog-list', 'topic-messages-flow'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.innerHTML = '';
+        if (el) {
+            el.classList.remove('is-loading-filter');
+            el.removeAttribute('aria-busy');
+            el.innerHTML = '';
+        }
     });
     const summaryBanner = document.getElementById('topic-summary-banner');
     if (summaryBanner) {
@@ -1255,11 +1513,7 @@ async function sendTopicMessage() {
     const text = textInput ? textInput.value.trim() : '';
 
     if (text.length > MAX_TOPIC_TEXT_LENGTH) {
-        if (typeof showToast === 'function') {
-            showToast(`心声留言最多支持 ${MAX_TOPIC_TEXT_LENGTH} 字，请精简后再发送 🌸`);
-        } else {
-            alert(`心声留言最多支持 ${MAX_TOPIC_TEXT_LENGTH} 字`);
-        }
+        window.showToast?.(`心声留言最多支持 ${MAX_TOPIC_TEXT_LENGTH} 字，请精简后再发送 🌸`);
         return;
     }
 
@@ -1274,26 +1528,22 @@ async function sendTopicMessage() {
 
     if (!currentTopicDetail) {
         console.warn('sendTopicMessage: currentTopicDetail 缺失');
-        if (typeof showToast === 'function') {
-            showToast('手账详情加载中或不存在，请刷新重试 🌸');
-        } else {
-            alert('手账详情加载中或不存在，请刷新重试 🌸');
-        }
+        window.showToast?.('手账详情加载中或不存在，请刷新重试 🌸');
         return;
     }
 
     if (!currentAuthUser || !currentUserProfile?.space_id) {
         console.warn('sendTopicMessage: 认证信息缺失');
-        if (typeof showToast === 'function') {
-            showToast('请先登录情侣空间后再发送消息哦 🌸');
-        } else {
-            alert('请先登录情侣空间后再发送消息哦 🌸');
-        }
+        window.showToast?.('请先登录情侣空间后再发送消息哦 🌸');
         return;
     }
 
     isTopicMessageSending = true;
-    if (sendBtn) sendBtn.disabled = true;
+    if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.classList.add('is-sending');
+        sendBtn.setAttribute('aria-busy', 'true');
+    }
 
     const uploadedPhotoRefs = [];
     let uploadedAudioRef = null;
@@ -1372,15 +1622,11 @@ async function sendTopicMessage() {
         if (error) {
             console.error('保存消息失败:', error);
             await removeUploadedTopicObjects([...uploadedPhotoRefs, uploadedAudioRef].filter(Boolean));
-            if (typeof showToast === 'function') {
-                showToast('发送失败：' + error.message);
-            } else {
-                alert('发送失败：' + error.message);
-            }
+            window.showToast?.('发送失败：' + error.message);
             return;
         }
 
-        // 清理输入状态
+        // 清理输入状态（自动归位单行高度）
         resetTopicComposer();
 
         // 本地立即增量追加（Realtime 会有去重）
@@ -1388,18 +1634,18 @@ async function sendTopicMessage() {
             currentTopicMessages.push(data);
         }
         await appendSingleTopicMessageToFlow(data);
-        scrollTopicToBottom();
+        scrollTopicToBottom({ behavior: 'smooth' });
     } catch (err) {
         console.error('发送话题消息异常:', err);
         await removeUploadedTopicObjects([...uploadedPhotoRefs, uploadedAudioRef].filter(Boolean));
-        if (typeof showToast === 'function') {
-            showToast('发送发生异常，请重试');
-        } else {
-            alert('发送发生异常，请重试');
-        }
+        window.showToast?.('发送发生异常，请重试 🌸');
     } finally {
         isTopicMessageSending = false;
-        if (sendBtn) sendBtn.disabled = false;
+        if (sendBtn) {
+            sendBtn.disabled = false;
+            sendBtn.classList.remove('is-sending');
+            sendBtn.removeAttribute('aria-busy');
+        }
     }
 }
 
@@ -1645,14 +1891,18 @@ async function openEditTopicModal(topicId, event) {
     selectedEditTopicCategory = topic?.category || 'general';
     selectedEditTopicStatus = topic?.status || 'open';
 
-    // 设置分类选中高亮
+    // 设置分类选中高亮与 aria-checked
     document.querySelectorAll('#editCategoryRadioGroup .category-radio-btn').forEach(btn => {
-        btn.classList.toggle('selected', btn.dataset.category === selectedEditTopicCategory);
+        const isSelected = btn.dataset.category === selectedEditTopicCategory;
+        btn.classList.toggle('selected', isSelected);
+        btn.setAttribute('aria-checked', String(isSelected));
     });
 
-    // 设置状态单选高亮
+    // 设置状态单选高亮与 aria-checked
     document.querySelectorAll('#editStatusRadioGroup .category-radio-btn').forEach(btn => {
-        btn.classList.toggle('selected', btn.dataset.status === selectedEditTopicStatus);
+        const isSelected = btn.dataset.status === selectedEditTopicStatus;
+        btn.classList.toggle('selected', isSelected);
+        btn.setAttribute('aria-checked', String(isSelected));
     });
 
     // 设置共识约定输入框
@@ -1679,10 +1929,14 @@ async function openEditTopicModal(topicId, event) {
                 selectedEditTopicStatus = data.status || 'open';
 
                 document.querySelectorAll('#editCategoryRadioGroup .category-radio-btn').forEach(btn => {
-                    btn.classList.toggle('selected', btn.dataset.category === selectedEditTopicCategory);
+                    const isSelected = btn.dataset.category === selectedEditTopicCategory;
+                    btn.classList.toggle('selected', isSelected);
+                    btn.setAttribute('aria-checked', String(isSelected));
                 });
                 document.querySelectorAll('#editStatusRadioGroup .category-radio-btn').forEach(btn => {
-                    btn.classList.toggle('selected', btn.dataset.status === selectedEditTopicStatus);
+                    const isSelected = btn.dataset.status === selectedEditTopicStatus;
+                    btn.classList.toggle('selected', isSelected);
+                    btn.setAttribute('aria-checked', String(isSelected));
                 });
                 if (summaryInput) summaryInput.value = data.summary || '';
                 if (summaryField) {
@@ -1704,14 +1958,18 @@ function closeEditTopicModal() {
 function selectEditTopicCategory(cat) {
     selectedEditTopicCategory = cat;
     document.querySelectorAll('#editCategoryRadioGroup .category-radio-btn').forEach(btn => {
-        btn.classList.toggle('selected', btn.dataset.category === cat);
+        const isSelected = btn.dataset.category === cat;
+        btn.classList.toggle('selected', isSelected);
+        btn.setAttribute('aria-checked', String(isSelected));
     });
 }
 
 function selectEditTopicStatus(status) {
     selectedEditTopicStatus = status;
     document.querySelectorAll('#editStatusRadioGroup .category-radio-btn').forEach(btn => {
-        btn.classList.toggle('selected', btn.dataset.status === status);
+        const isSelected = btn.dataset.status === status;
+        btn.classList.toggle('selected', isSelected);
+        btn.setAttribute('aria-checked', String(isSelected));
     });
 
     const summaryField = document.getElementById('editTopicSummaryField');
@@ -1817,14 +2075,22 @@ async function deleteTopic(topicId, event) {
     const idKey = String(id);
     if (deletingTopicIds.has(idKey)) return;
 
-    if (!confirm('确定要删除这本手账话题吗？\n删除后里面所有的交流回忆都将抹去，不可恢复哦 🌸')) {
-        return;
-    }
+    const confirmed = await window.showConfirmDialog(
+        '确定要删除这本手账话题吗？删除后里面所有的交流回忆都将抹去，不可恢复哦 🌸',
+        {
+            title: '删除恋爱手账',
+            confirmText: '确认删除',
+            cancelText: '再想想',
+            danger: true
+        }
+    );
+    if (!confirmed) return;
+    if (deletingTopicIds.has(idKey)) return;
 
     if (!currentUserProfile?.space_id || !currentAuthUser) {
         const authed = await ensureTopicAuthReady();
         if (!authed) {
-            alert('请先登录情侣空间后再操作 🌸');
+            window.showToast?.('请先登录情侣空间后再操作 🌸');
             return;
         }
     }
@@ -1859,11 +2125,7 @@ async function deleteTopic(topicId, event) {
 
         if (error) {
             console.error('删除手账失败:', error);
-            if (typeof showToast === 'function') {
-                showToast('删除手账失败：' + error.message);
-            } else {
-                alert('删除失败：' + error.message);
-            }
+            window.showToast?.('删除手账失败：' + error.message);
             return;
         }
 
@@ -1884,12 +2146,10 @@ async function deleteTopic(topicId, event) {
         loadHomeTopics();
         loadTopicsCatalog(activeTopicCategoryFilter);
 
-        if (typeof showToast === 'function') {
-            showToast('手账已删除 🌸');
-        }
+        window.showToast?.('手账已删除 🌸');
     } catch (err) {
         console.error('删除话题异常:', err);
-        alert('删除发生异常，请稍后重试');
+        window.showToast?.('删除发生异常，请稍后重试 🌸');
     } finally {
         deletingTopicIds.delete(idKey);
     }
@@ -1901,9 +2161,13 @@ async function deleteTopicMessage(msgId) {
     const msgKey = String(msgId);
     if (deletingTopicMsgIds.has(msgKey)) return;
 
-    if (!confirm('确定撤回这条心声留言吗？')) {
-        return;
-    }
+    const confirmed = await window.showConfirmDialog('确定要撤回这条手账心声吗？', {
+        title: '撤回留言',
+        confirmText: '撤回',
+        danger: true
+    });
+    if (!confirmed) return;
+    if (deletingTopicMsgIds.has(msgKey) || !currentAuthUser) return;
 
     deletingTopicMsgIds.add(msgKey);
 
@@ -1918,11 +2182,7 @@ async function deleteTopicMessage(msgId) {
 
         if (error) {
             console.error('撤回消息失败:', error);
-            if (typeof showToast === 'function') {
-                showToast('撤回失败：' + error.message);
-            } else {
-                alert('撤回失败：' + error.message);
-            }
+            window.showToast?.('撤回失败：' + error.message);
             return;
         }
 
@@ -1936,16 +2196,14 @@ async function deleteTopicMessage(msgId) {
             }
         }
 
-        // 从当前消息列表过滤并增量移除节点，避免打断其他语音播放或导致图片闪烁
+        // 从当前消息列表过滤并让气泡 220ms 平滑淡出收缩后再移除节点
         currentTopicMessages = (currentTopicMessages || []).filter(m => String(m.id) !== msgKey);
-        removeSingleTopicMessageFromFlow(msgId);
+        await removeSingleTopicMessageFromFlow(msgId);
 
-        if (typeof showToast === 'function') {
-            showToast('已撤回心声留言 🌸');
-        }
+        window.showToast?.('已撤回心声留言 🌸');
     } catch (err) {
         console.error('撤回消息异常:', err);
-        alert('撤回异常，请稍后重试');
+        window.showToast?.('撤回异常，请稍后重试 🌸');
     } finally {
         deletingTopicMsgIds.delete(msgKey);
     }
@@ -1992,6 +2250,8 @@ function enterTopicsPage(_route) {
 
 function enterTopicDetailPage(route) {
     initTopicDropZone();
+    bindTopicComposerAutoGrow();
+    bindTopicFlowScrollAndMediaPinning();
     const topicId = route?.params?.id;
     if (topicId) {
         if (typeof window.autoMarkTopicNotificationRead === 'function') {
@@ -2004,6 +2264,7 @@ function enterTopicDetailPage(route) {
 function leaveTopicDetailPage(_route) {
     cleanupTopicRealtimeSubscription();
     resetTopicComposer();
+    isTopicPinnedToBottom = true;
     currentTopicDetail = null;
     window.currentTopicDetail = null;
     currentTopicMessages = [];
@@ -2018,17 +2279,18 @@ window.enterTopicDetailPage = enterTopicDetailPage;
 window.leaveTopicsPage = leaveTopicsPage;
 window.leaveTopicDetailPage = leaveTopicDetailPage;
 
-// 初始化弹窗背景点击关闭监听
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initTopicModalBackdropHandlers);
-} else {
+function initTopicClientEnhancements() {
     initTopicModalBackdropHandlers();
+    initTopicDropZone();
+    bindTopicComposerAutoGrow();
+    bindTopicFlowScrollAndMediaPinning();
 }
 
+// 初始化弹窗背景点击关闭监听、拖拽区、多行输入增高与软键盘视口贴底
 if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initTopicDropZone);
+        document.addEventListener('DOMContentLoaded', initTopicClientEnhancements);
     } else {
-        initTopicDropZone();
+        initTopicClientEnhancements();
     }
 }

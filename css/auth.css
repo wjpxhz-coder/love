@@ -14,13 +14,20 @@
             justify-content: center;
             font-size: 1.2em;
             box-shadow: 0 2px 12px var(--shadow);
-            transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+            transition:
+                transform 0.24s var(--ease-spring-snappy),
+                box-shadow 0.24s ease,
+                background-color 0.24s ease,
+                border-color 0.24s ease,
+                color 0.24s ease;
             padding: 0;
             color: var(--text);
         }
-        .theme-toggle:hover {
-            transform: rotate(20deg) scale(1.1);
-            box-shadow: 0 4px 18px var(--shadow);
+        @media (hover: hover) and (pointer: fine) {
+            .theme-toggle:hover {
+                transform: rotate(20deg) scale(1.1);
+                box-shadow: 0 4px 18px var(--shadow);
+            }
         }
         /* ── 登录按钮 ── */
         .login-trigger-btn {
@@ -38,13 +45,20 @@
             justify-content: center;
             font-size: 1.1em;
             box-shadow: 0 2px 12px var(--shadow);
-            transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+            transition:
+                transform 0.24s var(--ease-spring-snappy),
+                box-shadow 0.24s ease,
+                background-color 0.24s ease,
+                border-color 0.24s ease,
+                color 0.24s ease;
             padding: 0;
             color: var(--text);
         }
-        .login-trigger-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 4px 18px var(--shadow);
+        @media (hover: hover) and (pointer: fine) {
+            .login-trigger-btn:hover {
+                transform: scale(1.1);
+                box-shadow: 0 4px 18px var(--shadow);
+            }
         }
         .login-trigger-btn::after { display: none; }
         /* ── 登录后头像按钮 ── */
@@ -63,12 +77,18 @@
             justify-content: center;
             overflow: hidden;
             box-shadow: 0 2px 12px rgba(181,115,122,0.3);
-            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+            transition:
+                transform 0.24s var(--ease-spring-snappy),
+                box-shadow 0.24s ease,
+                border-color 0.24s ease,
+                opacity 0.24s ease;
             padding: 0;
         }
-        .user-avatar-btn:hover {
-            transform: scale(1.08);
-            box-shadow: 0 4px 20px rgba(181,115,122,0.5);
+        @media (hover: hover) and (pointer: fine) {
+            .user-avatar-btn:hover {
+                transform: scale(1.08);
+                box-shadow: 0 4px 20px rgba(181,115,122,0.5);
+            }
         }
         .user-avatar-btn:active {
             transform: scale(0.92) !important;
@@ -89,7 +109,7 @@
             position: fixed;
             top: calc(66px + env(safe-area-inset-top, 0px));
             right: 112px;
-            z-index: 600;
+            z-index: 1350;
             background: var(--card);
             border: 1px solid var(--border);
             border-radius: 14px;
@@ -124,7 +144,7 @@
             font-size: 0.9em;
             color: var(--text);
             cursor: var(--cursor-pointer);
-            transition: background 0.2s;
+            transition: background-color 0.2s ease, color 0.2s ease;
             white-space: nowrap;
             width: 100%;
             border: 0;
@@ -135,18 +155,22 @@
             font-weight: 400;
             letter-spacing: normal;
         }
-        .user-dropdown-item:hover {
-            background: rgba(212,160,168,0.12);
-            color: var(--primary);
+        @media (hover: hover) and (pointer: fine) {
+            .user-dropdown-item:hover {
+                background: rgba(212,160,168,0.12);
+                color: var(--primary);
+            }
         }
         .user-dropdown-item.logout {
             color: var(--text-muted);
             border-top: 1px solid var(--border);
             margin-top: 4px;
         }
-        .user-dropdown-item.logout:hover {
-            color: #c05050;
-            background: rgba(200,80,80,0.06);
+        @media (hover: hover) and (pointer: fine) {
+            .user-dropdown-item.logout:hover {
+                color: #c05050;
+                background: rgba(200,80,80,0.06);
+            }
         }
         .user-name-label {
             padding: 10px 16px 6px;
@@ -213,7 +237,12 @@
             max-width: 360px;
             box-shadow: 0 0 60px rgba(255,80,120,0.35), 0 20px 50px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.35);
             transform: translateY(24px) scale(0.95);
-            transition: all 0.45s cubic-bezier(0.25,0.8,0.25,1);
+            transition:
+                transform 0.24s var(--ios-ease-nav, cubic-bezier(0.25,0.8,0.25,1)),
+                opacity 0.24s ease,
+                box-shadow 0.24s ease,
+                background-color 0.24s ease,
+                border-color 0.24s ease;
             text-align: center;
             max-height: calc(
                 100dvh
@@ -287,7 +316,11 @@
             font-family: 'Nunito','PingFang SC',system-ui,sans-serif;
             color: #fff;
             outline: none;
-            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+            transition:
+                background-color 0.24s ease,
+                border-color 0.24s ease,
+                box-shadow 0.24s ease,
+                color 0.24s ease;
         }
         .login-input::placeholder {
             color: rgba(255,200,215,0.6);
@@ -321,8 +354,12 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            transition: color 0.2s ease, transform 0.2s var(--ease-spring-snappy);
         }
-        .login-pw-eye:hover { color: #fff; transform: translateY(-50%) scale(1.15); }
+        @media (hover: hover) and (pointer: fine) {
+            .login-pw-eye:hover { color: #fff; transform: translateY(-50%) scale(1.15); }
+        }
+        .login-pw-eye:active { color: #fff; transform: translateY(-50%) scale(0.92); }
         .login-pw-eye::after { display: none; }
         .login-error {
             font-size: 0.82em;
@@ -331,7 +368,9 @@
             text-align: center;
             margin-bottom: 6px;
             letter-spacing: 0.5px;
-            animation: shake 0.4s ease;
+        }
+        .login-error.is-shaking {
+            animation: shake 0.38s ease;
         }
         @keyframes shake {
             0%,100% { transform: translateX(0); }
@@ -350,14 +389,25 @@
             letter-spacing: 4px;
             cursor: var(--cursor-pointer);
             box-shadow: 0 6px 24px rgba(232,67,147,0.55), 0 0 20px rgba(255,80,130,0.3);
-            transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+            transition:
+                transform 0.24s var(--ease-spring-gentle),
+                box-shadow 0.24s ease,
+                opacity 0.24s ease;
             margin-top: 8px;
             position: relative;
             overflow: hidden;
         }
-        .login-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(232,67,147,0.7);
+        @media (hover: hover) and (pointer: fine) {
+            .login-btn:not(:disabled):hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 30px rgba(232,67,147,0.7);
+            }
+            .login-btn:hover::after {
+                transform: rotate(25deg) translateX(100%);
+            }
+        }
+        .login-btn:not(:disabled):active {
+            transform: scale(0.97);
         }
         .login-btn::after {
             content: '';
@@ -367,9 +417,6 @@
             background: linear-gradient(to right, transparent, rgba(255,255,255,0.2), transparent);
             transform: rotate(25deg) translateX(-150%);
             transition: transform 0.6s ease;
-        }
-        .login-btn:hover::after {
-            transform: rotate(25deg) translateX(100%);
         }
         .login-close-btn {
             position: absolute;
@@ -385,13 +432,34 @@
             display: flex; align-items: center; justify-content: center;
             padding: 0;
             box-shadow: none;
-            transition: all 0.2s;
+            transition:
+                transform 0.24s var(--ease-spring-gentle),
+                background-color 0.24s ease,
+                border-color 0.24s ease,
+                color 0.24s ease;
         }
-        .login-close-btn:hover { background: rgba(255,255,255,0.25); color: #fff; transform: rotate(90deg); }
+        @media (hover: hover) and (pointer: fine) {
+            .login-close-btn:hover { background: rgba(255,255,255,0.25); color: #fff; transform: rotate(90deg); }
+        }
+        .login-close-btn:active { transform: rotate(90deg) scale(0.92); }
         .login-close-btn::after { display: none; }
         @media (prefers-reduced-motion: reduce) {
-            .user-dropdown {
+            .user-dropdown,
+            .login-box,
+            .login-btn,
+            .login-close-btn,
+            .theme-toggle,
+            .login-trigger-btn,
+            .user-avatar-btn {
                 transition: none !important;
+            }
+            .user-dropdown {
                 transform: none !important;
+            }
+            .login-halo,
+            .login-heart-icon,
+            .login-error,
+            .login-error.is-shaking {
+                animation: none !important;
             }
         }

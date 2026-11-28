@@ -91,6 +91,7 @@ const AI_IMAGE_EXTENSIONS = new Map([
     ['image/webp', 'webp']
 ]);
 let currentAITab = 'chat';
+let hasInitializedAITab = false;
 let chatHistory = [];
 let isChatSending = false;
 let isCompressingAIImages = false;
@@ -106,6 +107,14 @@ let aiUploadGeneration = 0;
 const activeAIUploadPaths = new Set();
 const activeAIUploadTasks = new Set();
 const aiDiaryPickerRenderedKeys = new Set();
+const AI_LOCAL_CACHE_PREFIX = 'ai_feature_cache_v1_';
+const aiLocalContentMemoryCache = new Map();
+let isAIChatPinnedToBottom = true;
+let lastAIChatClientHeight = 0;
+let lastAIVisualViewportHeight = typeof window !== 'undefined' && window.visualViewport
+    ? window.visualViewport.height
+    : 0;
+let aiViewportPinningBound = false;
 
 function getAIServiceConsentKey() {
     return currentAuthUser?.id ? `${AI_SERVICE_CONSENT_PREFIX}${currentAuthUser.id}` : '';
@@ -437,13 +446,24 @@ function openAIModal() {
     window.location.hash = '#/agnes';
 }
 
-function enterAIPage() {
+function enterAIPage(route) {
     initAIDropZone();
+    bindAIChatInputAutoGrow();
+    initAIChatViewportPinning();
     if (!isAuthenticated()) return;
     bindAIChatModalLifecycle();
     ensureAIChatWelcome();
     renderPendingChatAttachments();
-    switchAITab('chat', false, { silent: true, fromEnter: true });
+
+    const forceChatTab = route?.id === 'ai-chat'
+        || route?.pathname === '/agnes/chat'
+        || route?.path === '/agnes/chat';
+    let targetTab = 'chat';
+    if (!forceChatTab && hasInitializedAITab && AI_TABS.has(currentAITab)) {
+        targetTab = currentAITab;
+    }
+    hasInitializedAITab = true;
+    switchAITab(targetTab, false, { silent: true, fromEnter: true });
 }
 
 function leaveAIPage() {
@@ -534,13 +554,66 @@ async function loadRecentStoryLog() {
         .slice(0, AI_SUMMARY_STORY_MAX_CHARACTERS);
 }
 
+function getAIContentValidSinceDate(tabName) {
+    const validSince = new Date();
+    if (tabName === 'summary') validSince.setDate(validSince.getDate() - 7);
+    else validSince.setHours(0, 0, 0, 0);
+    return validSince;
+}
+
+function getAILocalCacheKey(tabName) {
+    const spaceId = String(currentUserProfile?.space_id || '').trim();
+    if (!spaceId) return '';
+    const userScope = tabName === 'summary' ? String(currentAuthUser?.id || '').trim() : 'shared';
+    if (tabName === 'summary' && !userScope) return '';
+    return `${AI_LOCAL_CACHE_PREFIX}${spaceId}:${userScope}:${tabName}:${AGNES_PROVIDER}:${AGNES_MODEL}:${AGNES_PROMPT_VERSION}`;
+}
+
+function getLocalCachedAIContent(tabName) {
+    const cacheKey = getAILocalCacheKey(tabName);
+    if (!cacheKey) return '';
+    const minTime = getAIContentValidSinceDate(tabName).getTime();
+
+    const memEntry = aiLocalContentMemoryCache.get(cacheKey);
+    if (memEntry) {
+        if (memEntry.createdAt >= minTime && typeof memEntry.content === 'string' && memEntry.content.trim()) {
+            return memEntry.content;
+        }
+        aiLocalContentMemoryCache.delete(cacheKey);
+    }
+
+    try {
+        const raw = localStorage.getItem(cacheKey);
+        if (!raw) return '';
+        const parsed = JSON.parse(raw);
+        const createdAt = Number(parsed?.createdAt);
+        const content = typeof parsed?.content === 'string' ? parsed.content.trim() : '';
+        if (Number.isFinite(createdAt) && createdAt >= minTime && content) {
+            aiLocalContentMemoryCache.set(cacheKey, { content, createdAt });
+            return content;
+        }
+        localStorage.removeItem(cacheKey);
+    } catch (_e) {}
+    return '';
+}
+
+function setLocalCachedAIContent(tabName, content, createdAtMs = Date.now()) {
+    const cacheKey = getAILocalCacheKey(tabName);
+    const trimmed = typeof content === 'string' ? content.trim() : '';
+    if (!cacheKey || !trimmed) return;
+    const timestamp = Number.isFinite(createdAtMs) && createdAtMs > 0 ? createdAtMs : Date.now();
+    const entry = { content: trimmed, createdAt: timestamp };
+    aiLocalContentMemoryCache.set(cacheKey, entry);
+    try {
+        localStorage.setItem(cacheKey, JSON.stringify(entry));
+    } catch (_e) {}
+}
+
 async function getCachedAIContent(tabName) {
     const spaceId = currentUserProfile?.space_id;
     if (!spaceId) throw createAIError('PROFILE_UNMAPPED');
 
-    const validSince = new Date();
-    if (tabName === 'summary') validSince.setDate(validSince.getDate() - 7);
-    else validSince.setHours(0, 0, 0, 0);
+    const validSince = getAIContentValidSinceDate(tabName);
 
     let query = supabaseClient
         .from('ai_content')
@@ -557,10 +630,17 @@ async function getCachedAIContent(tabName) {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data?.[0]?.content || '';
+    const row = data?.[0];
+    const content = row?.content || '';
+    if (content) {
+        const createdMs = Date.parse(row.created_at);
+        setLocalCachedAIContent(tabName, content, Number.isFinite(createdMs) ? createdMs : Date.now());
+    }
+    return content;
 }
 
 async function cacheAIContent(tabName, content) {
+    setLocalCachedAIContent(tabName, content, Date.now());
     const { error } = await supabaseClient
         .from('ai_content')
         .insert([{
@@ -653,7 +733,24 @@ async function switchAITab(tabName, forceRefresh = false, options = {}) {
         animateAIPanelSwitch(featurePanel, direction);
     }
 
-    setAIContent('思考中，请稍候... ✨', 'loading');
+    if (!forceRefresh) {
+        const localCached = getLocalCachedAIContent(tabName);
+        if (localCached) {
+            setAIContent(localCached);
+            return;
+        }
+    }
+
+    if (tabName === 'anniversary') {
+        const now = new Date();
+        let anniversary = new Date(now.getFullYear(), 4, 23);
+        if (now > anniversary) anniversary = new Date(now.getFullYear() + 1, 4, 23);
+        const days = Math.ceil((anniversary - now) / 86400000);
+        if (days > 7) {
+            setAIContent(`距离下一个纪念日（5月23日）还有 ${days} 天。剩下 7 天时再来领取专属倒计时情话吧~ 💖`);
+            return;
+        }
+    }
 
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
@@ -662,9 +759,34 @@ async function switchAITab(tabName, forceRefresh = false, options = {}) {
         && aiInteractionGeneration === interactionGeneration
         && currentAITab === tabName;
 
+    let loadingShown = false;
+    let deferredLoadingTimer = null;
+    const ensureLoadingShown = () => {
+        if (deferredLoadingTimer) {
+            clearTimeout(deferredLoadingTimer);
+            deferredLoadingTimer = null;
+        }
+        if (!loadingShown && stillCurrent()) {
+            loadingShown = true;
+            setAIContent('思考中，请稍候... ✨', 'loading');
+        }
+    };
+
+    if (forceRefresh) {
+        ensureLoadingShown();
+    } else {
+        const featureActions = document.getElementById('aiFeatureActions');
+        if (featureActions) featureActions.hidden = true;
+        deferredLoadingTimer = setTimeout(ensureLoadingShown, 95);
+    }
+
     try {
         if (!forceRefresh) {
             const cached = await getCachedAIContent(tabName);
+            if (deferredLoadingTimer) {
+                clearTimeout(deferredLoadingTimer);
+                deferredLoadingTimer = null;
+            }
             if (!stillCurrent()) return;
             if (cached) {
                 setAIContent(cached);
@@ -673,9 +795,15 @@ async function switchAITab(tabName, forceRefresh = false, options = {}) {
         }
 
         if (!hasAIServiceConsent()) {
+            if (deferredLoadingTimer) {
+                clearTimeout(deferredLoadingTimer);
+                deferredLoadingTimer = null;
+            }
             setAIContent('AI 服务已关闭。如需使用，请在“头像 → 设置 → AI 助手”中开启。');
             return;
         }
+
+        ensureLoadingShown();
 
         let generatedText = '';
         if (tabName === 'topic') {
@@ -713,6 +841,10 @@ async function switchAITab(tabName, forceRefresh = false, options = {}) {
         setAIContent(generatedText);
         await cacheAIContent(tabName, generatedText);
     } catch (error) {
+        if (deferredLoadingTimer) {
+            clearTimeout(deferredLoadingTimer);
+            deferredLoadingTimer = null;
+        }
         if (error.message === 'AUTH_REQUIRED' || !stillCurrent()) return;
         if (error.message === 'AI_CONSENT_REQUIRED') {
             setAIContent('AI 服务已关闭。如需使用，请在“头像 → 设置 → AI 助手”中开启。');
@@ -726,6 +858,129 @@ async function switchAITab(tabName, forceRefresh = false, options = {}) {
 // ==========================================
 // Agnes 2.0 对话与图片（仅保存在当前页面内）
 // ==========================================
+function autoResizeAIChatInput(inputEl) {
+    const el = inputEl || document.getElementById('aiChatInput');
+    if (!el) return;
+    if (!el.value) {
+        el.style.height = 'auto';
+        el.style.overflowY = 'hidden';
+        return;
+    }
+    el.style.height = 'auto';
+    const nextHeight = Math.min(el.scrollHeight, 136);
+    el.style.height = `${nextHeight}px`;
+    el.style.overflowY = el.scrollHeight > 136 ? 'auto' : 'hidden';
+}
+
+function resetAIChatInputHeight(inputEl) {
+    const el = inputEl || document.getElementById('aiChatInput');
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.overflowY = 'hidden';
+}
+
+function bindAIChatInputAutoGrow() {
+    const input = document.getElementById('aiChatInput');
+    if (!input || input.dataset.autoGrowBound === 'true') return;
+    input.dataset.autoGrowBound = 'true';
+    input.addEventListener('input', () => {
+        autoResizeAIChatInput(input);
+    });
+}
+
+function isNearAIChatBottom(container = document.getElementById('aiChatMessages'), threshold = 140) {
+    if (!container) return true;
+    return (container.scrollHeight - container.scrollTop - container.clientHeight) <= threshold;
+}
+
+function scrollAIChatToBottom(behavior = 'smooth') {
+    const container = document.getElementById('aiChatMessages');
+    if (!container) return;
+    isAIChatPinnedToBottom = true;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    const effectiveBehavior = reduced ? 'auto' : behavior;
+    if (typeof container.scrollTo === 'function') {
+        container.scrollTo({ top: container.scrollHeight, behavior: effectiveBehavior });
+    } else {
+        container.scrollTop = container.scrollHeight;
+    }
+    lastAIChatClientHeight = container.clientHeight;
+}
+
+function scrollAIReplyIntoView(replyEl, wasNearBottom) {
+    if (!wasNearBottom || !replyEl) return;
+    const container = document.getElementById('aiChatMessages');
+    if (!container) return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    const behavior = reduced ? 'auto' : 'smooth';
+
+    requestAnimationFrame(() => {
+        if (!container.isConnected || !replyEl.isConnected) return;
+        const viewHeight = container.clientHeight;
+        const msgHeight = replyEl.offsetHeight;
+        let targetTop;
+        if (msgHeight > 0 && viewHeight > 0 && msgHeight > viewHeight - 28) {
+            const containerRect = container.getBoundingClientRect();
+            const replyRect = replyEl.getBoundingClientRect();
+            const relativeTop = (replyRect.top - containerRect.top) + container.scrollTop;
+            targetTop = Math.max(0, relativeTop - 16);
+            isAIChatPinnedToBottom = false;
+        } else {
+            targetTop = container.scrollHeight;
+            isAIChatPinnedToBottom = true;
+        }
+        if (typeof container.scrollTo === 'function') {
+            container.scrollTo({ top: targetTop, behavior });
+        } else {
+            container.scrollTop = targetTop;
+        }
+        lastAIChatClientHeight = container.clientHeight;
+    });
+}
+
+function initAIChatViewportPinning() {
+    const container = document.getElementById('aiChatMessages');
+    if (container && container.dataset.scrollPinBound !== 'true') {
+        container.dataset.scrollPinBound = 'true';
+        lastAIChatClientHeight = container.clientHeight;
+        container.addEventListener('scroll', () => {
+            isAIChatPinnedToBottom = isNearAIChatBottom(container, 140);
+            lastAIChatClientHeight = container.clientHeight;
+        }, { passive: true });
+    }
+    if (aiViewportPinningBound || typeof window === 'undefined' || !window.visualViewport) return;
+    aiViewportPinningBound = true;
+    lastAIVisualViewportHeight = window.visualViewport.height;
+    window.visualViewport.addEventListener('resize', () => {
+        const vv = window.visualViewport;
+        if (!vv) return;
+        const prevVvHeight = lastAIVisualViewportHeight || vv.height;
+        lastAIVisualViewportHeight = vv.height;
+
+        const page = document.getElementById('aiModal') || document.getElementById('aiChatOverlay');
+        const msgBox = document.getElementById('aiChatMessages');
+        if (!page || page.hidden || !page.classList.contains('is-active') || currentAITab !== 'chat' || !msgBox || msgBox.hidden) {
+            return;
+        }
+
+        const prevClientH = lastAIChatClientHeight || msgBox.clientHeight;
+        const wasNearBottom = isAIChatPinnedToBottom
+            || (msgBox.scrollHeight - msgBox.scrollTop - prevClientH) <= 150;
+        lastAIChatClientHeight = msgBox.clientHeight;
+
+        if (vv.height < prevVvHeight - 12 && wasNearBottom) {
+            isAIChatPinnedToBottom = true;
+            msgBox.scrollTop = msgBox.scrollHeight;
+            requestAnimationFrame(() => {
+                if (msgBox.isConnected) {
+                    msgBox.scrollTop = msgBox.scrollHeight;
+                    lastAIChatClientHeight = msgBox.clientHeight;
+                }
+            });
+        }
+    }, { passive: true });
+}
+
 function createAIChatWelcome() {
     const welcome = document.createElement('div');
     welcome.className = 'ai-chat-welcome';
@@ -751,14 +1006,19 @@ function resetAIChatMessages() {
     const container = document.getElementById('aiChatMessages');
     if (!container) return;
     container.replaceChildren(createAIChatWelcome());
+    isAIChatPinnedToBottom = true;
 }
 
 function openAIChatModal() {
-    openAIModal();
+    if (typeof appNavigate === 'function') {
+        appNavigate('/agnes/chat');
+        return;
+    }
+    window.location.hash = '#/agnes/chat';
 }
 
-function enterAIChatPage() {
-    enterAIPage();
+function enterAIChatPage(route) {
+    enterAIPage({ ...(route || {}), id: 'ai-chat', pathname: '/agnes/chat' });
 }
 
 function closeAIChatModal() {
@@ -772,6 +1032,8 @@ function leaveAIChatPage() {
 }
 
 function bindAIChatModalLifecycle() {
+    bindAIChatInputAutoGrow();
+    initAIChatViewportPinning();
     const page = document.getElementById('aiModal') || document.getElementById('aiChatOverlay');
     if (!page || page.dataset.aiLifecycleBound === 'true') return;
     page.dataset.aiLifecycleBound = 'true';
@@ -785,7 +1047,7 @@ function handleChatKeyDown(event) {
     }
 }
 
-function appendChatMessage(role, message, attachmentCount = 0) {
+function appendChatMessage(role, message, attachmentCount = 0, options = {}) {
     const container = document.getElementById('aiChatMessages');
     if (!container) return null;
     container.querySelector('.ai-chat-welcome')?.remove();
@@ -805,7 +1067,9 @@ function appendChatMessage(role, message, attachmentCount = 0) {
         messageElement.textContent = message;
     }
     container.appendChild(messageElement);
-    container.scrollTop = container.scrollHeight;
+    if (options.scroll !== false) {
+        scrollAIChatToBottom(options.scrollBehavior || 'smooth');
+    }
     return messageElement;
 }
 
@@ -845,7 +1109,15 @@ function renderPendingChatAttachments() {
     const count = document.getElementById('aiAttachmentCount');
     const localButton = document.getElementById('aiLocalImageBtn');
     const localInput = document.getElementById('aiLocalImageInput');
-    if (count) count.textContent = `${pendingChatAttachments.length} / ${AI_MAX_ATTACHMENTS}`;
+    if (count) {
+        if (isCompressingAIImages) {
+            count.textContent = '正在准备图片… ✨';
+            count.classList.add('is-preparing');
+        } else {
+            count.textContent = `${pendingChatAttachments.length} / ${AI_MAX_ATTACHMENTS}`;
+            count.classList.remove('is-preparing');
+        }
+    }
     const localSelectionDisabled = isChatSending
         || isCompressingAIImages
         || pendingChatAttachments.length >= AI_MAX_ATTACHMENTS;
@@ -1032,10 +1304,23 @@ async function normalizeBlobToAIImageFile(blob, maxEdge = 960, quality = 0.76, f
 async function tryExtractLoadedCardImageFile(momentId, imageIndex = 0, maxEdge = 640, quality = 0.74) {
     if (!momentId || typeof document === 'undefined') return null;
     try {
+        const idx = Number(imageIndex);
         const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
         for (const card of cards) {
-            const gridImg = card.querySelector(`.moment-grid-item[data-gallery-index="${imageIndex}"] img.moment-grid-img`);
-            const singleImg = Number(imageIndex) === 0 ? card.querySelector('img.moment-single-media') : null;
+            let gridImg = card.querySelector(`img.moment-grid-item[data-media-index="${idx}"]`)
+                || card.querySelector(`.moment-grid-video-wrap[data-media-index="${idx}"] img.moment-grid-item`);
+            if (!gridImg && Number.isInteger(idx) && idx >= 0) {
+                const gridItems = card.querySelectorAll('.moment-grid-item');
+                const candidate = gridItems[idx];
+                if (candidate instanceof HTMLImageElement) {
+                    gridImg = candidate;
+                } else if (candidate) {
+                    gridImg = candidate.querySelector('img');
+                }
+            }
+            const singleImg = idx === 0
+                ? card.querySelector('img.moment-single-image, img.card-img, img.moment-single-video-poster')
+                : null;
             const imgEl = gridImg || singleImg;
             if (!imgEl || !imgEl.complete || !imgEl.naturalWidth || !imgEl.naturalHeight) continue;
 
@@ -1118,6 +1403,7 @@ async function handleAILocalImageFiles(files) {
 
     isCompressingAIImages = true;
     setAIChatComposerBusy(true);
+    await new Promise(resolve => requestAnimationFrame(resolve));
 
     let localBytes = getPendingLocalImageBytes();
     let rejectedType = false;
@@ -1539,7 +1825,7 @@ function closeAIDiaryPicker(immediate = false) {
         if (gen !== aiDiaryPickerAnimGen) return;
         picker.classList.remove('is-open', 'is-closing');
         picker.hidden = true;
-    }, 300);
+    }, 325);
 }
 
 function loadMoreAIDiaryImages() {
@@ -1883,14 +2169,14 @@ async function sendChatMessage() {
 
     if (input) {
         input.value = '';
-        input.style.height = 'auto';
+        resetAIChatInputHeight(input);
     }
     closeAIDiaryPicker();
     resetAIDiaryPicker();
     isChatSending = true;
     setAIChatComposerBusy(true);
-    appendChatMessage('user', effectiveMessage, selectedAttachments.length);
-    const typingMessage = appendChatMessage('ai', '感情小助手正在思考… ✨');
+    appendChatMessage('user', effectiveMessage, selectedAttachments.length, { scroll: false });
+    const typingMessage = appendChatMessage('ai', '感情小助手正在思考… ✨', 0, { scrollBehavior: 'smooth' });
     typingMessage?.classList.add('typing');
 
     try {
@@ -1907,8 +2193,13 @@ async function sendChatMessage() {
             && hasAIServiceConsent();
         if (!isCurrent || !typingMessage) return;
 
+        const chatContainer = document.getElementById('aiChatMessages');
+        const wasNearBottom = isNearAIChatBottom(chatContainer, 140);
         typingMessage.textContent = reply;
         typingMessage.classList.remove('typing');
+        typingMessage.classList.add('is-reply-ready');
+        scrollAIReplyIntoView(typingMessage, wasNearBottom);
+
         chatHistory.push(currentUserMessage, { role: 'assistant', content: reply });
         chatHistory = chatHistory.slice(-6);
         clearPendingChatAttachments();
@@ -1916,9 +2207,17 @@ async function sendChatMessage() {
         const isCurrent = isCurrentAuthSnapshot(epoch, userId)
             && aiInteractionGeneration === interactionGeneration;
         if (isCurrent && typingMessage) {
+            const chatContainer = document.getElementById('aiChatMessages');
+            const wasNearBottom = isNearAIChatBottom(chatContainer, 140);
             typingMessage.textContent = getFriendlyAIError(error);
             typingMessage.classList.remove('typing');
-            if (message && input && !input.value) input.value = message;
+            typingMessage.classList.add('is-reply-ready');
+            scrollAIReplyIntoView(typingMessage, wasNearBottom);
+
+            if (message && input && !input.value) {
+                input.value = message;
+                autoResizeAIChatInput(input);
+            }
             if (shouldDiscardFailedAIAttachments(error)) clearPendingChatAttachments();
         }
         console.error('Agnes 2.0 对话失败:', normalizeAIErrorCode(error));
@@ -1938,16 +2237,22 @@ function clearPrivateFeatureState() {
     aiInteractionGeneration += 1;
     activeChatRequestId += 1;
     currentAITab = 'chat';
+    hasInitializedAITab = false;
+    aiLocalContentMemoryCache.clear();
     chatHistory = [];
     isChatSending = false;
+    isAIChatPinnedToBottom = true;
     clearPendingChatAttachments();
-    closeAIDiaryPicker();
+    closeAIDiaryPicker(true);
     resetAIDiaryPicker();
+    resetAIChatInputHeight();
     setAIChatComposerBusy(false);
     const chatMessages = document.getElementById('aiChatMessages');
     if (chatMessages) chatMessages.replaceChildren();
     const aiContent = document.getElementById('aiContentArea');
     if (aiContent) aiContent.replaceChildren();
+    const featureActions = document.getElementById('aiFeatureActions');
+    if (featureActions) featureActions.hidden = true;
     if (typeof cleanupBlindBox === 'function') cleanupBlindBox();
     if (typeof clearOnThisDaySection === 'function') clearOnThisDaySection();
     window.currentBlindBoxMoment = null;
@@ -2406,10 +2711,16 @@ window.getStoredAIModel = getStoredAIModel;
 window.setStoredAIModel = setStoredAIModel;
 window.FALLBACK_AI_MODELS = FALLBACK_AI_MODELS;
 
+function initAIClientEnhancements() {
+    initAIDropZone();
+    bindAIChatInputAutoGrow();
+    initAIChatViewportPinning();
+}
+
 if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initAIDropZone);
+        document.addEventListener('DOMContentLoaded', initAIClientEnhancements);
     } else {
-        initAIDropZone();
+        initAIClientEnhancements();
     }
 }

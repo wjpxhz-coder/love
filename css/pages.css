@@ -14,11 +14,7 @@ body.app-page-active {
 /* 停留在子页时休眠底层首页：保留完整布局高度与 scrollY，零重排卸载 GPU 合成开销 */
 body.app-page-settled #main-content,
 body.app-page-settled #fab-container,
-body.app-page-settled #app-utility-bar,
-body.app-page-settled #login-trigger-btn,
-body.app-page-settled #user-avatar-btn,
-body.app-page-settled #notification-bell,
-body.app-page-settled #theme-toggle {
+body.app-page-settled #app-utility-bar {
     visibility: hidden;
     pointer-events: none;
 }
@@ -73,6 +69,7 @@ body.app-page-active #main-content {
     overscroll-behavior: contain;
     isolation: isolate;
     contain: layout style;
+    transition: none;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
 }
@@ -411,10 +408,11 @@ dialog.native-dialog.app-page::backdrop {
     margin-top: clamp(70px, 18vh, 170px);
 }
 
-/* Agnes 对话页 */
+/* Agnes 对话页（屏蔽旧版 dialog 的 allow-discrete 离散过渡，防止切屏结束后回中闪现） */
 :is(#aiModal, #aiChatOverlay).app-page,
 .app-page.ai-chat-dialog {
     padding: 0;
+    transition: none;
 }
 
 :is(#aiModal, #aiChatOverlay).app-page .app-page-scroll {

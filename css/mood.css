@@ -12,9 +12,11 @@
     transition: transform 0.35s var(--ease-spring-gentle), box-shadow 0.28s ease, border-color 0.25s ease;
 }
 
-.mood-section:hover {
-    border-color: rgba(253, 164, 175, 0.65);
-    box-shadow: var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
+@media (hover: hover) and (pointer: fine) {
+    .mood-section:hover {
+        border-color: rgba(253, 164, 175, 0.65);
+        box-shadow: var(--shadow-hover), inset 0 1.5px 1px var(--glass-highlight);
+    }
 }
 
 [data-theme='dark'] .mood-section {
@@ -68,7 +70,6 @@
     border-bottom: 1.5px solid var(--border);
 }
 
-
 .mood-today-btn {
     display: inline-flex;
     align-items: center;
@@ -85,14 +86,24 @@
     font-size: 0.85em;
     font-weight: 700;
     letter-spacing: 0.5px;
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition:
+        transform 0.25s var(--ease-spring-snappy),
+        border-color 0.22s ease,
+        background-color 0.22s ease,
+        color 0.22s ease,
+        box-shadow 0.25s ease,
+        opacity 0.2s ease;
 }
 
-.mood-today-btn:hover {
-    transform: translateY(-2px);
-    border-color: var(--primary);
-    background: var(--surface-elevated, #ffffff);
-    box-shadow: 0 6px 16px var(--shadow);
+.mood-today-btn[hidden],
+body[data-auth-state="locked"] .mood-today-btn,
+body[data-auth-state="pending"] .mood-today-btn,
+.mood-section:has(#mood-unlocked-content[hidden]) .mood-today-btn {
+    display: none !important;
+}
+
+.mood-today-btn:active {
+    transform: scale(0.95);
 }
 
 [data-theme='dark'] .mood-today-btn,
@@ -103,14 +114,21 @@
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
-[data-theme='dark'] .mood-today-btn:hover,
-[data-theme="dark"] .mood-today-btn:hover {
-    background: rgba(76, 29, 48, 0.75);
-    border-color: var(--primary);
-    color: #ffffff;
+@media (hover: hover) and (pointer: fine) {
+    .mood-today-btn:hover {
+        transform: translateY(-2px);
+        border-color: var(--primary);
+        background: var(--surface-elevated, #ffffff);
+        box-shadow: 0 6px 16px var(--shadow);
+    }
+
+    [data-theme='dark'] .mood-today-btn:hover,
+    [data-theme="dark"] .mood-today-btn:hover {
+        background: rgba(76, 29, 48, 0.75);
+        border-color: var(--primary);
+        color: #ffffff;
+    }
 }
-
-
 
 .mood-month-picker {
     display: flex;
@@ -137,7 +155,11 @@
     letter-spacing: 0;
     cursor: var(--cursor-pointer);
     box-shadow: 0 2px 6px var(--shadow);
-    transition: all 0.2s ease;
+    transition:
+        border-color 0.2s ease,
+        background-color 0.2s ease,
+        color 0.2s ease,
+        box-shadow 0.2s ease;
     text-align: left;
 }
 
@@ -145,11 +167,17 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ff85a2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
 }
 
-.mood-month-picker select:hover,
 .mood-month-picker select:focus-visible {
     border-color: var(--primary-light);
     outline: none;
     box-shadow: 0 0 0 3px rgba(143, 70, 84, 0.12), 0 3px 8px var(--shadow);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .mood-month-picker select:hover {
+        border-color: var(--primary-light);
+        box-shadow: 0 0 0 3px rgba(143, 70, 84, 0.12), 0 3px 8px var(--shadow);
+    }
 }
 
 #mood-calendar-year {
@@ -174,7 +202,13 @@
     color: var(--primary);
     box-shadow: 0 2px 6px var(--shadow);
     cursor: var(--cursor-pointer);
-    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition:
+        transform 0.22s var(--ease-spring-snappy),
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease,
+        box-shadow 0.22s ease,
+        opacity 0.2s ease;
     position: relative;
     user-select: none;
 }
@@ -186,13 +220,6 @@
     color: var(--primary-light);
 }
 
-[data-theme='dark'] .mood-month-nav:not(:disabled):hover,
-[data-theme="dark"] .mood-month-nav:not(:disabled):hover {
-    background: rgba(76, 29, 48, 0.75);
-    border-color: var(--primary);
-    color: #ffffff;
-}
-
 .mood-nav-icon {
     width: 18px;
     height: 18px;
@@ -201,19 +228,28 @@
     transition: transform 0.2s ease;
 }
 
-.mood-month-nav:not(:disabled):hover {
-    background: var(--surface-elevated, #ffffff);
-    border-color: var(--primary-light);
-    color: var(--primary);
-    box-shadow: 0 4px 14px var(--shadow), 0 0 0 1px rgba(143, 70, 84, 0.12);
-}
+@media (hover: hover) and (pointer: fine) {
+    .mood-month-nav:not(:disabled):hover {
+        background: var(--surface-elevated, #ffffff);
+        border-color: var(--primary-light);
+        color: var(--primary);
+        box-shadow: 0 4px 14px var(--shadow), 0 0 0 1px rgba(143, 70, 84, 0.12);
+    }
 
-.mood-month-prev:not(:disabled):hover {
-    transform: translateX(-2px);
-}
+    [data-theme='dark'] .mood-month-nav:not(:disabled):hover,
+    [data-theme="dark"] .mood-month-nav:not(:disabled):hover {
+        background: rgba(76, 29, 48, 0.75);
+        border-color: var(--primary);
+        color: #ffffff;
+    }
 
-.mood-month-next:not(:disabled):hover {
-    transform: translateX(2px);
+    .mood-month-prev:not(:disabled):hover {
+        transform: translateX(-2px);
+    }
+
+    .mood-month-next:not(:disabled):hover {
+        transform: translateX(2px);
+    }
 }
 
 .mood-month-nav:not(:disabled):active {
@@ -250,7 +286,18 @@
     font-size: 0.72em;
 }
 
-.mood-calendar-grid { min-height: 218px; }
+/* 6 行标准月历高度稳定锚定（6 × 74px + 5 × 5px = 469px），消除 4/5/6 周与首屏加载 CLS */
+.mood-calendar-grid {
+    min-height: 469px;
+    grid-auto-rows: minmax(74px, 1fr);
+    align-content: stretch;
+    transition: opacity 0.22s var(--ios-ease-decel, ease);
+}
+
+.mood-calendar-grid.is-loading-month {
+    opacity: 0.56;
+    pointer-events: none;
+}
 
 @keyframes moodMonthSlideNext {
     from {
@@ -274,19 +321,30 @@
     }
 }
 
+@keyframes moodDayBloom {
+    0% {
+        transform: scale(0.9);
+        box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.45), 0 0 0 0 rgba(251, 191, 36, 0.28);
+    }
+    45% {
+        transform: scale(1.06);
+        box-shadow: 0 0 0 7px rgba(244, 63, 94, 0.2), 0 8px 20px rgba(244, 63, 94, 0.24);
+    }
+    78% {
+        transform: scale(0.985);
+        box-shadow: 0 0 0 11px rgba(244, 63, 94, 0), 0 4px 12px rgba(244, 63, 94, 0.12);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
 .mood-calendar-grid.is-slide-next {
     animation: moodMonthSlideNext 240ms var(--ios-ease-nav) both;
 }
 
 .mood-calendar-grid.is-slide-prev {
     animation: moodMonthSlidePrev 240ms var(--ios-ease-nav) both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .mood-calendar-grid.is-slide-next,
-    .mood-calendar-grid.is-slide-prev {
-        animation: none !important;
-    }
 }
 
 .mood-calendar-day,
@@ -312,7 +370,7 @@
     box-shadow: none;
     cursor: var(--cursor-pointer);
     transition:
-        transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+        transform 0.25s var(--ease-spring-snappy),
         box-shadow 0.25s ease,
         border-color 0.25s ease,
         background-color 0.25s ease,
@@ -335,12 +393,43 @@
     box-shadow: 0 0 0 1.5px var(--primary-glow);
 }
 
-.mood-calendar-day:not(:disabled):hover,
+.mood-calendar-day.is-selected {
+    border-color: rgba(244, 63, 94, 0.72);
+    background: rgba(244, 63, 94, 0.14);
+    box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.24), 0 4px 12px var(--shadow);
+}
+
+[data-theme='dark'] .mood-calendar-day.is-selected,
+[data-theme="dark"] .mood-calendar-day.is-selected {
+    border-color: rgba(251, 113, 133, 0.78);
+    background: rgba(251, 113, 133, 0.18);
+    box-shadow: 0 0 0 2px rgba(251, 113, 133, 0.28), 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.mood-calendar-day.today.is-selected {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2.5px rgba(244, 63, 94, 0.34), 0 4px 14px var(--shadow);
+}
+
+.mood-calendar-day.is-just-updated {
+    z-index: 3;
+    animation: moodDayBloom 0.78s var(--ease-spring-snappy) both;
+}
+
 .mood-calendar-day:not(:disabled):focus-visible {
-    transform: translateY(-3px) scale(1.04) translateZ(0);
+    outline: none;
     background: rgba(255, 182, 193, 0.3);
     border-color: var(--primary);
-    box-shadow: 0 6px 16px var(--shadow);
+    box-shadow: 0 0 0 2.5px var(--primary-glow), 0 6px 16px var(--shadow);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .mood-calendar-day:not(:disabled):hover {
+        transform: translateY(-3px) scale(1.04) translateZ(0);
+        background: rgba(255, 182, 193, 0.3);
+        border-color: var(--primary);
+        box-shadow: 0 6px 16px var(--shadow);
+    }
 }
 
 .mood-calendar-day:not(:disabled):active {
@@ -412,12 +501,22 @@
     box-shadow: 0 4px 16px var(--shadow);
     font-size: 0.88em;
     font-weight: 600;
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+    transition:
+        transform 0.3s var(--ease-spring-snappy),
+        box-shadow 0.3s ease,
+        background-color 0.25s ease,
+        border-color 0.25s ease;
 }
 
-.btn-mood:hover {
-    transform: translateY(-2px) scale(1.03);
-    box-shadow: var(--shadow-hover);
+@media (hover: hover) and (pointer: fine) {
+    .btn-mood:hover {
+        transform: translateY(-2px) scale(1.03);
+        box-shadow: var(--shadow-hover);
+    }
+}
+
+.btn-mood:active {
+    transform: scale(0.96);
 }
 
 /* 心情弹窗 emoji 选择 */
@@ -442,20 +541,25 @@
     box-shadow: none;
     font-size: 1.45em;
     cursor: var(--cursor-pointer);
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-    will-change: transform;
+    transition:
+        transform 0.3s var(--ease-spring-snappy),
+        background-color 0.2s ease,
+        box-shadow 0.25s ease,
+        border-color 0.25s ease;
 }
 
-.mood-emoji-btn:hover {
-    animation: moodWobble 0.75s ease-in-out infinite;
-    background: rgba(255, 182, 193, 0.26);
-    box-shadow: 0 6px 16px var(--primary-glow);
+@media (hover: hover) and (pointer: fine) {
+    .mood-emoji-btn:hover {
+        animation: moodWobble 0.75s ease-in-out infinite;
+        background: rgba(255, 182, 193, 0.26);
+        box-shadow: 0 6px 16px var(--primary-glow);
+    }
 }
 
 .mood-emoji-btn.selected {
     border-color: var(--primary);
     background: rgba(255, 101, 132, 0.22);
-    animation: moodSelectJelly 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: moodSelectJelly 0.45s var(--ease-spring-snappy) both;
     box-shadow: 0 0 0 3px rgba(255, 101, 132, 0.25), var(--shadow-hover);
 }
 
@@ -469,7 +573,7 @@
     color: var(--text-muted);
     text-align: center;
     min-height: 20px;
-    transition: color 0.2s;
+    transition: color 0.2s ease;
 }
 
 .mood-selected-hint.active {
@@ -481,6 +585,7 @@
 .mood-day-modal-box {
     width: min(92vw, 440px);
     max-height: min(82vh, 680px);
+    max-height: min(82dvh, 680px);
 }
 
 .mood-day-list {
@@ -488,6 +593,7 @@
     flex-direction: column;
     gap: 10px;
     max-height: 56vh;
+    max-height: 56dvh;
     margin: 16px 0;
     padding: 2px;
     overflow-y: auto;
@@ -501,6 +607,21 @@
     text-align: left;
     content-visibility: auto;
     contain-intrinsic-size: auto 96px;
+    transition:
+        opacity 240ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1)),
+        transform 240ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1)),
+        height 240ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1)),
+        padding-top 240ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1)),
+        padding-bottom 240ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1)),
+        margin-top 240ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1)),
+        margin-bottom 240ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1)),
+        border-top-width 240ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1)),
+        border-bottom-width 240ms var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+.mood-day-entry-item.is-removing {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
 }
 
 .mood-day-entry.own { border-color: rgba(181,115,122,0.3); }
@@ -539,20 +660,33 @@
     font-size: 0.76em;
     font-weight: 600;
     letter-spacing: 0;
-}
-
-.mood-day-entry-actions button:hover {
-    transform: translateY(-1px);
-    background: var(--surface-elevated, rgba(255, 240, 246, 0.8));
-    border-color: var(--primary-light);
-    box-shadow: 0 2px 8px var(--shadow);
+    transition:
+        transform 0.22s var(--ease-spring-snappy),
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease,
+        box-shadow 0.22s ease;
 }
 
 .mood-day-entry-actions button.danger { color: #b54f5d; }
-.mood-day-entry-actions button.danger:hover {
-    background: rgba(225, 29, 72, 0.08);
-    border-color: rgba(225, 29, 72, 0.35);
-    color: #e11d48;
+
+@media (hover: hover) and (pointer: fine) {
+    .mood-day-entry-actions button:hover {
+        transform: translateY(-1px);
+        background: var(--surface-elevated, rgba(255, 240, 246, 0.8));
+        border-color: var(--primary-light);
+        box-shadow: 0 2px 8px var(--shadow);
+    }
+
+    .mood-day-entry-actions button.danger:hover {
+        background: rgba(225, 29, 72, 0.08);
+        border-color: rgba(225, 29, 72, 0.35);
+        color: #e11d48;
+    }
+}
+
+.mood-day-entry-actions button:active {
+    transform: scale(0.95);
 }
 
 /* 单日心情详情“🫂 抱抱 TA”暖粉胶囊微光按钮 */
@@ -571,16 +705,13 @@
     font-weight: 700;
     box-shadow: 0 3px 12px rgba(244, 63, 94, 0.14), inset 0 1px 1px rgba(255, 255, 255, 0.9);
     cursor: var(--cursor-pointer);
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.mood-hug-partner-btn:hover,
-.mood-day-entry-actions .mood-hug-partner-btn:hover {
-    background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
-    color: #ffffff;
-    border-color: transparent;
-    box-shadow: 0 6px 18px var(--primary-glow);
-    transform: translateY(-2px) scale(1.04);
+    transition:
+        transform 0.25s var(--ease-spring-snappy),
+        background-color 0.25s ease,
+        border-color 0.25s ease,
+        color 0.22s ease,
+        box-shadow 0.25s ease,
+        opacity 0.22s ease;
 }
 
 .mood-hug-partner-btn:active,
@@ -605,7 +736,7 @@
     background: linear-gradient(135deg, rgba(251, 113, 133, 0.18), rgba(244, 63, 94, 0.12));
     color: var(--primary);
     border-color: rgba(244, 63, 94, 0.25);
-    opacity: 0.88;
+    opacity: 0.92;
 }
 
 [data-theme='dark'] .mood-hug-partner-btn,
@@ -618,14 +749,34 @@
     box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35), 0 0 12px rgba(251, 113, 133, 0.15);
 }
 
-[data-theme='dark'] .mood-hug-partner-btn:hover,
-[data-theme="dark"] .mood-hug-partner-btn:hover,
-[data-theme='dark'] .mood-day-entry-actions .mood-hug-partner-btn:hover,
-[data-theme="dark"] .mood-day-entry-actions .mood-hug-partner-btn:hover {
-    background: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
-    color: #ffffff;
-    border-color: transparent;
-    box-shadow: 0 6px 20px rgba(251, 113, 133, 0.35);
+[data-theme='dark'] .mood-hug-partner-btn.is-hugged,
+[data-theme="dark"] .mood-hug-partner-btn.is-hugged,
+[data-theme='dark'] .mood-day-entry-actions .mood-hug-partner-btn.is-hugged,
+[data-theme="dark"] .mood-day-entry-actions .mood-hug-partner-btn.is-hugged {
+    background: linear-gradient(135deg, rgba(251, 113, 133, 0.24), rgba(225, 29, 72, 0.18));
+    border-color: rgba(251, 113, 133, 0.42);
+    color: #fecdd3;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .mood-hug-partner-btn:not(:disabled):not(.is-hugged):hover,
+    .mood-day-entry-actions .mood-hug-partner-btn:not(:disabled):not(.is-hugged):hover {
+        background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+        color: #ffffff;
+        border-color: transparent;
+        box-shadow: 0 6px 18px var(--primary-glow);
+        transform: translateY(-2px) scale(1.04);
+    }
+
+    [data-theme='dark'] .mood-hug-partner-btn:not(:disabled):not(.is-hugged):hover,
+    [data-theme="dark"] .mood-hug-partner-btn:not(:disabled):not(.is-hugged):hover,
+    [data-theme='dark'] .mood-day-entry-actions .mood-hug-partner-btn:not(:disabled):not(.is-hugged):hover,
+    [data-theme="dark"] .mood-day-entry-actions .mood-hug-partner-btn:not(:disabled):not(.is-hugged):hover {
+        background: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+        color: #ffffff;
+        border-color: transparent;
+        box-shadow: 0 6px 20px rgba(251, 113, 133, 0.35);
+    }
 }
 
 /* ── 心情日历“标记这一天”金光特效与星徽 ── */
@@ -694,6 +845,10 @@
     box-shadow: 0 0 16px rgba(255, 193, 7, 0.7), 0 0 30px rgba(181, 115, 122, 0.45), inset 0 0 10px rgba(255, 215, 0, 0.45) !important;
 }
 
+.mood-calendar-day.is-special.is-selected {
+    box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.58), 0 0 16px rgba(255, 193, 7, 0.6), inset 0 0 8px rgba(255, 235, 59, 0.4) !important;
+}
+
 /* 金光呼吸动画 */
 @keyframes goldenGlowPulse {
     0% {
@@ -750,7 +905,11 @@
     background: rgba(255, 255, 255, 0.4);
     cursor: var(--cursor-pointer);
     user-select: none;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+        transform 0.25s var(--ease-spring-gentle),
+        background-color 0.25s ease,
+        border-color 0.25s ease,
+        box-shadow 0.25s ease;
 }
 
 [data-theme="dark"] .mood-special-toggle {
@@ -758,10 +917,17 @@
     border-color: rgba(255, 255, 255, 0.1);
 }
 
-.mood-special-toggle:hover {
-    background: rgba(255, 255, 255, 0.65);
-    border-color: rgba(255, 193, 7, 0.5);
-    transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+    .mood-special-toggle:hover {
+        background: rgba(255, 255, 255, 0.65);
+        border-color: rgba(255, 193, 7, 0.5);
+        transform: translateY(-1px);
+    }
+
+    [data-theme="dark"] .mood-special-toggle:hover {
+        background: rgba(56, 42, 48, 0.68);
+        border-color: rgba(255, 215, 0, 0.45);
+    }
 }
 
 .mood-special-toggle input[type="checkbox"] {
@@ -778,7 +944,7 @@
     height: 24px;
     border-radius: 12px;
     background: rgba(180, 180, 180, 0.35);
-    transition: background 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s;
+    transition: background-color 0.25s var(--ease-spring-gentle), box-shadow 0.25s ease;
     flex-shrink: 0;
 }
 
@@ -791,7 +957,7 @@
     border-radius: 50%;
     background: #ffffff;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s;
+    transition: transform 0.25s var(--ease-spring-snappy), background-color 0.25s ease;
 }
 
 /* 勾选开启状态 */
@@ -833,7 +999,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    transition: color 0.2s;
+    transition: color 0.2s ease;
 }
 
 .mood-special-toggle input:checked ~ .mood-special-toggle-content .mood-special-toggle-title {
@@ -922,15 +1088,23 @@
     white-space: nowrap;
     cursor: var(--cursor-pointer);
     box-shadow: none;
-    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition:
+        transform 0.22s var(--ease-spring-snappy),
+        background-color 0.22s ease,
+        border-color 0.22s ease,
+        color 0.22s ease,
+        box-shadow 0.22s ease,
+        opacity 0.2s ease;
 }
 
-.mood-day-mark-btn:hover {
-    color: var(--primary);
-    border-color: var(--primary-light, rgba(255, 193, 7, 0.8));
-    background: var(--surface, rgba(255, 255, 255, 0.7));
-    box-shadow: 0 4px 14px var(--shadow, rgba(181, 115, 122, 0.2));
-    transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+    .mood-day-mark-btn:hover {
+        color: var(--primary);
+        border-color: var(--primary-light, rgba(255, 193, 7, 0.8));
+        background: var(--surface, rgba(255, 255, 255, 0.7));
+        box-shadow: 0 4px 14px var(--shadow, rgba(181, 115, 122, 0.2));
+        transform: translateY(-1px);
+    }
 }
 
 .mood-day-mark-btn:active {
@@ -993,7 +1167,17 @@
     font-size: 0.86em;
     font-weight: 700;
     cursor: var(--cursor-pointer);
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition:
+        transform 0.25s var(--ease-spring-snappy),
+        background-color 0.25s ease,
+        border-color 0.25s ease,
+        color 0.22s ease,
+        box-shadow 0.25s ease,
+        opacity 0.2s ease;
+}
+
+.btn-mood-action:active {
+    transform: scale(0.96);
 }
 
 .btn-mood-mark-direct {
@@ -1001,11 +1185,6 @@
     border-color: rgba(255, 193, 7, 0.8);
     color: #b87b00;
     box-shadow: 0 3px 12px rgba(255, 193, 7, 0.25);
-}
-
-.btn-mood-mark-direct:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 16px rgba(255, 193, 7, 0.4);
 }
 
 .btn-mood-mark-direct.is-active {
@@ -1022,9 +1201,16 @@
     box-shadow: 0 3px 12px rgba(181, 115, 122, 0.28);
 }
 
-.btn-mood-add-direct:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 16px rgba(181, 115, 122, 0.4);
+@media (hover: hover) and (pointer: fine) {
+    .btn-mood-mark-direct:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 16px rgba(255, 193, 7, 0.4);
+    }
+
+    .btn-mood-add-direct:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 16px rgba(181, 115, 122, 0.4);
+    }
 }
 
 /* 单日详情页列表下方的追加/补记按钮 */
@@ -1052,14 +1238,12 @@
     font: 700 0.88rem/1.2 'Nunito', 'PingFang SC', system-ui, sans-serif;
     cursor: var(--cursor-pointer);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.btn-mood-append:hover {
-    border-color: var(--primary);
-    background: var(--surface, rgba(255, 255, 255, 0.85));
-    box-shadow: 0 4px 14px var(--shadow, rgba(181, 115, 122, 0.22));
-    transform: translateY(-2px);
+    transition:
+        transform 0.25s var(--ease-spring-snappy),
+        background-color 0.25s ease,
+        border-color 0.25s ease,
+        color 0.22s ease,
+        box-shadow 0.25s ease;
 }
 
 .btn-mood-append:active {
@@ -1078,9 +1262,18 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-[data-theme="dark"] .btn-mood-append:hover {
-    border-color: var(--primary);
-    background: rgba(50, 50, 60, 0.75);
+@media (hover: hover) and (pointer: fine) {
+    .btn-mood-append:hover {
+        border-color: var(--primary);
+        background: var(--surface, rgba(255, 255, 255, 0.85));
+        box-shadow: 0 4px 14px var(--shadow, rgba(181, 115, 122, 0.22));
+        transform: translateY(-2px);
+    }
+
+    [data-theme="dark"] .btn-mood-append:hover {
+        border-color: var(--primary);
+        background: rgba(50, 50, 60, 0.75);
+    }
 }
 
 /* 设置中的站内提醒 */
@@ -1133,6 +1326,10 @@
     .anniv-card .anniv-days { font-size: 1.3em; }
     .mood-section { padding: 19px 14px 16px; }
     .mood-weekdays, .mood-calendar-grid { gap: 3px; }
+    .mood-calendar-grid {
+        min-height: 423px;
+        grid-auto-rows: minmax(68px, 1fr);
+    }
     .mood-calendar-day, .mood-calendar-spacer { min-height: 68px; border-radius: 9px; }
     .mood-calendar-day { padding-right: 0; padding-left: 0; }
     .mood-entry-count { display: none; }
@@ -1231,14 +1428,20 @@
     padding: 0;
     letter-spacing: 0;
     box-shadow: none;
-    transition: transform 0.2s ease, background-color 0.2s ease;
+    transition: transform 0.2s var(--ease-spring-snappy), background-color 0.2s ease;
     z-index: 2;
 }
 
-.mood-photo-remove-btn:hover {
-    background: rgba(230, 40, 40, 0.9);
-    transform: scale(1.12);
-    box-shadow: none;
+@media (hover: hover) and (pointer: fine) {
+    .mood-photo-remove-btn:hover {
+        background: rgba(230, 40, 40, 0.9);
+        transform: scale(1.12);
+        box-shadow: none;
+    }
+}
+
+.mood-photo-remove-btn:active {
+    transform: scale(0.92);
 }
 
 .mood-photo-add-btn {
@@ -1254,7 +1457,12 @@
     background: rgba(255, 240, 246, 0.5);
     color: var(--primary);
     cursor: var(--cursor-pointer);
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition:
+        transform 0.25s var(--ease-spring-snappy),
+        background-color 0.22s ease,
+        border-color 0.22s ease,
+        color 0.22s ease,
+        box-shadow 0.22s ease;
     padding: 0;
 }
 
@@ -1263,14 +1471,20 @@
     border-color: rgba(255, 143, 171, 0.35);
 }
 
-.mood-photo-add-btn:hover {
-    background: rgba(255, 220, 235, 0.8);
-    transform: scale(1.04);
-    border-color: var(--primary);
+@media (hover: hover) and (pointer: fine) {
+    .mood-photo-add-btn:hover {
+        background: rgba(255, 220, 235, 0.8);
+        transform: scale(1.04);
+        border-color: var(--primary);
+    }
+
+    [data-theme='dark'] .mood-photo-add-btn:hover {
+        background: rgba(255, 143, 171, 0.2);
+    }
 }
 
-[data-theme='dark'] .mood-photo-add-btn:hover {
-    background: rgba(255, 143, 171, 0.2);
+.mood-photo-add-btn:active {
+    transform: scale(0.96);
 }
 
 .mood-photo-add-icon {
@@ -1349,12 +1563,14 @@
     background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0) 100%);
     background-size: 200% 100%;
     animation: mediaShimmer 1.8s ease-in-out infinite;
-    transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1), transform 0.2s ease, box-shadow 0.2s ease;
+    transition: opacity 0.35s var(--ease-spring-gentle), transform 0.2s var(--ease-spring-snappy), box-shadow 0.2s ease;
 }
 
-.mood-day-photo-item:hover {
-    transform: scale(1.02);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+@media (hover: hover) and (pointer: fine) {
+    .mood-day-photo-item:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    }
 }
 
 .mood-day-photo-item.is-loaded {
@@ -1369,5 +1585,61 @@
     display: block;
     transition: opacity 0.3s ease;
 }
+
+/* ── 无障碍减弱动态（prefers-reduced-motion）完整停用动画 ── */
+@media (prefers-reduced-motion: reduce) {
+    .mood-calendar-grid.is-slide-next,
+    .mood-calendar-grid.is-slide-prev,
+    .mood-calendar-day.is-just-updated,
+    .mood-calendar-day.is-special,
+    .mood-calendar-day.is-special::before,
+    .mood-special-star,
+    .mood-day-empty-decor,
+    .mood-camera-badge,
+    .mood-emoji-btn,
+    .mood-emoji-btn:hover,
+    .mood-emoji-btn.selected,
+    .mood-hug-partner-btn.is-hugged .hug-icon,
+    .mood-hug-partner-btn.hugged .hug-icon,
+    .mood-day-entry-actions .mood-hug-partner-btn.is-hugged .hug-icon,
+    .mood-day-entry-actions .mood-hug-partner-btn.hugged .hug-icon,
+    .mood-day-photo-item {
+        animation: none !important;
+    }
+
+    .mood-calendar-day.is-special::before {
+        opacity: 0 !important;
+    }
+
+    .mood-day-photo-item {
+        background-image: none;
+    }
+
+    .mood-section,
+    .mood-today-btn,
+    .mood-month-nav,
+    .mood-nav-icon,
+    .mood-calendar-day,
+    .btn-mood,
+    .mood-emoji-btn,
+    .mood-day-entry,
+    .mood-day-entry-actions button,
+    .mood-hug-partner-btn,
+    .mood-special-toggle,
+    .mood-special-toggle-knob,
+    .mood-day-mark-btn,
+    .btn-mood-action,
+    .btn-mood-append,
+    .mood-photo-remove-btn,
+    .mood-photo-add-btn,
+    .mood-day-photo-item {
+        transition:
+            background-color 0.15s ease,
+            border-color 0.15s ease,
+            color 0.15s ease,
+            opacity 0.15s ease !important;
+    }
+}
+
 
 

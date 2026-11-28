@@ -110,3 +110,13 @@
     0%, 100% { transform: rotate(0deg) scale(1); }
     50% { transform: rotate(20deg) scale(1.25); }
 }
+
+@media (prefers-reduced-motion: reduce) {
+    .site-header h1,
+    .site-header h1 .heart-icon,
+    .site-header h1 span,
+    .site-header .tagline,
+    .header-divider i {
+        animation: none !important;
+    }
+}

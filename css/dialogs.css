@@ -2,7 +2,7 @@
 #lightbox {
     position: fixed;
     inset: 0;
-    background: rgba(14, 10, 13, 0.94);
+    background: rgba(14, 10, 13, 0.95);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -137,6 +137,7 @@ dialog.native-dialog[open]::backdrop {
     box-shadow: var(--shadow-hover), inset 0 2px 1px var(--glass-highlight);
     text-align: center;
     border: 1.5px solid var(--border);
+    max-height: calc(100vh - 2rem);
     max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -427,13 +428,15 @@ dialog.native-dialog[open]::backdrop {
             font-size: 0.92em;
             cursor: var(--cursor-pointer);
             box-shadow: 0 4px 15px rgba(212, 107, 122, 0.3);
-            transition: all 0.3s ease;
+            transition: transform 0.25s var(--ease-spring-gentle), box-shadow 0.25s ease, opacity 0.2s ease;
             outline: none;
         }
 
-        .btn-version-confirm:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(212, 107, 122, 0.45);
+        @media (hover: hover) and (pointer: fine) {
+            .btn-version-confirm:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(212, 107, 122, 0.45);
+            }
         }
 
         .btn-version-confirm:active {
@@ -501,7 +504,7 @@ dialog.native-dialog[open]::backdrop {
             align-items: center;
             justify-content: center;
             gap: 6px;
-            transition: all 0.3s ease;
+            transition: background-color 0.22s ease, border-color 0.22s ease, color 0.22s ease, box-shadow 0.22s ease, transform 0.22s var(--ease-spring-gentle);
             box-shadow: none;
             outline: none;
         }
@@ -543,14 +546,16 @@ dialog.native-dialog[open]::backdrop {
             font-size: 0.9em;
             cursor: var(--cursor-pointer);
             box-shadow: 0 4px 12px rgba(212, 107, 122, 0.15);
-            transition: all 0.3s ease;
+            transition: transform 0.25s var(--ease-spring-gentle), box-shadow 0.25s ease, opacity 0.2s ease;
             outline: none;
             text-align: center;
         }
 
-        .btn-settings-action:hover {
-            transform: translateY(-1.5px);
-            box-shadow: 0 6px 16px rgba(212, 107, 122, 0.35);
+        @media (hover: hover) and (pointer: fine) {
+            .btn-settings-action:hover {
+                transform: translateY(-1.5px);
+                box-shadow: 0 6px 16px rgba(212, 107, 122, 0.35);
+            }
         }
 
         .btn-settings-action:active {
@@ -612,7 +617,7 @@ dialog.native-dialog[open]::backdrop {
             box-sizing: border-box;
             cursor: var(--cursor-pointer);
             user-select: none;
-            transition: all 0.2s ease;
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
             flex-shrink: 0;
         }
 
@@ -1066,5 +1071,128 @@ body.dark-mode .drop-zone-text {
     }
     100% {
         transform: translateY(-4px);
+    }
+}
+
+/* ── 全局统一轻奢毛玻璃确认弹窗 (showConfirmDialog) ── */
+dialog.confirm-modal-dialog {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-width: 100vw;
+    max-height: 100vh;
+    max-height: 100dvh;
+    margin: 0;
+    padding:
+        max(16px, env(safe-area-inset-top))
+        max(16px, env(safe-area-inset-right))
+        max(16px, env(safe-area-inset-bottom))
+        max(16px, env(safe-area-inset-left));
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 230, 240, 0.42);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    opacity: 0;
+    transform: none;
+    transition: opacity 220ms var(--ios-ease-nav);
+    z-index: 2800;
+}
+
+[data-theme='dark'] dialog.confirm-modal-dialog {
+    background: rgba(16, 9, 24, 0.64);
+}
+
+dialog.confirm-modal-dialog[open] {
+    display: flex;
+}
+
+dialog.confirm-modal-dialog::backdrop {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+dialog.confirm-modal-dialog.is-open {
+    opacity: 1;
+}
+
+dialog.confirm-modal-dialog.is-closing {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.confirm-modal-box {
+    max-width: 340px;
+    width: min(88vw, 340px);
+    padding: 28px 24px 24px;
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.94);
+    transition:
+        transform 240ms var(--ios-ease-popover),
+        opacity 200ms ease;
+}
+
+dialog.confirm-modal-dialog.is-open .confirm-modal-box {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+}
+
+dialog.confirm-modal-dialog.is-closing .confirm-modal-box {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.96);
+    transition:
+        transform 200ms var(--ios-ease-nav),
+        opacity 180ms ease;
+}
+
+.confirm-modal-title {
+    font-size: 1.22rem;
+    margin-bottom: 10px;
+}
+
+.confirm-modal-message {
+    font-size: 0.93rem;
+    line-height: 1.6;
+    color: var(--text-main);
+    margin: 4px 0 20px;
+    white-space: pre-line;
+    word-break: break-word;
+}
+
+.confirm-modal-btns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 0;
+}
+
+.confirm-modal-btns button {
+    width: 100%;
+    padding: 11px 16px;
+    min-height: 44px;
+}
+
+.confirm-btn-ok.is-danger {
+    background: linear-gradient(135deg, #fb7185, #e11d48);
+    color: #ffffff;
+    box-shadow: 0 6px 18px rgba(225, 29, 72, 0.26);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    dialog.confirm-modal-dialog,
+    .confirm-modal-box,
+    .version-decor-heart,
+    .drop-zone-modal-box,
+    .drop-zone-icon {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+    .version-decor-heart {
+        transform: translateX(-50%) !important;
     }
 }

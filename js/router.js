@@ -80,11 +80,7 @@
     ];
     const HOME_FLOATING_CHROME_IDS = [
         'fab-container',
-        'app-utility-bar',
-        'login-trigger-btn',
-        'user-avatar-btn',
-        'notification-bell',
-        'theme-toggle'
+        'app-utility-bar'
     ];
 
     let initialized = false;
@@ -108,7 +104,25 @@
     const routeFocusMemory = new Map();
     const routeStackByDepth = new Map();
     let restoringNavigation = null;
+    let restoringNavigationTimer = null;
     let pendingBackOptions = null;
+    let pendingHistoryBackTimer = null;
+    let lastUserBackTriggerAt = 0;
+
+    function clearRestoringNavigation() {
+        if (restoringNavigationTimer !== null) {
+            global.clearTimeout(restoringNavigationTimer);
+            restoringNavigationTimer = null;
+        }
+        restoringNavigation = null;
+    }
+
+    function clearPendingHistoryBack() {
+        if (pendingHistoryBackTimer !== null) {
+            global.clearTimeout(pendingHistoryBackTimer);
+            pendingHistoryBackTimer = null;
+        }
+    }
 
     // ── 转场协调与生命周期状态 ──
     let scrimElement = null;
@@ -442,9 +456,26 @@
     }
 
     function getHomeFloatingElements() {
-        return HOME_FLOATING_CHROME_IDS
+        const list = HOME_FLOATING_CHROME_IDS
             .map(id => document.getElementById(id))
             .filter(Boolean);
+        const resonanceEl = document.getElementById('resonance-ui');
+        if (resonanceEl && resonanceEl.classList.contains('show')) {
+            list.push(resonanceEl);
+        }
+        return list;
+    }
+
+    function formatFloatingChromeTransform(el, shiftX = 0, scale = 1) {
+        const isCenteredResonance = el?.id === 'resonance-ui'
+            && !global.matchMedia?.('(max-width: 680px)')?.matches;
+        const xPart = isCenteredResonance
+            ? (shiftX === 0 ? '-50%' : `calc(-50% + ${shiftX}px)`)
+            : `${shiftX}px`;
+        if (scale !== 1) {
+            return `translate3d(${xPart}, 0, 0) scale(${scale})`;
+        }
+        return `translate3d(${xPart}, 0, 0)`;
     }
 
     function syncHomeViewportOrigin() {
@@ -458,14 +489,16 @@
     function applyScrollbarCompensation(lock) {
         if (!document.documentElement) return;
         if (lock) {
-            if (!document.body.classList.contains('app-page-active')) {
+            if (!document.body.classList.contains('app-page-active') && !document.body.classList.contains('is-scroll-locked')) {
                 const sbWidth = Math.max(0, global.innerWidth - document.documentElement.clientWidth);
                 document.documentElement.style.setProperty('--app-scrollbar-comp', `${sbWidth}px`);
             }
             document.body.classList.add('app-page-active');
         } else {
             document.body.classList.remove('app-page-active', 'app-page-settled');
-            document.documentElement.style.setProperty('--app-scrollbar-comp', '0px');
+            if (!document.body.classList.contains('is-scroll-locked')) {
+                document.documentElement.style.setProperty('--app-scrollbar-comp', '0px');
+            }
         }
     }
 
@@ -820,7 +853,7 @@
                     el.style.transition = 'none';
                     el.style.willChange = 'transform, opacity';
                     el.style.opacity = '1';
-                    el.style.transform = 'translate3d(0, 0, 0)';
+                    el.style.transform = formatFloatingChromeTransform(el, 0, 1);
                 });
             }
             scrim.classList.add('is-visible');
@@ -851,7 +884,7 @@
                     el.style.transition = 'none';
                     el.style.willChange = 'transform, opacity';
                     el.style.opacity = '0';
-                    el.style.transform = 'translate3d(-16px, 0, 0)';
+                    el.style.transform = formatFloatingChromeTransform(el, -16, 1);
                 });
             }
             scrim.classList.add('is-visible');
@@ -880,7 +913,7 @@
                     el.style.transition = 'none';
                     el.style.willChange = 'transform, opacity';
                     el.style.opacity = '1';
-                    el.style.transform = 'scale(1)';
+                    el.style.transform = formatFloatingChromeTransform(el, 0, 1);
                 });
             }
             scrim.classList.add('is-visible');
@@ -909,7 +942,7 @@
                     el.style.transition = 'none';
                     el.style.willChange = 'transform, opacity';
                     el.style.opacity = '0';
-                    el.style.transform = 'scale(0.94)';
+                    el.style.transform = formatFloatingChromeTransform(el, 0, 0.94);
                 });
             }
             scrim.classList.add('is-visible');
@@ -961,6 +994,7 @@
 
         const record = {
             kind,
+            isBack: kind === 'pop' || kind === 'sheet-out',
             elements: involvedElements,
             rafId: null,
             timerId: null,
@@ -1010,7 +1044,7 @@
                     floatingChrome.forEach(el => {
                         el.style.transition = `transform ${Math.round(dur * 0.8)}ms ${IOS_EASE_DECEL}, opacity ${Math.round(dur * 0.6)}ms ease`;
                         el.style.opacity = '0';
-                        el.style.transform = 'translate3d(-16px, 0, 0)';
+                        el.style.transform = formatFloatingChromeTransform(el, -16, 1);
                     });
                 }
                 scrim.style.transition = `opacity ${dur}ms ${navEasing}`;
@@ -1030,7 +1064,7 @@
                     floatingChrome.forEach(el => {
                         el.style.transition = `transform ${dur}ms ${navEasing}, opacity ${Math.round(dur * 0.78)}ms ease`;
                         el.style.opacity = '1';
-                        el.style.transform = 'translate3d(0, 0, 0)';
+                        el.style.transform = formatFloatingChromeTransform(el, 0, 1);
                     });
                 }
                 scrim.style.transition = `opacity ${dur}ms ${navEasing}`;
@@ -1048,7 +1082,7 @@
                     floatingChrome.forEach(el => {
                         el.style.transition = `transform ${Math.round(dur * 0.8)}ms ${IOS_EASE_DECEL}, opacity ${Math.round(dur * 0.55)}ms ease`;
                         el.style.opacity = '0';
-                        el.style.transform = 'scale(0.94)';
+                        el.style.transform = formatFloatingChromeTransform(el, 0, 0.94);
                     });
                 }
                 scrim.style.transition = `opacity ${dur}ms ${navEasing}`;
@@ -1066,7 +1100,7 @@
                     floatingChrome.forEach(el => {
                         el.style.transition = `transform ${dur}ms ${navEasing}, opacity ${Math.round(dur * 0.78)}ms ease`;
                         el.style.opacity = '1';
-                        el.style.transform = 'scale(1)';
+                        el.style.transform = formatFloatingChromeTransform(el, 0, 1);
                     });
                 }
                 scrim.style.transition = `opacity ${dur}ms ${navEasing}`;
@@ -1358,11 +1392,15 @@
     function restoreRejectedNavigation(incomingDepth) {
         const delta = currentDepth - incomingDepth;
         if (delta !== 0) {
+            clearRestoringNavigation();
             restoringNavigation = {
                 depth: currentDepth,
                 hash: currentHistoryHash,
                 fullPath: currentRoute.fullPath
             };
+            restoringNavigationTimer = global.setTimeout(() => {
+                clearRestoringNavigation();
+            }, 320);
             global.history.go(delta);
             return;
         }
@@ -1390,7 +1428,7 @@
         currentHistoryHash = global.location.hash;
         currentHistoryState = global.history.state;
         lastProcessedHref = global.location.href;
-        restoringNavigation = null;
+        clearRestoringNavigation();
         return true;
     }
 
@@ -1398,6 +1436,7 @@
         if (!initialized || handleRestorationEvent()) return;
         if (global.location.href === lastProcessedHref) return;
 
+        clearPendingHistoryBack();
         const navigationOptions = pendingBackOptions || {};
         pendingBackOptions = null;
         const effectiveReason = navigationOptions.reason || reason;
@@ -1470,6 +1509,7 @@
 
     function handleRouteEscape(event) {
         if (event.key !== 'Escape' || event.defaultPrevented || currentRoute?.id === 'home') return;
+        if (restoringNavigation !== null || pendingHistoryBackTimer !== null || activeTransition?.isBack) return;
         if (document.getElementById('lightbox')?.classList.contains('show')) return;
         if (document.querySelector('dialog[open]')) return;
 
@@ -1508,7 +1548,7 @@
         if (prefersReducedMotion()) return false;
         if (!currentRoute || currentRoute.id === 'home') return false;
         if (currentRoute.presentation !== 'push') return false;
-        if (activeTransition || swipeState || pendingSwipeCommitCleanup) return false;
+        if (restoringNavigation || pendingHistoryBackTimer || activeTransition || swipeState || pendingSwipeCommitCleanup) return false;
         if (document.getElementById('lightbox')?.classList.contains('show')) return false;
         if (document.querySelector('dialog[open]')) return false;
         const diaryPicker = document.getElementById('aiDiaryPicker');
@@ -1693,11 +1733,11 @@
                 }
                 swipeState.scrim.style.opacity = (swipeState.maxScrim * (1 - progress)).toFixed(3);
                 if (swipeState.underlayIsHome && swipeState.floatingChrome.length) {
-                    const chromeShift = (-16 * (1 - progress)).toFixed(1);
+                    const chromeShift = Number((-16 * (1 - progress)).toFixed(1));
                     const chromeAlpha = progress.toFixed(3);
                     swipeState.floatingChrome.forEach(el => {
                         el.style.opacity = chromeAlpha;
-                        el.style.transform = `translate3d(${chromeShift}px, 0, 0)`;
+                        el.style.transform = formatFloatingChromeTransform(el, chromeShift, 1);
                     });
                 }
             });
@@ -1748,7 +1788,7 @@
                     state.floatingChrome.forEach(el => {
                         el.style.transition = `transform ${dur}ms ${IOS_EASE_NAV}, opacity ${dur}ms ease`;
                         el.style.opacity = '1';
-                        el.style.transform = 'translate3d(0, 0, 0)';
+                        el.style.transform = formatFloatingChromeTransform(el, 0, 1);
                     });
                 }
             } else {
@@ -1760,7 +1800,7 @@
                     state.floatingChrome.forEach(el => {
                         el.style.transition = `transform ${dur}ms ${IOS_EASE_NAV}, opacity ${dur}ms ease`;
                         el.style.opacity = '0';
-                        el.style.transform = 'translate3d(-16px, 0, 0)';
+                        el.style.transform = formatFloatingChromeTransform(el, -16, 1);
                     });
                 }
             }
@@ -1915,6 +1955,10 @@
         if (!initialized) initAppRouter();
         if (!initialized) return false;
 
+        clearRestoringNavigation();
+        clearPendingHistoryBack();
+        pendingBackOptions = null;
+
         const requestedRoute = matchRoute(path);
         const unknown = !requestedRoute;
         const authorization = authorizeRoute(requestedRoute || matchRoute('/'));
@@ -1976,13 +2020,32 @@
         if (!initialized) initAppRouter();
         if (!initialized) return false;
 
+        const isProgrammaticBypass = Boolean(
+            options.force || options.skipGuard || options.reason === 'swipe-back' || options.reason === 'login-complete'
+        );
+        if (!isProgrammaticBypass) {
+            if (restoringNavigation !== null || pendingHistoryBackTimer !== null || activeTransition?.isBack) {
+                return true;
+            }
+            const now = Date.now();
+            if (now - lastUserBackTriggerAt < 220) {
+                return true;
+            }
+            lastUserBackTriggerAt = now;
+        }
+
         if (currentRoute?.id === 'home') rememberHomeScroll(true);
         else rememberHomeScroll();
         if (currentDepth > 0) {
+            if (pendingHistoryBackTimer !== null) return true;
             pendingBackOptions = {
                 ...options,
                 reason: options.reason || 'back'
             };
+            pendingHistoryBackTimer = global.setTimeout(() => {
+                pendingHistoryBackTimer = null;
+                pendingBackOptions = null;
+            }, 320);
             global.history.back();
             return true;
         }

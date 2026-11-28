@@ -222,14 +222,33 @@ function openLoginModal(returnTo = '') {
     window.location.hash = `#${target}`;
 }
 
+function setLoginErrorMessage(message) {
+    const errorElement = document.getElementById('login-error');
+    if (!errorElement) return;
+    const text = String(message || '');
+    errorElement.textContent = text;
+    if (!text) {
+        errorElement.classList.remove('is-shaking');
+        errorElement.style.animation = '';
+        return;
+    }
+    const reducedMotion = typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion) return;
+    errorElement.classList.remove('is-shaking');
+    errorElement.style.animation = 'none';
+    void errorElement.offsetWidth;
+    errorElement.style.animation = '';
+    errorElement.classList.add('is-shaking');
+}
+
 function enterLoginPage() {
     const emailInput = document.getElementById('login-username');
     const passwordInput = document.getElementById('login-password');
-    const errorElement = document.getElementById('login-error');
 
     if (emailInput) emailInput.value = '';
     if (passwordInput) passwordInput.value = '';
-    if (errorElement) errorElement.textContent = '';
+    setLoginErrorMessage('');
 
     const activateAfterTransition = () => {
         if (typeof isAppRouteActive === 'function' && !isAppRouteActive('login')) return;
@@ -279,20 +298,19 @@ function toggleLoginPwEye() {
 async function doLogin() {
     const email = document.getElementById('login-username')?.value.trim() || '';
     const password = document.getElementById('login-password')?.value || '';
-    const errorElement = document.getElementById('login-error');
     const button = document.getElementById('login-btn');
 
     if (!supabaseClient) {
-        if (errorElement) errorElement.textContent = '登录服务未加载，请联网后刷新页面。';
+        setLoginErrorMessage('登录服务未加载，请联网后刷新页面。');
         return;
     }
 
     if (!email) {
-        if (errorElement) errorElement.textContent = '请输入登录邮箱';
+        setLoginErrorMessage('请输入登录邮箱');
         return;
     }
     if (!password) {
-        if (errorElement) errorElement.textContent = '请输入密码';
+        setLoginErrorMessage('请输入密码');
         return;
     }
 
@@ -301,7 +319,7 @@ async function doLogin() {
         button.textContent = '登录中…';
         button.disabled = true;
     }
-    if (errorElement) errorElement.textContent = '';
+    setLoginErrorMessage('');
 
     try {
         const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
@@ -311,7 +329,7 @@ async function doLogin() {
         if (isAuthenticated()) closeLoginModal();
     } catch (error) {
         console.error('登录失败:', error);
-        if (errorElement) errorElement.textContent = '登录失败，请检查邮箱、密码和网络后重试。';
+        setLoginErrorMessage('登录失败，请检查邮箱、密码和网络后重试。');
     } finally {
         if (button) {
             button.textContent = originalText;
@@ -588,8 +606,37 @@ async function resetAuthenticatedUI() {
     document.getElementById('edit-profile-page')?.classList.remove('is-active');
 
     document.querySelectorAll('dialog[open]').forEach(dialog => {
-        dialog.close();
+        if (dialog.id === 'globalConfirmDialog') {
+            dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
+            return;
+        }
+        if (dialog.id === 'versionModal' && typeof window.closeVersionModal === 'function') {
+            window.closeVersionModal();
+            return;
+        }
+        if (typeof window.hideTopicModal === 'function' && dialog.classList.contains('topic-modal-dialog')) {
+            window.hideTopicModal(dialog);
+        } else {
+            dialog.classList.remove('is-open', 'is-closing');
+            try {
+                dialog.close();
+            } catch (_e) {
+                dialog.removeAttribute('open');
+            }
+        }
+        if (dialog.id) {
+            window.unlockBodyScroll?.(`topic-modal:${dialog.id}`);
+            window.unlockBodyScroll?.(dialog.id);
+        }
     });
+    if (typeof closeLightbox === 'function' && document.getElementById('lightbox')?.classList.contains('show')) {
+        closeLightbox();
+    }
+    window.unlockBodyScroll?.('lightbox');
+    window.unlockBodyScroll?.('topic-modal');
+    window.unlockBodyScroll?.('confirm-dialog');
+    window.unlockBodyScroll?.('version-modal');
+    window.unlockBodyScroll?.('modal');
     showLockedUI();
 
     const activeRoute = typeof getCurrentAppRoute === 'function' ? getCurrentAppRoute() : null;

@@ -1,4 +1,15 @@
 /* ── 评论区 ── */
+@keyframes commentSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .comment-toggle-btn {
     font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
     background: var(--primary-subtle);
@@ -16,14 +27,20 @@
     justify-content: center;
     gap: 6px;
     border-radius: var(--radius-pill);
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+        transform 0.22s var(--ease-spring-snappy),
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease;
     font-weight: 600;
 }
-.comment-toggle-btn:hover {
-    color: var(--twilight);
-    background: rgba(192, 132, 252, 0.12);
-    border-color: rgba(192, 132, 252, 0.25);
-    transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+    .comment-toggle-btn:hover {
+        color: var(--twilight);
+        background: rgba(192, 132, 252, 0.12);
+        border-color: rgba(192, 132, 252, 0.25);
+        transform: translateY(-1px);
+    }
 }
 .comment-toggle-btn::after { display: none !important; }
 .comment-toggle-btn .svg-icon,
@@ -34,12 +51,15 @@
     flex-shrink: 0;
 }
 
-.comment-section {
+.comment-section,
+.comments-section {
     border-top: 1px solid rgba(220, 180, 190, 0.22);
     margin-top: 12px;
     padding-top: 14px;
+    animation: commentSlideIn 0.24s var(--ios-ease-decel) both;
 }
-[data-theme='dark'] .comment-section {
+[data-theme='dark'] .comment-section,
+[data-theme='dark'] .comments-section {
     border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -49,6 +69,10 @@
     gap: 6px;
     margin-bottom: 12px;
     align-items: stretch;
+}
+
+.comment-item.comment-item--enter {
+    animation: commentSlideIn 0.28s var(--ios-ease-decel) both;
 }
 
 .comment-header {
@@ -132,20 +156,18 @@
     cursor: var(--cursor-pointer);
     box-shadow: none !important;
     margin-top: 10px;
-    transition: all 0.22s ease;
+    transition:
+        transform 0.22s var(--ease-spring-snappy),
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease,
+        box-shadow 0.2s ease;
     letter-spacing: 0.3px;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     width: 100%;
     justify-content: flex-start;
-}
-.comment-write-btn:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: rgba(255, 101, 132, 0.1);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 10px rgba(255, 101, 132, 0.12) !important;
 }
 .comment-write-btn::after { display: none !important; }
 
@@ -154,10 +176,20 @@
     border-color: rgba(255, 255, 255, 0.12);
     color: var(--text-muted);
 }
-[data-theme='dark'] .comment-write-btn:hover {
-    background: rgba(255, 143, 171, 0.15);
-    border-color: var(--primary-light);
-    color: var(--primary-light);
+
+@media (hover: hover) and (pointer: fine) {
+    .comment-write-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        background: rgba(255, 101, 132, 0.1);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 10px rgba(255, 101, 132, 0.12) !important;
+    }
+    [data-theme='dark'] .comment-write-btn:hover {
+        background: rgba(255, 143, 171, 0.15);
+        border-color: var(--primary-light);
+        color: var(--primary-light);
+    }
 }
 
 .comment-textarea {
@@ -222,10 +254,16 @@
             cursor: var(--cursor-pointer);
             box-shadow: none;
             margin-right: 0;
-            transition: all 0.2s;
+            transition:
+                transform 0.2s var(--ease-spring-snappy),
+                background-color 0.2s ease,
+                border-color 0.2s ease,
+                color 0.2s ease;
             letter-spacing: 0;
         }
-        .comment-cancel-btn:hover { background: rgba(200,155,155,0.08); transform: none; box-shadow: none; color: var(--text); }
+        @media (hover: hover) and (pointer: fine) {
+            .comment-cancel-btn:hover { background: rgba(200,155,155,0.08); transform: none; box-shadow: none; color: var(--text); }
+        }
 
         /* ── 评论区微型胶囊互动组 (Micro-Pills) ── */
         .comment-actions {
@@ -251,7 +289,10 @@
             cursor: var(--cursor-pointer);
             box-shadow: none !important;
             margin: 0;
-            transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+            transition:
+                transform 0.22s var(--ease-spring-snappy),
+                background-color 0.2s ease,
+                color 0.2s ease;
             display: inline-flex;
             align-items: center;
             gap: 3px;
@@ -272,36 +313,31 @@
             gap: 4px;
         }
         .comment-like-btn:focus-visible,
-        .moment-like-btn:focus-visible {
+        .moment-like-btn:focus-visible,
+        .moment-star-btn:focus-visible {
             outline: 2px solid var(--focus-ring, var(--primary));
             outline-offset: 2px;
-        }
-        .comment-like-btn:hover {
-            color: #e74c6f;
-            background: rgba(231, 76, 111, 0.08);
-            transform: none;
-            box-shadow: none !important;
         }
         .comment-like-btn.has-likers:not(.liked) {
             background: rgba(148, 163, 184, 0.12);
             color: var(--text-muted);
         }
-        .comment-like-btn.has-likers:not(.liked):hover {
-            background: rgba(231, 76, 111, 0.1);
-            color: #e74c6f;
-        }
         .comment-like-btn.liked {
             color: #e74c6f;
             background: rgba(231, 76, 111, 0.08);
-            font-weight: 600;
         }
         .comment-like-btn .like-heart {
             font-size: 1em;
             line-height: 1;
-            transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: transform 0.35s var(--ease-spring-snappy);
             display: inline-block;
         }
-        .comment-like-btn.liked .like-heart { animation: likePopIn 0.35s ease; }
+        .comment-like-btn.is-just-liked .like-heart {
+            animation: likePopIn 0.45s var(--ease-spring-snappy) both;
+        }
+        .comment-like-btn.is-just-liked .like-count {
+            animation: countBump 0.38s var(--ease-spring-snappy) both;
+        }
         .comment-like-btn .like-count {
             display: inline-flex;
             align-items: center;
@@ -366,12 +402,6 @@
         }
 
         /* 评论回复 */
-        .comment-reply-btn:hover {
-            color: var(--primary);
-            background: rgba(255, 101, 132, 0.08);
-            transform: none;
-            box-shadow: none !important;
-        }
         .comment-reply-btn .reply-btn-icon {
             font-size: 0.95em;
             opacity: 0.85;
@@ -380,12 +410,6 @@
         /* 评论撤回 */
         .comment-recall-btn {
             color: var(--text-muted);
-        }
-        .comment-recall-btn:hover {
-            color: #ef4444;
-            background: rgba(239, 68, 68, 0.09);
-            transform: none;
-            box-shadow: none !important;
         }
         .comment-recall-btn .recall-btn-icon {
             font-size: 0.95em;
@@ -404,7 +428,6 @@
             background: rgba(255, 255, 255, 0.08);
             color: var(--text-muted);
         }
-        [data-theme='dark'] .comment-like-btn:hover,
         [data-theme='dark'] .comment-like-btn.liked {
             color: #ff8fab;
             background: rgba(255, 143, 171, 0.15);
@@ -424,13 +447,39 @@
             color: #93c5fd;
             border-color: rgba(147, 197, 253, 0.54);
         }
-        [data-theme='dark'] .comment-reply-btn:hover {
-            color: #ff8fab;
-            background: rgba(255, 143, 171, 0.15);
-        }
-        [data-theme='dark'] .comment-recall-btn:hover {
-            color: #f87171;
-            background: rgba(248, 113, 113, 0.2);
+
+        @media (hover: hover) and (pointer: fine) {
+            .comment-like-btn:hover {
+                color: #e74c6f;
+                background: rgba(231, 76, 111, 0.08);
+                transform: none;
+                box-shadow: none !important;
+            }
+            .comment-like-btn.has-likers:not(.liked):hover {
+                background: rgba(231, 76, 111, 0.1);
+                color: #e74c6f;
+            }
+            .comment-reply-btn:hover {
+                color: var(--primary);
+                background: rgba(255, 101, 132, 0.08);
+                transform: none;
+                box-shadow: none !important;
+            }
+            .comment-recall-btn:hover {
+                color: #ef4444;
+                background: rgba(239, 68, 68, 0.09);
+                transform: none;
+                box-shadow: none !important;
+            }
+            [data-theme='dark'] .comment-like-btn:hover,
+            [data-theme='dark'] .comment-reply-btn:hover {
+                color: #ff8fab;
+                background: rgba(255, 143, 171, 0.15);
+            }
+            [data-theme='dark'] .comment-recall-btn:hover {
+                color: #f87171;
+                background: rgba(248, 113, 113, 0.2);
+            }
         }
 
         /* ── 动态卡片统一互动操作栏 (Action Bar) ── */
@@ -472,7 +521,12 @@
             justify-content: center;
             gap: 6px;
             border-radius: var(--radius-pill);
-            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            transition:
+                transform 0.25s var(--ease-spring-snappy),
+                background-color 0.2s ease,
+                border-color 0.2s ease,
+                color 0.2s ease,
+                box-shadow 0.2s ease;
             letter-spacing: 0;
             font-weight: 600;
             outline: none;
@@ -484,7 +538,7 @@
             display: none !important;
         }
 
-        /* 纯 GPU 微涟漪扩散光环 */
+        /* 纯 GPU 微涟漪扩散光环（仅在新点赞/新收藏瞬态类触发，历史加载不重播） */
         .moment-like-btn::before,
         .moment-star-btn::before {
             content: '';
@@ -498,66 +552,50 @@
             transform: translate(-50%, -50%) scale(0);
             opacity: 0;
         }
-        .moment-like-btn.liked::before {
+        .moment-like-btn.is-just-liked::before {
             background: radial-gradient(circle, rgba(244, 63, 94, 0.45) 0%, rgba(244, 63, 94, 0) 70%);
-            animation: touchRipple 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation: touchRipple 0.48s var(--ios-ease-decel) both;
         }
-        .moment-star-btn.starred::before {
+        .moment-star-btn.is-just-starred::before {
             background: radial-gradient(circle, rgba(245, 158, 11, 0.48) 0%, rgba(245, 158, 11, 0) 70%);
-            animation: touchRipple 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation: touchRipple 0.48s var(--ios-ease-decel) both;
         }
 
-        .moment-like-btn:hover {
-            background: rgba(244, 63, 94, 0.12);
-            border-color: rgba(244, 63, 94, 0.25);
-            color: var(--primary);
-            transform: translateY(-2px) scale(1.02);
-            box-shadow: 0 4px 12px rgba(244, 63, 94, 0.15) !important;
-        }
         .moment-like-btn.liked {
             color: var(--primary);
             background: rgba(244, 63, 94, 0.16);
             border-color: rgba(244, 63, 94, 0.35);
-            font-weight: 700;
+            font-weight: 600;
         }
         .moment-like-btn .ml-heart {
-            transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: transform 0.35s var(--ease-spring-snappy);
             display: inline-flex;
             align-items: center;
-            will-change: transform;
         }
-        .moment-like-btn.liked .ml-heart {
-            animation: likePopIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        .moment-like-btn.is-just-liked .ml-heart {
+            animation: likePopIn 0.45s var(--ease-spring-snappy) both;
         }
-        .moment-like-btn.liked .ml-count {
-            animation: countBump 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        .moment-like-btn.is-just-liked .ml-count {
+            animation: countBump 0.38s var(--ease-spring-snappy) both;
             display: inline-block;
         }
 
-        .moment-star-btn:hover {
-            background: rgba(245, 158, 11, 0.12);
-            border-color: rgba(245, 158, 11, 0.25);
-            color: var(--gold);
-            transform: translateY(-2px) scale(1.02);
-            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15) !important;
-        }
         .moment-star-btn.starred {
             color: var(--gold);
             background: rgba(245, 158, 11, 0.16);
             border-color: rgba(245, 158, 11, 0.35);
-            font-weight: 700;
+            font-weight: 600;
         }
         .moment-star-btn .star-btn-icon {
-            transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: transform 0.35s var(--ease-spring-snappy);
             display: inline-flex;
             align-items: center;
-            will-change: transform;
         }
-        .moment-star-btn.starred .star-btn-icon {
-            animation: starPopIn 0.48s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        .moment-star-btn.is-just-starred .star-btn-icon {
+            animation: starPopIn 0.48s var(--ease-spring-snappy) both;
         }
-        .moment-star-btn.starred .star-btn-text {
-            animation: countBump 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        .moment-star-btn.is-just-starred .star-btn-text {
+            animation: countBump 0.38s var(--ease-spring-snappy) both;
             display: inline-block;
         }
 
@@ -572,20 +610,10 @@
             border-color: rgba(255, 255, 255, 0.1);
             color: var(--text-muted);
         }
-        [data-theme='dark'] .moment-like-btn:hover {
-            background: rgba(251, 113, 133, 0.2);
-            border-color: rgba(251, 113, 133, 0.35);
-            color: var(--primary);
-        }
         [data-theme='dark'] .moment-like-btn.liked {
             background: rgba(251, 113, 133, 0.25);
             border-color: rgba(251, 113, 133, 0.45);
             color: var(--primary);
-        }
-        [data-theme='dark'] .moment-star-btn:hover {
-            background: rgba(253, 224, 71, 0.15);
-            border-color: rgba(253, 224, 71, 0.3);
-            color: #fde047;
         }
         [data-theme='dark'] .moment-star-btn.starred {
             background: rgba(253, 224, 71, 0.2);
@@ -593,9 +621,37 @@
             color: #fde047;
         }
 
+        @media (hover: hover) and (pointer: fine) {
+            .moment-like-btn:hover {
+                background: rgba(244, 63, 94, 0.12);
+                border-color: rgba(244, 63, 94, 0.25);
+                color: var(--primary);
+                transform: translateY(-2px) scale(1.02);
+                box-shadow: 0 4px 12px rgba(244, 63, 94, 0.15) !important;
+            }
+            .moment-star-btn:hover {
+                background: rgba(245, 158, 11, 0.12);
+                border-color: rgba(245, 158, 11, 0.25);
+                color: var(--gold);
+                transform: translateY(-2px) scale(1.02);
+                box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15) !important;
+            }
+            [data-theme='dark'] .moment-like-btn:hover {
+                background: rgba(251, 113, 133, 0.2);
+                border-color: rgba(251, 113, 133, 0.35);
+                color: var(--primary);
+            }
+            [data-theme='dark'] .moment-star-btn:hover {
+                background: rgba(253, 224, 71, 0.15);
+                border-color: rgba(253, 224, 71, 0.3);
+                color: #fde047;
+            }
+        }
+
         /* 点赞人展示行 */
         .moment-likers-row {
             padding-left: 2px;
+            animation: commentSlideIn 0.22s var(--ios-ease-decel) both;
         }
         .moment-likers-row:has(> .moment-like-likers:empty) {
             display: none;
@@ -631,7 +687,11 @@
             letter-spacing: 0;
             cursor: var(--cursor-pointer);
             box-shadow: none;
-            transition: all 0.2s;
+            transition:
+                transform 0.2s var(--ease-spring-snappy),
+                background-color 0.2s ease,
+                border-color 0.2s ease,
+                color 0.2s ease;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -639,12 +699,14 @@
             flex-shrink: 0;
             margin-right: auto;
         }
-        .comment-img-upload-btn:hover {
-            border-color: var(--primary-light);
-            color: var(--primary);
-            background: rgba(200,155,155,0.05);
-            transform: none;
-            box-shadow: none;
+        @media (hover: hover) and (pointer: fine) {
+            .comment-img-upload-btn:hover {
+                border-color: var(--primary-light);
+                color: var(--primary);
+                background: rgba(200,155,155,0.05);
+                transform: none;
+                box-shadow: none;
+            }
         }
         .comment-img-upload-btn::after { display: none; }
         .comment-img-previews {
@@ -692,7 +754,7 @@
             background-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
             background-size: 200% 100%;
             animation: mediaShimmer 1.8s ease-in-out infinite;
-            transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: opacity 0.35s var(--ios-ease-decel);
         }
         [data-theme='dark'] .comment-bubble img {
             background-color: rgba(60, 45, 50, 0.4);
@@ -702,7 +764,9 @@
             background: none;
             animation: none;
         }
-        .comment-bubble img:hover { opacity: 0.92; }
+        @media (hover: hover) and (pointer: fine) {
+            .comment-bubble img:hover { opacity: 0.92; }
+        }
 
         /* ── 感情助手专属评论样式 ── */
         .comment-item--ai {
@@ -711,7 +775,7 @@
             padding: 8px 10px;
             margin: 6px 0;
             border: 1px solid rgba(255, 182, 193, 0.3);
-            transition: all 0.2s ease;
+            transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         [data-theme='dark'] .comment-item--ai {
@@ -757,24 +821,26 @@
             color: var(--text-muted);
             line-height: 1.45;
             cursor: var(--cursor-pointer);
-            transition: background 0.2s, border-color 0.2s;
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
             display: flex;
             align-items: baseline;
             gap: 4px;
             overflow: hidden;
         }
-        .comment-reply-quote:hover {
-            background: rgba(255, 101, 132, 0.08);
-            border-left-color: var(--primary);
-            color: var(--text);
-        }
         [data-theme='dark'] .comment-reply-quote {
             background: rgba(255, 255, 255, 0.06);
             border-left-color: rgba(255, 138, 163, 0.6);
         }
-        [data-theme='dark'] .comment-reply-quote:hover {
-            background: rgba(255, 105, 180, 0.12);
-            border-left-color: #ff758c;
+        @media (hover: hover) and (pointer: fine) {
+            .comment-reply-quote:hover {
+                background: rgba(255, 101, 132, 0.08);
+                border-left-color: var(--primary);
+                color: var(--text);
+            }
+            [data-theme='dark'] .comment-reply-quote:hover {
+                background: rgba(255, 105, 180, 0.12);
+                border-left-color: #ff758c;
+            }
         }
         .reply-quote-author {
             font-weight: 600;
@@ -846,14 +912,16 @@
             line-height: 1;
             margin-left: 8px;
             flex-shrink: 0;
-            transition: color 0.2s;
+            transition: color 0.2s ease;
             box-shadow: none;
         }
-        .comment-reply-banner-close:hover {
-            color: var(--primary);
-            background: none;
-            transform: none;
-            box-shadow: none;
+        @media (hover: hover) and (pointer: fine) {
+            .comment-reply-banner-close:hover {
+                color: var(--primary);
+                background: none;
+                transform: none;
+                box-shadow: none;
+            }
         }
 
         /* ── 评论被引用时高亮闪烁效果 ── */
@@ -905,5 +973,31 @@
         @keyframes thinkingDot {
             0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
             40% { transform: scale(1); opacity: 1; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .comment-section,
+            .comments-section,
+            .comment-item.comment-item--enter,
+            .moment-likers-row,
+            .comment-reply-banner,
+            .comment-ai-thinking,
+            .comment-bubble img,
+            .comment-item--highlight,
+            .comment-ai-thinking-dots span,
+            .moment-like-btn.is-just-liked::before,
+            .moment-star-btn.is-just-starred::before,
+            .moment-like-btn.is-just-liked .ml-heart,
+            .moment-like-btn.is-just-liked .ml-count,
+            .comment-like-btn.is-just-liked .like-heart,
+            .comment-like-btn.is-just-liked .like-count,
+            .moment-star-btn.is-just-starred .star-btn-icon,
+            .moment-star-btn.is-just-starred .star-btn-text {
+                animation: none !important;
+            }
+            .comment-ai-thinking-dots span {
+                transform: none !important;
+                opacity: 0.75 !important;
+            }
         }
 

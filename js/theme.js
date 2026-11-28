@@ -25,11 +25,43 @@ function applyTheme(theme) {
     }
 }
 
+let activeThemeTransitionToken = 0;
+
+function runSmoothThemeChange(nextTheme, afterApply) {
+    const prefersReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    if (!prefersReduced && typeof document.startViewTransition === 'function' && !document.hidden) {
+        const token = ++activeThemeTransitionToken;
+        document.documentElement.classList.add('is-theme-transitioning');
+        try {
+            const vt = document.startViewTransition(() => {
+                applyTheme(nextTheme);
+                if (typeof afterApply === 'function') afterApply();
+            });
+            vt.finished
+                .catch(() => {})
+                .finally(() => {
+                    if (token === activeThemeTransitionToken) {
+                        document.documentElement.classList.remove('is-theme-transitioning');
+                    }
+                });
+            return;
+        } catch (_err) {
+            if (token === activeThemeTransitionToken) {
+                document.documentElement.classList.remove('is-theme-transitioning');
+            }
+        }
+    }
+    applyTheme(nextTheme);
+    if (typeof afterApply === 'function') afterApply();
+}
+
 function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || 'light';
     const next = current === 'dark' ? 'light' : 'dark';
     localStorage.setItem('theme_preference', next);
-    applyTheme(next);
+    runSmoothThemeChange(next, () => {
+        updateSettingsThemeButtons(next);
+    });
 }
 
 function updateThemeIcon(theme) {
@@ -37,7 +69,7 @@ function updateThemeIcon(theme) {
     if (btn) {
         const isDark = theme === 'dark';
         const iconId = isDark ? '#icon-sun' : '#icon-moon';
-        btn.innerHTML = `<svg class="svg-icon" aria-hidden="true"><use href="${iconId}"/></svg>`;
+        btn.innerHTML = `<svg class="svg-icon theme-switch-anim" aria-hidden="true"><use href="${iconId}"/></svg>`;
         btn.setAttribute('aria-pressed', String(isDark));
         btn.setAttribute('aria-label', isDark ? '切换到浅色主题' : '切换到深色主题');
     }
@@ -57,9 +89,14 @@ function updateSettingsThemeButtons(theme) {
 
 function setThemeDirect(theme) {
     if (typeof applyTheme !== 'function' || !['light', 'dark'].includes(theme)) return;
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
     localStorage.setItem('theme_preference', theme);
-    applyTheme(theme);
-    updateSettingsThemeButtons(theme);
+    runSmoothThemeChange(theme, () => {
+        updateSettingsThemeButtons(theme);
+    });
+    if (current !== theme && typeof showToast === 'function') {
+        showToast(theme === 'dark' ? '已切换至星夜深色主题 🌙' : '已切换至晨曦浅色主题 ☀️');
+    }
 }
 
 // --- 专属萌系鼠标样式（樱花奶蛇团 / 草莓奶芙猫爪 / 甜心樱花仙女棒 / 系统默认） ---

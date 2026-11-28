@@ -8,11 +8,23 @@ let isProfileSaving = false;
 let profileStatsRequestGeneration = 0;
 let currentViewingProfileAuthor = '';
 const PROFILE_MOMENTS_CACHE_TTL_MS = 30 * 1000;
+const PROFILE_CONTENT_LIMIT = 300;
 let profileMomentsMemoryCache = {
     author: '',
     epoch: -1,
     timestamp: 0,
     items: null
+};
+let profileStatsSnapshotByAuthor = Object.create(null);
+let renderedProfileMomentsState = {
+    author: '',
+    epoch: -1,
+    cacheTimestamp: 0
+};
+let renderedProfilePhotosState = {
+    author: '',
+    epoch: -1,
+    cacheTimestamp: 0
 };
 
 function getCachedProfileMoments(targetAuthor, epoch) {
@@ -39,8 +51,63 @@ function invalidateProfileMomentsCache() {
         timestamp: 0,
         items: null
     };
+    profileStatsSnapshotByAuthor = Object.create(null);
+    renderedProfileMomentsState = {
+        author: '',
+        epoch: -1,
+        cacheTimestamp: 0
+    };
+    renderedProfilePhotosState = {
+        author: '',
+        epoch: -1,
+        cacheTimestamp: 0
+    };
 }
 window.invalidateProfileMomentsCache = invalidateProfileMomentsCache;
+
+function computeProfileStatsFromRows(rows) {
+    let photoCount = 0;
+    (rows || []).forEach(item => {
+        if (item.type === 'photo') {
+            photoCount += 1;
+            return;
+        }
+        if (item.type !== 'moment') return;
+        try {
+            const content = JSON.parse(item.content);
+            if (Array.isArray(content.images)) photoCount += content.images.length;
+        } catch (_error) {
+            // 损坏的旧记录不计入照片总数。
+        }
+    });
+    return {
+        posts: String((rows || []).length),
+        photos: String(photoCount)
+    };
+}
+
+function applyProfileStatNumbers(postsText, photosText, isLoading = false) {
+    const postsElement = document.getElementById('stat-posts');
+    const photosElement = document.getElementById('stat-photos');
+    if (postsElement) {
+        if (postsElement.textContent !== postsText) postsElement.textContent = postsText;
+        postsElement.classList.toggle('is-loading', Boolean(isLoading));
+    }
+    if (photosElement) {
+        if (photosElement.textContent !== photosText) photosElement.textContent = photosText;
+        photosElement.classList.toggle('is-loading', Boolean(isLoading));
+    }
+    if (!isLoading && postsText !== '—' && postsText !== '…') {
+        document.querySelectorAll('.profile-subpage-moments-count').forEach(el => {
+            el.textContent = postsText;
+        });
+    }
+    if (!isLoading && photosText !== '—' && photosText !== '…') {
+        document.querySelectorAll('.profile-subpage-photos-count').forEach(el => {
+            el.textContent = photosText;
+        });
+    }
+}
 
 function getProfileAvatarUrl(profile) {
     if (!profile) return '';
@@ -467,6 +534,22 @@ function renderProfilePage(targetAuthor = currentAuthor) {
             editButtonBottom.setAttribute('aria-label', `给${profile.nickname || profile.username}写动态`);
         }
     }
+
+    // 同步预填统计数字，彻底消除 0 -> … -> 数字 三段生硬跳变
+    const epoch = typeof authEpoch === 'number' ? authEpoch : 0;
+    const cachedRows = isAuthenticated() ? getCachedProfileMoments(targetAuthor, epoch) : null;
+    if (cachedRows) {
+        const stats = computeProfileStatsFromRows(cachedRows);
+        profileStatsSnapshotByAuthor[targetAuthor] = { epoch, ...stats };
+        applyProfileStatNumbers(stats.posts, stats.photos, false);
+    } else {
+        const snapshot = profileStatsSnapshotByAuthor[targetAuthor];
+        if (snapshot && snapshot.epoch === epoch) {
+            applyProfileStatNumbers(snapshot.posts, snapshot.photos, true);
+        } else {
+            applyProfileStatNumbers('—', '—', true);
+        }
+    }
 }
 
 function handleProfileBottomAction() {
@@ -475,13 +558,17 @@ function handleProfileBottomAction() {
 
     if (isSelf) {
         openEditProfilePage();
-    } else {
+    } else if (typeof appReplace === 'function') {
+        appReplace('/moments/new');
+    } else if (typeof onAppRouteTransitionIdle === 'function') {
         closeProfilePage();
-        setTimeout(() => {
+        onAppRouteTransitionIdle(() => {
             if (typeof openMomentModal === 'function') {
                 openMomentModal();
             }
-        }, 220);
+        });
+    } else if (typeof openMomentModal === 'function') {
+        openMomentModal();
     }
 }
 
@@ -507,20 +594,23 @@ async function loadProfileStats(targetAuthor) {
     if (!isAuthenticated() || !allProfilesCache[targetAuthor]) return;
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
-    const postsElement = document.getElementById('stat-posts');
-    const photosElement = document.getElementById('stat-photos');
-    if (postsElement) postsElement.textContent = '…';
-    if (photosElement) photosElement.textContent = '…';
 
     let rows = getCachedProfileMoments(targetAuthor, epoch);
     if (!rows) {
+        const snapshot = profileStatsSnapshotByAuthor[targetAuthor];
+        if (snapshot && snapshot.epoch === epoch) {
+            applyProfileStatNumbers(snapshot.posts, snapshot.photos, true);
+        } else {
+            applyProfileStatNumbers('—', '—', true);
+        }
+
         const { data, error } = await supabaseClient
             .from('moments')
             .select('*')
             .eq('author', targetAuthor)
             .order('created_at', { ascending: false })
             .order('id', { ascending: false })
-            .limit(300);
+            .limit(PROFILE_CONTENT_LIMIT);
 
         if (!isCurrentProfileStatsRequest(
             requestGeneration,
@@ -530,40 +620,16 @@ async function loadProfileStats(targetAuthor) {
         )) return;
         if (error) {
             console.error('加载资料统计失败:', error);
-            if (postsElement) postsElement.textContent = '—';
-            if (photosElement) photosElement.textContent = '—';
+            applyProfileStatNumbers('—', '—', false);
             return;
         }
         rows = data || [];
         setCachedProfileMoments(targetAuthor, epoch, rows);
     }
 
-    let photoCount = 0;
-    rows.forEach(item => {
-        if (item.type === 'photo') {
-            photoCount += 1;
-            return;
-        }
-        if (item.type !== 'moment') return;
-        try {
-            const content = JSON.parse(item.content);
-            if (Array.isArray(content.images)) photoCount += content.images.length;
-        } catch (_error) {
-            // 损坏的旧记录不计入照片总数。
-        }
-    });
-
-    const finalPosts = String(rows.length);
-    const finalPhotos = String(photoCount);
-    if (postsElement) postsElement.textContent = finalPosts;
-    if (photosElement) photosElement.textContent = finalPhotos;
-
-    document.querySelectorAll('.profile-subpage-moments-count').forEach(el => {
-        el.textContent = finalPosts;
-    });
-    document.querySelectorAll('.profile-subpage-photos-count').forEach(el => {
-        el.textContent = finalPhotos;
-    });
+    const stats = computeProfileStatsFromRows(rows);
+    profileStatsSnapshotByAuthor[targetAuthor] = { epoch, ...stats };
+    applyProfileStatNumbers(stats.posts, stats.photos, false);
 }
 
 function openEditProfilePage() {
@@ -930,7 +996,7 @@ function leaveProfileMomentsPage() {
     profileMomentsRequestGeneration += 1;
     const container = document.getElementById('profile-moments-content');
     if (container && typeof releaseMomentVideosWithin === 'function') {
-        releaseMomentVideosWithin(container, true);
+        releaseMomentVideosWithin(container, false);
     }
 }
 
@@ -940,17 +1006,42 @@ async function loadProfileMoments(targetAuthor) {
     if (!contentContainer) return;
     if (!isAuthenticated()) {
         contentContainer.replaceChildren();
+        contentContainer.dataset.renderedAuthor = '';
         return;
     }
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
 
-    contentContainer.replaceChildren(createMomentNode('div', 'empty-state', '正在加载甜蜜动态… ✨'));
+    let cachedRows = getCachedProfileMoments(targetAuthor, epoch);
+    const hasRenderedSameAuthor = contentContainer.dataset.renderedAuthor === targetAuthor
+        && contentContainer.childElementCount > 0
+        && !contentContainer.querySelector('.empty-state');
+
+    if (
+        cachedRows
+        && hasRenderedSameAuthor
+        && renderedProfileMomentsState.author === targetAuthor
+        && renderedProfileMomentsState.epoch === epoch
+        && renderedProfileMomentsState.cacheTimestamp === profileMomentsMemoryCache.timestamp
+    ) {
+        const count = String(Math.min(cachedRows.length, PROFILE_CONTENT_LIMIT));
+        document.querySelectorAll('.profile-subpage-moments-count').forEach(el => {
+            el.textContent = count;
+        });
+        if (typeof refreshMomentVideoPlayback === 'function') {
+            contentContainer.querySelectorAll('video').forEach(video => refreshMomentVideoPlayback(video));
+        }
+        return;
+    }
+
+    if (!cachedRows && !hasRenderedSameAuthor) {
+        contentContainer.replaceChildren(createMomentNode('div', 'empty-state', '正在加载甜蜜动态… ✨'));
+    }
 
     try {
-        let data = getCachedProfileMoments(targetAuthor, epoch);
+        let data = cachedRows;
         if (data) {
-            data = data.slice(0, 200);
+            data = data.slice(0, PROFILE_CONTENT_LIMIT);
         } else {
             const res = await supabaseClient
                 .from('moments')
@@ -958,17 +1049,21 @@ async function loadProfileMoments(targetAuthor) {
                 .eq('author', targetAuthor)
                 .order('created_at', { ascending: false })
                 .order('id', { ascending: false })
-                .limit(300);
+                .limit(PROFILE_CONTENT_LIMIT);
 
             if (requestGeneration !== profileMomentsRequestGeneration || !isCurrentAuthSnapshot(epoch, userId)) return;
             if (res.error) throw res.error;
             const rows = res.data || [];
             setCachedProfileMoments(targetAuthor, epoch, rows);
-            data = rows.slice(0, 200);
+            const stats = computeProfileStatsFromRows(rows);
+            profileStatsSnapshotByAuthor[targetAuthor] = { epoch, ...stats };
+            data = rows.slice(0, PROFILE_CONTENT_LIMIT);
         }
 
         const count = String(data ? data.length : 0);
-        document.querySelectorAll('.profile-subpage-moments-count').forEach(el => el.textContent = count);
+        document.querySelectorAll('.profile-subpage-moments-count').forEach(el => {
+            el.textContent = count;
+        });
 
         if (!data || data.length === 0) {
             const profile = allProfilesCache[targetAuthor];
@@ -979,6 +1074,12 @@ async function loadProfileMoments(targetAuthor) {
                 'empty-state',
                 isSelf ? '你还没有发布过动态哦~\n在主页发布动态，记录属于你们的专属甜蜜吧 💕' : `${name} 还没有发布过动态哦~ 🌱`
             ));
+            contentContainer.dataset.renderedAuthor = targetAuthor;
+            renderedProfileMomentsState = {
+                author: targetAuthor,
+                epoch,
+                cacheTimestamp: profileMomentsMemoryCache.timestamp
+            };
             return;
         }
 
@@ -992,9 +1093,15 @@ async function loadProfileMoments(targetAuthor) {
         if (requestGeneration !== profileMomentsRequestGeneration || !isCurrentAuthSnapshot(epoch, userId)) return;
 
         renderProfileMomentsTimeline(hydratedItems, contentContainer);
+        contentContainer.dataset.renderedAuthor = targetAuthor;
+        renderedProfileMomentsState = {
+            author: targetAuthor,
+            epoch,
+            cacheTimestamp: profileMomentsMemoryCache.timestamp
+        };
     } catch (err) {
         console.error('加载用户动态失败:', err);
-        if (requestGeneration === profileMomentsRequestGeneration && isCurrentAuthSnapshot(epoch, userId)) {
+        if (requestGeneration === profileMomentsRequestGeneration && isCurrentAuthSnapshot(epoch, userId) && !hasRenderedSameAuthor) {
             contentContainer.replaceChildren(createMomentNode('div', 'empty-state', '加载动态失败，请稍后重试 😢'));
         }
     }
@@ -1004,7 +1111,6 @@ function renderProfileMomentsTimeline(items, container) {
     if (typeof releaseMomentVideosWithin === 'function') {
         releaseMomentVideosWithin(container, true);
     }
-    container.replaceChildren();
 
     const fragment = document.createDocumentFragment();
     items.forEach((item, cardIndex) => {
@@ -1018,7 +1124,7 @@ function renderProfileMomentsTimeline(items, container) {
     });
 
     const newVideos = Array.from(fragment.querySelectorAll('video'));
-    container.appendChild(fragment);
+    container.replaceChildren(fragment);
 
     if (typeof refreshMomentVideoPlayback === 'function') {
         newVideos.forEach(video => refreshMomentVideoPlayback(video));
@@ -1067,30 +1173,55 @@ async function loadProfilePhotos(targetAuthor) {
     if (!gridContainer) return;
     if (!isAuthenticated()) {
         gridContainer.replaceChildren();
+        gridContainer.dataset.renderedAuthor = '';
         return;
     }
     const epoch = authEpoch;
     const userId = currentAuthUser.id;
 
-    gridContainer.replaceChildren(createMomentNode('div', 'empty-state', '正在加载甜蜜照片… 📷'));
+    let cachedRows = getCachedProfileMoments(targetAuthor, epoch);
+    const hasRenderedSameAuthor = gridContainer.dataset.renderedAuthor === targetAuthor
+        && gridContainer.childElementCount > 0
+        && !gridContainer.querySelector('.empty-state');
+
+    if (
+        cachedRows
+        && hasRenderedSameAuthor
+        && renderedProfilePhotosState.author === targetAuthor
+        && renderedProfilePhotosState.epoch === epoch
+        && renderedProfilePhotosState.cacheTimestamp === profileMomentsMemoryCache.timestamp
+    ) {
+        const count = String(profileCurrentPhotosList.length);
+        document.querySelectorAll('.profile-subpage-photos-count').forEach(el => {
+            el.textContent = count;
+        });
+        return;
+    }
+
+    if (!cachedRows && !hasRenderedSameAuthor) {
+        gridContainer.replaceChildren(createMomentNode('div', 'empty-state', '正在加载甜蜜照片… 📷'));
+    }
 
     try {
-        let data = getCachedProfileMoments(targetAuthor, epoch);
+        let data = cachedRows;
         if (data) {
-            data = data.filter(item => item.type === 'photo' || item.type === 'moment').slice(0, 300);
+            data = data.filter(item => item.type === 'photo' || item.type === 'moment').slice(0, PROFILE_CONTENT_LIMIT);
         } else {
             const res = await supabaseClient
                 .from('moments')
                 .select('*')
                 .eq('author', targetAuthor)
-                .in('type', ['photo', 'moment'])
                 .order('created_at', { ascending: false })
                 .order('id', { ascending: false })
-                .limit(300);
+                .limit(PROFILE_CONTENT_LIMIT);
 
             if (requestGeneration !== profilePhotosRequestGeneration || !isCurrentAuthSnapshot(epoch, userId)) return;
             if (res.error) throw res.error;
-            data = res.data || [];
+            const rows = res.data || [];
+            setCachedProfileMoments(targetAuthor, epoch, rows);
+            const stats = computeProfileStatsFromRows(rows);
+            profileStatsSnapshotByAuthor[targetAuthor] = { epoch, ...stats };
+            data = rows.filter(item => item.type === 'photo' || item.type === 'moment').slice(0, PROFILE_CONTENT_LIMIT);
         }
 
         const hydratedItems = typeof batchHydrateMomentMediaRecords === 'function'
@@ -1168,7 +1299,9 @@ async function loadProfilePhotos(targetAuthor) {
         profileCurrentPhotosList = photos;
 
         const count = String(photos.length);
-        document.querySelectorAll('.profile-subpage-photos-count').forEach(el => el.textContent = count);
+        document.querySelectorAll('.profile-subpage-photos-count').forEach(el => {
+            el.textContent = count;
+        });
 
         if (photos.length === 0) {
             const profile = allProfilesCache[targetAuthor];
@@ -1179,21 +1312,56 @@ async function loadProfilePhotos(targetAuthor) {
                 'empty-state',
                 isSelf ? '你还没有上传过照片哦~\n在发布动态时添加照片，留下甜蜜光影吧 📷' : `${name} 还没有上传过照片哦~ 🌸`
             ));
+            gridContainer.dataset.renderedAuthor = targetAuthor;
+            renderedProfilePhotosState = {
+                author: targetAuthor,
+                epoch,
+                cacheTimestamp: profileMomentsMemoryCache.timestamp
+            };
             return;
         }
 
         renderProfilePhotosGrid(photos, gridContainer);
+        gridContainer.dataset.renderedAuthor = targetAuthor;
+        renderedProfilePhotosState = {
+            author: targetAuthor,
+            epoch,
+            cacheTimestamp: profileMomentsMemoryCache.timestamp
+        };
     } catch (err) {
         console.error('加载用户照片失败:', err);
-        if (requestGeneration === profilePhotosRequestGeneration && isCurrentAuthSnapshot(epoch, userId)) {
+        if (requestGeneration === profilePhotosRequestGeneration && isCurrentAuthSnapshot(epoch, userId) && !hasRenderedSameAuthor) {
             gridContainer.replaceChildren(createMomentNode('div', 'empty-state', '加载照片失败，请稍后重试 😢'));
         }
     }
 }
 
-function renderProfilePhotosGrid(photos, container) {
-    container.replaceChildren();
+function createProfileVideoPlaceholder() {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'profile-video-placeholder';
+    placeholder.setAttribute('aria-hidden', 'true');
+    const icon = document.createElement('span');
+    icon.className = 'profile-video-placeholder-icon';
+    icon.textContent = '🎬';
+    const label = document.createElement('span');
+    label.className = 'profile-video-placeholder-label';
+    label.textContent = '甜蜜影像';
+    placeholder.append(icon, label);
+    return placeholder;
+}
 
+function bindProfilePhotoReveal(img, src) {
+    img.classList.add('is-loading');
+    const reveal = () => img.classList.remove('is-loading');
+    img.addEventListener('load', reveal, { once: true });
+    img.addEventListener('error', reveal, { once: true });
+    img.src = src;
+    if (img.complete && img.naturalWidth > 0) {
+        img.classList.remove('is-loading');
+    }
+}
+
+function renderProfilePhotosGrid(photos, container) {
     const allPhotoUrls = photos.map(p => p.url);
     const fragment = document.createDocumentFragment();
 
@@ -1212,23 +1380,32 @@ function renderProfilePhotosGrid(photos, container) {
                 img.loading = index < 6 ? 'eager' : 'lazy';
                 img.decoding = 'async';
                 img.addEventListener('error', () => {
-                    const placeholder = document.createElement('div');
-                    placeholder.className = 'moment-grid-video-placeholder profile-photo-img';
-                    placeholder.textContent = '🎬';
-                    placeholder.style.background = 'linear-gradient(135deg, #2b1f2e 0%, #17111b 100%)';
-                    placeholder.setAttribute('aria-hidden', 'true');
-                    img.replaceWith(placeholder);
+                    img.replaceWith(createProfileVideoPlaceholder());
                 }, { once: true });
-                img.src = photo.poster;
+                bindProfilePhotoReveal(img, photo.poster);
                 itemEl.appendChild(img);
             } else {
-                const video = document.createElement('video');
-                video.src = photo.url;
-                video.className = 'profile-photo-img';
-                video.preload = 'none';
-                video.muted = true;
-                video.playsInline = true;
-                itemEl.appendChild(video);
+                const placeholder = createProfileVideoPlaceholder();
+                itemEl.appendChild(placeholder);
+                if (index < 9) {
+                    const video = document.createElement('video');
+                    video.className = 'profile-photo-img profile-photo-video-thumb is-loading';
+                    video.preload = 'metadata';
+                    video.muted = true;
+                    video.playsInline = true;
+                    video.setAttribute('playsinline', '');
+                    const cleanUrl = String(photo.url || '').replace(/#t=[\d.]+.*$/, '');
+                    video.addEventListener('loadeddata', () => {
+                        if (video.videoWidth > 0) {
+                            video.classList.remove('is-loading');
+                        }
+                    }, { once: true });
+                    video.addEventListener('error', () => {
+                        video.remove();
+                    }, { once: true });
+                    video.src = `${cleanUrl}#t=0.001`;
+                    itemEl.appendChild(video);
+                }
             }
 
             const playBadge = document.createElement('div');
@@ -1238,11 +1415,11 @@ function renderProfilePhotosGrid(photos, container) {
             itemEl.appendChild(playBadge);
         } else {
             const img = document.createElement('img');
-            img.src = photo.thumbUrl || photo.url;
             img.alt = photo.textSnippet ? photo.textSnippet.slice(0, 30) : '照片';
             img.className = 'profile-photo-img';
             img.loading = index < 6 ? 'eager' : 'lazy';
             img.decoding = 'async';
+            bindProfilePhotoReveal(img, photo.thumbUrl || photo.url);
             itemEl.appendChild(img);
         }
 
@@ -1279,7 +1456,7 @@ function renderProfilePhotosGrid(photos, container) {
         fragment.appendChild(itemEl);
     });
 
-    container.appendChild(fragment);
+    container.replaceChildren(fragment);
 }
 
 // 键盘无障碍支持（回车或空格触发可点击卡片）
