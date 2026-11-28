@@ -7,12 +7,606 @@ const commentLikeInFlight = new Set();
 const commentDeleteInFlight = new Set();
 const commentLikesActorsCache = new Map(); // commentId -> actor[]
 const commentLikePopTimers = new WeakMap();
+const commentSectionAnimStates = new WeakMap(); // section -> { token, cleanup, direction }
+const commentInputAnimStates = new WeakMap(); // inputArea -> { token, cleanup, direction }
+const commentTogglePopTimers = new WeakMap();
+const COMMENT_EASE_IOS = 'var(--ios-ease-nav, cubic-bezier(0.32, 0.72, 0, 1))';
+const COMMENT_EASE_DECEL = 'var(--ios-ease-decel, cubic-bezier(0.22, 1, 0.36, 1))';
 const activeCommentReplies = new Map(); // momentId -> { commentId, author, snippet, isAI }
 const activeAICommentReplies = new Set(); // momentId -> awaiting AI reply
 const MAX_COMMENT_TEXT_LENGTH = 1000;
 const MAX_COMMENT_IMAGE_COUNT = 4;
 const MAX_COMMENT_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_COMMENT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+function prefersReducedCommentMotion() {
+    return typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches === true;
+}
+
+function triggerCommentTogglePop(button) {
+    if (!button || prefersReducedCommentMotion()) return;
+    if (typeof window.triggerTransientPopClass === 'function') {
+        window.triggerTransientPopClass(button, 'is-toggling', 400);
+        return;
+    }
+    const prev = commentTogglePopTimers.get(button);
+    if (prev) clearTimeout(prev);
+    button.classList.remove('is-toggling');
+    void button.offsetWidth;
+    button.classList.add('is-toggling');
+    const timer = setTimeout(() => {
+        button.classList.remove('is-toggling');
+        commentTogglePopTimers.delete(button);
+    }, 400);
+    commentTogglePopTimers.set(button, timer);
+}
+
+function computeCommentTransitionMs(heightDelta, mode = 'open') {
+    const delta = Math.max(0, Number(heightDelta) || 0);
+    if (mode === 'close') {
+        return Math.round(Math.min(350, Math.max(230, 210 + Math.sqrt(delta) * 6.5)));
+    }
+    if (mode === 'resize') {
+        return Math.round(Math.min(390, Math.max(250, 230 + Math.sqrt(delta) * 7)));
+    }
+    return Math.round(Math.min(410, Math.max(270, 250 + Math.sqrt(delta) * 7.4)));
+}
+
+function clearCommentSectionInlineStyles(section) {
+    if (!section) return;
+    section.style.removeProperty('height');
+    section.style.removeProperty('margin-top');
+    section.style.removeProperty('padding-top');
+    section.style.removeProperty('border-top-color');
+    section.style.removeProperty('opacity');
+    section.style.removeProperty('transform');
+    section.style.removeProperty('transition');
+    section.style.removeProperty('will-change');
+    section.style.removeProperty('overflow');
+    section.classList.remove('is-animating', 'is-collapsing');
+}
+
+function cancelCommentSectionAnimation(section, { resetStyles = false } = {}) {
+    if (!section) return;
+    const state = commentSectionAnimStates.get(section);
+    if (state && typeof state.cleanup === 'function') {
+        state.cleanup();
+    }
+    commentSectionAnimStates.delete(section);
+    if (resetStyles) {
+        clearCommentSectionInlineStyles(section);
+    }
+}
+
+function isCommentSectionOpen(section) {
+    if (!section) return false;
+    if (section.dataset.commentOpen === 'true') return true;
+    if (section.dataset.commentOpen === 'false') return false;
+    return section.style.display !== 'none' && window.getComputedStyle(section).display !== 'none';
+}
+
+function restoreCardViewportAfterCommentCollapse(card, rectBefore) {
+    if (!card || !rectBefore) return;
+    const topThreshold = 76;
+    if (rectBefore.top >= topThreshold) return;
+    const rectAfter = card.getBoundingClientRect();
+    if (rectAfter.top >= topThreshold) return;
+
+    const behavior = prefersReducedCommentMotion() ? 'auto' : 'smooth';
+    const scrollParent = card.closest('.app-page-scroll, .modal-body-scroll');
+    if (scrollParent && scrollParent.scrollHeight > scrollParent.clientHeight) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        const targetTop = scrollParent.scrollTop + (rectAfter.top - parentRect.top) - 16;
+        scrollParent.scrollTo({ top: Math.max(0, targetTop), behavior });
+    } else {
+        const currentY = window.scrollY || window.pageYOffset || 0;
+        const targetY = currentY + rectAfter.top - topThreshold;
+        window.scrollTo({ top: Math.max(0, targetY), behavior });
+    }
+}
+
+function openCommentSection(section, toggleBtn = null, options = {}) {
+    if (!section) return false;
+    const instant = Boolean(options.instant) || prefersReducedCommentMotion();
+    const prevAnim = commentSectionAnimStates.get(section);
+    const wasHidden = section.style.display === 'none' || window.getComputedStyle(section).display === 'none';
+    const wasCollapsing = prevAnim?.direction === 'close';
+
+    section.dataset.commentOpen = 'true';
+    section.setAttribute('aria-hidden', 'false');
+    toggleBtn?.setAttribute('aria-expanded', 'true');
+    if (options.popButton) triggerCommentTogglePop(toggleBtn);
+
+    if (!wasHidden && !wasCollapsing && !prevAnim) {
+        section.classList.add('is-open');
+        return false;
+    }
+
+    if (instant) {
+        cancelCommentSectionAnimation(section, { resetStyles: true });
+        section.style.display = 'block';
+        section.classList.add('is-open');
+        return true;
+    }
+
+    // 捕获打断前的实时几何态（支持收起中途无缝反向弹开）
+    let startHeight = 0;
+    let startMarginTop = '0px';
+    let startPaddingTop = '0px';
+    let startBorderTopColor = 'transparent';
+    let startOpacity = '0';
+    let startTransform = 'translateY(-6px)';
+
+    if (!wasHidden) {
+        const currentCs = window.getComputedStyle(section);
+        startHeight = section.getBoundingClientRect().height;
+        startMarginTop = currentCs.marginTop;
+        startPaddingTop = currentCs.paddingTop;
+        startBorderTopColor = currentCs.borderTopColor;
+        startOpacity = currentCs.opacity;
+        startTransform = currentCs.transform === 'none' ? 'translateY(0px)' : currentCs.transform;
+    }
+
+    cancelCommentSectionAnimation(section, { resetStyles: false });
+
+    // 临时恢复最终静息布局以同步测量目标高度（同帧写回起点，零视觉闪烁与零 BFC 高度偏差）
+    section.style.transition = 'none';
+    section.style.removeProperty('height');
+    section.style.removeProperty('margin-top');
+    section.style.removeProperty('padding-top');
+    section.style.removeProperty('border-top-color');
+    section.style.removeProperty('transform');
+    section.style.removeProperty('overflow');
+    section.style.display = 'block';
+    section.classList.remove('is-collapsing', 'is-animating');
+    section.classList.add('is-open');
+
+    const naturalCs = window.getComputedStyle(section);
+    const targetHeight = section.getBoundingClientRect().height;
+    const targetMarginTop = naturalCs.marginTop;
+    const targetPaddingTop = naturalCs.paddingTop;
+    const targetBorderTopColor = naturalCs.borderTopColor;
+
+    // 写回起点并开启裁切态，强制回流
+    section.classList.add('is-animating');
+    section.style.height = `${startHeight}px`;
+    section.style.marginTop = startMarginTop;
+    section.style.paddingTop = startPaddingTop;
+    section.style.borderTopColor = startBorderTopColor;
+    section.style.opacity = startOpacity;
+    section.style.transform = startTransform;
+    section.style.overflow = 'hidden';
+    section.style.willChange = 'height, opacity, transform';
+    void section.offsetHeight;
+
+    const durationMs = computeCommentTransitionMs(Math.abs(targetHeight - startHeight), 'open');
+    const opacityMs = Math.round(durationMs * 0.68);
+    const token = Symbol('comment-open');
+
+    section.style.transition = [
+        `height ${durationMs}ms ${COMMENT_EASE_IOS}`,
+        `margin-top ${durationMs}ms ${COMMENT_EASE_IOS}`,
+        `padding-top ${durationMs}ms ${COMMENT_EASE_IOS}`,
+        `border-top-color ${opacityMs}ms ease`,
+        `opacity ${opacityMs}ms ${COMMENT_EASE_DECEL}`,
+        `transform ${durationMs}ms ${COMMENT_EASE_IOS}`
+    ].join(', ');
+
+    section.style.height = `${targetHeight}px`;
+    section.style.marginTop = targetMarginTop;
+    section.style.paddingTop = targetPaddingTop;
+    section.style.borderTopColor = targetBorderTopColor;
+    section.style.opacity = '1';
+    section.style.transform = 'translateY(0)';
+
+    let fallbackTimer = null;
+    const finalize = () => {
+        if (commentSectionAnimStates.get(section)?.token !== token) return;
+        cleanup();
+        commentSectionAnimStates.delete(section);
+        clearCommentSectionInlineStyles(section);
+        section.classList.add('is-open');
+    };
+    const onTransitionEnd = (event) => {
+        if (event.target !== section || event.propertyName !== 'height') return;
+        finalize();
+    };
+    const cleanup = () => {
+        section.removeEventListener('transitionend', onTransitionEnd);
+        if (fallbackTimer) {
+            clearTimeout(fallbackTimer);
+            fallbackTimer = null;
+        }
+    };
+
+    section.addEventListener('transitionend', onTransitionEnd);
+    fallbackTimer = setTimeout(finalize, durationMs + 70);
+    commentSectionAnimStates.set(section, { token, cleanup, direction: 'open' });
+    return true;
+}
+
+function closeCommentSection(section, toggleBtn = null, options = {}) {
+    if (!section) return false;
+    const instant = Boolean(options.instant) || prefersReducedCommentMotion();
+    const card = options.card || section.closest('.moment-card');
+    const rectBefore = card ? card.getBoundingClientRect() : null;
+    const wasHidden = section.style.display === 'none' || window.getComputedStyle(section).display === 'none';
+
+    section.dataset.commentOpen = 'false';
+    section.setAttribute('aria-hidden', 'true');
+    toggleBtn?.setAttribute('aria-expanded', 'false');
+    if (options.popButton) triggerCommentTogglePop(toggleBtn);
+
+    if (wasHidden) {
+        cancelCommentSectionAnimation(section, { resetStyles: true });
+        section.style.display = 'none';
+        section.classList.remove('is-open');
+        return false;
+    }
+
+    if (instant) {
+        cancelCommentSectionAnimation(section, { resetStyles: true });
+        section.style.display = 'none';
+        section.classList.remove('is-open');
+        restoreCardViewportAfterCommentCollapse(card, rectBefore);
+        return true;
+    }
+
+    const currentCs = window.getComputedStyle(section);
+    const startHeight = section.getBoundingClientRect().height;
+    const startMarginTop = currentCs.marginTop;
+    const startPaddingTop = currentCs.paddingTop;
+    const startBorderTopColor = currentCs.borderTopColor;
+    const startOpacity = currentCs.opacity;
+    const startTransform = currentCs.transform === 'none' ? 'translateY(0px)' : currentCs.transform;
+
+    cancelCommentSectionAnimation(section, { resetStyles: false });
+
+    section.classList.add('is-animating', 'is-collapsing');
+    section.style.transition = 'none';
+    section.style.height = `${startHeight}px`;
+    section.style.marginTop = startMarginTop;
+    section.style.paddingTop = startPaddingTop;
+    section.style.borderTopColor = startBorderTopColor;
+    section.style.opacity = startOpacity;
+    section.style.transform = startTransform;
+    section.style.overflow = 'hidden';
+    section.style.willChange = 'height, opacity, transform';
+    void section.offsetHeight;
+
+    const durationMs = computeCommentTransitionMs(startHeight, 'close');
+    const opacityMs = Math.round(durationMs * 0.62);
+    const token = Symbol('comment-close');
+
+    section.style.transition = [
+        `height ${durationMs}ms ${COMMENT_EASE_IOS}`,
+        `margin-top ${durationMs}ms ${COMMENT_EASE_IOS}`,
+        `padding-top ${durationMs}ms ${COMMENT_EASE_IOS}`,
+        `border-top-color ${opacityMs}ms ease`,
+        `opacity ${opacityMs}ms ease-out`,
+        `transform ${durationMs}ms ${COMMENT_EASE_IOS}`
+    ].join(', ');
+
+    section.style.height = '0px';
+    section.style.marginTop = '0px';
+    section.style.paddingTop = '0px';
+    section.style.borderTopColor = 'transparent';
+    section.style.opacity = '0';
+    section.style.transform = 'translateY(-6px)';
+
+    let fallbackTimer = null;
+    const finalize = () => {
+        if (commentSectionAnimStates.get(section)?.token !== token) return;
+        cleanup();
+        commentSectionAnimStates.delete(section);
+        clearCommentSectionInlineStyles(section);
+        section.style.display = 'none';
+        section.classList.remove('is-open');
+        restoreCardViewportAfterCommentCollapse(card, rectBefore);
+    };
+    const onTransitionEnd = (event) => {
+        if (event.target !== section || event.propertyName !== 'height') return;
+        finalize();
+    };
+    const cleanup = () => {
+        section.removeEventListener('transitionend', onTransitionEnd);
+        if (fallbackTimer) {
+            clearTimeout(fallbackTimer);
+            fallbackTimer = null;
+        }
+    };
+
+    section.addEventListener('transitionend', onTransitionEnd);
+    fallbackTimer = setTimeout(finalize, durationMs + 70);
+    commentSectionAnimStates.set(section, { token, cleanup, direction: 'close' });
+    return true;
+}
+
+function animateCommentSectionHeightTransition(section, mutateDomFn) {
+    if (typeof mutateDomFn !== 'function') return;
+    if (!section || !isCommentSectionOpen(section) || prefersReducedCommentMotion()) {
+        mutateDomFn();
+        return;
+    }
+    const isVisible = section.style.display !== 'none' && window.getComputedStyle(section).display !== 'none';
+    if (!isVisible) {
+        mutateDomFn();
+        return;
+    }
+
+    // 捕获当前真实渲染态（若正处于首次展开半途中也能无缝接力）
+    const currentCs = window.getComputedStyle(section);
+    const startHeight = section.getBoundingClientRect().height;
+    const startMarginTop = currentCs.marginTop;
+    const startPaddingTop = currentCs.paddingTop;
+    const startBorderTopColor = currentCs.borderTopColor;
+    const startOpacity = currentCs.opacity;
+    const startTransform = currentCs.transform === 'none' ? 'translateY(0px)' : currentCs.transform;
+    const wasAnimatingOpen = commentSectionAnimStates.get(section)?.direction === 'open';
+
+    cancelCommentSectionAnimation(section, { resetStyles: false });
+
+    // 执行 DOM 更新并在最终静息态测量自然目标高度
+    section.classList.remove('is-animating', 'is-collapsing');
+    section.style.transition = 'none';
+    section.style.removeProperty('height');
+    section.style.removeProperty('margin-top');
+    section.style.removeProperty('padding-top');
+    section.style.removeProperty('border-top-color');
+    section.style.removeProperty('transform');
+    section.style.removeProperty('overflow');
+
+    mutateDomFn();
+
+    const naturalCs = window.getComputedStyle(section);
+    const targetHeight = section.getBoundingClientRect().height;
+    const targetMarginTop = naturalCs.marginTop;
+    const targetPaddingTop = naturalCs.paddingTop;
+    const targetBorderTopColor = naturalCs.borderTopColor;
+
+    const heightDiff = Math.abs(targetHeight - startHeight);
+    if (heightDiff <= 1.5 && !wasAnimatingOpen) {
+        clearCommentSectionInlineStyles(section);
+        return;
+    }
+
+    section.classList.add('is-open', 'is-animating');
+    section.style.height = `${startHeight}px`;
+    section.style.marginTop = startMarginTop;
+    section.style.paddingTop = startPaddingTop;
+    section.style.borderTopColor = startBorderTopColor;
+    section.style.opacity = startOpacity;
+    section.style.transform = startTransform;
+    section.style.overflow = 'hidden';
+    section.style.willChange = 'height, opacity, transform';
+    void section.offsetHeight;
+
+    const durationMs = computeCommentTransitionMs(heightDiff, 'resize');
+    const opacityMs = Math.round(durationMs * 0.65);
+    const token = Symbol('comment-resize');
+
+    section.style.transition = [
+        `height ${durationMs}ms ${COMMENT_EASE_IOS}`,
+        `margin-top ${durationMs}ms ${COMMENT_EASE_IOS}`,
+        `padding-top ${durationMs}ms ${COMMENT_EASE_IOS}`,
+        `border-top-color ${opacityMs}ms ease`,
+        `opacity ${opacityMs}ms ${COMMENT_EASE_DECEL}`,
+        `transform ${durationMs}ms ${COMMENT_EASE_IOS}`
+    ].join(', ');
+
+    section.style.height = `${targetHeight}px`;
+    section.style.marginTop = targetMarginTop;
+    section.style.paddingTop = targetPaddingTop;
+    section.style.borderTopColor = targetBorderTopColor;
+    section.style.opacity = '1';
+    section.style.transform = 'translateY(0)';
+
+    let fallbackTimer = null;
+    const finalize = () => {
+        if (commentSectionAnimStates.get(section)?.token !== token) return;
+        cleanup();
+        commentSectionAnimStates.delete(section);
+        clearCommentSectionInlineStyles(section);
+        section.classList.add('is-open');
+    };
+    const onTransitionEnd = (event) => {
+        if (event.target !== section || event.propertyName !== 'height') return;
+        finalize();
+    };
+    const cleanup = () => {
+        section.removeEventListener('transitionend', onTransitionEnd);
+        if (fallbackTimer) {
+            clearTimeout(fallbackTimer);
+            fallbackTimer = null;
+        }
+    };
+
+    section.addEventListener('transitionend', onTransitionEnd);
+    fallbackTimer = setTimeout(finalize, durationMs + 70);
+    commentSectionAnimStates.set(section, { token, cleanup, direction: 'resize' });
+}
+
+function clearCommentInputInlineStyles(inputArea) {
+    if (!inputArea) return;
+    inputArea.style.removeProperty('height');
+    inputArea.style.removeProperty('margin-top');
+    inputArea.style.removeProperty('opacity');
+    inputArea.style.removeProperty('transform');
+    inputArea.style.removeProperty('transition');
+    inputArea.style.removeProperty('overflow');
+    inputArea.style.removeProperty('will-change');
+    inputArea.classList.remove('is-animating', 'is-collapsing');
+}
+
+function cancelCommentInputAnimation(inputArea, { resetStyles = false } = {}) {
+    if (!inputArea) return;
+    const state = commentInputAnimStates.get(inputArea);
+    if (state && typeof state.cleanup === 'function') {
+        state.cleanup();
+    }
+    commentInputAnimStates.delete(inputArea);
+    if (resetStyles) clearCommentInputInlineStyles(inputArea);
+}
+
+function animateCommentInputOpen(inputArea, writeBtn, { instant = false } = {}) {
+    if (!inputArea) return;
+    const section = inputArea.closest('.comment-section');
+    const parentAnimating = Boolean(section && commentSectionAnimStates.has(section));
+    const shouldInstant = instant || prefersReducedCommentMotion() || parentAnimating;
+
+    if (writeBtn) {
+        writeBtn.classList.remove('is-revealing');
+        writeBtn.style.display = 'none';
+    }
+
+    const wasVisible = inputArea.style.display !== 'none'
+        && window.getComputedStyle(inputArea).display !== 'none'
+        && commentInputAnimStates.get(inputArea)?.direction !== 'close';
+
+    if (shouldInstant || wasVisible) {
+        cancelCommentInputAnimation(inputArea, { resetStyles: true });
+        inputArea.style.display = 'block';
+        return;
+    }
+
+    const prevAnim = commentInputAnimStates.get(inputArea);
+    let startHeight = 0;
+    let startOpacity = '0';
+    let startTransform = 'translateY(-4px)';
+    if (prevAnim?.direction === 'close') {
+        const cs = window.getComputedStyle(inputArea);
+        startHeight = inputArea.getBoundingClientRect().height;
+        startOpacity = cs.opacity;
+        startTransform = cs.transform === 'none' ? 'translateY(0px)' : cs.transform;
+    }
+    cancelCommentInputAnimation(inputArea, { resetStyles: false });
+
+    inputArea.style.transition = 'none';
+    inputArea.style.removeProperty('height');
+    inputArea.style.removeProperty('transform');
+    inputArea.style.display = 'block';
+    const targetHeight = inputArea.getBoundingClientRect().height;
+
+    inputArea.classList.remove('is-collapsing');
+    inputArea.classList.add('is-animating');
+    inputArea.style.height = `${startHeight}px`;
+    inputArea.style.opacity = startOpacity;
+    inputArea.style.transform = startTransform;
+    inputArea.style.overflow = 'hidden';
+    inputArea.style.willChange = 'height, opacity, transform';
+    void inputArea.offsetHeight;
+
+    const durationMs = 280;
+    const token = Symbol('input-open');
+    inputArea.style.transition = [
+        `height ${durationMs}ms ${COMMENT_EASE_IOS}`,
+        `opacity 200ms ${COMMENT_EASE_DECEL}`,
+        `transform ${durationMs}ms ${COMMENT_EASE_IOS}`
+    ].join(', ');
+    inputArea.style.height = `${targetHeight}px`;
+    inputArea.style.opacity = '1';
+    inputArea.style.transform = 'translateY(0)';
+
+    let fallbackTimer = null;
+    const finalize = () => {
+        if (commentInputAnimStates.get(inputArea)?.token !== token) return;
+        cleanup();
+        commentInputAnimStates.delete(inputArea);
+        clearCommentInputInlineStyles(inputArea);
+    };
+    const onTransitionEnd = (event) => {
+        if (event.target !== inputArea || event.propertyName !== 'height') return;
+        finalize();
+    };
+    const cleanup = () => {
+        inputArea.removeEventListener('transitionend', onTransitionEnd);
+        if (fallbackTimer) {
+            clearTimeout(fallbackTimer);
+            fallbackTimer = null;
+        }
+    };
+    inputArea.addEventListener('transitionend', onTransitionEnd);
+    fallbackTimer = setTimeout(finalize, durationMs + 60);
+    commentInputAnimStates.set(inputArea, { token, cleanup, direction: 'open' });
+}
+
+function animateCommentInputClose(inputArea, writeBtn, { instant = false } = {}) {
+    const revealWriteBtn = () => {
+        if (!writeBtn) return;
+        writeBtn.style.display = 'inline-flex';
+        if (!instant && !prefersReducedCommentMotion()) {
+            writeBtn.classList.remove('is-revealing');
+            void writeBtn.offsetWidth;
+            writeBtn.classList.add('is-revealing');
+            setTimeout(() => writeBtn.classList.remove('is-revealing'), 280);
+        }
+    };
+
+    if (!inputArea) {
+        revealWriteBtn();
+        return;
+    }
+
+    const wasHidden = inputArea.style.display === 'none' || window.getComputedStyle(inputArea).display === 'none';
+    if (instant || prefersReducedCommentMotion() || wasHidden) {
+        cancelCommentInputAnimation(inputArea, { resetStyles: true });
+        inputArea.style.display = 'none';
+        revealWriteBtn();
+        return;
+    }
+
+    const cs = window.getComputedStyle(inputArea);
+    const startHeight = inputArea.getBoundingClientRect().height;
+    const startOpacity = cs.opacity;
+    const startTransform = cs.transform === 'none' ? 'translateY(0px)' : cs.transform;
+
+    cancelCommentInputAnimation(inputArea, { resetStyles: false });
+
+    inputArea.classList.add('is-animating', 'is-collapsing');
+    inputArea.style.transition = 'none';
+    inputArea.style.height = `${startHeight}px`;
+    inputArea.style.opacity = startOpacity;
+    inputArea.style.transform = startTransform;
+    inputArea.style.overflow = 'hidden';
+    inputArea.style.willChange = 'height, opacity, transform';
+    void inputArea.offsetHeight;
+
+    const durationMs = 240;
+    const token = Symbol('input-close');
+    inputArea.style.transition = [
+        `height ${durationMs}ms ${COMMENT_EASE_IOS}`,
+        `opacity 160ms ease-out`,
+        `transform ${durationMs}ms ${COMMENT_EASE_IOS}`
+    ].join(', ');
+    inputArea.style.height = '0px';
+    inputArea.style.opacity = '0';
+    inputArea.style.transform = 'translateY(-4px)';
+
+    let fallbackTimer = null;
+    const finalize = () => {
+        if (commentInputAnimStates.get(inputArea)?.token !== token) return;
+        cleanup();
+        commentInputAnimStates.delete(inputArea);
+        clearCommentInputInlineStyles(inputArea);
+        inputArea.style.display = 'none';
+        revealWriteBtn();
+    };
+    const onTransitionEnd = (event) => {
+        if (event.target !== inputArea || event.propertyName !== 'height') return;
+        finalize();
+    };
+    const cleanup = () => {
+        inputArea.removeEventListener('transitionend', onTransitionEnd);
+        if (fallbackTimer) {
+            clearTimeout(fallbackTimer);
+            fallbackTimer = null;
+        }
+    };
+    inputArea.addEventListener('transitionend', onTransitionEnd);
+    fallbackTimer = setTimeout(finalize, durationMs + 60);
+    commentInputAnimStates.set(inputArea, { token, cleanup, direction: 'close' });
+}
 
 function triggerCommentLikePop(button, duration = 520) {
     if (!button) return;
@@ -52,7 +646,9 @@ function syncMomentCommentCountDisplay(momentId, count) {
     const cards = document.querySelectorAll(`[id="card-${momentId}"]`);
     if (cards.length > 0) {
         cards.forEach(card => {
-            const countEl = card.querySelector('.comment-toggle-btn span:last-child') || card.querySelector(`[id="comment-count-${momentId}"]`);
+            const countEl = card.querySelector('.comment-toggle-btn .comment-btn-count')
+                || card.querySelector(`[id="comment-count-${momentId}"]`)
+                || card.querySelector('.comment-toggle-btn span:last-child');
             if (countEl) countEl.innerText = text;
         });
     } else {
@@ -171,6 +767,19 @@ function setCommentStatus(container, text) {
     container.replaceChildren(status);
 }
 
+function setCommentLoadingStatus(container) {
+    const wrap = document.createElement('div');
+    wrap.className = 'comment-loading-state';
+    const dots = document.createElement('span');
+    dots.className = 'comment-loading-dots';
+    dots.setAttribute('aria-hidden', 'true');
+    dots.innerHTML = '<span></span><span></span><span></span>';
+    const label = document.createElement('span');
+    label.textContent = '正在加载评论…';
+    wrap.append(dots, label);
+    container.replaceChildren(wrap);
+}
+
 function clearCommentImageSelection(momentId, targetCard = null) {
     (commentImgFiles[momentId] || []).forEach(entry => URL.revokeObjectURL(entry.objectUrl));
     delete commentImgFiles[momentId];
@@ -210,11 +819,9 @@ function startReplyToComment(momentId, replyTarget, triggerElement = null) {
     }
     const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
     const section = card ? card.querySelector('.comment-section') : document.getElementById(`comments-${momentId}`);
-    if (section && section.style.display === 'none') {
-        section.style.display = 'block';
-        section.setAttribute('aria-hidden', 'false');
+    if (section && !isCommentSectionOpen(section)) {
         const toggleBtn = card ? card.querySelector('.comment-toggle-btn') : document.getElementById(`comment-toggle-${momentId}`);
-        toggleBtn?.setAttribute('aria-expanded', 'true');
+        openCommentSection(section, toggleBtn);
     }
 
     activeCommentReplies.set(momentId, replyTarget);
@@ -275,7 +882,7 @@ function startReplyToComment(momentId, replyTarget, triggerElement = null) {
     }
 }
 
-function showCommentInput(momentId, triggerElement = null, { isReply = false } = {}) {
+function showCommentInput(momentId, triggerElement = null, { isReply = false, instant = false } = {}) {
     if (!hasCommentAuthContext()) return;
     const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
     if (!isReply) {
@@ -283,9 +890,7 @@ function showCommentInput(momentId, triggerElement = null, { isReply = false } =
     }
     const writeBtn = card ? card.querySelector('.comment-write-btn') : document.getElementById(`comment-write-btn-${momentId}`);
     const inputArea = card ? card.querySelector('.comment-input-area') : document.getElementById(`comment-input-area-${momentId}`);
-    if (writeBtn) writeBtn.style.display = 'none';
     if (inputArea) {
-        inputArea.style.display = 'block';
         if (!inputArea.dataset.dropZoneBound && typeof window.registerDropAndPasteZone === 'function') {
             inputArea.dataset.dropZoneBound = 'true';
             window.registerDropAndPasteZone({
@@ -326,6 +931,8 @@ function showCommentInput(momentId, triggerElement = null, { isReply = false } =
             avatarContainer.replaceChildren(badge);
         }
 
+        animateCommentInputOpen(inputArea, writeBtn, { instant });
+
         const ta = inputArea.querySelector('.comment-textarea');
         if (ta) {
             ta.style.borderColor = '';
@@ -335,12 +942,20 @@ function showCommentInput(momentId, triggerElement = null, { isReply = false } =
                     if (ta.style.borderColor) ta.style.borderColor = '';
                 });
             }
-            setTimeout(() => ta.focus(), 100);
+            setTimeout(() => {
+                try {
+                    ta.focus({ preventScroll: true });
+                } catch (_err) {
+                    ta.focus();
+                }
+            }, 120);
         }
+    } else if (writeBtn) {
+        writeBtn.style.display = 'none';
     }
 }
 
-function cancelCommentInput(momentId, triggerElement = null) {
+function cancelCommentInput(momentId, triggerElement = null, options = {}) {
     if (commentSubmitRequests.has(momentId)) {
         if (typeof showToast === 'function') showToast('评论正在发送，请稍候…');
         return;
@@ -354,12 +969,11 @@ function cancelCommentInput(momentId, triggerElement = null) {
         ta.style.borderColor = '';
     }
     clearCommentReplyTarget(momentId, card);
-    if (inputArea) inputArea.style.display = 'none';
-    if (writeBtn) writeBtn.style.display = 'inline-flex';
     // 清除图片选择
     clearCommentImageSelection(momentId, card);
     const fileInput = card ? card.querySelector('input[type="file"]') : document.getElementById(`comment-img-input-${momentId}`);
     if (fileInput) fileInput.value = '';
+    animateCommentInputClose(inputArea, writeBtn, { instant: Boolean(options?.instant) });
 }
 
 function applyCommentLikeButtonState(button, likeActors, isLiked) {
@@ -425,20 +1039,19 @@ function toggleComments(momentId, triggerElement = null) {
     const card = triggerElement?.closest('.moment-card') || document.getElementById(`card-${momentId}`);
     const section = card ? card.querySelector('.comment-section') : document.getElementById(`comments-${momentId}`);
     if (!section) return;
-    const isHidden = section.style.display === 'none';
-    section.style.display = isHidden ? 'block' : 'none';
-    section.setAttribute('aria-hidden', String(!isHidden));
 
     const toggleBtn = card ? card.querySelector('.comment-toggle-btn') : document.getElementById(`comment-toggle-${momentId}`);
-    toggleBtn?.setAttribute('aria-expanded', String(isHidden));
+    const isCurrentlyOpen = isCommentSectionOpen(section);
 
-    if (isHidden) {
-        section.classList.remove('is-entering');
-        void section.offsetWidth;
-        section.classList.add('is-entering');
+    if (!isCurrentlyOpen) {
+        const listEl = section.querySelector('.comment-list');
+        if (listEl && !listEl.querySelector('.comment-item') && !listEl.querySelector('.comment-loading-state')) {
+            setCommentLoadingStatus(listEl);
+        }
+        openCommentSection(section, toggleBtn, { popButton: true });
         loadComments(momentId, card);
     } else {
-        section.classList.remove('is-entering');
+        closeCommentSection(section, toggleBtn, { popButton: true, card });
     }
 }
 
@@ -464,8 +1077,10 @@ async function loadComments(momentId, targetCard = null, options = {}) {
     if (!listEls.length) return;
     // 保留已有评论列表避免清空闪烁；仅在列表尚无评论条目时显示加载提示
     listEls.forEach(listEl => {
-        if (!listEl.querySelector('.comment-item')) {
-            setCommentStatus(listEl, '加载中…');
+        if (!listEl.querySelector('.comment-item') && !listEl.querySelector('.comment-loading-state')) {
+            animateCommentSectionHeightTransition(listEl.closest('.comment-section'), () => {
+                setCommentLoadingStatus(listEl);
+            });
         }
     });
 
@@ -479,14 +1094,20 @@ async function loadComments(momentId, targetCard = null, options = {}) {
     if (error) {
         currentListEls.forEach(listEl => {
             if (!listEl.querySelector('.comment-item')) {
-                setCommentStatus(listEl, '加载失败 😢');
+                animateCommentSectionHeightTransition(listEl.closest('.comment-section'), () => {
+                    setCommentStatus(listEl, '加载失败 😢');
+                });
             }
         });
         return;
     }
 
     if (!data || !data.length) {
-        currentListEls.forEach(listEl => setCommentStatus(listEl, '还没有评论，来说点什么吧 ✨'));
+        currentListEls.forEach(listEl => {
+            animateCommentSectionHeightTransition(listEl.closest('.comment-section'), () => {
+                setCommentStatus(listEl, '还没有评论，来说点什么吧 ✨');
+            });
+        });
         return;
     }
 
@@ -564,14 +1185,23 @@ async function loadComments(momentId, targetCard = null, options = {}) {
 
             const isAIComment = Boolean(resolvedContents[commentIndex].isAI);
             const domId = `comment-${commentId}`;
-            const shouldAnimateEnter = options?.animateNewCommentId === commentId
+            const shouldStaggerInitial = wasInitiallyEmpty && !prefersReducedCommentMotion();
+            const shouldAnimateEnter = shouldStaggerInitial
+                || options?.animateNewCommentId === commentId
                 || (!wasInitiallyEmpty && !prevItemIds.has(domId));
 
             const item = document.createElement('div');
             item.className = `comment-item${isAIComment ? ' comment-item--ai' : ''}${shouldAnimateEnter ? ' comment-item--enter' : ''}`;
             item.id = domId;
             if (shouldAnimateEnter) {
-                setTimeout(() => item.classList.remove('comment-item--enter'), 380);
+                const staggerDelay = shouldStaggerInitial ? Math.min(commentIndex, 5) * 36 : 0;
+                if (staggerDelay > 0) {
+                    item.style.setProperty('--comment-enter-delay', `${staggerDelay}ms`);
+                }
+                setTimeout(() => {
+                    item.classList.remove('comment-item--enter');
+                    item.style.removeProperty('--comment-enter-delay');
+                }, 400 + staggerDelay);
             }
             const authorBadge = document.createElement('span');
 
@@ -756,10 +1386,12 @@ async function loadComments(momentId, targetCard = null, options = {}) {
             item.append(header, body);
             fragment.appendChild(item);
         });
-        listEl.replaceChildren(fragment);
-        if (activeThinking && activeAICommentReplies.has(momentId)) {
-            listEl.appendChild(activeThinking);
-        }
+        animateCommentSectionHeightTransition(listEl.closest('.comment-section'), () => {
+            listEl.replaceChildren(fragment);
+            if (activeThinking && activeAICommentReplies.has(momentId)) {
+                listEl.appendChild(activeThinking);
+            }
+        });
     });
 
     if (Array.isArray(data) && data.length > 0) {
@@ -1159,7 +1791,7 @@ async function submitComment(momentId, triggerElement = null) {
 
         activeCommentReplies.delete(momentId);
         commentSubmitRequests.delete(momentId);
-        cancelCommentInput(momentId, triggerElement);
+        cancelCommentInput(momentId, triggerElement, { instant: true });
         await loadComments(momentId, null, { animateNewCommentId: newCommentId });
         await loadCommentCounts([momentId]);
 
@@ -1212,7 +1844,9 @@ async function handleAICommentContinuation({ momentId, userCommentId, userCommen
         dots.innerHTML = '<span></span><span></span><span></span>';
 
         thinkingEl.append(icon, label, dots);
-        listEl.appendChild(thinkingEl);
+        animateCommentSectionHeightTransition(listEl.closest('.comment-section'), () => {
+            listEl.appendChild(thinkingEl);
+        });
         thinkingEls.push(thinkingEl);
     });
 
@@ -1332,20 +1966,18 @@ async function submitAIAnalysisComment(momentId, commentText) {
     if (cards.length > 0) {
         cards.forEach(card => {
             const section = card.querySelector('.comment-section');
-            if (section) {
-                section.style.display = 'block';
-                section.setAttribute('aria-hidden', 'false');
-            }
             const toggleBtn = card.querySelector('.comment-toggle-btn');
-            toggleBtn?.setAttribute('aria-expanded', 'true');
+            if (section) {
+                openCommentSection(section, toggleBtn);
+            } else {
+                toggleBtn?.setAttribute('aria-expanded', 'true');
+            }
         });
     } else {
         const section = document.getElementById(`comments-${momentId}`);
+        const toggleBtn = document.getElementById(`comment-toggle-${momentId}`);
         if (section) {
-            section.style.display = 'block';
-            section.setAttribute('aria-hidden', 'false');
-            const toggleBtn = document.getElementById(`comment-toggle-${momentId}`);
-            toggleBtn?.setAttribute('aria-expanded', 'true');
+            openCommentSection(section, toggleBtn);
         }
     }
 
@@ -1369,3 +2001,7 @@ async function submitAIAnalysisComment(momentId, commentText) {
 window.submitAIAnalysisComment = submitAIAnalysisComment;
 window.startReplyToComment = startReplyToComment;
 window.clearCommentReplyTarget = clearCommentReplyTarget;
+window.openCommentSection = openCommentSection;
+window.closeCommentSection = closeCommentSection;
+window.isCommentSectionOpen = isCommentSectionOpen;
+window.animateCommentSectionHeightTransition = animateCommentSectionHeightTransition;

@@ -3019,7 +3019,13 @@ function createMomentCardElement(item, options = {}) {
     commentIcon.innerHTML = '<svg class="svg-icon" aria-hidden="true"><use href="#icon-chat"/></svg>';
     const commentCount = createMomentNode('span', 'comment-btn-count', '评论');
     commentCount.id = `comment-count-${momentId}`;
-    commentToggle.append(commentIcon, commentCount);
+    const commentChevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    commentChevron.setAttribute('class', 'comment-btn-chevron');
+    commentChevron.setAttribute('viewBox', '0 0 16 16');
+    commentChevron.setAttribute('fill', 'none');
+    commentChevron.setAttribute('aria-hidden', 'true');
+    commentChevron.innerHTML = '<path d="M4.25 6.25 8 10l3.75-3.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>';
+    commentToggle.append(commentIcon, commentCount, commentChevron);
 
     // 3. 收藏按钮
     const starButton = createMomentNode('button', `moment-star-btn${hasStarred ? ' starred' : ''}`);
@@ -3050,6 +3056,7 @@ function createMomentCardElement(item, options = {}) {
 
     const commentSection = createMomentNode('div', 'comment-section');
     commentSection.id = `comments-${momentId}`;
+    commentSection.dataset.commentOpen = 'false';
     commentSection.style.display = 'none';
     commentSection.setAttribute('aria-hidden', 'true');
     const commentList = createMomentNode('div', 'comment-list');
@@ -3357,42 +3364,56 @@ async function startMomentAIAnalysis(momentId, triggerElement = null) {
 
         const section = card.querySelector('.comment-section');
         if (section) {
-            const wasHidden = section.style.display === 'none';
+            const toggleBtn = card.querySelector('.comment-toggle-btn');
+            const wasHidden = typeof window.isCommentSectionOpen === 'function'
+                ? !window.isCommentSectionOpen(section)
+                : section.style.display === 'none';
+
+            let thinkingEl = section.querySelector('.comment-ai-thinking--analysis');
+            const insertThinkingEl = () => {
+                if (!thinkingEl) {
+                    thinkingEl = document.createElement('div');
+                    thinkingEl.className = 'comment-ai-thinking comment-ai-thinking--analysis';
+                    const icon = document.createElement('span');
+                    icon.textContent = '🤖';
+                    const label = document.createElement('span');
+                    label.className = 'comment-ai-thinking-label';
+                    label.textContent = '感情小助手正在品读动态与照片… ✨';
+                    const dots = document.createElement('span');
+                    dots.className = 'comment-ai-thinking-dots';
+                    dots.innerHTML = '<span></span><span></span><span></span>';
+                    thinkingEl.append(icon, label, dots);
+
+                    const listEl = section.querySelector('.comment-list');
+                    if (listEl && listEl.nextSibling) {
+                        section.insertBefore(thinkingEl, listEl.nextSibling);
+                    } else {
+                        section.prepend(thinkingEl);
+                    }
+                    createdThinkingEls.push(thinkingEl);
+                    thinkingLabelNodes.push(label);
+                } else {
+                    const existingLabel = thinkingEl.querySelector('.comment-ai-thinking-label');
+                    if (existingLabel) thinkingLabelNodes.push(existingLabel);
+                }
+            };
+
             if (wasHidden) {
-                section.style.display = 'block';
-                section.setAttribute('aria-hidden', 'false');
-                const toggleBtn = card.querySelector('.comment-toggle-btn');
-                toggleBtn?.setAttribute('aria-expanded', 'true');
+                insertThinkingEl();
+                if (typeof window.openCommentSection === 'function') {
+                    window.openCommentSection(section, toggleBtn);
+                } else {
+                    section.style.display = 'block';
+                    section.setAttribute('aria-hidden', 'false');
+                    toggleBtn?.setAttribute('aria-expanded', 'true');
+                }
                 if (typeof loadComments === 'function') {
                     loadComments(momentId, card);
                 }
-            }
-
-            let thinkingEl = section.querySelector('.comment-ai-thinking--analysis');
-            if (!thinkingEl) {
-                thinkingEl = document.createElement('div');
-                thinkingEl.className = 'comment-ai-thinking comment-ai-thinking--analysis';
-                const icon = document.createElement('span');
-                icon.textContent = '🤖';
-                const label = document.createElement('span');
-                label.className = 'comment-ai-thinking-label';
-                label.textContent = '感情小助手正在品读动态与照片… ✨';
-                const dots = document.createElement('span');
-                dots.className = 'comment-ai-thinking-dots';
-                dots.innerHTML = '<span></span><span></span><span></span>';
-                thinkingEl.append(icon, label, dots);
-
-                const listEl = section.querySelector('.comment-list');
-                if (listEl && listEl.nextSibling) {
-                    section.insertBefore(thinkingEl, listEl.nextSibling);
-                } else {
-                    section.prepend(thinkingEl);
-                }
-                createdThinkingEls.push(thinkingEl);
-                thinkingLabelNodes.push(label);
+            } else if (typeof window.animateCommentSectionHeightTransition === 'function') {
+                window.animateCommentSectionHeightTransition(section, insertThinkingEl);
             } else {
-                const existingLabel = thinkingEl.querySelector('.comment-ai-thinking-label');
-                if (existingLabel) thinkingLabelNodes.push(existingLabel);
+                insertThinkingEl();
             }
         }
     });

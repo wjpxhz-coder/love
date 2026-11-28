@@ -693,11 +693,18 @@ async function handleNotificationClick(notificationId, type, relatedId) {
             const commentsSection = document.getElementById(`comments-${targetMomentId}`);
             let comment = document.getElementById(`comment-${targetCommentId}`);
             if (commentsSection) {
-                const isHidden = getComputedStyle(commentsSection).display === 'none';
+                const toggleBtn = document.getElementById(`comment-toggle-${targetMomentId}`);
+                const isHidden = typeof window.isCommentSectionOpen === 'function'
+                    ? !window.isCommentSectionOpen(commentsSection)
+                    : getComputedStyle(commentsSection).display === 'none';
                 if (isHidden || !comment) {
-                    commentsSection.style.display = 'block';
-                    commentsSection.setAttribute('aria-hidden', 'false');
-                    document.getElementById(`comment-toggle-${targetMomentId}`)?.setAttribute('aria-expanded', 'true');
+                    if (typeof window.openCommentSection === 'function') {
+                        window.openCommentSection(commentsSection, toggleBtn);
+                    } else {
+                        commentsSection.style.display = 'block';
+                        commentsSection.setAttribute('aria-hidden', 'false');
+                        toggleBtn?.setAttribute('aria-expanded', 'true');
+                    }
                     await loadComments(targetMomentId);
                     comment = document.getElementById(`comment-${targetCommentId}`);
                 }
